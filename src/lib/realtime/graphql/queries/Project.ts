@@ -15,6 +15,7 @@ export const Q_LIST_USER_PROJECTS = `
                 isArchived
                 isActive
                 image
+                vectorStoreId
                 id
                 documents {
                     id
@@ -45,6 +46,7 @@ export const Q_GET_PROJECT_BY_ID = `
             assetType
             createdAt
             description
+            vectorStoreId
             documents {
               id
               filename

@@ -49,32 +49,25 @@
 				rows: [
 					{
 						Name: 'City',
-						Value: 'Hillsboro'
+						Value: 'San Antonio'
 					},
 					{
 						Name: 'State',
-						Value: 'Oregon'
+						Value: 'Texas'
 					},
 					{
 						Name: 'County',
-						Value: 'Washington'
+						Value: 'Bexar'
 					},
 					{
 						Name: 'Zip Codes',
-						Value: '97124 97123'
+						Value: '78220'
 					},
 					{
-						Name: 'Cost of Living',
-						Value: '28.1% higher'
+						Name: 'Asset Class',
+						Value: 'Retail Shopping Center'
 					},
-					{
-						Name: 'Time zone',
-						Value: 'Pacific Standard Time (PST)'
-					},
-					{
-						Name: 'Elevation',
-						Value: '33 ft above sea level'
-					}
+
 				],
 				sortable: true,
 				paginated: false

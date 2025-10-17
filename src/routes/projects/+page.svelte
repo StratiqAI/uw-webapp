@@ -72,23 +72,24 @@
 		const client = new AppSyncWsClient({
 			graphqlHttpUrl: PUBLIC_GRAPHQL_HTTP_ENDPOINT,
 			auth: { mode: 'cognito', idToken },
-			subscriptions: [
-				{
-					query: S_PROJECT_CREATED,
-					path: 'onProjectCreated',
-					next: (it: Project) => projectListOps.upsertMutable(projects, it)
-				},
-				{
-					query: S_PROJECT_UPDATED,
-					path: 'onProjectUpdated',
-					next: (it: Project) => projectListOps.upsertMutable(projects, it)
-				},
-				{
-					query: S_PROJECT_DELETED,
-					path: 'onProjectDeleted',
-					next: (it: Project) => projectListOps.removeMutable(projects, it)
+		subscriptions: [
+			{
+				query: S_PROJECT_CREATED,
+				path: 'onProjectCreated',
+				next: (it: Project) => {
+					console.log('Project created subscription received:', it);
+					projectListOps.upsertMutable(projects, it);
 				}
-			]
+			},
+			// Note: Removed S_PROJECT_UPDATED because it doesn't include the required id parameter
+			// and would subscribe to ALL project updates, which is inefficient.
+			// Individual project pages should use S_PROJECT_UPDATED_BY_ID to subscribe to specific projects.
+			{
+				query: S_PROJECT_DELETED,
+				path: 'onProjectDeleted',
+				next: (it: Project) => projectListOps.removeMutable(projects, it)
+			}
+		]
 		});
 
 		// Return disposer to clean up subscriptions on component unmount/HMR
@@ -129,6 +130,7 @@
 	import { gql } from '$lib/realtime/graphql/requestHandler';
 	import { M_CREATE_PROJECT } from '$lib/realtime/graphql/mutations/Project';
 	import { goto } from '$app/navigation';
+	import PdfViewer from 'svelte-pdf';
 
 	// State
 	let openProject: boolean = $state(false); // modal control
@@ -253,7 +255,7 @@
 		</Toolbar>
 	</div>
 	<Table>
-		<TableHead class="border border-gray-200 bg-gray-100 dark:border-gray-700">
+		<TableHead class=" bg-gray-100 dark:border-gray-700">
 			<!-- <TableHeadCell class="w-4 p-4"><Checkbox /></TableHeadCell> -->
 			{#each ['Name', 'Address', 'Asset Type', 'Status', 'Actions'] as title}
 				<TableHeadCell class="p-4 font-medium">{title}</TableHeadCell>
@@ -263,26 +265,39 @@
 			{#each projects as project}
 				<TableBodyRow class="border-gray-200 text-base">
 					<!-- <TableBodyCell class="w-4 p-4"><Checkbox /></TableBodyCell> -->
-					<TableBodyCell class="mr-12 flex items-center space-x-6 whitespace-nowrap p-4">
+					<TableBodyCell class="mr-12 p-0 flex items-center space-x-2 whitespace-nowrap">
 						<a
 							href={`/projects/workspace/${project.id}/get-started`}
 							class="group flex items-center space-x-6"
 						>
-							<Avatar src={project.image || ''} size="lg" cornerStyle="rounded" />
-							<div class="text-sm font-normal text-gray-500 dark:text-gray-300">
+							{#if project.documents?.[0]?.id}
+								<div class="relative h-36 w-48 overflow-hidden rounded ">
+									<div class="absolute inset-0 flex items-center justify-center">
+										<PdfViewer
+											url={`https://uw-dev-documents-e1tez94r.s3.us-west-2.amazonaws.com/${project.documents[0].id}/pages/1.pdf`}
+											scale={0.20}
+											showButtons={[]}
+											showBorder={false}
+										/>
+									</div>
+								</div>
+							{:else}
+								<Avatar src={project.image || ''} size="lg" cornerStyle="rounded" />
+							{/if}
+							<div class="text-sm font-normal text-gray-500 dark:text-gray-300 max-w-xs break-words">
 								<div
 									class="text-base font-semibold text-gray-900 group-hover:underline dark:text-white"
 								>
 									{project.name}
 								</div>
-								<div class="text-sm font-normal text-gray-500 dark:text-gray-300">
+								<div class="text-sm font-normal text-gray-500 dark:text-gray-300 break-words max-w-xl overflow-hidden text-ellipsis">
 									{project.description}
 								</div>
 							</div>
 						</a>
 					</TableBodyCell>
 					<TableBodyCell
-						class="max-w-sm overflow-hidden truncate p-4 text-base font-normal text-gray-500 xl:max-w-xs dark:text-gray-300"
+						class="max-w-sm overflow-hidden truncate  text-base font-normal text-gray-500 xl:max-w-xs dark:text-gray-300"
 					>
 						<div class="text-base font-semibold text-gray-900 dark:text-white">
 							{project.address || ''}
@@ -292,8 +307,8 @@
 							{(project.city || '') + ' ' + (project.state || '') + ' ' + (project.zip || '')}
 						</div>
 					</TableBodyCell>
-					<TableBodyCell class="p-4">{project.assetType || ''}</TableBodyCell>
-					<TableBodyCell class="p-4 font-normal">
+					<TableBodyCell class="">{project.assetType || ''}</TableBodyCell>
+					<TableBodyCell class=" font-normal">
 						<div class="flex items-center gap-2">
 							<Indicator
 								color={project.status === 'Active'

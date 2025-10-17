@@ -223,6 +223,9 @@
 			error = null;
 			isLoading = true;
 
+			console.log("55555555555555555555555555555555555555")
+			console.log('projectStore:', $projectStore);
+			console.log('projectStore.vectorStoreId:', $projectStore?.vectorStoreId);
 			// Get vector store ID from current project
 			const vectorStoreId = $projectStore?.vectorStoreId || 'vs_68da2c6862088191a5b51b8b4566b300';
 

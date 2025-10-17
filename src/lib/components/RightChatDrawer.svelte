@@ -81,7 +81,7 @@
 			id: uuid(),
 			role: 'assistant',
 			content:
-				'Hi! I can help and also control the app. Try: “Add a task to email the pipeline investors today.”',
+				'Hi! I can help and also control the app. Try: “What is the population and income like around the property at address 907-1015 S WW White Road, San Antonio, TX 78220?”',
 			ts: new Date().toISOString()
 		}
 	]);
