@@ -72,24 +72,24 @@
 		const client = new AppSyncWsClient({
 			graphqlHttpUrl: PUBLIC_GRAPHQL_HTTP_ENDPOINT,
 			auth: { mode: 'cognito', idToken },
-		subscriptions: [
-			{
-				query: S_PROJECT_CREATED,
-				path: 'onProjectCreated',
-				next: (it: Project) => {
-					console.log('Project created subscription received:', it);
-					projectListOps.upsertMutable(projects, it);
+			subscriptions: [
+				{
+					query: S_PROJECT_CREATED,
+					path: 'onProjectCreated',
+					next: (it: Project) => {
+						console.log('Project created subscription received:', it);
+						projectListOps.upsertMutable(projects, it);
+					}
+				},
+				// Note: Removed S_PROJECT_UPDATED because it doesn't include the required id parameter
+				// and would subscribe to ALL project updates, which is inefficient.
+				// Individual project pages should use S_PROJECT_UPDATED_BY_ID to subscribe to specific projects.
+				{
+					query: S_PROJECT_DELETED,
+					path: 'onProjectDeleted',
+					next: (it: Project) => projectListOps.removeMutable(projects, it)
 				}
-			},
-			// Note: Removed S_PROJECT_UPDATED because it doesn't include the required id parameter
-			// and would subscribe to ALL project updates, which is inefficient.
-			// Individual project pages should use S_PROJECT_UPDATED_BY_ID to subscribe to specific projects.
-			{
-				query: S_PROJECT_DELETED,
-				path: 'onProjectDeleted',
-				next: (it: Project) => projectListOps.removeMutable(projects, it)
-			}
-		]
+			]
 		});
 
 		// Return disposer to clean up subscriptions on component unmount/HMR
@@ -110,7 +110,8 @@
 		Button,
 		Checkbox,
 		Heading,
-		Indicator
+		Indicator,
+		P
 	} from 'flowbite-svelte';
 
 	import { Input, Table, TableBody, TableBodyCell, TableBodyRow, TableHead } from 'flowbite-svelte';
@@ -146,8 +147,8 @@
 	async function createNewProjectHandler(e: Event) {
 		e.preventDefault();
 
-		const id =  crypto.randomUUID?.() || Math.random().toString(36).slice(2);
-			// const now = new Date().toISOString();
+		const id = crypto.randomUUID?.() || Math.random().toString(36).slice(2);
+		// const now = new Date().toISOString();
 
 		// Prepare input for create/update project mutations
 		const input = {
@@ -209,6 +210,10 @@
 				>Investment Pipeline</Heading
 			>
 			<Input placeholder="Search for projects" class="me-4 w-80 border xl:w-96" />
+			<div class="ml-16 justify-center space-x-2">
+				<P class="text-center text-sm">Forward documents to <span class="font-bold">daniel-pipeline@stratiqai.com</span> for automated pipeline analysis</P
+				>
+			</div>
 			<!-- <div class="border-l border-gray-100 pl-2 dark:border-gray-700">
 				<ToolbarButton
 					color="dark"
@@ -265,17 +270,17 @@
 			{#each projects as project}
 				<TableBodyRow class="border-gray-200 text-base">
 					<!-- <TableBodyCell class="w-4 p-4"><Checkbox /></TableBodyCell> -->
-					<TableBodyCell class="mr-12 p-0 flex items-center space-x-2 whitespace-nowrap">
+					<TableBodyCell class="mr-12 flex items-center space-x-2 whitespace-nowrap p-0">
 						<a
 							href={`/projects/workspace/${project.id}/get-started`}
 							class="group flex items-center space-x-6"
 						>
 							{#if project.documents?.[0]?.id}
-								<div class="relative h-36 w-48 overflow-hidden rounded ">
+								<div class="relative h-36 w-48 overflow-hidden rounded">
 									<div class="absolute inset-0 flex items-center justify-center">
 										<PdfViewer
 											url={`https://uw-dev-documents-e1tez94r.s3.us-west-2.amazonaws.com/${project.documents[0].id}/pages/1.pdf`}
-											scale={0.20}
+											scale={0.2}
 											showButtons={[]}
 											showBorder={false}
 										/>
@@ -284,13 +289,17 @@
 							{:else}
 								<Avatar src={project.image || ''} size="lg" cornerStyle="rounded" />
 							{/if}
-							<div class="text-sm font-normal text-gray-500 dark:text-gray-300 max-w-xs break-words">
+							<div
+								class="max-w-xs break-words text-sm font-normal text-gray-500 dark:text-gray-300"
+							>
 								<div
 									class="text-base font-semibold text-gray-900 group-hover:underline dark:text-white"
 								>
 									{project.name}
 								</div>
-								<div class="text-sm font-normal text-gray-500 dark:text-gray-300 break-words max-w-xl overflow-hidden text-ellipsis">
+								<div
+									class="max-w-xl overflow-hidden text-ellipsis break-words text-sm font-normal text-gray-500 dark:text-gray-300"
+								>
 									{project.description}
 								</div>
 							</div>
