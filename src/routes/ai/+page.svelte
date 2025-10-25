@@ -120,23 +120,22 @@
 <div class="container mx-auto max-w-full p-6">
 	<h1 class="mb-6 text-3xl font-bold">AI Job Submission</h1>
 
-	<div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-		<!-- Left Column -->
+	<!-- <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+
 		<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
 			<h2 class="mb-4 text-xl font-semibold text-gray-800">Project Details</h2>
 			<JobSubmission idToken={data.idToken} jobInput={jobInput1} />
 		</div>
 
-		<!-- Right Column -->
+
 		<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
 			<h2 class="mb-4 text-xl font-semibold text-gray-800">Project Details</h2>
 			<JobSubmission idToken={data.idToken} jobInput={jobInput1} />
-			<!-- <JobSubmission idToken={data.idToken} jobInput={jobInput2} /> -->
 		</div>
 
 		<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
 			<h2 class="mb-4 text-xl font-semibold text-gray-800">Two Sentence Summary</h2>
 			<JobSubmission idToken={data.idToken} jobInput={jobInput3} />
 		</div>
-	</div>
+	</div> -->
 </div>

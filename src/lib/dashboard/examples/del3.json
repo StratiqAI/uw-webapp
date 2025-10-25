@@ -1,0 +1,59 @@
+{
+	"model": "gpt-5-nano",
+	"input": [
+		{
+			"role": "system",
+			"content": "Extract the details from the file"
+		}
+	],
+	"tools": [
+		{
+			"type": "file_search",
+			"vector_store_ids": ["vs_68f27e777d308191bb5c70ad8e5f8ba9"]
+		}
+	],
+	"tool_choice": "auto",
+	"text": {
+		"format": {
+			"type": "json_schema",
+			"name": "propertyDetails",
+			"strict": true,
+			"schema": {
+				"type": "object",
+				"properties": {
+					"name": {
+						"type": "string",
+						"description": "The name of the commercial property"
+					},
+					"description": {
+						"type": "string",
+						"description": "A two-sentence overview of the property and the investment opportunity"
+					},
+					"address": {
+						"type": "string",
+						"description": "The address of the property"
+					},
+					"city": {
+						"type": "string",
+						"description": "The city the property is located in"
+					},
+					"state": {
+						"type": "string",
+						"description": "The state the property is located in"
+					},
+					"zip": {
+						"type": "string",
+						"description": "The zip the property is located in"
+					},
+					"assetType": {
+						"type": "string",
+						"description": "The asset type of the commercial real estate property. For example, Retail, Industrial, Multifamily, Medical Office, etc ..."
+					}
+				},
+				"required": ["name", "description", "address", "city", "state", "zip", "assetType"],
+				"additionalProperties": false,
+				"$schema": "http://json-schema.org/draft-07/schema#"
+			}
+		}
+	}
+}

@@ -8,6 +8,10 @@
 	 * - Result transformation
 	 * - Bridge creation and management
 	 * - Passing transformed data to child component
+	 *
+	 * Supports two modes:
+	 * 1. Built-in prompt mode: Uses simple prompt string (default)
+	 * 2. Custom config mode: Accepts full job configuration from OpenAI API builder
 	 */
 
 	import { onDestroy, onMount } from 'svelte';
@@ -19,7 +23,7 @@
 		type ParagraphWidgetData,
 		ParagraphWidgetDataSchema
 	} from '$lib/dashboard/types/widgetSchemas';
-	import { createJobWidgetBridge, type JobWidgetBridge } from '$lib/dashboard/types/widgetBridge';
+	import { createJobWidgetBridge, type JobWidgetBridge, Consumers } from '$lib/dashboard/types/widgetBridge';
 	import { z } from 'zod';
 
 	// ===== Types =====
@@ -33,6 +37,8 @@
 		model?: 'gpt-5-nano';
 		/** Optional: Auto-submit on mount */
 		autoSubmit?: boolean;
+		/** Optional: Job configuration from API builder (overrides prompt/model) */
+		jobConfig?: any;
 	}
 
 	// Enhanced job status type
@@ -68,7 +74,8 @@
 		prompt = 'Summarize the latest AI developments in a short paragraph',
 		widgetId = 'ai-paragraph-widget',
 		model = 'gpt-5-nano',
-		autoSubmit = false
+		autoSubmit = false,
+		jobConfig
 	}: Props = $props();
 
 	// ===== Enhanced State Management =====
@@ -120,6 +127,15 @@
 
 	// ===== Enhanced Job Configuration =====
 	const createJobInput = (customPrompt?: string) => {
+		// If jobConfig is provided from API builder, use it directly
+		if (jobConfig) {
+			return {
+				request: JSON.stringify(jobConfig),
+				priority: 'HIGH' as const
+			};
+		}
+
+		// Otherwise, create default configuration
 		const textFormat = getWidgetTextFormat('paragraph', 'ParagraphContent');
 
 		return {
@@ -324,14 +340,37 @@
 		};
 	}
 
+	// ===== Reactive Effects =====
+	$effect(() => {
+		// Recreate job input when jobConfig changes
+		if (jobConfig) {
+			jobInput = createJobInput();
+		}
+	});
+
+	// ===== Channel Subscription =====
+	// Subscribe to the channel to receive published data from the bridge
+	const channelConsumer = Consumers.paragraph('paragraph-content', `${widgetId}-consumer`);
+	const unsubscribeChannel = channelConsumer.subscribe((data) => {
+		if (data) {
+			console.log('📥 Parent received data from channel:', data);
+			widgetData = data;
+		}
+	});
+
 	// ===== Lifecycle =====
 	onMount(() => {
 		if (autoSubmit) {
 			console.log('🚀 Auto-submit configured (use JobSubmission component directly)');
 		}
+		if (jobConfig) {
+			console.log('📦 Using custom job configuration from API builder');
+		}
 	});
 
 	onDestroy(() => {
+		console.log('🧹 Cleaning up subscriptions');
+		unsubscribeChannel();
 		if (bridge) {
 			console.log('🧹 Cleaning up bridge and producer');
 			bridge.disconnect();
@@ -395,13 +434,28 @@
 		<div class="grid grid-cols-2 gap-3 text-sm">
 			<div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
 				<span class="font-medium text-gray-600">Model:</span>
-				<span class="ml-2 text-gray-900">{model}</span>
+				<span class="ml-2 text-gray-900">{jobConfig?.model || model}</span>
 			</div>
 			<div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
 				<span class="font-medium text-gray-600">Widget ID:</span>
 				<span class="ml-2 font-mono text-xs text-gray-900">{widgetId}</span>
 			</div>
 		</div>
+		{#if jobConfig}
+			<div class="rounded-lg border border-blue-200 bg-blue-50 p-3">
+				<div class="flex items-center gap-2">
+					<span class="text-sm font-medium text-blue-800">📦 Using Custom API Builder Config</span>
+				</div>
+				<details class="mt-2">
+					<summary class="cursor-pointer text-xs text-blue-600">View Configuration</summary>
+					<pre class="mt-2 overflow-x-auto rounded bg-white p-2 text-xs text-gray-700">{JSON.stringify(
+							jobConfig,
+							null,
+							2
+						)}</pre>
+				</details>
+			</div>
+		{/if}
 	</div>
 
 	<!-- Job Submission -->
