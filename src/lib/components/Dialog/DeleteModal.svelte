@@ -26,10 +26,9 @@
 	// $inspect(data);
 	async function deleteProject(id: string, idToken: string) {
 		const mutation = M_DELETE_PROJECT;
-		const input = { id };
 
 		try {
-			const res = await gql<{ deleteProject: Project }>(mutation, { input }, idToken);
+			const res = await gql<{ deleteProject: Project }>(mutation, { id }, idToken);
 			return res.deleteProject;
 		} catch (e) {
 			console.error('Error deleting project:', e);
@@ -43,16 +42,14 @@
 
 	<h3 class="mb-6 text-center text-lg text-gray-500 dark:text-gray-300">{title}</h3>
 	<div class="mb-6 flex flex-row items-center rounded-lg p-4">
-		<img src={data.image} alt={data.name} class="h-50 w-50 mr-6 rounded" />
 		<div class="flex flex-col items-start">
 			<div class="mb-2 text-lg font-semibold text-gray-900 dark:text-white">{data.name}</div>
-			<div class="mb-1 text-sm text-gray-500 dark:text-gray-300">{data.address}</div>
+			<div class="mb-1 text-sm text-gray-500 dark:text-gray-300">{data.details?.streetAddress || ''}</div>
 			<div class="mb-1 text-sm text-gray-500 dark:text-gray-300">
-				{data.city}, {data.state}
-				{data.zip}
+				{data.details?.city || ''}, {data.details?.state || ''}
+				{data.details?.zip || ''}
 			</div>
-			<div class="mb-1 text-xs text-gray-400 dark:text-gray-400">Type: {data.assetType}</div>
-			<div class="mb-1 text-xs text-gray-400 dark:text-gray-400">Status: {data.status}</div>
+			<div class="mb-1 text-xs text-gray-400 dark:text-gray-400">Type: {data.details?.assetType || ''}</div>
 		</div>
 	</div>
 

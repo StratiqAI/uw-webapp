@@ -13,7 +13,7 @@ import type { PageServerLoad } from './$types';
 // Import the GraphQL helper for making HTTP requests to AppSync
 import { gql } from '$lib/realtime/graphql/requestHandler';
 // Import the GraphQL query and mutation strings
-import { Q_LIST_USER_PROJECTS } from '$lib/realtime/graphql/queries/Project';
+import { Q_LIST_USER_PROJECTS } from '@stratiqai/types';
 
 // Import the UserItem type definition
 import type { Project } from '$lib/types/Project';
@@ -30,7 +30,7 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
 		// The response is expected to have a listMyProjects object with an items array
 		const response = await gql<{ listMyProjects: { items: Project[]; nextToken?: string | null } }>(Q_LIST_USER_PROJECTS, { limit: 50 }, idToken);
 		// Log the full response for debugging purposes
-		// console.log('GraphQL response:', JSON.stringify(response, null, 2));
+		console.log('GraphQL response:', JSON.stringify(response, null, 2));
 		
 		// Check if response is null or undefined
 		if (!response) {

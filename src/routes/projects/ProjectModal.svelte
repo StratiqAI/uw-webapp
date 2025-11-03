@@ -33,66 +33,55 @@
 		const form = formEl;
 		const formData = new FormData(form);
 
-		const project: any = {};
+		const formValues: any = {};
 		for (const [key, value] of formData.entries()) {
-			if (key === 'isPublic') {
-				project[key] = true;
-			} else if (key === 'tags') {
-				project[key] = (value as string).split(',').map(s => s.trim()).filter(Boolean);
-			} else {
-				project[key] = value;
-			}
-		}
-		if (!formData.has('isPublic')) project.isPublic = false;
-
-		const merged = { ...data, ...project };
-
-		const id = merged.id || crypto.randomUUID?.() || Math.random().toString(36).slice(2);
-		const now = new Date().toISOString();
-
-		// Prepare input for create/update project mutations
-		const input = {
-			id: data && data.id ? data.id : id,
-			name: project.name,
-			description: project.description || '',
-			image: project.image || '',
-			address: project.address,
-			city: project.city || '',
-			state: project.state || '',
-			zip: project.zip || '',
-			country: project.country || '',
-			assetType: project.assetType,
-			status: project.status || 'Active',
-			isActive: project.status !== 'Deleted',
-			isArchived: project.status === 'Archived',
-			isDeleted: project.status === 'Deleted',
-			isPublic: project.isPublic || false,
-			members: project.members || [],
-			documents: project.documents || [],
-			tags: project.tags || []
-		};
-
-		console.log('input', JSON.stringify(input, null, 2));
-		let mutation: string;
-		let opName: string;
-		if (data && data.id) {
-			mutation = M_UPDATE_PROJECT;
-			opName = 'updateProject';
-		} else {
-			mutation = M_CREATE_PROJECT;
-			opName = 'createProject';
+			formValues[key] = value;
 		}
 
-		console.log('mutation', mutation);
-		console.log('input', input);
-		console.log('idToken', idToken);
 		try {
-			const res = await gql<{ [key: string]: any }>(mutation, { input }, idToken);
+			let projectId: string;
+			
+			// Step 1: Create or update the Project
+			if (data && data.id) {
+				// Update existing project
+				const projectInput = {
+					projectId: data.id,
+					name: formValues.name
+				};
+				const projectRes = await gql<{ updateProject: any }>(M_UPDATE_PROJECT, { input: projectInput }, idToken);
+				projectId = projectRes.updateProject.id;
+			} else {
+				// Create new project
+				const projectInput = {
+					name: formValues.name
+				};
+				const projectRes = await gql<{ createProject: any }>(M_CREATE_PROJECT, { input: projectInput }, idToken);
+				projectId = projectRes.createProject.id;
+			}
+
+			// Step 2: Create or update ProjectDetail with address and property info
+			const detailInput = {
+				...(data?.details?.id ? { id: data.details.id } : { projectId }),
+				projectId,
+				description: formValues.description || undefined,
+				streetAddress: formValues.streetAddress || undefined,
+				city: formValues.city || undefined,
+				state: formValues.state || undefined,
+				zip: formValues.zip || undefined,
+				assetType: formValues.assetType || undefined
+			};
+
+			// Import detail mutations
+			const { M_CREATE_PROJECT_DETAIL, M_UPDATE_PROJECT_DETAIL } = await import('$lib/realtime/graphql/mutations/Project');
+			
+			if (data?.details?.id) {
+				await gql<{ updateProjectDetail: any }>(M_UPDATE_PROJECT_DETAIL, { input: detailInput }, idToken);
+			} else if (projectId) {
+				await gql<{ createProjectDetail: any }>(M_CREATE_PROJECT_DETAIL, { input: detailInput }, idToken);
+			}
+
 			open = false;
-			console.log('res', res);
-			console.log('opName', opName);
-			console.log('id', id);
-		await goto(`/projects/workspace/${id}/get-started`);
+			await goto(`/projects/workspace/${projectId}/get-started`);
 		} catch (err) {
 			console.error('Error saving project:', err);
 			alert('Error saving project');
@@ -119,8 +108,8 @@
 					<Input name="assetType" class="border outline-none" placeholder="e.g. Office" required />
 				</Label>
 				<Label class="col-span-6 space-y-2 sm:col-span-3">
-					<span>Address</span>
-					<Input name="address" class="border outline-none" placeholder="e.g. 100 Market St" required />
+					<span>Street Address</span>
+					<Input name="streetAddress" class="border outline-none" placeholder="e.g. 100 Market St" />
 				</Label>
 				<Label class="col-span-6 space-y-2 sm:col-span-3">
 					<span>City</span>
@@ -134,14 +123,6 @@
 					<span>Zip</span>
 					<Input name="zip" class="border outline-none" placeholder="e.g. 94105" />
 				</Label>
-				<Label class="col-span-6 space-y-2 sm:col-span-3">
-					<span>Country</span>
-					<Input name="country" class="border outline-none" placeholder="e.g. USA" />
-				</Label>
-				<Label class="col-span-6 space-y-2 sm:col-span-3">
-					<span>Image URL</span>
-					<Input name="image" class="border outline-none" placeholder="e.g. ./images/downtown-office.png" />
-				</Label>
 				<Label class="col-span-6 space-y-2">
 					<span>Description</span>
 					<Textarea
@@ -151,25 +132,6 @@
 						class="w-full bg-gray-50 outline-none dark:bg-gray-700"
 						placeholder="Project description"
 					/>
-				</Label>
-				<Label class="col-span-6 space-y-2 sm:col-span-3">
-					<span>Status</span>
-					<Select name="status" class="border outline-none">
-						<option value="Active">Active</option>
-						<option value="Archived">Archived</option>
-						<option value="Deleted">Deleted</option>
-					</Select>
-				</Label>
-				<Label class="col-span-6 space-y-2 sm:col-span-3">
-					<span>Tags (comma separated)</span>
-					<Input name="tags" class="border outline-none" placeholder="e.g. Office, High-rise, Downtown" />
-				</Label>
-				<Label class="col-span-6 space-y-2 sm:col-span-3">
-					<span>Public</span>
-					<div class="flex items-center space-x-2">
-						<Checkbox name="isPublic" />
-						<span class="text-sm text-gray-600 dark:text-gray-300">Make project public</span>
-					</div>
 				</Label>
 			</div>
 			<!-- Modal footer -->

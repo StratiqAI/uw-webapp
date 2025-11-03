@@ -38,64 +38,23 @@ export const load: LayoutServerLoad = async ({ params, cookies, url }) => {
 		};
 	}
 
-	const response = await gql<{ project: Project }>(Q_GET_PROJECT_BY_ID, { id: projectId }, idToken);
+	const response = await gql<{ getProject: Project }>(Q_GET_PROJECT_BY_ID, { id: projectId }, idToken);
 	// console.log("response", response);
 	if (!response) {
 		throw error(404, 'Project not found');
 	}
 
-	if (!response.project) {
+	if (!response.getProject) {
 		throw error(404, 'Project not found');
 	}
 
-	for (const document of response.project.documents) {
-		// console.log("document", document);
-		const documentResponse = await gql<{ document: Document }>(
-			Q_DOCUMENT_BY_ID,
-			{ id: document.id },
-			idToken
-		);
-		if (!documentResponse) {
-			throw error(404, 'Document not found');
-		}
-		if (!documentResponse.document) {
-			throw error(404, 'Document not found');
-		}
-
-		// console.log("documentResponse", documentResponse);
-
-		const insightsResponse = await gql<{ listInsightsByDocument: { items: Insight[] } }>(
-			Q_INSIGHT_BY_DOCHASH,
-			{ docHash: documentResponse.document.docHash },
-			idToken
-		);
-
-		// console.log("insightsResponse", JSON.stringify(insightsResponse, null, 2));
-		// if (!insightsResponse) {
-		// 	throw error(404, 'Insights not found');
-		// }
-		// if (!insightsResponse) {
-		// 	throw error(404, 'Insights not found');
-		// }
-		// documentResponse.document.insights = insightsResponse.insights;
-
-		documentResponse.document.insights = { items: insightsResponse.listInsightsByDocument.items };
-		const sortedPages = documentResponse.document.pages?.items?.sort(
-			(a, b) => a.pageNumber - b.pageNumber
-		);
-		documentResponse.document.pages!.items = sortedPages!;
-
-		const sortedTexts = documentResponse.document.texts?.items?.sort(
-			(a, b) => a.pageNumber - b.pageNumber
-		);
-		documentResponse.document.texts!.items = sortedTexts!;
-
-		documents.push(documentResponse.document);
-	}
+	// TODO: Documents relationship needs to be re-implemented
+	// The new schema doesn't have a documents field on Project
+	// Documents may need to be queried separately or linked differently
 
 	// console.log("documents", JSON.stringify(documents, null, 2));
 	return {
-		project: response.project,
+		project: response.getProject,
 		idToken: idToken,
 		documents: documents,
 		isNewProject: false

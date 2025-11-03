@@ -75,19 +75,23 @@
 			subscriptions: [
 				{
 					query: S_PROJECT_CREATED,
-					path: 'onProjectCreated',
+					variables: { ownerId: currentUser?.sub || '' },
+					path: 'onCreateProject',
 					next: (it: Project) => {
 						console.log('Project created subscription received:', it);
 						projectListOps.upsertMutable(projects, it);
-					}
+					},
+					error: (err: any) => console.error('project creation sub error', err)
 				},
 				// Note: Removed S_PROJECT_UPDATED because it doesn't include the required id parameter
 				// and would subscribe to ALL project updates, which is inefficient.
 				// Individual project pages should use S_PROJECT_UPDATED_BY_ID to subscribe to specific projects.
 				{
 					query: S_PROJECT_DELETED,
-					path: 'onProjectDeleted',
-					next: (it: Project) => projectListOps.removeMutable(projects, it)
+					variables: { ownerId: currentUser?.sub || '' },
+					path: 'onDeleteProject',
+					next: (it: Project) => projectListOps.removeMutable(projects, it),
+					error: (err: any) => console.error('project deletion sub error', err)
 				}
 			]
 		});
@@ -147,40 +151,15 @@
 	async function createNewProjectHandler(e: Event) {
 		e.preventDefault();
 
-		const id = crypto.randomUUID?.() || Math.random().toString(36).slice(2);
-		// const now = new Date().toISOString();
-
-		// Prepare input for create/update project mutations
+		// Prepare input for create project mutation - only name is required
 		const input = {
-			id: id,
-			name: 'New Project',
-			description: '',
-			image: '',
-			address: '',
-			city: '',
-			state: '',
-			zip: '',
-			country: '',
-			assetType: '',
-			status: 'Active',
-			isActive: true,
-			isArchived: false,
-			isDeleted: false,
-			isPublic: false,
-			members: [],
-			documents: [],
-			tags: []
+			name: 'New Project'
 		};
 
-		// console.log('input', JSON.stringify(input, null, 2));
-		let mutation: string;
-		let opName: string;
-
-		// console.log('input', input);
-		// console.log('idToken', idToken);
 		try {
-			const res = await gql<{ [key: string]: any }>(M_CREATE_PROJECT, { input }, idToken);
-			await goto(`/projects/workspace/${id}/get-started`);
+			const res = await gql<{ createProject: Project }>(M_CREATE_PROJECT, { input }, idToken);
+			const projectId = res.createProject.id;
+			await goto(`/projects/workspace/${projectId}/get-started`);
 		} catch (err) {
 			console.error('Error creating new project:', err);
 			alert('Error creating new project');
@@ -262,7 +241,7 @@
 	<Table>
 		<TableHead class=" bg-gray-100 dark:border-gray-700">
 			<!-- <TableHeadCell class="w-4 p-4"><Checkbox /></TableHeadCell> -->
-			{#each ['Name', 'Address', 'Asset Type', 'Status', 'Actions'] as title}
+			{#each ['Name', 'Address', 'Asset Type', 'Actions'] as title}
 				<TableHeadCell class="p-4 font-medium">{title}</TableHeadCell>
 			{/each}
 		</TableHead>
@@ -275,20 +254,7 @@
 							href={`/projects/workspace/${project.id}/get-started`}
 							class="group flex items-center space-x-6"
 						>
-							{#if project.documents?.[0]?.id}
-								<div class="relative h-36 w-48 overflow-hidden rounded">
-									<div class="absolute inset-0 flex items-center justify-center">
-										<PdfViewer
-											url={`https://uw-dev-documents-e1tez94r.s3.us-west-2.amazonaws.com/${project.documents[0].id}/pages/1.pdf`}
-											scale={0.2}
-											showButtons={[]}
-											showBorder={false}
-										/>
-									</div>
-								</div>
-							{:else}
-								<Avatar src={project.image || ''} size="lg" cornerStyle="rounded" />
-							{/if}
+							<Avatar size="lg" cornerStyle="rounded" />
 							<div
 								class="max-w-xs break-words text-sm font-normal text-gray-500 dark:text-gray-300"
 							>
@@ -300,7 +266,7 @@
 								<div
 									class="max-w-xl overflow-hidden text-ellipsis break-words text-sm font-normal text-gray-500 dark:text-gray-300"
 								>
-									{project.description}
+									{project.details?.description || ''}
 								</div>
 							</div>
 						</a>
@@ -309,26 +275,14 @@
 						class="max-w-sm overflow-hidden truncate  text-base font-normal text-gray-500 xl:max-w-xs dark:text-gray-300"
 					>
 						<div class="text-base font-semibold text-gray-900 dark:text-white">
-							{project.address || ''}
+							{project.details?.streetAddress || ''}
 						</div>
 
 						<div class="text-sm font-normal text-gray-500 dark:text-gray-300">
-							{(project.city || '') + ' ' + (project.state || '') + ' ' + (project.zip || '')}
+							{(project.details?.city || '') + ' ' + (project.details?.state || '') + ' ' + (project.details?.zip || '')}
 						</div>
 					</TableBodyCell>
-					<TableBodyCell class="">{project.assetType || ''}</TableBodyCell>
-					<TableBodyCell class=" font-normal">
-						<div class="flex items-center gap-2">
-							<Indicator
-								color={project.status === 'Active'
-									? 'green'
-									: project.status === 'Archived'
-										? 'blue'
-										: 'red'}
-							/>
-							{project.status || ''}
-						</div>
-					</TableBodyCell>
+					<TableBodyCell class="">{project.details?.assetType || ''}</TableBodyCell>
 					<TableBodyCell class="space-x-2 p-4">
 						<!-- <Button
 							size="sm"

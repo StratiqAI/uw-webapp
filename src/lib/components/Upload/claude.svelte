@@ -270,12 +270,13 @@
 			// Upload to S3
 			await uploadToS3(url, file, fileIndex, fileObj.abortController!);
 
-			// Update project documents
-			files[fileIndex].progress = 95;
-			files = [...files];
+		// TODO: Update project documents - needs to be re-implemented with new schema
+		// The new schema doesn't have documents on Project - documents need to be managed separately
+		files[fileIndex].progress = 95;
+		files = [...files];
 
-			const updatedDocuments = [...project.documents, { id: sha256, filename: file.name }];
-			// await updateProjectDocuments(updatedDocuments);
+		// const updatedDocuments = [...project.documents, { id: sha256, filename: file.name }];
+		// await updateProjectDocuments(updatedDocuments);
 
 			// Mark as complete
 			files[fileIndex] = {
@@ -345,13 +346,14 @@
 			// Remove from UI immediately
 			files = files.filter((f) => f !== fileToRemove);
 
-			// If file was uploaded, remove from project
-			if (fileToRemove.documentId && fileToRemove.result?.success) {
-				const updatedDocuments = project.documents.filter(
-					(doc) => doc.id !== fileToRemove.documentId
-				);
-				await updateProjectDocuments(updatedDocuments);
-			}
+		// TODO: Remove document from project - needs to be re-implemented with new schema
+		// The new schema doesn't have documents on Project - documents need to be managed separately
+		// if (fileToRemove.documentId && fileToRemove.result?.success) {
+		// 	const updatedDocuments = project.documents.filter(
+		// 		(doc) => doc.id !== fileToRemove.documentId
+		// 	);
+		// 	await updateProjectDocuments(updatedDocuments);
+		// }
 		} catch (error) {
 			logger('Error removing file:', error);
 			// Re-add file to list if removal failed

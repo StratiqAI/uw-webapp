@@ -32,7 +32,7 @@ function claimsToCurrentUser(payload: JWTPayload) {
 		preferredUsername: payload['preferred_username'] as string,
 		pictureUrl: payload['picture'] as string,
 		groups: (payload['cognito:groups'] as string[]) ?? [],
-		tenantId: payload['custom:tenant_id'] as string,
+		tenant: payload['tenant'] as string,
 		locale: payload['locale'] as string,
 		timezone: payload['custom:timezone'] as string,
 		// amr: Authentication Methods References (array of strings indicating how the user was authenticated)

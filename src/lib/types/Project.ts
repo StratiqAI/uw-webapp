@@ -1,43 +1,65 @@
-// Enum for status (from your schema)
-export type ProjectStatus = 'Active' | 'Inactive' | 'Archived';
+// Enums matching GraphQL schema
+export type SharingMode = 'PRIVATE' | 'PUBLIC' | 'TENANT' | 'SPECIFIC_USERS';
+export type AssetType = 'RESIDENTIAL' | 'MULTIFAMILY' | 'RETAIL' | 'OFFICE' | 'HISTORIC' | 'INDUSTRIAL' | 'LAND' | 'OTHER';
 
-export interface ProjectDocument {
+export interface ProjectDetail {
 	id: string;
-	filename: string;
+	projectId: string;
+	ownerId: string;
+	tenant?: string | null;
+	description?: string | null;
+	streetAddress?: string | null;
+	city?: string | null;
+	state?: string | null;
+	zip?: string | null;
+	assetType?: AssetType | null;
+	sharingMode?: SharingMode | null;
+	createdAt?: string; // AWSDateTime
+	updatedAt?: string; // AWSDateTime
 }
 
 export interface Project {
 	id: string;
-	ownerId: string; // Cognito username or sub
 	name: string;
-	description?: string | null;
-	image?: string | null;
-	address?: string | null;
-	city?: string | null;
-	state?: string | null;
-	zip?: string | null;
-	country?: string | null;
-	assetType?: string | null;
-	status: ProjectStatus;
-	isActive: boolean;
-	isArchived: boolean;
-	isDeleted: boolean;
-	isPublic: boolean;
-	vectorStoreId?: string | null;
-	members: string[]; // list of usernames/emails
-	documents: ProjectDocument[]; // list of document IDs
-	tags: string[];
-	createdAt: string; // ISO8601 DateTime
-	updatedAt: string; // ISO8601 DateTime
+	ownerId: string;
+	tenant?: string | null;
+	sharingMode?: SharingMode | null;
+	createdAt?: string; // AWSDateTime
+	details?: ProjectDetail | null;
 }
 
-export interface ProjectInput extends Omit<Project, 'id' | 'ownerId' | 'createdAt' | 'updatedAt'> {
+export interface CreateProjectInput {
 	name: string;
-	description?: string | null;
-	image?: string | null;
-	address?: string | null;
-	city?: string | null;
-	state?: string | null;
-	zip?: string | null;
-	country?: string | null;
+}
+
+export interface ShareProjectInput {
+	projectId: string;
+	sharingMode: SharingMode;
+	allowedUsers?: string[];
+}
+
+export interface UpdateProjectInput {
+	projectId: string;
+	name?: string;
+}
+
+export interface CreateProjectDetailInput {
+	projectId: string;
+	description?: string;
+	streetAddress?: string;
+	city?: string;
+	state?: string;
+	zip?: string;
+	assetType?: AssetType;
+}
+
+export interface UpdateProjectDetailInput {
+	id: string;
+	projectId?: string;
+	description?: string;
+	streetAddress?: string;
+	city?: string;
+	state?: string;
+	zip?: string;
+	assetType?: AssetType;
 }

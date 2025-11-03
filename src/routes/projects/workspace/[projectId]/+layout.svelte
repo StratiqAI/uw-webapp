@@ -117,14 +117,13 @@
 		const subscriptions = [
 			{
 				query: S_PROJECT_UPDATED_BY_ID,
-				variables: { id: project?.id },
-				path: 'onProjectUpdated',
+				variables: { projectId: project?.id },
+				path: 'onUpdateProject',
 				next: (it: Project) => {
 					project = it;
 					// Update the global project store so all child pages stay in sync
 					if (browser) {
 						setProject(it);
-						console.log('Setting documents: ', it.documents);
 						documentsStore.set(documents);
 					}
 					logger(`Project ${it.id} updated:`, it);
@@ -133,82 +132,86 @@
 			}
 		];
 
+		// TODO: Document subscriptions need to be re-implemented
+		// The new schema doesn't have a documents field on Project
+		// Documents may need to be queried and subscribed to separately
+		
 		// Add document-specific subscriptions for each document in the project
-		if (project?.documents) {
-			for (const projectDoc of project.documents) {
-				// Subscribe to document creation (global)
-				subscriptions.push({
-					query: S_CREATE_DOCUMENT,
-					variables: {} as any,
-					path: 'onCreateDocument',
-					next: (newDocument: any) => {
-						if (browser) {
-							addDocument(newDocument);
-							mapStore.addToKey('documents', newDocument);
-							logger('Document created:', newDocument);
-						}
-					},
-					error: (err: any) => console.error('document creation sub error', err)
-				});
+		// if (project?.documents) {
+		// 	for (const projectDoc of project.documents) {
+		// 		// Subscribe to document creation (global)
+		// 		subscriptions.push({
+		// 			query: S_CREATE_DOCUMENT,
+		// 			variables: {} as any,
+		// 			path: 'onCreateDocument',
+		// 			next: (newDocument: any) => {
+		// 				if (browser) {
+		// 					addDocument(newDocument);
+		// 					mapStore.addToKey('documents', newDocument);
+		// 					logger('Document created:', newDocument);
+		// 				}
+		// 			},
+		// 			error: (err: any) => console.error('document creation sub error', err)
+		// 		});
 
-				// Subscribe to page creation for this document
-				subscriptions.push({
-					query: S_CREATE_PAGE,
-					variables: { docHash: projectDoc.id } as any,
-					path: 'onCreatePage',
-					next: (newPage: any) => {
-						if (browser) {
-							addPageToDocument(projectDoc.id, newPage);
-							logger('Page created:', newPage);
-						}
-					},
-					error: (err: any) => console.error('page creation sub error', err)
-				});
+		// 		// Subscribe to page creation for this document
+		// 		subscriptions.push({
+		// 			query: S_CREATE_PAGE,
+		// 			variables: { docHash: projectDoc.id } as any,
+		// 			path: 'onCreatePage',
+		// 			next: (newPage: any) => {
+		// 				if (browser) {
+		// 					addPageToDocument(projectDoc.id, newPage);
+		// 					logger('Page created:', newPage);
+		// 				}
+		// 			},
+		// 			error: (err: any) => console.error('page creation sub error', err)
+		// 		});
 
-				// Subscribe to text creation for this document (we'll need to get page IDs)
-				// For now, we'll subscribe globally and filter by docHash in the handler
-				subscriptions.push({
-					query: S_CREATE_TEXT,
-					variables: {} as any, // Subscribe to all text creation
-					path: 'onCreateText',
-					next: (newText: any) => {
-						if (browser && newText.docHash === projectDoc.id) {
-							addTextToDocument(projectDoc.id, newText);
-							logger('Text created:', newText);
-						}
-					},
-					error: (err: any) => console.error('text creation sub error', err)
-				});
+		// 		// Subscribe to text creation for this document (we'll need to get page IDs)
+		// 		// For now, we'll subscribe globally and filter by docHash in the handler
+		// 		subscriptions.push({
+		// 			query: S_CREATE_TEXT,
+		// 			variables: {} as any, // Subscribe to all text creation
+		// 			path: 'onCreateText',
+		// 			next: (newText: any) => {
+		// 				if (browser && newText.docHash === projectDoc.id) {
+		// 					addTextToDocument(projectDoc.id, newText);
+		// 					logger('Text created:', newText);
+		// 				}
+		// 			},
+		// 			error: (err: any) => console.error('text creation sub error', err)
+		// 		});
 
-				// Subscribe to image creation for this document
-				subscriptions.push({
-					query: S_CREATE_IMAGE,
-					variables: {} as any, // Subscribe to all image creation
-					path: 'onCreateImage',
-					next: (newImage: any) => {
-						if (browser && newImage.docHash === projectDoc.id) {
-							addImageToDocument(projectDoc.id, newImage);
-							logger('Image created:', newImage);
-						}
-					},
-					error: (err: any) => console.error('image creation sub error', err)
-				});
+		// 		// Subscribe to image creation for this document
+		// 		subscriptions.push({
+		// 			query: S_CREATE_IMAGE,
+		// 			variables: {} as any, // Subscribe to all image creation
+		// 			path: 'onCreateImage',
+		// 			next: (newImage: any) => {
+		// 				if (browser && newImage.docHash === projectDoc.id) {
+		// 					addImageToDocument(projectDoc.id, newImage);
+		// 					logger('Image created:', newImage);
+		// 				}
+		// 			},
+		// 			error: (err: any) => console.error('image creation sub error', err)
+		// 		});
 
-				// Subscribe to insight creation for this document
-				subscriptions.push({
-					query: S_CREATE_INSIGHT,
-					variables: { docHash: projectDoc.id } as any,
-					path: 'onCreateInsight',
-					next: (newInsight: any) => {
-						if (browser) {
-							addInsightToDocument(projectDoc.id, newInsight);
-							logger('Insight created:', newInsight);
-						}
-					},
-					error: (err: any) => console.error('insight creation sub error', err)
-				});
-			}
-		}
+		// 		// Subscribe to insight creation for this document
+		// 		subscriptions.push({
+		// 			query: S_CREATE_INSIGHT,
+		// 			variables: { docHash: projectDoc.id } as any,
+		// 			path: 'onCreateInsight',
+		// 			next: (newInsight: any) => {
+		// 				if (browser) {
+		// 					addInsightToDocument(projectDoc.id, newInsight);
+		// 					logger('Insight created:', newInsight);
+		// 				}
+		// 			},
+		// 			error: (err: any) => console.error('insight creation sub error', err)
+		// 		});
+		// 	}
+		// }
 
 		client = new AppSyncWsClient({
 			graphqlHttpUrl: PUBLIC_GRAPHQL_HTTP_ENDPOINT,

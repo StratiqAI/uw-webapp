@@ -1,122 +1,96 @@
 export const S_PROJECT_CREATED = `
-subscription subCreateProject {
-  onProjectCreated {
+subscription subCreateProject($ownerId: String!) {
+  onCreateProject(ownerId: $ownerId) {
     id
     name
-    address
-    city
-    state
-    zip
-    country
-    assetType
-    createdAt
-    description
-    documents {
-      id
-      filename
-    }
-    image
-    isActive
-    members
     ownerId
-    status
-    tags
-    updatedAt
-    isArchived
-    isDeleted
-    isPublic
+    tenant
+    sharingMode
+    createdAt
+    details {
+      id
+      projectId
+      ownerId
+      tenant
+      description
+      streetAddress
+      city
+      state
+      zip
+      assetType
+      sharingMode
+      createdAt
+      updatedAt
+    }
   }
 }
 `;
 
 export const S_PROJECT_UPDATED = `
-  subscription OnProjectUpdated {
-    onProjectUpdated {
-      address
-      assetType
-      city
-      country
-      createdAt
-      description
-      documents {
-        filename
-        id
-      }
+  subscription OnProjectUpdated($projectId: ID!) {
+    onUpdateProject(projectId: $projectId) {
       id
-      image
-      isActive
-      isArchived
-      isDeleted
-      isPublic
-      members
       name
       ownerId
-      state
-      status
-      tags
-      updatedAt
-      zip
+      tenant
+      sharingMode
+      createdAt
+      details {
+        id
+        projectId
+        ownerId
+        tenant
+        description
+        streetAddress
+        city
+        state
+        zip
+        assetType
+        sharingMode
+        createdAt
+        updatedAt
+      }
     }
   }
 `;
 
 export const S_PROJECT_DELETED = `
-  subscription subDeleteProject {
-    onProjectDeleted {
-    id
-    name
-    address
-    city
-    state
-    zip
-    country
-    assetType
-    createdAt
-    description
-    documents {
+  subscription subDeleteProject($ownerId: String!) {
+    onDeleteProject(ownerId: $ownerId) {
       id
-      filename
-    }
-    image
-    isActive
-    members
-    ownerId
-    status
-    tags
-    updatedAt
-    isArchived
-    isDeleted
-    isPublic
-  }
-}`;
-
-export const S_PROJECT_UPDATED_BY_ID = `
-  subscription OnProjectUpdated($id: ID!) {
-    onProjectUpdated(id: $id) {
-      address
-      assetType
-      city
-      country
-      createdAt
-      description
-      documents {
-        filename
-        id
-      }
-      id
-      image
-      isActive
-      isArchived
-      isDeleted
-      isPublic
-      members
       name
       ownerId
-      state
-      status
-      tags
-      updatedAt
-      zip
+      tenant
+      sharingMode
+      createdAt
+    }
+  }
+`;
+
+export const S_PROJECT_UPDATED_BY_ID = `
+  subscription OnProjectUpdated($projectId: ID!) {
+    onUpdateProject(projectId: $projectId) {
+      id
+      name
+      ownerId
+      tenant
+      sharingMode
+      createdAt
+      details {
+        id
+        projectId
+        ownerId
+        tenant
+        description
+        streetAddress
+        city
+        state
+        zip
+        assetType
+        sharingMode
+        createdAt
+        updatedAt
+      }
     }
   }
 `;

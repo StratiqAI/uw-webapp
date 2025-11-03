@@ -25,10 +25,10 @@
 	<section
 		class="space-y-6 rounded-2xl bg-gradient-to-br from-zinc-50 via-red-50 to-indigo-50 p-2 shadow-md dark:bg-gray-800 dark:bg-none"
 	>
-		{#if $projectStore?.documents || isNewProject}
+		{#if $projectStore || isNewProject}
 			<UploadArea {idToken} />
 		{/if}
-		<SourceCards columns={3} />
+		<!-- <SourceCards columns={3} /> -->
 	</section>
 </div>
 

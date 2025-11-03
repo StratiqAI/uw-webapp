@@ -2,9 +2,15 @@
 
 > Brief description of what your SvelteKit application does, who it's for, and key features.
 
+# Thing I Need to Document
+
+- Verdaccio is used in development to locally deploy stratiqai-types and import it into the other projects. npm link and symlinks are fragile and don't work well.
+
+
 ## Table of Contents
 
 - [Project Name](#project-name)
+- [Thing I Need to Document](#thing-i-need-to-document)
   - [Table of Contents](#table-of-contents)
   - [Overview](#overview)
   - [Demo](#demo)
@@ -25,6 +31,8 @@
   - [TODO](#todo)
   - [License](#license)
   - [Acknowledgments](#acknowledgments)
+  - [Tasks for Today](#tasks-for-today)
+    - [2025/09/28](#20250928)
 
 ## Overview
 

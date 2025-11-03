@@ -16,7 +16,7 @@
       preferredUsername?: string;       // User's preferred username
       pictureUrl?: string;              // URL to user's profile picture
       groups?: string[];                // Cognito groups the user belongs to
-      tenantId?: string;                // Custom tenant ID (multi-tenancy)
+      tenant?: string;                // Custom tenant ID (multi-tenancy)
       locale?: string;                  // User's locale (language/country)
       timezone?: string;                // User's timezone
       amr?: string[];                   // Authentication Methods References
