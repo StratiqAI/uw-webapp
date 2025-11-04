@@ -154,6 +154,51 @@ export const M_DELETE_PROJECT_DETAIL = `
     }
 `;
 
+// Mutation for creating ProjectDocument
+export const M_CREATE_PROJECT_DOCUMENT = `
+    mutation createProjectDocument($input: CreateProjectDocumentInput!) {
+        createProjectDocument(input: $input) {
+            id
+            projectId
+            ownerId
+            tenant
+            filename
+            openAIFileId
+            sharingMode
+            createdAt
+            updatedAt
+        }
+    }
+`;
+
+// Mutation for updating ProjectDocument
+export const M_UPDATE_PROJECT_DOCUMENT = `
+    mutation updateProjectDocument($input: UpdateProjectDocumentInput!) {
+        updateProjectDocument(input: $input) {
+            id
+            projectId
+            ownerId
+            tenant
+            filename
+            openAIFileId
+            sharingMode
+            createdAt
+            updatedAt
+        }
+    }
+`;
+
+// Mutation for deleting ProjectDocument
+export const M_DELETE_PROJECT_DOCUMENT = `
+    mutation deleteProjectDocument($id: ID!) {
+        deleteProjectDocument(id: $id) {
+            id
+            projectId
+            ownerId
+        }
+    }
+`;
+
 export async function updateProject(project: Project, idToken: string) {
     const mutation = M_UPDATE_PROJECT;
     // Extract only the fields that can be updated according to UpdateProjectInput

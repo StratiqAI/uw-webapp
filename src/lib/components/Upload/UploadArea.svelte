@@ -1,11 +1,12 @@
 <!-- 
   Document Upload Component
   Features:
+  - Abstraction of upload logic into a custom store for better separation of concerns
   - GraphQL integration for project document updates
   - S3 presigned URL uploads with SHA-256 verification
   - Drag & drop support
-  - Progress tracking
-  - Error handling and retry logic
+  - Progress tracking with defined steps
+  - Enhanced error handling, user feedback, and unified retry logic
 -->
 
 <script lang="ts">
@@ -13,7 +14,7 @@
 	// External Dependencies
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	import { TrashBinOutline } from 'flowbite-svelte-icons';
-	import { onMount, onDestroy } from 'svelte';
+	import { createEventDispatcher, onDestroy } from 'svelte';
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Internal Dependencies
@@ -21,28 +22,32 @@
 	import YesNoDialog from '$lib/components/Dialog/YesNoDialog.svelte';
 	import { logger } from '$lib/logging/debug';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
-	import { M_UPDATE_PROJECT } from '$lib/realtime/graphql/mutations/Project';
-	import type { Project, ProjectDocument } from '$lib/types/Project';
+	import {
+		M_CREATE_PROJECT_DOCUMENT,
+		M_DELETE_PROJECT_DOCUMENT
+	} from '$lib/realtime/graphql/mutations/Project';
 	import { project as projectStore } from '$lib/stores/project.svelte';
+	import type { Project, ProjectDocument } from '$lib/types/Project';
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Types & Interfaces
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+	type UploadStatus = 'pending' | 'hashing' | 'uploading' | 'saving' | 'success' | 'error';
+
 	interface UploadFile {
+		id: string; // Unique ID for the file instance (e.g., timestamp + name)
 		file: File;
-		uploading: boolean;
+		status: UploadStatus;
 		progress: number;
 		result: UploadResult | null;
 		documentId?: string;
-		abortController?: AbortController;
+		abortController: AbortController;
 		retryCount: number;
 	}
 
 	interface UploadResult {
 		success: boolean;
 		message: string;
-		sha256?: string;
-		key?: string;
 	}
 
 	interface PresignedUrlResponse {
@@ -58,101 +63,263 @@
 	const MAX_RETRY_ATTEMPTS = 3;
 	const RETRY_DELAY_MS = 1000;
 	const CONCURRENT_UPLOAD_LIMIT = 3;
+	const LOG_PREFIX = '[DocumentUpload]';
+
+	// Progress constants for clarity
+	const PROGRESS_PENDING = 0;
+	const PROGRESS_HASHING = 5;
+	const PROGRESS_GETTING_URL = 10;
+	const PROGRESS_UPLOADING_MAX = 95;
+	const PROGRESS_SAVING = 98;
+	const PROGRESS_COMPLETE = 100;
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	// Props & State
+	// Props & Component State
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	let { idToken }: { idToken: string } = $props();
-
+	const { idToken }: { idToken: string } = $props();
 	const project: Project = $derived($projectStore)!;
-	const documents = $derived(project?.documents || []);
+	const dispatch = createEventDispatcher<{ error: string[] }>();
 
 	let fileInput: HTMLInputElement;
 	let openDeleteDialog = $state(false);
-	let selectedFile = $state<UploadFile | null>(null);
+	let fileToDelete = $state<UploadFile | null>(null);
 	let isDragging = $state(false);
-	let uploadQueue = $state<File[]>([]);
-	let activeUploads = $state(0);
 
-	// Initialize files from existing documents
-	let files = $state<UploadFile[]>(
-		documents.map((doc: ProjectDocument) => ({
-			file: new File([], doc.filename),
-			uploading: false,
-			progress: 100,
-			result: { success: true, message: 'Existing document', sha256: doc.id },
-			documentId: doc.id,
-			retryCount: 0
-		}))
-	);
+	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+	// Uploader Store - Encapsulates all upload logic
+	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+	function createUploader() {
+		let files = $state<UploadFile[]>([]);
+		let uploadQueue = $state<UploadFile[]>([]);
+		let activeUploads = $state(0);
+
+		// Initialize with existing documents from the project
+		$effect(() => {
+			const existingDocs = project?.documents?.items || [];
+			if (existingDocs.length > 0 && files.length === 0) {
+				logger(`${LOG_PREFIX} Initializing store with ${existingDocs.length} existing documents.`);
+				files = existingDocs.map((doc) => ({
+					id: doc.id,
+					file: new File([], doc.filename),
+					status: 'success',
+					progress: PROGRESS_COMPLETE,
+					result: { success: true, message: 'Existing document' },
+					documentId: doc.id,
+					abortController: new AbortController(),
+					retryCount: 0
+				}));
+			}
+		});
+
+		// Helper to update a file and trigger reactivity
+		function updateFile(fileId: string, updates: Partial<UploadFile>) {
+			files = files.map((f) => (f.id === fileId ? { ...f, ...updates } : f));
+		}
+
+		function addFilesToQueue(fileList: File[]) {
+			const newUploads: UploadFile[] = fileList.map((file) => ({
+				id: `${file.name}-${Date.now()}`,
+				file,
+				status: 'pending',
+				progress: PROGRESS_PENDING,
+				result: null,
+				abortController: new AbortController(),
+				retryCount: 0
+			}));
+
+			files.push(...newUploads);
+			uploadQueue.push(...newUploads);
+			processQueue();
+		}
+
+		function processQueue() {
+			while (uploadQueue.length > 0 && activeUploads < CONCURRENT_UPLOAD_LIMIT) {
+				const fileToUpload = uploadQueue.shift();
+				if (fileToUpload) {
+					activeUploads++;
+					uploadFile(fileToUpload).finally(() => {
+						activeUploads--;
+						processQueue();
+					});
+				}
+			}
+		}
+
+		async function removeFile(fileToRemove: UploadFile) {
+			logger(`${LOG_PREFIX} Removing file: ${fileToRemove.file.name}`);
+			// 1. Abort ongoing upload
+			if (fileToRemove.status === 'uploading' || fileToRemove.status === 'hashing') {
+				fileToRemove.abortController.abort();
+			}
+
+			// 2. Delete from backend if successfully uploaded
+			if (fileToRemove.status === 'success' && fileToRemove.documentId) {
+				try {
+					await deleteProjectDocument(fileToRemove.documentId);
+				} catch (error) {
+					logger(`${LOG_PREFIX} Failed to delete document from backend:`, error);
+					dispatch('error', ['Failed to remove document from server. Please refresh.']);
+					// Do not remove from UI if backend deletion fails, to avoid inconsistency.
+					return;
+				}
+			}
+
+			// 3. Remove from local state
+			files = files.filter((f) => f.id !== fileToRemove.id);
+		}
+
+		function retryUpload(fileToRetry: UploadFile) {
+			logger(`${LOG_PREFIX} Retrying upload for: ${fileToRetry.file.name}`);
+			// Reset state for retry
+			const newAbortController = new AbortController();
+			updateFile(fileToRetry.id, {
+				status: 'pending',
+				progress: PROGRESS_PENDING,
+				result: null,
+				retryCount: 0,
+				abortController: newAbortController
+			});
+
+			// Get the updated file object
+			const updatedFile = files.find((f) => f.id === fileToRetry.id);
+			if (updatedFile) {
+				// Add to front of the queue for immediate processing
+				uploadQueue.unshift(updatedFile);
+				processQueue();
+			}
+		}
+
+		// Public interface of the store
+		return {
+			get files() {
+				return files;
+			},
+			add: addFilesToQueue,
+			remove: removeFile,
+			retry: retryUpload,
+			updateFile,
+			cancelAll: () => {
+				files.forEach((f) => {
+					if (f.status === 'uploading' || f.status === 'hashing') {
+						f.abortController.abort();
+					}
+				});
+				uploadQueue.length = 0; // Clear the queue
+			}
+		};
+	}
+
+	const uploader = createUploader();
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Lifecycle
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	onMount(() => {
-		// Process upload queue
-		processUploadQueue();
-	});
-
 	onDestroy(() => {
-		// Cancel any ongoing uploads
-		files.forEach((f) => f.abortController?.abort());
+		logger(`${LOG_PREFIX} Component destroying. Cancelling all uploads.`);
+		uploader.cancelAll();
 	});
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	// GraphQL Operations
+	// Upload Pipeline
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	async function updateProjectDocuments(updatedDocuments: ProjectDocument[]): Promise<void> {
-		console.log('updateProjectDocuments', updatedDocuments);
+	async function uploadFile(upload: UploadFile): Promise<void> {
 		try {
-			await gql<{ updateProject: Project }>(
-				M_UPDATE_PROJECT,
-				{ input: { id: project.id, documents: updatedDocuments } },
+			// Step 1: Hashing
+			uploader.updateFile(upload.id, { status: 'hashing', progress: PROGRESS_HASHING });
+			const sha256 = await calculateSHA256(upload.file);
+
+			// Step 2: Get Presigned URL
+			uploader.updateFile(upload.id, { progress: PROGRESS_GETTING_URL });
+			const { url } = await getPresignedUrl(
+				upload.file.name,
+				upload.file.type || 'application/pdf',
+				sha256
+			);
+
+			// Step 3: Upload to S3
+			uploader.updateFile(upload.id, { status: 'uploading' });
+			await uploadToS3(url, upload);
+
+			// Step 4: Create Project Document in Backend
+			uploader.updateFile(upload.id, { status: 'saving', progress: PROGRESS_SAVING });
+			const document = await createProjectDocument(upload.file.name);
+
+			// Step 5: Success
+			uploader.updateFile(upload.id, {
+				status: 'success',
+				progress: PROGRESS_COMPLETE,
+				result: { success: true, message: 'Upload successful' },
+				documentId: document.id
+			});
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+			if (errorMessage.includes('cancelled')) {
+				logger(`${LOG_PREFIX} Upload cancelled for ${upload.file.name}.`);
+				// This will be handled by the removeFile function which triggered the abort
+				return;
+			}
+
+			// Handle retries for network/server errors
+			if (upload.retryCount < MAX_RETRY_ATTEMPTS) {
+				const newRetryCount = upload.retryCount + 1;
+				uploader.updateFile(upload.id, { retryCount: newRetryCount });
+				logger(
+					`${LOG_PREFIX} Upload failed for ${upload.file.name}. Retrying attempt ${newRetryCount}...`
+				);
+				// Get the updated upload object
+				const updatedUpload = uploader.files.find((f) => f.id === upload.id);
+				if (updatedUpload) {
+					setTimeout(() => uploadFile(updatedUpload), RETRY_DELAY_MS * newRetryCount);
+				}
+			} else {
+				uploader.updateFile(upload.id, {
+					status: 'error',
+					result: { success: false, message: errorMessage }
+				});
+				logger(
+					`${LOG_PREFIX} Upload failed for ${upload.file.name} after all retries: ${errorMessage}`
+				);
+			}
+		}
+	}
+
+	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+	// API & Helper Functions
+	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+	async function createProjectDocument(filename: string): Promise<ProjectDocument> {
+		try {
+			const result = await gql<{ createProjectDocument: ProjectDocument }>(
+				M_CREATE_PROJECT_DOCUMENT,
+				{
+					input: {
+						projectId: project.id,
+						filename
+					}
+				},
 				idToken
 			);
-			logger('Project documents updated successfully');
+			logger('Project document created successfully');
+			return result.createProjectDocument;
 		} catch (error) {
-			logger('Error updating project documents:', error);
-			throw new Error('Failed to update project documents. Please try again.');
+			logger('Error creating project document:', error);
+			throw new Error('Failed to save document record.');
 		}
 	}
 
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	// File Validation
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	function validateFile(file: File): { valid: boolean; error?: string } {
-		// Check file size
-		if (file.size > MAX_FILE_SIZE) {
-			return {
-				valid: false,
-				error: `File "${file.name}" exceeds maximum size of ${MAX_FILE_SIZE / (1024 * 1024)}MB`
-			};
+	async function deleteProjectDocument(documentId: string): Promise<void> {
+		try {
+			await gql<{ deleteProjectDocument: ProjectDocument }>(
+				M_DELETE_PROJECT_DOCUMENT,
+				{ id: documentId },
+				idToken
+			);
+			logger('Project document deleted successfully');
+		} catch (error) {
+			logger('Error deleting project document:', error);
+			throw new Error('Failed to delete document record.');
 		}
-
-		// Check file type
-		const extension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
-		if (!SUPPORTED_FILE_TYPES.includes(extension)) {
-			return {
-				valid: false,
-				error: `File type "${extension}" not supported. Only PDF files are allowed.`
-			};
-		}
-
-		// Check for duplicate
-		const isDuplicate = files.some((f) => f.file.name === file.name && f.result?.success);
-		if (isDuplicate) {
-			return {
-				valid: false,
-				error: `File "${file.name}" has already been uploaded.`
-			};
-		}
-
-		return { valid: true };
 	}
 
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	// SHA-256 Calculation
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	async function calculateSHA256(file: File): Promise<string> {
 		try {
 			const arrayBuffer = await file.arrayBuffer();
@@ -165,9 +332,6 @@
 		}
 	}
 
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	// S3 Upload Operations
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	async function getPresignedUrl(
 		filename: string,
 		contentType: string,
@@ -181,240 +345,121 @@
 
 		if (!response.ok) {
 			const errorText = await response.text();
-			throw new Error(`Failed to get presigned URL: ${errorText}`);
+			throw new Error(`Could not get upload URL: ${errorText}`);
 		}
 
 		return response.json();
 	}
 
-	async function uploadToS3(
-		url: string,
-		file: File,
-		fileIndex: number,
-		abortController: AbortController
-	): Promise<void> {
+	function uploadToS3(url: string, upload: UploadFile): Promise<void> {
 		return new Promise((resolve, reject) => {
 			const xhr = new XMLHttpRequest();
+			const { signal } = upload.abortController;
 
-			// Set up abort handling
-			abortController.signal.addEventListener('abort', () => {
+			logger('Starting S3 upload:', { url, fileName: upload.file.name, fileSize: upload.file.size });
+
+			signal.addEventListener('abort', () => {
 				xhr.abort();
-				reject(new Error('Upload cancelled'));
+				logger('Upload aborted by user:', upload.file.name);
+				reject(new Error('Upload cancelled by user'));
 			});
 
-			xhr.open('PUT', url);
-			xhr.setRequestHeader('Content-Type', file.type || 'application/pdf');
+		xhr.open('PUT', url);
+		xhr.setRequestHeader('Content-Type', upload.file.type || 'application/pdf');
+		// xhr.setRequestHeader('x-amz-acl', 'bucket-owner-full-control');
 
-			xhr.upload.onprogress = (e) => {
-				if (e.lengthComputable) {
-					files[fileIndex].progress = Math.round((e.loaded / e.total) * 100);
-					files = [...files];
-				}
-			};
+		xhr.upload.onprogress = (e) => {
+			if (e.lengthComputable) {
+				const uploadedPercentage = e.loaded / e.total;
+				const newProgress = Math.round(
+					PROGRESS_GETTING_URL +
+						(PROGRESS_UPLOADING_MAX - PROGRESS_GETTING_URL) * uploadedPercentage
+				);
+				uploader.updateFile(upload.id, { progress: newProgress });
+				logger(
+					`Upload progress (${upload.file.name}):`,
+					`${newProgress}% (${e.loaded}/${e.total} bytes)`
+				);
+			}
+		};
 
 			xhr.onload = () => {
 				if (xhr.status >= 200 && xhr.status < 300) {
+					logger('Upload successful:', upload.file.name, `Status ${xhr.status}`);
 					resolve();
 				} else {
+					logger('Upload failed:', upload.file.name, `Status ${xhr.status}`, xhr.responseText);
 					reject(new Error(`Upload failed with status ${xhr.status}`));
 				}
 			};
-
-			xhr.onerror = () => reject(new Error('Network error during upload'));
-			xhr.ontimeout = () => reject(new Error('Upload timeout'));
+			xhr.onerror = () => {
+				logger('Network error during upload:', upload.file.name);
+				reject(new Error('Network error during upload'));
+			};
+			xhr.ontimeout = () => {
+				logger('Upload timed out:', upload.file.name);
+				reject(new Error('Upload timed out'));
+			};
 			xhr.timeout = 300000; // 5 minute timeout
 
-			xhr.send(file);
+			xhr.send(upload.file);
+			logger('Upload request sent:', upload.file.name);
 		});
 	}
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	// Upload Management
+	// File Validation & Event Handlers
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	async function processUploadQueue() {
-		while (uploadQueue.length > 0 && activeUploads < CONCURRENT_UPLOAD_LIMIT) {
-			const file = uploadQueue.shift();
-			if (file) {
-				activeUploads++;
-				uploadFile(file).finally(() => {
-					activeUploads--;
-					processUploadQueue();
-				});
-			}
-		}
-	}
+	function handleAddFiles(incomingFiles: FileList | null): void {
+		if (!incomingFiles) return;
 
-	async function uploadFile(file: File, retryCount = 0): Promise<void> {
-		const fileObj: UploadFile = {
-			file,
-			uploading: true,
-			progress: 0,
-			result: null,
-			abortController: new AbortController(),
-			retryCount
-		};
-
-		files = [...files, fileObj];
-		const fileIndex = files.length - 1;
-
-		try {
-			// Calculate hash
-			files[fileIndex].progress = 5;
-			files = [...files];
-			const sha256 = await calculateSHA256(file);
-
-			// Get presigned URL
-			files[fileIndex].progress = 10;
-			files = [...files];
-			const { url, key } = await getPresignedUrl(file.name, file.type || 'application/pdf', sha256);
-
-			// Upload to S3
-			await uploadToS3(url, file, fileIndex, fileObj.abortController!);
-
-		// TODO: Update project documents - needs to be re-implemented with new schema
-		// The new schema doesn't have documents on Project - documents need to be managed separately
-		files[fileIndex].progress = 95;
-		files = [...files];
-
-		// const updatedDocuments = [...project.documents, { id: sha256, filename: file.name }];
-		// await updateProjectDocuments(updatedDocuments);
-
-			// Mark as complete
-			files[fileIndex] = {
-				...files[fileIndex],
-				uploading: false,
-				progress: 100,
-				result: { success: true, message: 'Upload successful', sha256, key },
-				documentId: sha256
-			};
-			files = [...files];
-		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : 'Upload failed';
-
-			// Retry logic
-			if (retryCount < MAX_RETRY_ATTEMPTS && !errorMessage.includes('cancelled')) {
-				logger(`Retrying upload for ${file.name}, attempt ${retryCount + 1}`);
-				files = files.filter((_, idx) => idx !== fileIndex);
-
-				setTimeout(
-					() => {
-						uploadQueue.push(file);
-						uploadFile(file, retryCount + 1);
-					},
-					RETRY_DELAY_MS * (retryCount + 1)
-				);
-			} else {
-				files[fileIndex] = {
-					...files[fileIndex],
-					uploading: false,
-					result: { success: false, message: errorMessage }
-				};
-				files = [...files];
-			}
-		}
-	}
-
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	// File Management
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	async function addFiles(fileList: File[]): Promise<void> {
+		const filesToValidate = Array.from(incomingFiles);
 		const validFiles: File[] = [];
 		const errors: string[] = [];
+		const existingFileNames = uploader.files.map((f) => f.file.name);
 
-		for (const file of fileList) {
-			const validation = validateFile(file);
-			if (validation.valid) {
+		for (const file of filesToValidate) {
+			if (file.size > MAX_FILE_SIZE) {
+				errors.push(`"${file.name}" is too large (max ${MAX_FILE_SIZE / (1024 * 1024)}MB).`);
+			} else if (!file.name.toLowerCase().endsWith('.pdf')) {
+				errors.push(`"${file.name}" is not a supported PDF file.`);
+			} else if (existingFileNames.includes(file.name)) {
+				errors.push(`"${file.name}" has already been added.`);
+			} else {
 				validFiles.push(file);
-			} else if (validation.error) {
-				errors.push(validation.error);
 			}
 		}
 
 		if (errors.length > 0) {
-			// You could show these errors in a toast or modal
-			logger('File validation errors:', errors);
+			dispatch('error', errors);
 		}
 
-		uploadQueue.push(...validFiles);
-		processUploadQueue();
-	}
-
-	async function removeFile(fileToRemove: UploadFile): Promise<void> {
-		try {
-			// Cancel upload if in progress
-			fileToRemove.abortController?.abort();
-
-			// Remove from UI immediately
-			files = files.filter((f) => f !== fileToRemove);
-
-		// TODO: Remove document from project - needs to be re-implemented with new schema
-		// The new schema doesn't have documents on Project - documents need to be managed separately
-		// if (fileToRemove.documentId && fileToRemove.result?.success) {
-		// 	const updatedDocuments = project.documents.filter(
-		// 		(doc) => doc.id !== fileToRemove.documentId
-		// 	);
-		// 	await updateProjectDocuments(updatedDocuments);
-		// }
-		} catch (error) {
-			logger('Error removing file:', error);
-			// Re-add file to list if removal failed
-			files = [...files, fileToRemove];
-			throw error;
+		if (validFiles.length > 0) {
+			uploader.add(validFiles);
 		}
 	}
 
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	// Event Handlers
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	function handleFileSelect(event: Event): void {
-		const input = event.currentTarget as HTMLInputElement;
-		if (input.files?.length) {
-			addFiles(Array.from(input.files));
-			input.value = ''; // Reset to allow re-selection
-		}
-	}
-
-	function handleDragEnter(event: DragEvent): void {
-		event.preventDefault();
-		isDragging = true;
-	}
-
-	function handleDragLeave(event: DragEvent): void {
-		event.preventDefault();
-		// Only set isDragging to false if we're leaving the drop zone entirely
-		const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-		const x = event.clientX;
-		const y = event.clientY;
-
-		if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) {
-			isDragging = false;
-		}
-	}
-
-	function handleDragOver(event: DragEvent): void {
-		event.preventDefault();
-		event.dataTransfer!.dropEffect = 'copy';
-	}
-
-	function handleDrop(event: DragEvent): void {
+	function handleDrop(event: DragEvent) {
 		event.preventDefault();
 		isDragging = false;
-
-		const droppedFiles = event.dataTransfer?.files;
-		if (droppedFiles?.length) {
-			addFiles(Array.from(droppedFiles));
-		}
+		handleAddFiles(event.dataTransfer?.files ?? null);
 	}
 
-	function handleDeleteClick(file: UploadFile): void {
-		selectedFile = file;
+	function handleFileSelect(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		handleAddFiles(input.files);
+		input.value = ''; // Reset to allow re-selection of the same file
+	}
+
+	function handleDeleteClick(file: UploadFile) {
+		fileToDelete = file;
 		openDeleteDialog = true;
 	}
 
-	async function handleDeleteConfirm(): Promise<void> {
-		if (selectedFile) {
-			await removeFile(selectedFile);
-			selectedFile = null;
+	async function handleDeleteConfirm() {
+		if (fileToDelete) {
+			await uploader.remove(fileToDelete);
+			fileToDelete = null;
 		}
 	}
 
@@ -426,11 +471,30 @@
 	}
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	// Computed Properties
+	// UI Computed Properties
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	const uploadingCount = $derived(files.filter((f) => f.uploading).length);
-	const successCount = $derived(files.filter((f) => f.result?.success).length);
-	const errorCount = $derived(files.filter((f) => f.result && !f.result.success).length);
+	const statusCounts = $derived.by(() => {
+		const counts = { uploading: 0, success: 0, error: 0 };
+		for (const file of uploader.files) {
+			if (['hashing', 'uploading', 'saving', 'pending'].includes(file.status))
+				counts.uploading++;
+			else if (file.status === 'success') counts.success++;
+			else if (file.status === 'error') counts.error++;
+		}
+		return counts;
+	});
+
+	const statusText = (status: UploadStatus) => {
+		const map: Record<UploadStatus, string> = {
+			pending: 'Pending...',
+			hashing: 'Hashing...',
+			uploading: 'Uploading...',
+			saving: 'Saving...',
+			success: '✓ Uploaded',
+			error: '✗ Failed'
+		};
+		return map[status];
+	};
 </script>
 
 <!-- Upload Area -->
@@ -443,9 +507,9 @@
 	tabindex="0"
 	aria-label="Upload documents"
 	onkeydown={handleKeydown}
-	ondragenter={handleDragEnter}
-	ondragleave={handleDragLeave}
-	ondragover={handleDragOver}
+	ondragenter={() => (isDragging = true)}
+	ondragleave={() => (isDragging = false)}
+	ondragover={(e) => e.preventDefault()}
 	ondrop={handleDrop}
 >
 	<input
@@ -483,27 +547,27 @@
 		Supported: PDF (max {MAX_FILE_SIZE / (1024 * 1024)}MB)
 	</p>
 
-	{#if uploadingCount > 0}
+	{#if statusCounts.uploading > 0}
 		<p class="mt-2 text-xs text-blue-600">
-			Uploading {uploadingCount} file{uploadingCount > 1 ? 's' : ''}...
+			Uploading {statusCounts.uploading} file{statusCounts.uploading > 1 ? 's' : ''}...
 		</p>
 	{/if}
 </div>
 
 <!-- Files Table -->
-{#if files.length > 0}
+{#if uploader.files.length > 0}
 	<div class="mt-4 hidden lg:block">
 		<!-- Summary Stats -->
-		{#if uploadingCount > 0 || errorCount > 0}
+		{#if statusCounts.uploading > 0 || statusCounts.error > 0}
 			<div class="mb-2 flex gap-4 text-sm">
-				{#if successCount > 0}
-					<span class="text-green-600">✓ {successCount} uploaded</span>
+				{#if statusCounts.success > 0}
+					<span class="text-green-600">✓ {statusCounts.success} uploaded</span>
 				{/if}
-				{#if uploadingCount > 0}
-					<span class="text-blue-600">↻ {uploadingCount} uploading</span>
+				{#if statusCounts.uploading > 0}
+					<span class="text-blue-600">↻ {statusCounts.uploading} in progress</span>
 				{/if}
-				{#if errorCount > 0}
-					<span class="text-red-600">✗ {errorCount} failed</span>
+				{#if statusCounts.error > 0}
+					<span class="text-red-600">✗ {statusCounts.error} failed</span>
 				{/if}
 			</div>
 		{/if}
@@ -519,7 +583,7 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each files as file}
+				{#each uploader.files as file (file.id)}
 					<tr
 						class="border-b border-gray-300 last:border-b-0 hover:bg-gray-50 dark:border-gray-500 dark:hover:bg-gray-800/50"
 					>
@@ -528,7 +592,7 @@
 								type="button"
 								class="text-red-500 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
 								aria-label="Remove {file.file.name}"
-								disabled={file.uploading}
+								disabled={file.status === 'uploading' || file.status === 'saving'}
 								onclick={() => handleDeleteClick(file)}
 							>
 								<TrashBinOutline class="h-5 w-5" />
@@ -543,7 +607,7 @@
 									</span>
 								{/if}
 							</div>
-							{#if file.uploading}
+							{#if file.status !== 'success' && file.status !== 'error'}
 								<div class="mt-1">
 									<div class="flex items-center gap-2">
 										<progress
@@ -557,28 +621,22 @@
 								</div>
 							{/if}
 						</td>
-						<td class="px-4 py-2 text-center">
-							{#if file.uploading}
-								<span class="text-xs text-blue-600">Uploading...</span>
-							{:else if file.result?.success}
-								<span class="text-xs text-green-600">✓ Uploaded</span>
-							{:else if file.result}
-								<div class="text-xs text-red-600">
-									<span>✗ Failed</span>
-									{#if file.retryCount < MAX_RETRY_ATTEMPTS}
-										<button
-											type="button"
-											class="ml-2 underline hover:text-red-800"
-											onclick={() => {
-												files = files.filter((f) => f !== file);
-												uploadQueue.push(file.file);
-												processUploadQueue();
-											}}
-										>
-											Retry
-										</button>
-									{/if}
+						<td class="px-4 py-2 text-center text-xs">
+							{#if file.status === 'success'}
+								<span class="text-green-600">{statusText(file.status)}</span>
+							{:else if file.status === 'error'}
+								<div class="text-red-600" title={file.result?.message}>
+									<span>{statusText(file.status)}</span>
+									<button
+										type="button"
+										class="ml-2 underline hover:text-red-800"
+										onclick={() => uploader.retry(file)}
+									>
+										Retry
+									</button>
 								</div>
+							{:else}
+								<span class="text-blue-600">{statusText(file.status)}</span>
 							{/if}
 						</td>
 					</tr>
@@ -591,9 +649,8 @@
 <!-- Delete Confirmation Dialog -->
 <YesNoDialog
 	bind:open={openDeleteDialog}
-	data={selectedFile}
+	data={{}}
 	{idToken}
-	title="Remove Document"
-	message="Are you sure you want to remove '{selectedFile?.file.name}'?"
+	title="Are you sure you want to remove '{fileToDelete?.file.name}'?"
 	onConfirm={handleDeleteConfirm}
 />

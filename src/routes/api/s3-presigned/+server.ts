@@ -32,24 +32,29 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   // Create S3 client
   const s3 = new S3Client({ region: REGION, credentials });
 
-  // Create key
-  const key = `${currentUser.username}/${projectId}/${filename}`;
-
   try {
-    // Use the same presigner logic in all environments for consistency
-    const creds = await s3.config.credentials();   // resolves env/role creds uniformly
-    const region = await s3.config.region();
+    // Resolve credentials to get the Cognito Identity ID
+    const resolvedCreds = await credentials();
+    const identityId = resolvedCreds.identityId;
+    
+    if (!identityId) {
+      throw svelteError(401, 'Could not resolve identity ID');
+    }
 
-    const cmd = new PutObjectCommand ({
+    // Create key using Cognito Identity ID (matches bucket policy requirement)
+    const key = `${identityId}/${projectId}/${filename}`;
+
+    const cmd = new PutObjectCommand({
       Bucket: USER_FILE_STAGING_BUCKET,
       Key: key,
       ContentType: contentType,
+      ACL: 'bucket-owner-full-control', // Required by bucket policy
       // Optional: ServerSideEncryption: "AES256",
       // Optional: ChecksumSHA256: "<BASE64_SHA256>"
     });
   
     const url = await getSignedUrl(s3, cmd, { expiresIn: 900 }); // 15 min
-    console.log(url);
+    console.log('Generated presigned URL for key:', key);
   
     return json({ url, key });
   } catch (err) {

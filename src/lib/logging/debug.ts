@@ -1,5 +1,5 @@
 /**
- * Debug logging function that only logs if the UW_DEBUG environment variable is set to 1.
+ * Debug logging function that only logs if PUBLIC_LOG_LEVEL is set to 'DEBUG'.
  * @param args - The arguments to log.
  */
 import { PUBLIC_LOG_LEVEL } from '$env/static/public';

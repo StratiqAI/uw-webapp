@@ -18,6 +18,23 @@ export interface ProjectDetail {
 	updatedAt?: string; // AWSDateTime
 }
 
+export interface ProjectDocument {
+	id: string;
+	projectId: string;
+	ownerId: string;
+	tenant?: string | null;
+	filename: string;
+	openAIFileId?: string | null;
+	sharingMode?: SharingMode | null;
+	createdAt?: string; // AWSDateTime
+	updatedAt?: string; // AWSDateTime
+}
+
+export interface ProjectDocumentConnection {
+	items: ProjectDocument[];
+	nextToken?: string | null;
+}
+
 export interface Project {
 	id: string;
 	name: string;
@@ -26,6 +43,7 @@ export interface Project {
 	sharingMode?: SharingMode | null;
 	createdAt?: string; // AWSDateTime
 	details?: ProjectDetail | null;
+	documents?: ProjectDocumentConnection | null;
 }
 
 export interface CreateProjectInput {
@@ -62,4 +80,17 @@ export interface UpdateProjectDetailInput {
 	state?: string;
 	zip?: string;
 	assetType?: AssetType;
+}
+
+export interface CreateProjectDocumentInput {
+	projectId: string;
+	filename: string;
+	openAIFileId?: string;
+}
+
+export interface UpdateProjectDocumentInput {
+	id: string;
+	projectId?: string;
+	filename?: string;
+	openAIFileId?: string;
 }
