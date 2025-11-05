@@ -9,7 +9,7 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   const { filename, contentType, projectId } = await request.json();
 
   const currentUser = locals.currentUser;
-  if (!currentUser?.isAuthenticated || !currentUser.username) {
+  if (!currentUser?.isAuthenticated || !currentUser.username || !currentUser.sub) {
     throw svelteError(401, 'Unauthorized');
   }
 
@@ -33,16 +33,9 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   const s3 = new S3Client({ region: REGION, credentials });
 
   try {
-    // Resolve credentials to get the Cognito Identity ID
-    const resolvedCreds = await credentials();
-    const identityId = resolvedCreds.identityId;
-    
-    if (!identityId) {
-      throw svelteError(401, 'Could not resolve identity ID');
-    }
-
-    // Create key using Cognito Identity ID (matches bucket policy requirement)
-    const key = `${identityId}/${projectId}/${filename}`;
+    // Create key using Cognito User Pool sub (stable user ID for DynamoDB correlation)
+    const userId = currentUser.sub;
+    const key = `${userId}/${projectId}/${filename}`;
 
     const cmd = new PutObjectCommand({
       Bucket: USER_FILE_STAGING_BUCKET,
