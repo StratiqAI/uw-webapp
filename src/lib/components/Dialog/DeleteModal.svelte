@@ -6,13 +6,13 @@
 		no?: string;
 		data: Record<string, string>;
 		idToken: string;
+		mutation: string;
 		onConfirm?: () => Promise<void>;
 	}
 	import { Button, Modal } from 'flowbite-svelte';
 	import { ExclamationCircleOutline } from 'flowbite-svelte-icons';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
 	import type { Project } from '$lib/types/Project';
-	import { M_DELETE_PROJECT } from '$lib/realtime/graphql/mutations/Project';
 	let {
 		open = $bindable(true),
 		title = 'Are you sure you want to delete this?',
@@ -20,13 +20,12 @@
 		no = 'No, cancel',
 		data,
 		idToken,
+		mutation,
 		onConfirm
 	}: YesNoDialogProps = $props();
 
 	// $inspect(data);
 	async function deleteProject(id: string, idToken: string) {
-		const mutation = M_DELETE_PROJECT;
-
 		try {
 			const res = await gql<{ deleteProject: Project }>(mutation, { id }, idToken);
 			return res.deleteProject;

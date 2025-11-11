@@ -1,9 +1,10 @@
 <!-- +page.svelte -->
 <script>
 	import UploadArea from '$lib/components/Upload/UploadArea.svelte';
-	import SourceCards from '$lib/components/workspace/SourceCards.svelte';
 	import { project as projectStore } from '$lib/stores/project.svelte';
+
 	console.log('In file get-started/+page.svelte');
+	
 	let { data } = $props();
 	let idToken = data.idToken;
 	// Use reactive project store instead of static data

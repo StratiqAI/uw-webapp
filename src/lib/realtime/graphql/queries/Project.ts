@@ -1,6 +1,6 @@
 export const Q_LIST_USER_PROJECTS = `
     query listProjects($limit: Int, $nextToken: String) {
-        listMyProjects(limit: $limit, nextToken: $nextToken) {
+        listProjects(limit: $limit, nextToken: $nextToken) {
             items {
                 id
                 name

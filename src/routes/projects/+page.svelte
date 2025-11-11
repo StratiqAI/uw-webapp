@@ -1,14 +1,13 @@
 <script lang="ts">
 	import { logger } from '$lib/logging/debug';
 
-	import { v4 as uuidv4 } from 'uuid';
-
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Props Section
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 	// Import the SvelteKit Types for the Page Properties
 	import type { PageProps } from './$types';
+	import { goto } from '$app/navigation';
 
 	// Get the Props for the Component
 	let componentProps: PageProps = $props();
@@ -27,22 +26,27 @@
 	import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from '$env/static/public';
 
 	// 2. Import types for user items
-	import type { Project } from '$lib/types/Project';
+	import type { Project } from '@stratiqai/types';
+	import { GraphQLOperationGenerator, ProjectSchemas } from '@stratiqai/types';
+	const projectGenerator = new GraphQLOperationGenerator('Project', ProjectSchemas);
+	const S_PROJECT_CREATED = projectGenerator.generateSubscription({
+		eventType: 'create',
+		filterBy: 'ownerId',
+		filterType: 'ID!'
+	});
+	const S_PROJECT_DELETED = projectGenerator.generateSubscription({
+		eventType: 'delete',
+		filterBy: 'ownerId',
+		filterType: 'ID!'
+	});
+	const M_CREATE_PROJECT = projectGenerator.generateCreateMutation();
+	const M_DELETE_PROJECT = projectGenerator.generateDeleteMutation();
 
 	// 3. Import realtime subscription setup
 	import { AppSyncWsClient } from '$lib/realtime/websocket/AppSyncWsClient';
 
 	// 4. Import list operations for Project
 	import { createListOps } from '$lib/realtime/websocket/ListOperations';
-
-	// 5. Import GraphQL subscription queries for create, update, and delete events
-	// import { Q_LIST_USER_PROJECTS } from '$lib/realtime/graphql/Projects/queries';
-	// import { M_CREATE_PROJECT, M_DELETE_PROJECT } from '$lib/realtime/graphql/Projects/mutations';
-	import {
-		S_PROJECT_CREATED,
-		S_PROJECT_UPDATED,
-		S_PROJECT_DELETED
-	} from '$lib/realtime/graphql/subscriptions/Project';
 
 	// 6. Create reactive state for Project list
 	let projects = $state<Project[]>(componentProps.data?.items);
@@ -107,35 +111,18 @@
 	// Flowbite Svelte Components
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-	import {
-		Avatar,
-		// Breadcrumb,
-		// BreadcrumbItem,
-		Button,
-		Checkbox,
-		Heading,
-		Indicator,
-		P
-	} from 'flowbite-svelte';
+	import { Avatar, Breadcrumb, BreadcrumbItem, Button, Heading, P } from 'flowbite-svelte';
 
 	import { Input, Table, TableBody, TableBodyCell, TableBodyRow, TableHead } from 'flowbite-svelte';
 	import { TableHeadCell, Toolbar, ToolbarButton } from 'flowbite-svelte';
-	// import { CogSolid, DotsVerticalOutline, DownloadSolid } from 'flowbite-svelte-icons';
-	import {
-		// EditOutline,
-		// ExclamationCircleSolid,
-		PlusOutline,
-		TrashBinSolid
-	} from 'flowbite-svelte-icons';
+	import { PlusOutline, TrashBinSolid } from 'flowbite-svelte-icons';
 
 	// Local Components
 	import DeleteModal from '$lib/components/Dialog/DeleteModal.svelte';
 	import ProjectModal from './ProjectModal.svelte';
 	import MetaTag from './MetaTag.svelte';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
-	import { M_CREATE_PROJECT } from '$lib/realtime/graphql/mutations/Project';
-	import { goto } from '$app/navigation';
-	import PdfViewer from 'svelte-pdf';
+
 
 	// State
 	let openProject: boolean = $state(false); // modal control
@@ -172,11 +159,11 @@
 <main class="relative h-full w-full overflow-y-auto bg-white dark:bg-gray-800">
 	<h1 class="hidden">Projects</h1>
 	<div class="p-4">
-		<!-- <Breadcrumb class="mb-5">
+		<Breadcrumb class="mb-5">
 			<BreadcrumbItem home>Home</BreadcrumbItem>
 			<BreadcrumbItem href="/projects">Projects</BreadcrumbItem>
 			<BreadcrumbItem>List</BreadcrumbItem>
-		</Breadcrumb> -->
+		</Breadcrumb>
 
 		<!-- {#if currentUser?.isAuthenticated}
 			<p>Hi {currentUser.givenName + ' ' + currentUser.familyName}</p>
@@ -190,7 +177,9 @@
 			>
 			<Input placeholder="Search for projects" class="me-4 w-80 border xl:w-96" />
 			<div class="ml-16 justify-center space-x-2">
-				<P class="text-center text-sm">Forward documents to <span class="font-bold">daniel-pipeline@stratiqai.com</span> for automated pipeline analysis</P
+				<P class="text-center text-sm"
+					>Forward documents to <span class="font-bold">daniel-pipeline@stratiqai.com</span> for automated
+					pipeline analysis</P
 				>
 			</div>
 			<!-- <div class="border-l border-gray-100 pl-2 dark:border-gray-700">
@@ -241,7 +230,7 @@
 	<Table>
 		<TableHead class=" bg-gray-100 dark:border-gray-700">
 			<!-- <TableHeadCell class="w-4 p-4"><Checkbox /></TableHeadCell> -->
-			{#each ['Name', 'Address', 'Asset Type', 'Actions'] as title}
+			{#each ['Name', 'Actions'] as title}
 				<TableHeadCell class="p-4 font-medium">{title}</TableHeadCell>
 			{/each}
 		</TableHead>
@@ -266,12 +255,12 @@
 								<div
 									class="max-w-xl overflow-hidden text-ellipsis break-words text-sm font-normal text-gray-500 dark:text-gray-300"
 								>
-									{project.details?.description || ''}
+									{project.description || ''}
 								</div>
 							</div>
 						</a>
 					</TableBodyCell>
-					<TableBodyCell
+					<!-- <TableBodyCell
 						class="max-w-sm overflow-hidden truncate  text-base font-normal text-gray-500 xl:max-w-xs dark:text-gray-300"
 					>
 						<div class="text-base font-semibold text-gray-900 dark:text-white">
@@ -281,8 +270,8 @@
 						<div class="text-sm font-normal text-gray-500 dark:text-gray-300">
 							{(project.details?.city || '') + ' ' + (project.details?.state || '') + ' ' + (project.details?.zip || '')}
 						</div>
-					</TableBodyCell>
-					<TableBodyCell class="">{project.details?.assetType || ''}</TableBodyCell>
+					</TableBodyCell> -->
+					<!-- <TableBodyCell class="">{project.details?.assetType || ''}</TableBodyCell> -->
 					<TableBodyCell class="space-x-2 p-4">
 						<!-- <Button
 							size="sm"
@@ -308,4 +297,4 @@
 <!-- onclick={() => ((current_project = project), (openDelete = true))} -->
 <!-- Modals -->
 <ProjectModal bind:open={openProject} data={current_project} {idToken} />
-<DeleteModal bind:open={openDelete} data={current_project} {idToken} />
+<DeleteModal bind:open={openDelete} data={current_project} {idToken} mutation={M_DELETE_PROJECT} />

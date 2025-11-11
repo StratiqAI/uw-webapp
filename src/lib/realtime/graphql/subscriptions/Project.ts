@@ -3,25 +3,10 @@ subscription subCreateProject($ownerId: String!) {
   onCreateProject(ownerId: $ownerId) {
     id
     name
+    description
     ownerId
-    tenant
-    sharingMode
     createdAt
-    details {
-      id
-      projectId
-      ownerId
-      tenant
-      description
-      streetAddress
-      city
-      state
-      zip
-      assetType
-      sharingMode
-      createdAt
-      updatedAt
-    }
+    updatedAt
   }
 }
 `;
@@ -57,12 +42,12 @@ export const S_PROJECT_UPDATED = `
 export const S_PROJECT_DELETED = `
   subscription subDeleteProject($ownerId: String!) {
     onDeleteProject(ownerId: $ownerId) {
-      id
-      name
-      ownerId
-      tenant
-      sharingMode
-      createdAt
+    id
+    name
+    description
+    ownerId
+    createdAt
+    updatedAt
     }
   }
 `;
