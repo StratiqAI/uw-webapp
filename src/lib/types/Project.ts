@@ -35,15 +35,17 @@ export interface ProjectDocumentConnection {
 	nextToken?: string | null;
 }
 
-export interface Project {
-	id: string;
-	name: string;
-	ownerId: string;
-	tenant?: string | null;
-	sharingMode?: SharingMode | null;
-	createdAt?: string; // AWSDateTime
-	details?: ProjectDetail | null;
-	documents?: ProjectDocumentConnection | null;
+import type { ProjectDocumentLink, Project as StratiqProject } from '@stratiqai/types';
+
+export interface ProjectDocumentLinkConnection {
+	items: ProjectDocumentLink[];
+	nextToken?: string | null;
+}
+
+// Extend the Project type from stratiqai-types to include GraphQL Connection format
+export interface Project extends Omit<StratiqProject, 'projectDocumentLinks'> {
+	projectDocumentLinks?: ProjectDocumentLinkConnection | ProjectDocumentLink[] | null;
+	documents?: ProjectDocumentConnection | null; // Legacy - deprecated
 }
 
 export interface CreateProjectInput {

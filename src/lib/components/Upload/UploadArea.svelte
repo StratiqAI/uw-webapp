@@ -2,7 +2,6 @@
   Document Upload Component
   Features:
   - Abstraction of upload logic into a custom store for better separation of concerns
-  - GraphQL integration for project document updates
   - S3 presigned URL uploads with SHA-256 verification
   - Drag & drop support
   - Progress tracking with defined steps
@@ -19,20 +18,12 @@
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Internal Dependencies
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	import YesNoDialog from '$lib/components/Dialog/YesNoDialog.svelte';
 	import { logger } from '$lib/logging/debug';
-	import { gql } from '$lib/realtime/graphql/requestHandler';
-	import {
-		M_CREATE_PROJECT_DOCUMENT,
-		M_DELETE_PROJECT_DOCUMENT
-	} from '$lib/realtime/graphql/mutations/Project';
-	import { project as projectStore } from '$lib/stores/project.svelte';
-	import type { Project, ProjectDocument } from '$lib/types/Project';
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Types & Interfaces
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	type UploadStatus = 'pending' | 'hashing' | 'uploading' | 'saving' | 'success' | 'error';
+	type UploadStatus = 'pending' | 'hashing' | 'uploading' | 'success' | 'error';
 
 	interface UploadFile {
 		id: string; // Unique ID for the file instance (e.g., timestamp + name)
@@ -40,7 +31,6 @@
 		status: UploadStatus;
 		progress: number;
 		result: UploadResult | null;
-		documentId?: string;
 		abortController: AbortController;
 		retryCount: number;
 	}
@@ -70,19 +60,14 @@
 	const PROGRESS_HASHING = 5;
 	const PROGRESS_GETTING_URL = 10;
 	const PROGRESS_UPLOADING_MAX = 95;
-	const PROGRESS_SAVING = 98;
 	const PROGRESS_COMPLETE = 100;
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Props & Component State
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	const { idToken }: { idToken: string } = $props();
-	const project: Project = $derived($projectStore)!;
 	const dispatch = createEventDispatcher<{ error: string[] }>();
 
 	let fileInput: HTMLInputElement;
-	let openDeleteDialog = $state(false);
-	let fileToDelete = $state<UploadFile | null>(null);
 	let isDragging = $state(false);
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -92,24 +77,6 @@
 		let files = $state<UploadFile[]>([]);
 		let uploadQueue = $state<UploadFile[]>([]);
 		let activeUploads = $state(0);
-
-		// Initialize with existing documents from the project
-		$effect(() => {
-			const existingDocs = project?.documents?.items || [];
-			if (existingDocs.length > 0 && files.length === 0) {
-				logger(`${LOG_PREFIX} Initializing store with ${existingDocs.length} existing documents.`);
-				files = existingDocs.map((doc) => ({
-					id: doc.id,
-					file: new File([], doc.filename),
-					status: 'success',
-					progress: PROGRESS_COMPLETE,
-					result: { success: true, message: 'Existing document' },
-					documentId: doc.id,
-					abortController: new AbortController(),
-					retryCount: 0
-				}));
-			}
-		});
 
 		// Helper to update a file and trigger reactivity
 		function updateFile(fileId: string, updates: Partial<UploadFile>) {
@@ -147,24 +114,12 @@
 
 		async function removeFile(fileToRemove: UploadFile) {
 			logger(`${LOG_PREFIX} Removing file: ${fileToRemove.file.name}`);
-			// 1. Abort ongoing upload
+			// Abort ongoing upload
 			if (fileToRemove.status === 'uploading' || fileToRemove.status === 'hashing') {
 				fileToRemove.abortController.abort();
 			}
 
-			// 2. Delete from backend if successfully uploaded
-			if (fileToRemove.status === 'success' && fileToRemove.documentId) {
-				try {
-					await deleteProjectDocument(fileToRemove.documentId);
-				} catch (error) {
-					logger(`${LOG_PREFIX} Failed to delete document from backend:`, error);
-					dispatch('error', ['Failed to remove document from server. Please refresh.']);
-					// Do not remove from UI if backend deletion fails, to avoid inconsistency.
-					return;
-				}
-			}
-
-			// 3. Remove from local state
+			// Remove from local state
 			files = files.filter((f) => f.id !== fileToRemove.id);
 		}
 
@@ -240,16 +195,11 @@
 			uploader.updateFile(upload.id, { status: 'uploading' });
 			await uploadToS3(url, upload);
 
-			// Step 4: Create Project Document in Backend
-			uploader.updateFile(upload.id, { status: 'saving', progress: PROGRESS_SAVING });
-			const document = await createProjectDocument(upload.file.name);
-
-			// Step 5: Success
+			// Step 4: Success
 			uploader.updateFile(upload.id, {
 				status: 'success',
 				progress: PROGRESS_COMPLETE,
-				result: { success: true, message: 'Upload successful' },
-				documentId: document.id
+				result: { success: true, message: 'Upload successful' }
 			});
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
@@ -286,40 +236,6 @@
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// API & Helper Functions
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	async function createProjectDocument(filename: string): Promise<ProjectDocument> {
-		try {
-			const result = await gql<{ createProjectDocument: ProjectDocument }>(
-				M_CREATE_PROJECT_DOCUMENT,
-				{
-					input: {
-						projectId: project.id,
-						filename
-					}
-				},
-				idToken
-			);
-			logger('Project document created successfully');
-			return result.createProjectDocument;
-		} catch (error) {
-			logger('Error creating project document:', error);
-			throw new Error('Failed to save document record.');
-		}
-	}
-
-	async function deleteProjectDocument(documentId: string): Promise<void> {
-		try {
-			await gql<{ deleteProjectDocument: ProjectDocument }>(
-				M_DELETE_PROJECT_DOCUMENT,
-				{ id: documentId },
-				idToken
-			);
-			logger('Project document deleted successfully');
-		} catch (error) {
-			logger('Error deleting project document:', error);
-			throw new Error('Failed to delete document record.');
-		}
-	}
-
 	async function calculateSHA256(file: File): Promise<string> {
 		try {
 			const arrayBuffer = await file.arrayBuffer();
@@ -340,7 +256,7 @@
 		const response = await fetch('/api/s3-presigned', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ filename, contentType, fileHash, projectId: project.id })
+			body: JSON.stringify({ filename, contentType, fileHash })
 		});
 
 		if (!response.ok) {
@@ -452,15 +368,7 @@
 	}
 
 	function handleDeleteClick(file: UploadFile) {
-		fileToDelete = file;
-		openDeleteDialog = true;
-	}
-
-	async function handleDeleteConfirm() {
-		if (fileToDelete) {
-			await uploader.remove(fileToDelete);
-			fileToDelete = null;
-		}
+		uploader.remove(file);
 	}
 
 	function handleKeydown(event: KeyboardEvent): void {
@@ -476,7 +384,7 @@
 	const statusCounts = $derived.by(() => {
 		const counts = { uploading: 0, success: 0, error: 0 };
 		for (const file of uploader.files) {
-			if (['hashing', 'uploading', 'saving', 'pending'].includes(file.status))
+			if (['hashing', 'uploading', 'pending'].includes(file.status))
 				counts.uploading++;
 			else if (file.status === 'success') counts.success++;
 			else if (file.status === 'error') counts.error++;
@@ -489,7 +397,6 @@
 			pending: 'Pending...',
 			hashing: 'Hashing...',
 			uploading: 'Uploading...',
-			saving: 'Saving...',
 			success: '✓ Uploaded',
 			error: '✗ Failed'
 		};
@@ -592,7 +499,7 @@
 								type="button"
 								class="text-red-500 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
 								aria-label="Remove {file.file.name}"
-								disabled={file.status === 'uploading' || file.status === 'saving'}
+								disabled={file.status === 'uploading' || file.status === 'hashing'}
 								onclick={() => handleDeleteClick(file)}
 							>
 								<TrashBinOutline class="h-5 w-5" />
@@ -645,12 +552,3 @@
 		</table>
 	</div>
 {/if}
-
-<!-- Delete Confirmation Dialog -->
-<YesNoDialog
-	bind:open={openDeleteDialog}
-	data={{}}
-	{idToken}
-	title="Are you sure you want to remove '{fileToDelete?.file.name}'?"
-	onConfirm={handleDeleteConfirm}
-/>

@@ -1,17 +1,18 @@
 import { error } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types';
-import { Q_GET_PROJECT_BY_ID_WITH_DOCUMENTS } from '$lib/realtime/graphql/queries/Project';
-import { Q_DOCUMENT_BY_ID } from '$lib/realtime/graphql/queries/Document';
+
+// Import the GraphQL helper for making HTTP requests to AppSync
 import { gql } from '$lib/realtime/graphql/requestHandler';
-import type { Project, ProjectDocument } from '$lib/types/Project';
-import type { Document } from '$lib/types/Document';
-import { Q_INSIGHT_BY_DOCHASH } from '$lib/realtime/graphql/queries/Insight';
-import type { Insight } from '$lib/types/Insight';
+
+// Import the GraphQL query and mutation strings
+import type { Project } from '@stratiqai/types';
+import { GraphQLOperationGenerator, ProjectSchemas } from '@stratiqai/types';
+const projectGenerator = new GraphQLOperationGenerator("Project", ProjectSchemas);
+
+const Q_GET_PROJECT_BY_ID = projectGenerator.generateGetQuery();
 
 export const load: LayoutServerLoad = async ({ params, cookies, url }) => {
-	// console.log('Starting layout.server.ts');
-	// console.log('url', url);
-	// console.log('params', params);
+
 	let { projectId } = params;
 
 	const newProject = url.searchParams.get('new');
@@ -39,7 +40,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, url }) => {
 		};
 	}
 
-	const response = await gql<{ getProject: Project }>(Q_GET_PROJECT_BY_ID_WITH_DOCUMENTS, { id: projectId }, idToken);
+	const response = await gql<{ getProject: Project }>(Q_GET_PROJECT_BY_ID, { id: projectId }, idToken);
 	// console.log("response", response);
 	if (!response) {
 		throw error(404, 'Project not found');

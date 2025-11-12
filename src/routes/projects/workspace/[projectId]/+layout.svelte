@@ -7,11 +7,6 @@
 		project as projectStore,
 		setProject,
 		documents as documentsStore,
-		addDocument,
-		addPageToDocument,
-		addTextToDocument,
-		addImageToDocument,
-		addInsightToDocument
 	} from '$lib/stores/project.svelte';
 	import { mapStore } from '$lib/stores/mapStore';
 	import { setContext } from 'svelte';
@@ -65,11 +60,6 @@
 
 	// Import GraphQL Queries, Mutations, and Subscriptions
 	import { S_PROJECT_UPDATED_BY_ID } from '$lib/realtime/graphql/subscriptions/Project';
-	import { S_CREATE_DOCUMENT } from '$lib/realtime/graphql/subscriptions/Document';
-	import { S_CREATE_PAGE } from '$lib/realtime/graphql/subscriptions/Page';
-	import { S_CREATE_TEXT } from '$lib/realtime/graphql/subscriptions/Text';
-	import { S_CREATE_IMAGE } from '$lib/realtime/graphql/subscriptions/Image';
-	import { S_CREATE_INSIGHT } from '$lib/realtime/graphql/subscriptions/Insight';
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Application Svelte Components Section
@@ -266,5 +256,5 @@
 	</div>
 
 	<!-- Right chat drawer which will contain the chatbot -->
-	<RightChatDrawer />
+	<!-- <RightChatDrawer /> -->
 </div>

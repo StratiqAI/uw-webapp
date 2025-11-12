@@ -199,6 +199,35 @@ export const M_DELETE_PROJECT_DOCUMENT = `
     }
 `;
 
+// Mutation for creating ProjectDocumentLink
+export const M_CREATE_PROJECT_DOCUMENT_LINK = `
+    mutation createProjectDocumentLink($input: CreateProjectDocumentLinkInput!) {
+        createProjectDocumentLink(input: $input) {
+            id
+            parentId
+            parentType
+            documentId
+            filename
+            ownerId
+            tenantId
+            createdAt
+            updatedAt
+        }
+    }
+`;
+
+// Mutation for deleting ProjectDocumentLink
+export const M_DELETE_PROJECT_DOCUMENT_LINK = `
+    mutation deleteProjectDocumentLink($id: ID!) {
+        deleteProjectDocumentLink(id: $id) {
+            id
+            parentId
+            documentId
+            filename
+        }
+    }
+`;
+
 export async function updateProject(project: Project, idToken: string) {
     const mutation = M_UPDATE_PROJECT;
     // Extract only the fields that can be updated according to UpdateProjectInput
