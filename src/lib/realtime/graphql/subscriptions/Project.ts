@@ -53,29 +53,14 @@ export const S_PROJECT_DELETED = `
 `;
 
 export const S_PROJECT_UPDATED_BY_ID = `
-  subscription OnProjectUpdated($projectId: ID!) {
-    onUpdateProject(projectId: $projectId) {
+  subscription OnProjectUpdated($id: ID!) {
+    onUpdateProject(id: $id) {
       id
       name
       ownerId
-      tenant
       sharingMode
       createdAt
-      details {
-        id
-        projectId
-        ownerId
-        tenant
-        description
-        streetAddress
-        city
-        state
-        zip
-        assetType
-        sharingMode
-        createdAt
-        updatedAt
-      }
+      updatedAt
     }
   }
 `;

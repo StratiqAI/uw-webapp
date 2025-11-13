@@ -21,7 +21,7 @@
 		<DarkMode class="text-primary-500 dark:text-primary-600 border dark:border-gray-800" />
 		<Button href="/support" icon>Help & Documentation</Button>
 
-		<Button onclick={() => (ui.sidebarOpen = !ui.sidebarOpen)}>
+		<Button onclick={() => ui.setOpen(!ui.sidebarOpen)}>
 			{ui.sidebarOpen ? 'Hide AI' : 'Show AI'}
 		</Button>
 	</div>

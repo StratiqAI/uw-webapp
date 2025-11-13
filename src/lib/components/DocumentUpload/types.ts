@@ -1,0 +1,27 @@
+// src/lib/components/DocumentUpload/types.ts
+
+/** Defines the possible states of a file upload. */
+export type UploadStatus = 'pending' | 'hashing' | 'uploading' | 'success' | 'error';
+
+/** Represents the result of a completed upload attempt. */
+export interface UploadResult {
+	success: boolean;
+	message: string;
+}
+
+/** Represents a file being managed by the uploader. */
+export interface UploadFile {
+	id: string; // Unique ID for the file instance
+	file: File;
+	status: UploadStatus;
+	progress: number;
+	result: UploadResult | null;
+	abortController: AbortController;
+	retryCount: number;
+}
+
+/** The expected response from the presigned URL API endpoint. */
+export interface PresignedUrlResponse {
+	url: string;
+	key: string;
+}

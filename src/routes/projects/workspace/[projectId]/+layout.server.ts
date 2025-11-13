@@ -11,7 +11,8 @@ const projectGenerator = new GraphQLOperationGenerator("Project", ProjectSchemas
 
 const Q_GET_PROJECT_BY_ID = projectGenerator.generateGetQuery();
 
-export const load: LayoutServerLoad = async ({ params, cookies, url }) => {
+export const load: LayoutServerLoad = async ({ params, cookies, url, parent }) => {
+	const parentData = await parent();
 
 	let { projectId } = params;
 
@@ -34,6 +35,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, url }) => {
 		return {
 			project: null,
 			idToken: idToken,
+			currentUser: parentData.currentUser,
 			documents: [],
 			projectDocuments: projectDocuments,
 			isNewProject: true
@@ -57,6 +59,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, url }) => {
 	return {
 		project: response.getProject,
 		idToken: idToken,
+		currentUser: parentData.currentUser,
 		documents: [], // Legacy Document[] type - kept for backward compatibility
 		projectDocuments: projectDocuments,
 		isNewProject: false

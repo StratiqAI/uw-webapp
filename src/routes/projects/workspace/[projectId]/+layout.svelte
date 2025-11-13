@@ -9,6 +9,7 @@
 		documents as documentsStore,
 	} from '$lib/stores/project.svelte';
 	import { mapStore } from '$lib/stores/mapStore';
+	import { authStore } from '$lib/stores/auth.svelte';
 	import { setContext } from 'svelte';
 
 	// Type imports
@@ -48,6 +49,10 @@
 			}
 			if (documents && !isNewProject) {
 				documentsStore.set(documents);
+			}
+			// Sync auth data to auth store
+			if (currentUser && idToken) {
+				authStore.setAuth(currentUser, idToken);
 			}
 		});
 	}
@@ -107,7 +112,7 @@
 		const subscriptions = [
 			{
 				query: S_PROJECT_UPDATED_BY_ID,
-				variables: { projectId: project?.id },
+				variables: { id: project?.id },
 				path: 'onUpdateProject',
 				next: (it: Project) => {
 					project = it;
@@ -222,27 +227,15 @@
 	style={`padding-right:${ui.sidebarOpen ? ui.sidebarWidth : 0}px`}
 >
 	<!-- Main app area -->
-	<div class="flex min-w-0 flex-1 flex-col">
+	<div class="flex min-w-0 flex-1 flex-col w-full">
 		<WorkspaceHeaderBar projectName={$projectStore?.name ?? (isNewProject ? 'New Project' : '')} />
 
-		<div class="grid flex-1 grid-cols-6 gap-6 p-4">
-			<!-- Column 1 -->
-			<!-- <div class="hidden xl:block lg:col-span-1">
-				<section
-					class="space-y-6 rounded-2xl bg-gradient-to-br from-zinc-50 via-red-50 to-indigo-50 p-2 shadow-md dark:bg-gray-800 dark:bg-none"
-				>
-					{#if $projectStore?.documents || isNewProject}
-						<UploadArea {idToken} />
-					{/if}
-					<SourceCards columns={1} />
-				</section>
-			</div> -->
-			<div class="col-span-6 xl:col-span-5">
+		<div class="grid flex-1 grid-cols-6 gap-6 px-4 py-4">
+			<div class="col-span-6">
 				<!-- Workspace Navigation -->
 				<div class="mb-4 flex flex-wrap gap-2">
 					<TabButton href="get-started">Get Started</TabButton>
-					<TabButton href="document-analysis">Document Analysis</TabButton>
-					<!-- <TabButton href="ai-data-labeling">AI Data Labeling</TabButton> -->					
+					<TabButton href="document-analysis">Document Analysis</TabButton>				
 					<TabButton href="market-analysis">Market Analysis</TabButton>
 					<TabButton href="property-analysis">Financial Analysis</TabButton>
 					<TabButton href="investment-analysis">Location/Site</TabButton>
@@ -256,5 +249,5 @@
 	</div>
 
 	<!-- Right chat drawer which will contain the chatbot -->
-	<!-- <RightChatDrawer /> -->
+	<RightChatDrawer />
 </div>

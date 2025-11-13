@@ -149,7 +149,7 @@
 	}
 
 	function toggle() {
-		ui.sidebarOpen = !ui.sidebarOpen;
+		ui.setOpen(!ui.sidebarOpen);
 	}
 
 	function clearMessages() {
@@ -317,7 +317,7 @@
 {#if !ui.sidebarOpen}
 	<button
 		title="Open chat"
-		onclick={() => (ui.sidebarOpen = true)}
+		onclick={() => ui.setOpen(true)}
 		class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full rounded-l-xl bg-blue-600 px-3 py-2 text-white shadow"
 	>
 		Chat
