@@ -3,6 +3,7 @@
 	import DocumentUpload from '$lib/components/DocumentUpload/DocumentUpload.svelte';
 	import { project as projectStore } from '$lib/stores/project.svelte';
 	import { authStore } from '$lib/stores/auth.svelte';
+	import { page } from '$app/stores';
 
 	console.log('In file get-started/+page.svelte');
 	
@@ -14,7 +15,8 @@
 	// Use reactive project store instead of static data
 	let project = $derived($projectStore);
 	let isNewProject = $derived(data.isNewProject);
-	const projectId = $derived(project?.id ?? null);
+	// Get projectId from route params (more reliable than project store)
+	const projectId = $derived($page.params.projectId ?? null);
 </script>
 
 <section class="shadow">

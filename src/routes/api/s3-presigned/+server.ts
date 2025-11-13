@@ -8,6 +8,10 @@ import { fromCognitoIdentityPool } from '@aws-sdk/credential-provider-cognito-id
 export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   const { filename, contentType, projectId } = await request.json();
 
+  if (!projectId) {
+    throw svelteError(400, 'Project ID is required');
+  }
+
   const currentUser = locals.currentUser;
   if (!currentUser?.isAuthenticated || !currentUser.username || !currentUser.sub) {
     throw svelteError(401, 'Unauthorized');
