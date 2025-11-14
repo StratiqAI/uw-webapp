@@ -5,18 +5,27 @@
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { page } from '$app/stores';
 
-	console.log('In file get-started/+page.svelte');
-	
 	let { data } = $props();
 
 	// Use reactive auth store instead of static data
 	const cognitoIdToken = $derived(authStore.idToken);
+	const currentUser = $derived(authStore.currentUser);
 
 	// Use reactive project store instead of static data
 	let project = $derived($projectStore);
 	let isNewProject = $derived(data.isNewProject);
 	// Get projectId from route params (more reliable than project store)
 	const projectId = $derived($page.params.projectId ?? null);
+
+	// Construct file metadata for S3 uploads
+	const fileMetadata = $derived.by(() => {
+		if (!currentUser?.sub || !projectId) return null;
+		return {
+			tenantId: currentUser.tenant || 'default',
+			ownerId: currentUser.sub,
+			parentId: projectId
+		};
+	});
 </script>
 
 <section class="shadow">
@@ -33,7 +42,7 @@
 	<section
 		class="space-y-6 rounded-2xl bg-gradient-to-br from-zinc-50 via-red-50 to-indigo-50 p-2 shadow-md dark:bg-gray-800 dark:bg-none"
 	>
-		<DocumentUpload idToken={cognitoIdToken} projectId={projectId} />
+		<DocumentUpload idToken={cognitoIdToken} projectId={projectId} metadata={fileMetadata} />
 		<!-- {#if $projectStore || isNewProject}
 			<UploadArea {idToken} />
 		{/if} -->

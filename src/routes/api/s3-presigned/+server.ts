@@ -6,7 +6,7 @@ import { REGION, USER_FILE_STAGING_BUCKET, COGNITO_IDENTITY_POOL_ID, COGNITO_USE
 import { fromCognitoIdentityPool } from '@aws-sdk/credential-provider-cognito-identity';
 
 export const POST: RequestHandler = async ({ request, locals, cookies }) => {
-  const { filename, contentType, projectId } = await request.json();
+  const { filename, contentType, projectId, fileHash, metadata } = await request.json();
 
   if (!projectId) {
     throw svelteError(400, 'Project ID is required');
@@ -41,17 +41,26 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
     const userId = currentUser.sub;
     const key = `${userId}/${projectId}/${filename}`;
 
+    // Prepare S3 metadata - keys must be lowercase
+    // Metadata will be included in the presigned URL query parameters
+    const s3Metadata: Record<string, string> = {};
+    if (metadata) {
+      if (metadata.tenantId) s3Metadata['tenantid'] = metadata.tenantId;
+      if (metadata.ownerId) s3Metadata['ownerid'] = metadata.ownerId;
+      if (metadata.parentId) s3Metadata['parentid'] = metadata.parentId;
+    }
+
     const cmd = new PutObjectCommand({
       Bucket: USER_FILE_STAGING_BUCKET,
       Key: key,
       ContentType: contentType,
       ACL: 'bucket-owner-full-control', // Required by bucket policy
+      Metadata: Object.keys(s3Metadata).length > 0 ? s3Metadata : undefined,
       // Optional: ServerSideEncryption: "AES256",
-      // Optional: ChecksumSHA256: "<BASE64_SHA256>"
+      // Optional: ChecksumSHA256: fileHash ? Buffer.from(fileHash, 'hex').toString('base64') : undefined
     });
   
     const url = await getSignedUrl(s3, cmd, { expiresIn: 900 }); // 15 min
-    console.log('Generated presigned URL for key:', key);
   
     return json({ url, key });
   } catch (err) {

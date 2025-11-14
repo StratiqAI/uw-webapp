@@ -25,3 +25,10 @@ export interface PresignedUrlResponse {
 	url: string;
 	key: string;
 }
+
+/** File metadata to attach to S3 uploads. */
+export interface FileMetadata {
+	tenantId: string;
+	ownerId: string;
+	parentId: string;
+}

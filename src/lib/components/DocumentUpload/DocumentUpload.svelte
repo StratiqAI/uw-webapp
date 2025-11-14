@@ -7,13 +7,21 @@
 
 	import { SUPPORTED_FILE_TYPES, MAX_FILE_SIZE } from './constants';
 
-	const { idToken, projectId } = $props<{
+	const { idToken, projectId, metadata } = $props<{
 		idToken: string | null;
 		projectId: string | null;
+		metadata?: import('./types').FileMetadata | null;
 	}>();
 
 	// The uploader store manages all state and logic
-	const uploader = createUploader(idToken, projectId);
+	const uploader = createUploader(idToken, projectId, metadata ?? null);
+	
+	// Update uploader metadata when it changes reactively
+	$effect(() => {
+		if (metadata && uploader.updateMetadata) {
+			uploader.updateMetadata(metadata);
+		}
+	});
 	
 	// Make files reactive so the list updates when files are added
 	const files = $derived(uploader.files);

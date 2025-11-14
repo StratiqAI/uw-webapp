@@ -5,22 +5,30 @@ import { redirect } from '@sveltejs/kit';
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
 
 import { REGION, COGNITO_USER_POOL_ID } from '$env/static/private';
-import { logger } from '$lib/logging/debug';
 
 const JWKS = createRemoteJWKSet(
 	new URL(`https://cognito-idp.${REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}/.well-known/jwks.json`)
 );
 
 const verify = async (token: string) => {
-	// console.log("JWT token: -----------------------2222222222222222222222222222222>>>>>>>>>>>", token)
 	const { payload } = await jwtVerify(token, JWKS);
 	return claimsToCurrentUser(payload);
 };
 
 function claimsToCurrentUser(payload: JWTPayload) {
+	// Extract tenant - check custom:tenant first (AWS Cognito custom attribute format)
+	// then fall back to tenant, then to a default
+	const tenant = 
+		(payload['custom:tenant'] as string) ?? 
+		(payload['tenant'] as string) ?? 
+		'default';
+
+	// Extract sub - this is the Cognito user unique identifier (required)
+	const sub = payload.sub as string;
+
 	const cu: CurrentUser = {
 		isAuthenticated: true,
-		sub: payload.sub as string,
+		sub: sub,
 		username: (payload['cognito:username'] as string) ?? (payload['preferred_username'] as string),
 		email: payload['email'] as string,
 		emailVerified: payload['email_verified'] as boolean,
@@ -32,16 +40,14 @@ function claimsToCurrentUser(payload: JWTPayload) {
 		preferredUsername: payload['preferred_username'] as string,
 		pictureUrl: payload['picture'] as string,
 		groups: (payload['cognito:groups'] as string[]) ?? [],
-		tenant: payload['tenant'] as string,
+		tenant: tenant,
 		locale: payload['locale'] as string,
 		timezone: payload['custom:timezone'] as string,
-		// amr: Authentication Methods References (array of strings indicating how the user was authenticated)
 		amr: payload['amr'] as string[],
-		// exp: Expiration time (epoch seconds when the token expires)
 		exp: payload['exp'] as number,
-		// iat: Issued at time (epoch seconds when the token was issued)
 		iat: payload['iat'] as number
 	};
+
 	return cu;
 }
 
@@ -52,21 +58,26 @@ export const handle: Handle = async ({ event, resolve }) => {
 		event.url.pathname.startsWith('/auth/login') ||
 		event.url.pathname.startsWith('/auth/callback')
 	) {
-		event.locals.currentUser = { isAuthenticated: false };
+		event.locals.currentUser = { 
+			isAuthenticated: false,
+			sub: '',
+			tenant: 'default'
+		};
 		return resolve(event);
 	}
 
 	// Read token from HttpOnly cookies
 	const id_token = event.cookies.get('id_token');
 	const access_token = event.cookies.get('access_token');
-	// console.log("access_token: -----------------------3333333333333333333333333333333>>>>>>>>>>>", access_token)
 	const refresh_token = event.cookies.get('refresh_token');
-
-	// logger('id_token:', id_token);
 
 	// If user is not logged in, redirect to login
 	if (!id_token || !access_token || !refresh_token) {
-		event.locals.currentUser = { isAuthenticated: false };
+		event.locals.currentUser = { 
+			isAuthenticated: false,
+			sub: '',
+			tenant: 'default'
+		};
 		throw redirect(302, '/auth/login');
 	}
 
@@ -78,7 +89,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 		event.cookies.delete('access_token', { path: '/' });
 		event.cookies.delete('refresh_token', { path: '/' });
 		console.error('Error verifying token:', error);
-		event.locals.currentUser = { isAuthenticated: false };
+		event.locals.currentUser = { 
+			isAuthenticated: false,
+			sub: '',
+			tenant: 'default'
+		};
 		throw redirect(302, '/auth/login');
 	}
 

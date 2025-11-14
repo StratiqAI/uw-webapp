@@ -4,7 +4,7 @@
   export type CurrentUser = {
       isAuthenticated: boolean;         // Whether the user is authenticated
       idToken?: string;                 // Cognito ID token for API authentication
-      sub?: string;                     // Cognito user unique identifier (subject)
+      sub: string;                      // Cognito user unique identifier (subject) - REQUIRED
       username?: string;                // Username (may be Cognito or preferred username)
       email?: string;                   // User's email address
       emailVerified?: boolean;          // Whether the email is verified
@@ -16,7 +16,7 @@
       preferredUsername?: string;       // User's preferred username
       pictureUrl?: string;              // URL to user's profile picture
       groups?: string[];                // Cognito groups the user belongs to
-      tenant?: string;                // Custom tenant ID (multi-tenancy)
+      tenant: string;                   // Tenant ID (multi-tenancy) - REQUIRED, defaults to 'default'
       locale?: string;                  // User's locale (language/country)
       timezone?: string;                // User's timezone
       amr?: string[];                   // Authentication Methods References

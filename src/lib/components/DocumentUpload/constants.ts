@@ -2,7 +2,7 @@
 
 export const SUPPORTED_FILE_TYPES = '.pdf';
 export const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
-export const MAX_RETRY_ATTEMPTS = 3;
+export const MAX_RETRY_ATTEMPTS = 1;
 export const RETRY_DELAY_MS = 1000;
 export const CONCURRENT_UPLOAD_LIMIT = 3;
 export const LOG_PREFIX = '[DocumentUpload]';
