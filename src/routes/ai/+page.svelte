@@ -3,7 +3,7 @@
 	import JobSubmission from '$lib/components/AI/JobSubmission.svelte';
 	import { zodTextFormat } from 'openai/helpers/zod';
 	import { z } from 'zod';
-	import { project as projectStore } from '$lib/stores/project.svelte';
+	import { project as projectStore } from '$lib/stores/appStateStore';
 
 	// Define a type for Job Input Request
 

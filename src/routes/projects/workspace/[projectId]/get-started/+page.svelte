@@ -1,7 +1,7 @@
 <!-- +page.svelte -->
 <script>
 	import DocumentUpload from '$lib/components/DocumentUpload/DocumentUpload.svelte';
-	import { project as projectStore } from '$lib/stores/project.svelte';
+	import { project as projectStore } from '$lib/stores/appStateStore.js';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { page } from '$app/stores';
 

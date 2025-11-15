@@ -72,11 +72,11 @@
     console.log("S_ON_UPDATE_PROJECT", S_ON_UPDATE_PROJECT);
 
 	console.log("projectFromServer", projectFromServer);
+
+	
 	// Instantiate a GraphQLOperationGenerator for the Project model
 	const projectDocumentLinkGenerator = new GraphQLOperationGenerator('ProjectDocumentLink', ProjectDocumentLinkSchemas);
-	// Generate a GraphQL query for fetching a project by ID, including relations (e.g., documents)
 	const S_ON_CREATE_PROJECT_DOCUMENT_LINK = projectDocumentLinkGenerator.generateSubscription({eventType: 'create', includeRelations: true, filterBy: "parentId", filterType: "ID!"});
-	// const S_ON_UPDATE_PROJECT_DOCUMENT_LINK = projectDocumentLinkGenerator.generateSubscription({eventType: 'update', includeRelations: true, filterBy: "parentId", filterType: "ID!"});
 	const S_ON_DELETE_PROJECT_DOCUMENT_LINK = projectDocumentLinkGenerator.generateSubscription({eventType: 'delete', includeRelations: true, filterBy: "parentId", filterType: "ID!"});
 	
 	console.log("S_ON_CREATE_PROJECT_DOCUMENT_LINK", S_ON_CREATE_PROJECT_DOCUMENT_LINK);

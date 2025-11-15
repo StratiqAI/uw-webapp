@@ -23,7 +23,7 @@
 	import { gql } from '$lib/realtime/graphql/requestHandler';
 	import { M_UPDATE_PROJECT } from '$lib/realtime/graphql/mutations/Project';
 	import type { Project, ProjectDocument } from '$lib/types/Project';
-	import { project as projectStore } from '$lib/stores/project.svelte';
+	import { project as projectStore } from '$lib/stores/appStateStore';
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Types & Interfaces

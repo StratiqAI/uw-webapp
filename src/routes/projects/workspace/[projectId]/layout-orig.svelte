@@ -12,7 +12,7 @@
 		addTextToDocument,
 		addImageToDocument,
 		addInsightToDocument
-	} from '$lib/stores/project.svelte';
+	} from '$lib/stores/appStateStore';
 	import { mapStore } from '$lib/stores/mapStore';
 	import { setContext } from 'svelte';
 

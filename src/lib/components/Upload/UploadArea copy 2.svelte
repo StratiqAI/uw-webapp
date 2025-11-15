@@ -26,7 +26,7 @@
 		M_DELETE_PROJECT_DOCUMENT
 	} from '$lib/realtime/graphql/mutations/Project';
 	import type { Project, ProjectDocument } from '$lib/types/Project';
-	import { project as projectStore } from '$lib/stores/project.svelte';
+	import { project as projectStore } from '$lib/stores/appStateStore';
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Types & Interfaces

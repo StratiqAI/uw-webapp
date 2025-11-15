@@ -15,7 +15,7 @@
 		addImageToDocument,
 		addInsightToDocument,
 		type ProjectStore
-	} from '$lib/stores/project.svelte';
+	} from '$lib/stores/appStateStore';
 	import { mapStore } from '$lib/stores/mapStore';
 	import { ui } from '$lib/stores/ui.svelte';
 

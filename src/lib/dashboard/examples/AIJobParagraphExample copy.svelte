@@ -21,7 +21,7 @@
 	import { createJobWidgetBridge, type JobWidgetBridge } from '$lib/dashboard/types/widgetBridge';
 	// import { z } from 'zod';
 	import { paragraphTitleQuery } from '../types/OpenAIQueryDefs';
-	import { project as projectStore } from '$lib/stores/project.svelte';
+	import { project as projectStore } from '$lib/stores/appStateStore';
 
 	// ===== Types =====
 	interface Props {

@@ -16,7 +16,7 @@
     // Types
     import type { ParagraphWidgetData } from '$lib/dashboard/widget-system';
     import type { CurrentUser } from '$lib/types/auth';
-    import { project as projectStore } from '$lib/stores/project.svelte';
+    import { project as projectStore } from '$lib/stores/appStateStore';
     
     // ============================================================================
     // Props

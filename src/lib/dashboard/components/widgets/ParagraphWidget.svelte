@@ -22,7 +22,7 @@
 	import { Publishers, WidgetStores } from '$lib/dashboard/types/widgetBridge';
 	import { submitAIJob, type JobSubmissionCallbacks } from './utils/aiJobSubmission';
 	import { paragraphTitleQuery } from '$lib/dashboard/types/OpenAIQueryDefs';
-	import { project as projectStore } from '$lib/stores/project.svelte';
+	import { project as projectStore } from '$lib/stores/appStateStore';
 
 	// Inferred Types
 	type ParagraphWidgetData = z.infer<typeof ParagraphWidgetDataSchema>;

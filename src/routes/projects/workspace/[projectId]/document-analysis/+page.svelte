@@ -7,7 +7,7 @@
 	
 	// The project store holds the state for the workspace. 
 	// It's initialized from data loaded on the server side and passed to the client.
-	import { project as projectStore, documents as documentsStore } from '$lib/stores/project.svelte';
+	import { project as projectStore, documents as documentsStore } from '$lib/stores/appStateStore';
 	
 	// Access mapStore from parent layout context
 	import { getContext } from 'svelte';
