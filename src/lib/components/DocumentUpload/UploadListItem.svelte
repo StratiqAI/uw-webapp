@@ -1,12 +1,12 @@
 <!-- src/lib/components/DocumentUpload/UploadListItem.svelte -->
 <script lang="ts">
-	import type { UploadFile, UploadStatus } from './types';
+	import type { DocumentListItem, UploadStatus } from './types';
 	import { TrashBinOutline } from 'flowbite-svelte-icons';
 
-	const { file, onRemove, onRetry } = $props<{
-		file: UploadFile;
-		onRemove?: (event: { fileId: string }) => void;
-		onRetry?: (event: { fileId: string }) => void;
+	const { item, onRemove, onRetry } = $props<{
+		item: DocumentListItem;
+		onRemove?: (event: { item: DocumentListItem }) => void;
+		onRetry?: (event: { item: DocumentListItem }) => void;
 	}>();
 
 	const statusText = (status: UploadStatus) => {
@@ -19,55 +19,73 @@
 		};
 		return map[status];
 	};
+
+	const displayName = $derived(item.filename);
+	const fileSize = $derived(item.size);
+	const isUploading = $derived(item.status === 'upload' && item.uploadFile && ['hashing', 'uploading', 'pending'].includes(item.uploadFile.status));
+	const canRemove = $derived(item.status === 'upload' && item.uploadFile && !['uploading', 'hashing'].includes(item.uploadFile.status));
+	const progress = $derived(item.status === 'upload' && item.uploadFile ? item.uploadFile.progress : undefined);
+	const uploadStatus = $derived(item.status === 'upload' && item.uploadFile ? item.uploadFile.status : undefined);
 </script>
 
 <tr
 	class="border-b border-gray-300 last:border-b-0 hover:bg-gray-50 dark:border-gray-500 dark:hover:bg-gray-800/50"
 >
 	<td class="px-4 py-2 text-center">
-		<button
-			type="button"
-			class="text-red-500 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-			aria-label="Remove {file.file.name}"
-			disabled={file.status === 'uploading' || file.status === 'hashing'}
-			onclick={() => onRemove?.({ fileId: file.id })}
-		>
-			<TrashBinOutline class="h-5 w-5" />
-		</button>
+		{#if canRemove}
+			<button
+				type="button"
+				class="text-red-500 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+				aria-label="Remove {displayName}"
+				disabled={!canRemove}
+				onclick={() => onRemove?.({ item })}
+			>
+				<TrashBinOutline class="h-5 w-5" />
+			</button>
+		{:else if item.status === 'existing'}
+			<!-- Existing documents don't have remove button for now -->
+			<span class="text-gray-400">—</span>
+		{/if}
 	</td>
 	<td class="px-4 py-2">
 		<div class="break-words">
-			<span class="block font-medium">{file.file.name}</span>
-			<span class="text-xs text-gray-500">
-				{(file.file.size / (1024 * 1024)).toFixed(2)} MB
-			</span>
+			<span class="block font-medium">{displayName}</span>
+			{#if fileSize !== undefined}
+				<span class="text-xs text-gray-500">
+					{(fileSize / (1024 * 1024)).toFixed(2)} MB
+				</span>
+			{:else if item.status === 'existing'}
+				<span class="text-xs text-gray-500">Existing document</span>
+			{/if}
 		</div>
-		{#if file.status !== 'success' && file.status !== 'error'}
+		{#if progress !== undefined && uploadStatus !== 'success' && uploadStatus !== 'error'}
 			<div class="mt-1">
 				<div class="flex items-center gap-2">
-					<progress class="flex-1" max="100" value={file.progress} aria-label="Upload progress"
+					<progress class="flex-1" max="100" value={progress} aria-label="Upload progress"
 					></progress>
-					<span class="text-xs text-gray-600">{file.progress}%</span>
+					<span class="text-xs text-gray-600">{progress}%</span>
 				</div>
 			</div>
 		{/if}
 	</td>
 	<td class="px-4 py-2 text-center text-xs">
-		{#if file.status === 'success'}
-			<span class="text-green-600">{statusText(file.status)}</span>
-		{:else if file.status === 'error'}
-			<div class="text-red-600" title={file.result?.message}>
-				<span>{statusText(file.status)}</span>
+		{#if item.status === 'existing'}
+			<span class="text-gray-600">✓ Existing</span>
+		{:else if uploadStatus === 'success'}
+			<span class="text-green-600">{statusText(uploadStatus)}</span>
+		{:else if uploadStatus === 'error'}
+			<div class="text-red-600" title={item.uploadFile?.result?.message}>
+				<span>{statusText(uploadStatus)}</span>
 				<button
 					type="button"
 					class="ml-2 underline hover:text-red-800"
-					onclick={() => onRetry?.({ fileId: file.id })}
+					onclick={() => onRetry?.({ item })}
 				>
 					Retry
 				</button>
 			</div>
-		{:else}
-			<span class="text-blue-600">{statusText(file.status)}</span>
+		{:else if uploadStatus}
+			<span class="text-blue-600">{statusText(uploadStatus)}</span>
 		{/if}
 	</td>
 </tr>

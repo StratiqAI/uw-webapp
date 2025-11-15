@@ -32,3 +32,13 @@ export interface FileMetadata {
 	ownerId: string;
 	parentId: string;
 }
+
+/** Unified list item that can represent either an upload file or an existing ProjectDocumentLink */
+export interface DocumentListItem {
+	id: string;
+	filename: string;
+	size?: number; // File size in bytes (only available for uploads)
+	status: 'upload' | 'existing'; // 'upload' for files being uploaded, 'existing' for ProjectDocumentLinks
+	uploadFile?: UploadFile; // Present if status is 'upload'
+	documentLink?: import('@stratiqai/types').ProjectDocumentLink; // Present if status is 'existing'
+}

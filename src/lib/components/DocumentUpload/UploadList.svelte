@@ -1,30 +1,38 @@
 <!-- src/lib/components/DocumentUpload/UploadList.svelte -->
 <script lang="ts">
-	import type { UploadFile } from './types';
+	import type { DocumentListItem } from './types';
 	import UploadListItem from './UploadListItem.svelte';
 
-	const { files, onRemove, onRetry } = $props<{
-		files: UploadFile[];
-		onRemove?: (event: { fileId: string }) => void;
-		onRetry?: (event: { fileId: string }) => void;
+	const { items, onRemove, onRetry } = $props<{
+		items: DocumentListItem[];
+		onRemove?: (event: { item: DocumentListItem }) => void;
+		onRetry?: (event: { item: DocumentListItem }) => void;
 	}>();
 
 	const statusCounts = $derived.by(() => {
-		const counts = { uploading: 0, success: 0, error: 0 };
-		for (const file of files) {
-			if (['hashing', 'uploading', 'pending'].includes(file.status)) counts.uploading++;
-			else if (file.status === 'success') counts.success++;
-			else if (file.status === 'error') counts.error++;
+		const counts = { uploading: 0, success: 0, error: 0, existing: 0 };
+		for (const item of items) {
+			if (item.status === 'existing') {
+				counts.existing++;
+			} else if (item.uploadFile) {
+				const status = item.uploadFile.status;
+				if (['hashing', 'uploading', 'pending'].includes(status)) counts.uploading++;
+				else if (status === 'success') counts.success++;
+				else if (status === 'error') counts.error++;
+			}
 		}
 		return counts;
 	});
 </script>
 
-{#if files.length > 0}
+{#if items.length > 0}
 	<div class="mt-4">
 		<!-- Summary Stats -->
-		{#if statusCounts.uploading > 0 || statusCounts.error > 0}
+		{#if statusCounts.uploading > 0 || statusCounts.error > 0 || statusCounts.existing > 0}
 			<div class="mb-2 flex gap-4 text-sm">
+				{#if statusCounts.existing > 0}
+					<span class="text-gray-600">📄 {statusCounts.existing} existing</span>
+				{/if}
 				{#if statusCounts.success > 0}
 					<span class="text-green-600">✓ {statusCounts.success} uploaded</span>
 				{/if}
@@ -48,8 +56,8 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each files as file (file.id)}
-					<UploadListItem {file} {onRemove} {onRetry} />
+				{#each items as item (item.id)}
+					<UploadListItem {item} {onRemove} {onRetry} />
 				{/each}
 			</tbody>
 		</table>

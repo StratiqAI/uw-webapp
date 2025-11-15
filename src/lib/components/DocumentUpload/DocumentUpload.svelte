@@ -4,6 +4,9 @@
 	import { createUploader } from './uploader.store.svelte';
 	import UploadDropZone from './UploadDropZone.svelte';
 	import UploadList from './UploadList.svelte';
+	import { project } from '$lib/stores/appStateStore';
+	import type { ProjectDocumentLink } from '@stratiqai/types';
+	import type { DocumentListItem } from './types';
 
 	import { SUPPORTED_FILE_TYPES, MAX_FILE_SIZE } from './constants';
 
@@ -24,7 +27,47 @@
 	});
 	
 	// Make files reactive so the list updates when files are added
-	const files = $derived(uploader.files);
+	const uploadFiles = $derived(uploader.files);
+
+	// Get projectDocumentLinks from the project store reactively
+	const projectDocumentLinks = $derived.by(() => {
+		const currentProject = $project;
+		if (!currentProject?.projectDocumentLinks) return [] as ProjectDocumentLink[];
+		
+		const links = currentProject.projectDocumentLinks;
+		if (Array.isArray(links)) {
+			return links;
+		}
+		return (links as { items: ProjectDocumentLink[] }).items || [];
+	});
+
+	// Combine upload files and existing ProjectDocumentLinks into a unified list
+	const documentList = $derived.by(() => {
+		const items: DocumentListItem[] = [];
+		
+		// Add existing ProjectDocumentLinks
+		for (const link of projectDocumentLinks) {
+			items.push({
+				id: link.id,
+				filename: link.filename,
+				status: 'existing',
+				documentLink: link
+			});
+		}
+		
+		// Add upload files
+		for (const uploadFile of uploadFiles) {
+			items.push({
+				id: uploadFile.id,
+				filename: uploadFile.file.name,
+				size: uploadFile.file.size,
+				status: 'upload',
+				uploadFile: uploadFile
+			});
+		}
+		
+		return items;
+	});
 
 	// Cancel any ongoing uploads when the component is removed from the DOM
 	onDestroy(() => {
@@ -32,10 +75,13 @@
 	});
 
 	function handleFilesAdded(event: { validFiles: File[] }) {
-		// Prevent adding files that are already in the list
-		const existingFileNames = files.map((f) => f.file.name);
+		// Prevent adding files that are already in the list (check both uploads and existing links)
+		const existingFileNames = new Set([
+			...uploadFiles.map((f) => f.file.name),
+			...projectDocumentLinks.map((link: ProjectDocumentLink) => link.filename)
+		]);
 		const newFiles = event.validFiles.filter(
-			(file) => !existingFileNames.includes(file.name)
+			(file) => !existingFileNames.has(file.name)
 		);
 		uploader.add(newFiles);
 	}
@@ -61,7 +107,17 @@
 </UploadDropZone>
 
 <UploadList
-	files={files}
-	onRemove={(e) => uploader.remove(e.fileId)}
-	onRetry={(e) => uploader.retry(e.fileId)}
+	items={documentList}
+	onRemove={(e) => {
+		if (e.item.status === 'upload' && e.item.uploadFile) {
+			uploader.remove(e.item.uploadFile.id);
+		}
+		// Note: Removing existing ProjectDocumentLinks would require a mutation
+		// For now, we'll only allow removing upload files
+	}}
+	onRetry={(e) => {
+		if (e.item.status === 'upload' && e.item.uploadFile) {
+			uploader.retry(e.item.uploadFile.id);
+		}
+	}}
 />
