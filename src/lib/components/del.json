@@ -1,7 +1,7 @@
 {
 	"model": "gpt-5-nano",
 	"input": [{ "role": "system", "content": "Extract the details from the file" }],
-	"tools": [{ "type": "file_search", "vector_store_ids": ["vs_68f27e777d308191bb5c70ad8e5f8ba9"] }],
+	"tools": [{ "type": "file_search", "vector_store_ids": ["vs_6918d2ecf0f48191af572585f63ab54a"] }],
 	"tool_choice": "auto",
 	"text": {
 		"format": {

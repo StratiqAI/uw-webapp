@@ -1,0 +1,116 @@
+{
+	"id": "resp_000e641f570c82c600691a565143ec819c9fffcab0af042ea7",
+	"object": "response",
+	"created_at": 1763333713,
+	"status": "completed",
+	"background": false,
+	"billing": {
+		"payer": "developer"
+	},
+	"error": null,
+	"incomplete_details": null,
+	"instructions": null,
+	"max_output_tokens": null,
+	"max_tool_calls": null,
+	"model": "gpt-5-nano-2025-08-07",
+	"output": [
+		{
+			"id": "rs_000e641f570c82c600691a56525f4c819c88742bf0928747fb",
+			"type": "reasoning",
+			"summary": []
+		},
+		{
+			"id": "fs_000e641f570c82c600691a56563bac819ca451c8557009d873",
+			"type": "file_search_call",
+			"status": "completed",
+			"queries": [
+				"Extract the details from the file!",
+				"What are the key details in the uploaded file?",
+				"Summarize the main facts from the document(s) provided.",
+				"List the names, dates, numbers, and sections in the file.",
+				"Provide a structured extraction of the file contents (title, author, date, summary, figures)"
+			],
+			"results": null
+		},
+		{
+			"id": "rs_000e641f570c82c600691a565834dc819c8c6640bb2a0b95ba",
+			"type": "reasoning",
+			"summary": []
+		},
+		{
+			"id": "msg_000e641f570c82c600691a5674efd8819c87a53df35f31340d",
+			"type": "message",
+			"status": "completed",
+			"content": [
+				{
+					"type": "output_text",
+					"annotations": [],
+					"logprobs": [],
+					"text": "{\"name\":\"198 NE Combs Flat Rd Offering Memorandum (Prineville, OR)\"}"
+				}
+			],
+			"role": "assistant"
+		}
+	],
+	"parallel_tool_calls": true,
+	"previous_response_id": null,
+	"prompt_cache_key": null,
+	"prompt_cache_retention": null,
+	"reasoning": {
+		"effort": "medium",
+		"summary": null
+	},
+	"safety_identifier": null,
+	"service_tier": "default",
+	"store": true,
+	"temperature": 1,
+	"text": {
+		"format": {
+			"type": "json_schema",
+			"description": null,
+			"name": "responseSchema",
+			"schema": {
+				"type": "object",
+				"properties": {
+					"name": {
+						"type": "string",
+						"description": "the name of the commercial real estate property"
+					}
+				},
+				"required": ["name"],
+				"additionalProperties": false
+			},
+			"strict": true
+		},
+		"verbosity": "medium"
+	},
+	"tool_choice": "auto",
+	"tools": [
+		{
+			"type": "file_search",
+			"filters": null,
+			"max_num_results": 20,
+			"ranking_options": {
+				"ranker": "auto",
+				"score_threshold": 0
+			},
+			"vector_store_ids": ["vs_6918d2ecf0f48191af572585f63ab54a"]
+		}
+	],
+	"top_logprobs": 0,
+	"top_p": 1,
+	"truncation": "disabled",
+	"usage": {
+		"input_tokens": 5588,
+		"input_tokens_details": {
+			"cached_tokens": 1152
+		},
+		"output_tokens": 5790,
+		"output_tokens_details": {
+			"reasoning_tokens": 5760
+		},
+		"total_tokens": 11378
+	},
+	"user": null,
+	"metadata": {}
+}

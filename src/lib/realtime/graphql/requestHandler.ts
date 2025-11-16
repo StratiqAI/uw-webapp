@@ -38,7 +38,7 @@ export async function gql<T>(
 	}
 	
 	const body = await res.json();
-	console.log('GraphQL Response:', JSON.stringify(body, null, 2));
+	// console.log('GraphQL Response:', JSON.stringify(body, null, 2));
 	
 	if (body.errors?.length) {
 		console.error('GraphQL errors:', body.errors);

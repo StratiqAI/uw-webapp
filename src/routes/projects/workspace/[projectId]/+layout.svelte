@@ -71,7 +71,7 @@
     const S_ON_UPDATE_PROJECT = projectGenerator.generateSubscription({eventType: 'update', includeRelations: true, filterBy: "id", filterType: "ID!"});
     console.log("S_ON_UPDATE_PROJECT", S_ON_UPDATE_PROJECT);
 
-	console.log("projectFromServer", projectFromServer);
+	// console.log("projectFromServer", projectFromServer);
 
 	
 	// Instantiate a GraphQLOperationGenerator for the Project model
@@ -125,9 +125,9 @@
 			client = null;
 		}
 
-        console.log("++++++++++++++++++++++++++++")
-        console.log("projectFromServer", projectFromServer)
-        console.log("++++++++++++++++++++++++++++")
+        // console.log("++++++++++++++++++++++++++++")
+        // console.log("projectFromServer", projectFromServer)
+        // console.log("++++++++++++++++++++++++++++")
 
 		// Build subscription array dynamically based on project documents
 		const subscriptions = [

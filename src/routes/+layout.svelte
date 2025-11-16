@@ -2,7 +2,7 @@
 	import Sidebar from '$lib/components/Sidebar/Sidebar.svelte';
 	import '../app.css';
 	import type { LayoutData } from './$types';
-	console.log('In file +layout.svelte');
+	// console.log('In file +layout.svelte');
 	let { children, data } = $props<{ children: any; data: LayoutData }>();
 
 	let isSidebarOpen = $state(false);
@@ -25,7 +25,7 @@
 			localStorage.setItem('sidebar-open', String(isSidebarOpen));
 		} catch {}
 	}
-	console.log("End of file +layout.svelte");
+	// console.log("End of file +layout.svelte");
 </script>
 
 <div class="h-full bg-gray-50 dark:bg-gray-900">
