@@ -68,7 +68,7 @@
 					<div>
 						<h3 class="text-lg font-semibold text-green-800">API Response</h3>
 						{#if elapsedTime !== null}
-							<p class="text-xs text-green-600">
+							<p class="text-xl text-green-600">
 								<svg
 									class="mr-1 inline-block h-3 w-3"
 									fill="none"

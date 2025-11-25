@@ -79,9 +79,9 @@
 	const S_ON_CREATE_PROJECT_DOCUMENT_LINK = projectDocumentLinkGenerator.generateSubscription({eventType: 'create', includeRelations: true, filterBy: "parentId", filterType: "ID!"});
 	const S_ON_DELETE_PROJECT_DOCUMENT_LINK = projectDocumentLinkGenerator.generateSubscription({eventType: 'delete', includeRelations: true, filterBy: "parentId", filterType: "ID!"});
 	
-	console.log("S_ON_CREATE_PROJECT_DOCUMENT_LINK", S_ON_CREATE_PROJECT_DOCUMENT_LINK);
+	// console.log("S_ON_CREATE_PROJECT_DOCUMENT_LINK", S_ON_CREATE_PROJECT_DOCUMENT_LINK);
 	// console.log("S_ON_UPDATE_PROJECT_DOCUMENT_LINK", S_ON_UPDATE_PROJECT_DOCUMENT_LINK);
-	console.log("S_ON_DELETE_PROJECT_DOCUMENT_LINK", S_ON_DELETE_PROJECT_DOCUMENT_LINK);
+	// console.log("S_ON_DELETE_PROJECT_DOCUMENT_LINK", S_ON_DELETE_PROJECT_DOCUMENT_LINK);
 	
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Application Svelte Components Section

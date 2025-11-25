@@ -61,7 +61,8 @@ export function buildOutput(
 		tools: [
 			{
 				type: 'file_search',
-				vector_store_ids: vectorStoreIds.filter((id) => id.trim() !== '')
+				vector_store_ids: vectorStoreIds.filter((id) => id.trim() !== ''),
+				"max_num_results": 5
 			}
 		],
 		tool_choice: 'auto',
@@ -79,3 +80,64 @@ export function buildOutput(
 		include: ['output.file_search_call.results']
 	};
 }
+
+
+// export function buildOutput(
+// 	model: string,
+// 	messages: Message[],
+// 	vectorStoreIds: string[],
+// 	schemaName: string,
+// 	strict: boolean,
+// 	properties: SchemaProperty[]
+// ) {
+// 	return  {
+// 		"model": "gpt-4.1-mini",
+// 		"input": [
+// 		  {
+// 			"role": "system",
+// 			"content": "Extract the details from the file"
+// 		  }
+// 		],
+// 		"tools": [
+// 		  {
+// 			"type": "file_search",
+// 			"vector_store_ids": [
+// 			  "vs_6918d2ecf0f48191af572585f63ab54a"
+// 			]
+// 		  }
+// 		],
+// 		"tool_choice": "auto",
+// 		"text": {
+// 		  "format": {
+// 			"type": "json_schema",
+// 			"name": "brokerInfo",
+// 			"strict": true,
+// 			"schema": {
+// 			  "type": "object",
+// 			  "properties": {
+// 				"brokers": {
+// 				  "type": "array",
+// 				  "items": {
+// 					"type": "object",
+// 					"properties": {
+// 					  "name": {
+// 						"type": "string"
+// 					  }
+// 					},
+// 					"required": [
+// 					  "name"
+// 					],
+// 					"additionalProperties": false
+// 				  }
+// 				}
+// 			  },
+// 			  "required": [
+// 				"brokers"
+// 			  ],
+// 			  "additionalProperties": false,
+// 			  "$schema": "http://json-schema.org/draft-07/schema#"
+// 			}
+// 		  }
+// 		}
+// 	  }
+// }
