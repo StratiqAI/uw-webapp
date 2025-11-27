@@ -10,7 +10,7 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 
 export const GET: RequestHandler = async ({ cookies, url }) => {
-	// console.log('In auth/login/+server.ts url:', url);
+	console.log('In auth/login/+server.ts url:', url);
 
 	// 1. Generate a random PKCE code verifier
 	const verifier = generateCodeVerifier();

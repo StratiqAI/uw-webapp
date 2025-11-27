@@ -1,7 +1,7 @@
 <script lang="ts">
     import { createPromptManager } from './prompts';
     import { onMount } from 'svelte';
-    import type { PageProps } from './$types';
+    import type { PageProps } from '../prompts/$types';
 
     // Get the Props for the Component
     let componentProps: PageProps = $props();
