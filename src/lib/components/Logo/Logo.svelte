@@ -1,1 +1,1 @@
-<img src="/images/logos/logo-graphic-only.png" alt="Logo" class="w-10 h-10" />
+<img src="/images/logos/logo.png" alt="Logo" class="w-10 h-10" />

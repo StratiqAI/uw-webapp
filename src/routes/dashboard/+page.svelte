@@ -2,13 +2,16 @@
 	import type { PageData } from './$types';
 	import Dashboard from '$lib/dashboard/components/Dashboard.svelte';
 	import DashboardControls from '$lib/dashboard/components/DashboardControls.svelte';
+	import ProjectSwitcher from '$lib/dashboard/components/ProjectSwitcher.svelte';
 	import MapStoreDebugPanel from '$lib/dashboard/components/widgets/MapStoreDebugWidget.svelte';
 	import ParagraphDisplayParent from '$lib/dashboard/examples/ParagraphDisplayParent.svelte';
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
+	import { DashboardStorage } from '$lib/dashboard/utils/storage';
 	import { dashboardWidgets } from './config';
 
 	import { onMount, setContext } from 'svelte';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
+	import type { Project } from '@stratiqai/types';
 
 	interface Props {
 		data: PageData;
@@ -21,6 +24,10 @@
 	let darkMode = $derived.by(() => darkModeStore.darkMode);
 	let toggleDarkMode = darkModeStore.toggle;
 
+	// Project state
+	let projects = $state<Project[]>(data.projects || []);
+	let selectedProjectId = $state<string | null>(null);
+
 	// Set page data context for child components
 	setContext('pageData', { currentUser: data.currentUser });
 	
@@ -29,9 +36,34 @@
 		setContext('darkMode', darkMode);
 	});
 
+	function handleProjectChange(projectId: string | null) {
+		selectedProjectId = projectId;
+		// Save current dashboard before switching
+		if (dashboard.hasUnsavedChanges) {
+			dashboard.save();
+		}
+		// Initialize dashboard for the new project
+		const hasLoadedDashboard = dashboard.initialize(projectId);
+		// If no saved dashboard for this project, load defaults
+		if (!hasLoadedDashboard) {
+			console.info('No saved dashboard found for project, loading defaults');
+			dashboardWidgets.forEach((widget) => {
+				dashboard.addWidget(widget);
+			});
+		}
+	}
+
 	onMount(() => {
-		// Try to load saved dashboard
-		const hasLoadedDashboard = dashboard.initialize();
+		// Load selected project from storage or use first project
+		const savedProjectId = DashboardStorage.getSelectedProjectId();
+		if (savedProjectId && projects.some((p) => p.id === savedProjectId)) {
+			selectedProjectId = savedProjectId;
+		} else if (projects.length > 0) {
+			selectedProjectId = projects[0].id;
+		}
+
+		// Initialize dashboard for the selected project
+		const hasLoadedDashboard = dashboard.initialize(selectedProjectId);
 
 		// If no saved dashboard, load defaults
 		if (!hasLoadedDashboard) {
@@ -93,6 +125,15 @@
 		<div class="h-14 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border-b flex items-center justify-between px-6 shadow-sm">
 			<div class="flex items-center gap-4">
 				<h1 class="text-2xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'} tracking-tight">Dashboards</h1>
+				<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
+				{#if projects.length > 0}
+					<ProjectSwitcher
+						{projects}
+						{selectedProjectId}
+						{darkMode}
+						onProjectChange={handleProjectChange}
+					/>
+				{/if}
 				<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
 				<span class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'}">
 					{dashboard.widgets.length} {dashboard.widgets.length === 1 ? 'widget' : 'widgets'}

@@ -6,7 +6,8 @@ export const load: PageLoad = async ({ data, parent }) => {
 
 	return {
 		currentUser: parentData.currentUser,
-		idToken: data.idToken
+		idToken: data.idToken,
+		projects: data.projects || []
 	};
 };
 

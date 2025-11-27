@@ -91,9 +91,9 @@
 					title={!isSidebarOpen ? 'Click to expand sidebar' : ''}
 				>
 					<img
-						src="/images/logos/logo-graphic-only.png"
+						src="/images/logos/logo.png"
 						alt="StratiqAI Logo"
-						class={`${isSidebarOpen ? 'h-10 w-10' : 'h-10 w-10'} transition-all object-contain`}
+						class={`${isSidebarOpen ? 'h-16 w-16' : 'h-12 w-12'} transition-all object-contain`}
 					/>
 				</button>
 				{#if isSidebarOpen}

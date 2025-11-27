@@ -5,8 +5,16 @@ const STORAGE_KEYS = {
 	WIDGETS: 'dashboard_widgets',
 	CONFIG: 'dashboard_config',
 	WIDGET_DATA: 'dashboard_widget_data',
-	VERSION: 'dashboard_version'
+	VERSION: 'dashboard_version',
+	SELECTED_PROJECT: 'dashboard_selected_project'
 } as const;
+
+function getProjectScopedKey(baseKey: string, projectId: string | null): string {
+	if (!projectId) {
+		return baseKey;
+	}
+	return `${baseKey}_project_${projectId}`;
+}
 
 const CURRENT_VERSION = '2.0.0'; // Bumped version to include widget data
 
@@ -94,8 +102,8 @@ export class DashboardStorage {
 		}
 	}
 
-	static saveDashboard(widgets: Widget[], config: DashboardConfig): boolean {
-		console.log('\n💾 [DashboardStorage] Saving dashboard to localStorage...');
+	static saveDashboard(widgets: Widget[], config: DashboardConfig, projectId: string | null = null): boolean {
+		console.log(`\n💾 [DashboardStorage] Saving dashboard${projectId ? ` for project ${projectId}` : ''} to localStorage...`);
 		
 		if (!this.isLocalStorageAvailable()) {
 			console.warn('LocalStorage is not available');
@@ -123,10 +131,20 @@ export class DashboardStorage {
 				version: CURRENT_VERSION
 			};
 
-			localStorage.setItem(STORAGE_KEYS.WIDGETS, JSON.stringify(widgets));
-			localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(config));
-			localStorage.setItem(STORAGE_KEYS.WIDGET_DATA, JSON.stringify(widgetData));
-			localStorage.setItem(STORAGE_KEYS.VERSION, CURRENT_VERSION);
+			const widgetsKey = getProjectScopedKey(STORAGE_KEYS.WIDGETS, projectId);
+			const configKey = getProjectScopedKey(STORAGE_KEYS.CONFIG, projectId);
+			const widgetDataKey = getProjectScopedKey(STORAGE_KEYS.WIDGET_DATA, projectId);
+			const versionKey = getProjectScopedKey(STORAGE_KEYS.VERSION, projectId);
+
+			localStorage.setItem(widgetsKey, JSON.stringify(widgets));
+			localStorage.setItem(configKey, JSON.stringify(config));
+			localStorage.setItem(widgetDataKey, JSON.stringify(widgetData));
+			localStorage.setItem(versionKey, CURRENT_VERSION);
+
+			// Save the selected project ID
+			if (projectId !== null) {
+				localStorage.setItem(STORAGE_KEYS.SELECTED_PROJECT, projectId);
+			}
 
 			console.log('✅ [DashboardStorage] Dashboard saved successfully\n');
 			return true;
@@ -136,8 +154,9 @@ export class DashboardStorage {
 		}
 	}
 
-	static loadDashboard(): DashboardState | null {
-		console.log('\n📂 [DashboardStorage] Loading dashboard from localStorage...');
+	static loadDashboard(projectId: string | null = null): DashboardState | null {
+		const projectLabel = projectId ? ` for project ${projectId}` : '';
+		console.log(`\n📂 [DashboardStorage] Loading dashboard${projectLabel} from localStorage...`);
 		
 		if (!this.isLocalStorageAvailable()) {
 			console.warn('LocalStorage is not available');
@@ -145,18 +164,23 @@ export class DashboardStorage {
 		}
 
 		try {
-			const version = localStorage.getItem(STORAGE_KEYS.VERSION);
+			const widgetsKey = getProjectScopedKey(STORAGE_KEYS.WIDGETS, projectId);
+			const configKey = getProjectScopedKey(STORAGE_KEYS.CONFIG, projectId);
+			const widgetDataKey = getProjectScopedKey(STORAGE_KEYS.WIDGET_DATA, projectId);
+			const versionKey = getProjectScopedKey(STORAGE_KEYS.VERSION, projectId);
+
+			const version = localStorage.getItem(versionKey);
 
 			// Check if stored version matches current version
 			if (version !== CURRENT_VERSION) {
 				console.info(`   Version mismatch (stored: ${version}, current: ${CURRENT_VERSION}), clearing old data`);
-				this.clearDashboard();
+				this.clearDashboard(projectId);
 				return null;
 			}
 
-			const widgetsJson = localStorage.getItem(STORAGE_KEYS.WIDGETS);
-			const configJson = localStorage.getItem(STORAGE_KEYS.CONFIG);
-			const widgetDataJson = localStorage.getItem(STORAGE_KEYS.WIDGET_DATA);
+			const widgetsJson = localStorage.getItem(widgetsKey);
+			const configJson = localStorage.getItem(configKey);
+			const widgetDataJson = localStorage.getItem(widgetDataKey);
 
 			if (!widgetsJson || !configJson) {
 				console.log('   No saved dashboard found');
@@ -191,6 +215,13 @@ export class DashboardStorage {
 		}
 	}
 
+	static getSelectedProjectId(): string | null {
+		if (!this.isLocalStorageAvailable()) {
+			return null;
+		}
+		return localStorage.getItem(STORAGE_KEYS.SELECTED_PROJECT);
+	}
+
 	/**
 	 * Restore widget data to mapObjectStore
 	 */
@@ -218,18 +249,24 @@ export class DashboardStorage {
 		console.log('✅ [DashboardStorage] Widget data restoration complete\n');
 	}
 
-	static clearDashboard(): boolean {
-		console.log('\n🗑️  [DashboardStorage] Clearing dashboard from localStorage...');
+	static clearDashboard(projectId: string | null = null): boolean {
+		const projectLabel = projectId ? ` for project ${projectId}` : '';
+		console.log(`\n🗑️  [DashboardStorage] Clearing dashboard${projectLabel} from localStorage...`);
 		
 		if (!this.isLocalStorageAvailable()) {
 			return false;
 		}
 
 		try {
-			localStorage.removeItem(STORAGE_KEYS.WIDGETS);
-			localStorage.removeItem(STORAGE_KEYS.CONFIG);
-			localStorage.removeItem(STORAGE_KEYS.WIDGET_DATA);
-			localStorage.removeItem(STORAGE_KEYS.VERSION);
+			const widgetsKey = getProjectScopedKey(STORAGE_KEYS.WIDGETS, projectId);
+			const configKey = getProjectScopedKey(STORAGE_KEYS.CONFIG, projectId);
+			const widgetDataKey = getProjectScopedKey(STORAGE_KEYS.WIDGET_DATA, projectId);
+			const versionKey = getProjectScopedKey(STORAGE_KEYS.VERSION, projectId);
+
+			localStorage.removeItem(widgetsKey);
+			localStorage.removeItem(configKey);
+			localStorage.removeItem(widgetDataKey);
+			localStorage.removeItem(versionKey);
 			
 			console.log('✅ [DashboardStorage] Dashboard cleared\n');
 			return true;
@@ -239,8 +276,8 @@ export class DashboardStorage {
 		}
 	}
 
-	static exportDashboard(): string | null {
-		const state = this.loadDashboard();
+	static exportDashboard(projectId: string | null = null): string | null {
+		const state = this.loadDashboard(projectId);
 		if (!state) return null;
 
 		try {
@@ -251,7 +288,7 @@ export class DashboardStorage {
 		}
 	}
 
-	static importDashboard(jsonString: string): boolean {
+	static importDashboard(jsonString: string, projectId: string | null = null): boolean {
 		try {
 			const state = JSON.parse(jsonString) as DashboardState;
 
@@ -259,7 +296,7 @@ export class DashboardStorage {
 				throw new Error('Invalid dashboard data structure');
 			}
 
-			return this.saveDashboard(state.widgets, state.config);
+			return this.saveDashboard(state.widgets, state.config, projectId);
 		} catch (error) {
 			console.error('Failed to import dashboard:', error);
 			return false;

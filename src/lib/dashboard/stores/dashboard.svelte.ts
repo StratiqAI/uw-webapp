@@ -66,6 +66,7 @@ class DashboardStore {
 	#autoSaveWidgetData = $state(true);
 	#devMode = $state(false);
 	#hasUnsavedChanges = $state(false);
+	#projectId = $state<string | null>(null);
 	
 	// Private state
 	#initialized = false;
@@ -81,6 +82,7 @@ class DashboardStore {
 	get hasUnsavedChanges() { return this.#hasUnsavedChanges; }
 	get isInitialized() { return this.#initialized; }
 	get autoSaveEnabled() { return this.#autoSaveEnabled; }
+	get projectId() { return this.#projectId; }
 	
 	// Derived state with memoization
 	gridCells = $derived.by(() => this.#computeGridCells());
@@ -110,11 +112,24 @@ class DashboardStore {
 	}
 	
 	// Initialization
-	initialize(): boolean {
-		if (this.#initialized) {
-			console.warn('Dashboard already initialized');
+	initialize(projectId: string | null = null): boolean {
+		if (this.#initialized && this.#projectId === projectId) {
+			console.warn('Dashboard already initialized for this project');
 			return true;
 		}
+		
+		// If switching projects, save current dashboard first
+		if (this.#initialized && this.#projectId !== projectId && this.#hasUnsavedChanges) {
+			this.save();
+		}
+		
+		// Reset state for new project
+		this.#widgets = [];
+		this.#widgetZIndexMap.clear();
+		this.#nextZIndex = 1;
+		this.#hasUnsavedChanges = false;
+		this.#projectId = projectId;
+		this.#initialized = false;
 		
 		try {
 			DashboardStorage.setAutoSaveWidgetData(this.#autoSaveWidgetData);
@@ -125,7 +140,7 @@ class DashboardStore {
 				return false;
 			}
 			
-			const savedState = DashboardStorage.loadDashboard();
+			const savedState = DashboardStorage.loadDashboard(projectId);
 			if (savedState) {
 				this.#loadFromSavedState(savedState);
 				this.#emit('dashboard:loaded', undefined);
@@ -149,7 +164,7 @@ class DashboardStore {
 		}
 		
 		try {
-			const success = DashboardStorage.saveDashboard(this.#widgets, this.#config);
+			const success = DashboardStorage.saveDashboard(this.#widgets, this.#config, this.#projectId);
 			if (success) {
 				this.#hasUnsavedChanges = false;
 				this.#emit('dashboard:saved', undefined);
@@ -386,7 +401,7 @@ class DashboardStore {
 	
 	clearSavedDashboard(): boolean {
 		console.log('🧹 Clearing saved dashboard...');
-		const success = DashboardStorage.clearDashboard();
+		const success = DashboardStorage.clearDashboard(this.#projectId);
 		
 		if (success) {
 			mapStore.clearData();
@@ -399,19 +414,19 @@ class DashboardStore {
 	
 	exportDashboard(): string | null {
 		try {
-			return DashboardStorage.exportDashboard();
+			return DashboardStorage.exportDashboard(this.#projectId);
 		} catch (error) {
 			console.error('Failed to export dashboard:', error);
 			return null;
 		}
 	}
-	
+
 	importDashboard(jsonString: string): boolean {
 		try {
-			const success = DashboardStorage.importDashboard(jsonString);
+			const success = DashboardStorage.importDashboard(jsonString, this.#projectId);
 			if (!success) return false;
 			
-			const savedState = DashboardStorage.loadDashboard();
+			const savedState = DashboardStorage.loadDashboard(this.#projectId);
 			if (!savedState) return false;
 			
 			this.#loadFromSavedState(savedState);

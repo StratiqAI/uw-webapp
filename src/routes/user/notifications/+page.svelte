@@ -1,220 +1,333 @@
-<div class="px-4 pt-4">
-	<nav class="mb-4 flex" aria-label="Breadcrumb">
-	  <ol class="inline-flex items-center space-x-1 md:space-x-2 rtl:space-x-reverse">
-		<li class="inline-flex items-center">
-		  <a href="/" class="inline-flex items-center text-sm font-medium text-gray-700 hover:text-primary-700 dark:text-gray-400 dark:hover:text-white">
-			<svg class="me-2.5 h-4 w-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24">
-			  <path fill-rule="evenodd" d="M11.3 3.3a1 1 0 0 1 1.4 0l6 6 2 2a1 1 0 0 1-1.4 1.4l-.3-.3V19a2 2 0 0 1-2 2h-3a1 1 0 0 1-1-1v-3h-2v3c0 .6-.4 1-1 1H7a2 2 0 0 1-2-2v-6.6l-.3.3a1 1 0 0 1-1.4-1.4l2-2 6-6Z" clip-rule="evenodd" />
-			</svg>
-			Home
-		  </a>
-		</li>
-		<li>
-		  <div class="flex items-center">
-			<svg class="mx-1 h-4 w-4 text-gray-400 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-			  <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 5 7 7-7 7" />
-			</svg>
-			<a href="/" class="ms-1 text-sm font-medium text-gray-700 hover:text-primary-700 dark:text-gray-400 dark:hover:text-white md:ms-2">User</a>
-		  </div>
-		</li>
-		<li aria-current="page">
-		  <div class="flex items-center">
-			<svg class="mx-1 h-4 w-4 text-gray-400 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-			  <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 5 7 7-7 7" />
-			</svg>
-			<span class="ms-1 text-sm font-medium text-gray-500 dark:text-gray-400 md:ms-2">Notifications</span>
-		  </div>
-		</li>
-	  </ol>
-	</nav>
-	<!-- <h1 class="text-xl font-bold text-gray-900 dark:text-white">Settings</h1> -->
-  </div>
-  <div class="gap-4 p-4 mt-0 pt-0 xl:grid xl:grid-cols-1">
-	<div class="mb-4 rounded-lg bg-white p-4 shadow-sm dark:bg-gray-800 sm:p-6 xl:mb-0">
-	  <h2 class="mb-4 md:mb-6 text-xl font-bold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-4">Notifications</h2>
-	  <div class="mb-4 flex items-center justify-between">
-		<h3 class="text-lg font-bold text-gray-900 dark:text-white">Alerts & Notifications</h3>
-		<a href="/" class="text-base font-medium text-primary-700 hover:underline dark:text-primary-500">Select all</a>
-	  </div>
-	  <div class="mb-4 sm:mb-6">
-		<label class="relative mb-4 flex cursor-pointer">
-		  <input type="checkbox" value="" class="peer sr-only" />
-		  <div
-			class="peer h-6 w-11 shrink-0 rounded-full bg-gray-200 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-primary-800 rtl:peer-checked:after:-translate-x-full"
-		  ></div>
-		  <div class="ms-3">
-			<span class="font-medium text-gray-900 dark:text-gray-300">Flowbite Communication</span>
-			<p id="helper-toggle-text" class="text-sm font-normal text-gray-500 dark:text-gray-300">Get Flowbite news, announcements, and product updates</p>
-		  </div>
-		</label>
-		<label class="relative mb-4 flex cursor-pointer">
-		  <input type="checkbox" value="" class="peer sr-only" checked />
-		  <div
-			class="peer h-6 w-11 shrink-0 rounded-full bg-gray-200 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-primary-800 rtl:peer-checked:after:-translate-x-full"
-		  ></div>
-		  <div class="ms-3">
-			<span class="font-medium text-gray-900 dark:text-gray-300">Account Activity</span>
-			<p id="helper-toggle-text" class="text-sm font-normal text-gray-500 dark:text-gray-300">Get important notifications about you or activity you've missed</p>
-		  </div>
-		</label>
-		<label class="relative mb-4 flex cursor-pointer">
-		  <input type="checkbox" value="" class="peer sr-only" checked />
-		  <div
-			class="peer h-6 w-11 shrink-0 rounded-full bg-gray-200 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-primary-800 rtl:peer-checked:after:-translate-x-full"
-		  ></div>
-		  <div class="ms-3">
-			<span class="font-medium text-gray-900 dark:text-gray-300">Mobile push notifications</span>
-			<p id="helper-toggle-text" class="text-sm font-normal text-gray-500 dark:text-gray-300">Receive push notifications whenever your company requires your attention</p>
-		  </div>
-		</label>
-		<label class="relative mb-4 flex cursor-pointer">
-		  <input type="checkbox" value="" class="peer sr-only" />
-		  <div
-			class="peer h-6 w-11 shrink-0 rounded-full bg-gray-200 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-primary-800 rtl:peer-checked:after:-translate-x-full"
-		  ></div>
-		  <div class="ms-3">
-			<span class="font-medium text-gray-900 dark:text-gray-300">Email notification</span>
-			<p id="helper-toggle-text" class="text-sm font-normal text-gray-500 dark:text-gray-300">Receive email notifications whenever your company requires your attention</p>
-		  </div>
-		</label>
-		<label class="relative mb-4 flex cursor-pointer">
-		  <input type="checkbox" value="" class="peer sr-only" checked />
-		  <div
-			class="peer h-6 w-11 shrink-0 rounded-full bg-gray-200 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-primary-800 rtl:peer-checked:after:-translate-x-full"
-		  ></div>
-		  <div class="ms-3">
-			<span class="font-medium text-gray-900 dark:text-gray-300">Meetups near me</span>
-			<p id="helper-toggle-text" class="text-sm font-normal text-gray-500 dark:text-gray-300">Get an email when a Flowbite Meetup is posted close to my location</p>
-		  </div>
-		</label>
-	  </div>
-	  <div class="mb-4 flex items-center justify-between">
-		<h3 class="text-lg font-bold text-gray-900 dark:text-white">Email me when:</h3>
-		<a href="/" class="text-base font-medium text-primary-700 hover:underline dark:text-primary-500">Select all</a>
-	  </div>
-	  <div class="mb-4 sm:mb-6">
-		<div class="mb-4 flex items-center">
-		  <input
-			checked
-			id="mention-checkbox"
-			type="checkbox"
-			value=""
-			class="h-4 w-4 rounded-sm border-gray-300 bg-gray-100 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
-		  />
-		  <label for="mention-checkbox" class="ms-2 text-sm font-medium text-gray-900 dark:text-white">Someone mentions me</label>
-		</div>
-		<div class="mb-4 flex items-center">
-		  <input
-			checked
-			id="ask-checkbox"
-			type="checkbox"
-			value=""
-			class="h-4 w-4 rounded-sm border-gray-300 bg-gray-100 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
-		  />
-		  <label for="ask-checkbox" class="ms-2 text-sm font-medium text-gray-900 dark:text-white">Someone asks me to be a collaborator on one of their projects</label>
-		</div>
-		<div class="mb-4 flex items-center">
-		  <input
-			id="invitation-checkbox"
-			type="checkbox"
-			value=""
-			class="h-4 w-4 rounded-sm border-gray-300 bg-gray-100 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
-		  />
-		  <label for="invitation-checkbox" class="ms-2 text-sm font-medium text-gray-900 dark:text-white">I receive invitations to invite new team members</label>
-		</div>
-		<div class="mb-4 flex items-center">
-		  <input
-			id="follow-checkbox"
-			type="checkbox"
-			value=""
-			class="h-4 w-4 rounded-sm border-gray-300 bg-gray-100 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
-		  />
-		  <label for="follow-checkbox" class="ms-2 text-sm font-medium text-gray-900 dark:text-white">Anyone follows me</label>
-		</div>
-		<div class="mb-4 flex items-center">
-		  <input
-			id="invitation-accept-checkbox"
-			type="checkbox"
-			value=""
-			class="h-4 w-4 rounded-sm border-gray-300 bg-gray-100 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
-		  />
-		  <label for="invitation-accept-checkbox" class="ms-2 text-sm font-medium text-gray-900 dark:text-white">Someone accepts my invitation</label>
-		</div>
-	  </div>
-	  <div class="mb-4 flex items-center justify-between">
-		<h3 class="text-lg font-bold text-gray-900 dark:text-white">Subscribe me to:</h3>
-		<a href="/" class="text-base font-medium text-primary-700 hover:underline dark:text-primary-500">Select all</a>
-	  </div>
-	  <div class="mb-4 sm:mb-6">
-		<div class="mb-4 flex">
-		  <div class="flex h-5 items-center">
-			<input
-			  checked
-			  id="newsletter-checkbox"
-			  aria-describedby="newsletter-checkbox-helper"
-			  type="checkbox"
-			  value=""
-			  class="h-4 w-4 rounded-sm border-gray-300 bg-gray-100 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
-			/>
-		  </div>
-		  <div class="ms-2 text-sm">
-			<label for="newsletter-checkbox" class="font-medium text-gray-900 dark:text-gray-300">Weekly newsletter</label>
-			<p id="newsletter-checkbox-helper" class="text-sm font-normal text-gray-500 dark:text-gray-400">Get the latest news for Flowbite and Tailwind CSS</p>
-		  </div>
-		</div>
-		<div class="mb-4 flex">
-		  <div class="flex h-5 items-center">
-			<input
-			  checked
-			  id="products-checkbox"
-			  aria-describedby="products-checkbox-helper"
-			  type="checkbox"
-			  value=""
-			  class="h-4 w-4 rounded-sm border-gray-300 bg-gray-100 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
-			/>
-		  </div>
-		  <div class="ms-2 text-sm">
-			<label for="products-checkbox" class="font-medium text-gray-900 dark:text-gray-300">Products</label>
-			<p id="products-checkbox-helper" class="text-sm font-normal text-gray-500 dark:text-gray-400">Get notified when a product has been updated or launched</p>
-		  </div>
-		</div>
-		<div class="mb-4 flex">
-		  <div class="flex h-5 items-center">
-			<input
-			  id="community-checkbox"
-			  aria-describedby="community-checkbox-helper"
-			  type="checkbox"
-			  value=""
-			  class="h-4 w-4 rounded-sm border-gray-300 bg-gray-100 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
-			/>
-		  </div>
-		  <div class="ms-2 text-sm">
-			<label for="community-checkbox" class="font-medium text-gray-900 dark:text-gray-300">Flowbite community</label>
-			<p id="community-checkbox-helper" class="text-sm font-normal text-gray-500 dark:text-gray-400">Monday: Latest design news & community highlights</p>
-		  </div>
-		</div>
-		<div class="mb-4 flex">
-		  <div class="flex h-5 items-center">
-			<input
-			  id="jobs-checkbox"
-			  aria-describedby="jobs-checkbox-helper"
-			  type="checkbox"
-			  value=""
-			  class="h-4 w-4 rounded-sm border-gray-300 bg-gray-100 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
-			/>
-		  </div>
-		  <div class="ms-2 text-sm">
-			<label for="jobs-checkbox" class="font-medium text-gray-900 dark:text-gray-300">Flowbite jobs</label>
-			<p id="jobs-checkbox-helper" class="text-sm font-normal text-gray-500 dark:text-gray-400">Friday: New career and freelance project opportunities</p>
-		  </div>
-		</div>
-	  </div>
-	  <button
-		type="button"
-		class="w-full rounded-lg bg-primary-700 px-5 py-2.5 text-center text-sm font-medium text-white hover:bg-primary-800 focus:outline-none focus:ring-4 focus:ring-primary-300 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800 sm:w-auto"
-	  >
-		Save changes
-	  </button>
-	</div>
+<script lang="ts">
+	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 
-  </div>
+	// Use unified dark mode store
+	let darkMode = $derived.by(() => darkModeStore.darkMode);
+	let toggleDarkMode = darkModeStore.toggle;
+
+	// Notification preferences state
+	let flowbiteCommunication = $state(false);
+	let accountActivity = $state(true);
+	let mobilePushNotifications = $state(true);
+	let emailNotification = $state(false);
+	let meetupsNearMe = $state(true);
+	let someoneMentionsMe = $state(true);
+	let collaboratorRequest = $state(true);
+	let teamInvitations = $state(false);
+	let anyoneFollowsMe = $state(false);
+	let invitationAccepted = $state(false);
+	let weeklyNewsletter = $state(true);
+	let products = $state(true);
+	let community = $state(false);
+	let jobs = $state(false);
+</script>
+
+<div class="flex h-screen w-full overflow-hidden {darkMode ? 'bg-slate-900' : 'bg-slate-50'} transition-colors">
+	<!-- Main Content Area -->
+	<div class="flex-1 flex flex-col overflow-hidden {darkMode ? 'bg-slate-900' : 'bg-white'}">
+		<!-- Header -->
+		<div class="h-14 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border-b flex items-center justify-between px-6 shadow-sm">
+			<div class="flex items-center gap-4">
+				<div class="w-10 h-10 {darkMode ? 'bg-indigo-900' : 'bg-indigo-100'} rounded-lg flex items-center justify-center">
+					<svg class="w-5 h-5 {darkMode ? 'text-indigo-300' : 'text-indigo-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+					</svg>
+				</div>
+				<h1 class="text-2xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'} tracking-tight">Notifications</h1>
+			</div>
+			<div class="flex items-center gap-2">
+				<button
+					class="p-2 {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'} rounded-md transition-colors"
+					onclick={toggleDarkMode}
+					aria-label="Toggle dark mode"
+					title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+				>
+					{#if darkMode}
+						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+						</svg>
+					{:else}
+						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+						</svg>
+					{/if}
+				</button>
+			</div>
+		</div>
+
+		<!-- Main Content -->
+		<div class="flex-1 overflow-y-auto {darkMode ? 'bg-slate-900' : 'bg-slate-50'}">
+			<div class="max-w-4xl mx-auto px-6 py-8">
+				<!-- Notifications Card -->
+				<div class="{darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border rounded-lg p-6 shadow-sm">
+					<div class="flex items-center gap-3 mb-6 pb-4 {darkMode ? 'border-slate-700' : 'border-slate-200'} border-b">
+						<div class="w-10 h-10 {darkMode ? 'bg-indigo-900' : 'bg-indigo-100'} rounded-lg flex items-center justify-center">
+							<svg class="w-5 h-5 {darkMode ? 'text-indigo-300' : 'text-indigo-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+							</svg>
+						</div>
+						<h2 class="text-xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">Notification Preferences</h2>
+					</div>
+
+					<form onsubmit={(e) => { e.preventDefault(); }}>
+						<!-- Alerts & Notifications Section -->
+						<div class="mb-8">
+							<div class="flex items-center justify-between mb-4">
+								<h3 class="text-lg font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">Alerts & Notifications</h3>
+								<button
+									type="button"
+									class="text-sm font-medium {darkMode ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-700'} transition-colors"
+								>
+									Select all
+								</button>
+							</div>
+							<div class="space-y-4">
+								<label class="relative flex items-start gap-4 cursor-pointer group">
+									<input
+										type="checkbox"
+										bind:checked={flowbiteCommunication}
+										class="sr-only peer"
+									/>
+									<div class="relative w-11 h-6 {darkMode ? 'bg-slate-700' : 'bg-slate-300'} peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:{darkMode ? 'bg-indigo-600' : 'bg-indigo-600'}"></div>
+									<div class="flex-1">
+										<span class="block text-sm font-medium {darkMode ? 'text-white' : 'text-slate-900'} group-hover:{darkMode ? 'text-indigo-300' : 'text-indigo-600'} transition-colors">
+											StratiqAI Communication
+										</span>
+										<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5">
+											Get StratiqAI news, announcements, and product updates
+										</p>
+									</div>
+								</label>
+
+								<label class="relative flex items-start gap-4 cursor-pointer group">
+									<input
+										type="checkbox"
+										bind:checked={accountActivity}
+										class="sr-only peer"
+									/>
+									<div class="relative w-11 h-6 {darkMode ? 'bg-slate-700' : 'bg-slate-300'} peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:{darkMode ? 'bg-indigo-600' : 'bg-indigo-600'}"></div>
+									<div class="flex-1">
+										<span class="block text-sm font-medium {darkMode ? 'text-white' : 'text-slate-900'} group-hover:{darkMode ? 'text-indigo-300' : 'text-indigo-600'} transition-colors">
+											Account Activity
+										</span>
+										<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5">
+											Get important notifications about you or activity you've missed
+										</p>
+									</div>
+								</label>
+
+								<label class="relative flex items-start gap-4 cursor-pointer group">
+									<input
+										type="checkbox"
+										bind:checked={mobilePushNotifications}
+										class="sr-only peer"
+									/>
+									<div class="relative w-11 h-6 {darkMode ? 'bg-slate-700' : 'bg-slate-300'} peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:{darkMode ? 'bg-indigo-600' : 'bg-indigo-600'}"></div>
+									<div class="flex-1">
+										<span class="block text-sm font-medium {darkMode ? 'text-white' : 'text-slate-900'} group-hover:{darkMode ? 'text-indigo-300' : 'text-indigo-600'} transition-colors">
+											Mobile Push Notifications
+										</span>
+										<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5">
+											Receive push notifications whenever your company requires your attention
+										</p>
+									</div>
+								</label>
+
+								<label class="relative flex items-start gap-4 cursor-pointer group">
+									<input
+										type="checkbox"
+										bind:checked={emailNotification}
+										class="sr-only peer"
+									/>
+									<div class="relative w-11 h-6 {darkMode ? 'bg-slate-700' : 'bg-slate-300'} peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:{darkMode ? 'bg-indigo-600' : 'bg-indigo-600'}"></div>
+									<div class="flex-1">
+										<span class="block text-sm font-medium {darkMode ? 'text-white' : 'text-slate-900'} group-hover:{darkMode ? 'text-indigo-300' : 'text-indigo-600'} transition-colors">
+											Email Notification
+										</span>
+										<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5">
+											Receive email notifications whenever your company requires your attention
+										</p>
+									</div>
+								</label>
+
+								<label class="relative flex items-start gap-4 cursor-pointer group">
+									<input
+										type="checkbox"
+										bind:checked={meetupsNearMe}
+										class="sr-only peer"
+									/>
+									<div class="relative w-11 h-6 {darkMode ? 'bg-slate-700' : 'bg-slate-300'} peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:{darkMode ? 'bg-indigo-600' : 'bg-indigo-600'}"></div>
+									<div class="flex-1">
+										<span class="block text-sm font-medium {darkMode ? 'text-white' : 'text-slate-900'} group-hover:{darkMode ? 'text-indigo-300' : 'text-indigo-600'} transition-colors">
+											Events Near Me
+										</span>
+										<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5">
+											Get an email when a StratiqAI event is posted close to my location
+										</p>
+									</div>
+								</label>
+							</div>
+						</div>
+
+						<!-- Email me when Section -->
+						<div class="mb-8 pt-6 {darkMode ? 'border-slate-700' : 'border-slate-200'} border-t">
+							<div class="flex items-center justify-between mb-4">
+								<h3 class="text-lg font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">Email me when:</h3>
+								<button
+									type="button"
+									class="text-sm font-medium {darkMode ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-700'} transition-colors"
+								>
+									Select all
+								</button>
+							</div>
+							<div class="space-y-3">
+								<label class="flex items-center gap-3 cursor-pointer group">
+									<input
+										type="checkbox"
+										bind:checked={someoneMentionsMe}
+										class="w-4 h-4 {darkMode ? 'bg-slate-700 border-slate-600 text-indigo-600 focus:ring-indigo-500' : 'bg-white border-slate-300 text-indigo-600 focus:ring-indigo-500'} border rounded focus:ring-2"
+									/>
+									<span class="text-sm font-medium {darkMode ? 'text-white' : 'text-slate-900'} group-hover:{darkMode ? 'text-indigo-300' : 'text-indigo-600'} transition-colors">
+										Someone mentions me
+									</span>
+								</label>
+
+								<label class="flex items-center gap-3 cursor-pointer group">
+									<input
+										type="checkbox"
+										bind:checked={collaboratorRequest}
+										class="w-4 h-4 {darkMode ? 'bg-slate-700 border-slate-600 text-indigo-600 focus:ring-indigo-500' : 'bg-white border-slate-300 text-indigo-600 focus:ring-indigo-500'} border rounded focus:ring-2"
+									/>
+									<span class="text-sm font-medium {darkMode ? 'text-white' : 'text-slate-900'} group-hover:{darkMode ? 'text-indigo-300' : 'text-indigo-600'} transition-colors">
+										Someone asks me to be a collaborator on one of their projects
+									</span>
+								</label>
+
+								<label class="flex items-center gap-3 cursor-pointer group">
+									<input
+										type="checkbox"
+										bind:checked={teamInvitations}
+										class="w-4 h-4 {darkMode ? 'bg-slate-700 border-slate-600 text-indigo-600 focus:ring-indigo-500' : 'bg-white border-slate-300 text-indigo-600 focus:ring-indigo-500'} border rounded focus:ring-2"
+									/>
+									<span class="text-sm font-medium {darkMode ? 'text-white' : 'text-slate-900'} group-hover:{darkMode ? 'text-indigo-300' : 'text-indigo-600'} transition-colors">
+										I receive invitations to invite new team members
+									</span>
+								</label>
+
+								<label class="flex items-center gap-3 cursor-pointer group">
+									<input
+										type="checkbox"
+										bind:checked={anyoneFollowsMe}
+										class="w-4 h-4 {darkMode ? 'bg-slate-700 border-slate-600 text-indigo-600 focus:ring-indigo-500' : 'bg-white border-slate-300 text-indigo-600 focus:ring-indigo-500'} border rounded focus:ring-2"
+									/>
+									<span class="text-sm font-medium {darkMode ? 'text-white' : 'text-slate-900'} group-hover:{darkMode ? 'text-indigo-300' : 'text-indigo-600'} transition-colors">
+										Anyone follows me
+									</span>
+								</label>
+
+								<label class="flex items-center gap-3 cursor-pointer group">
+									<input
+										type="checkbox"
+										bind:checked={invitationAccepted}
+										class="w-4 h-4 {darkMode ? 'bg-slate-700 border-slate-600 text-indigo-600 focus:ring-indigo-500' : 'bg-white border-slate-300 text-indigo-600 focus:ring-indigo-500'} border rounded focus:ring-2"
+									/>
+									<span class="text-sm font-medium {darkMode ? 'text-white' : 'text-slate-900'} group-hover:{darkMode ? 'text-indigo-300' : 'text-indigo-600'} transition-colors">
+										Someone accepts my invitation
+									</span>
+								</label>
+							</div>
+						</div>
+
+						<!-- Subscribe me to Section -->
+						<div class="mb-6 pt-6 {darkMode ? 'border-slate-700' : 'border-slate-200'} border-t">
+							<div class="flex items-center justify-between mb-4">
+								<h3 class="text-lg font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">Subscribe me to:</h3>
+								<button
+									type="button"
+									class="text-sm font-medium {darkMode ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-700'} transition-colors"
+								>
+									Select all
+								</button>
+							</div>
+							<div class="space-y-4">
+								<label class="flex items-start gap-3 cursor-pointer group">
+									<input
+										type="checkbox"
+										bind:checked={weeklyNewsletter}
+										class="mt-0.5 w-4 h-4 {darkMode ? 'bg-slate-700 border-slate-600 text-indigo-600 focus:ring-indigo-500' : 'bg-white border-slate-300 text-indigo-600 focus:ring-indigo-500'} border rounded focus:ring-2"
+									/>
+									<div class="flex-1">
+										<span class="block text-sm font-medium {darkMode ? 'text-white' : 'text-slate-900'} group-hover:{darkMode ? 'text-indigo-300' : 'text-indigo-600'} transition-colors">
+											Weekly Newsletter
+										</span>
+										<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5">
+											Get the latest news for StratiqAI and platform updates
+										</p>
+									</div>
+								</label>
+
+								<label class="flex items-start gap-3 cursor-pointer group">
+									<input
+										type="checkbox"
+										bind:checked={products}
+										class="mt-0.5 w-4 h-4 {darkMode ? 'bg-slate-700 border-slate-600 text-indigo-600 focus:ring-indigo-500' : 'bg-white border-slate-300 text-indigo-600 focus:ring-indigo-500'} border rounded focus:ring-2"
+									/>
+									<div class="flex-1">
+										<span class="block text-sm font-medium {darkMode ? 'text-white' : 'text-slate-900'} group-hover:{darkMode ? 'text-indigo-300' : 'text-indigo-600'} transition-colors">
+											Products
+										</span>
+										<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5">
+											Get notified when a product has been updated or launched
+										</p>
+									</div>
+								</label>
+
+								<label class="flex items-start gap-3 cursor-pointer group">
+									<input
+										type="checkbox"
+										bind:checked={community}
+										class="mt-0.5 w-4 h-4 {darkMode ? 'bg-slate-700 border-slate-600 text-indigo-600 focus:ring-indigo-500' : 'bg-white border-slate-300 text-indigo-600 focus:ring-indigo-500'} border rounded focus:ring-2"
+									/>
+									<div class="flex-1">
+										<span class="block text-sm font-medium {darkMode ? 'text-white' : 'text-slate-900'} group-hover:{darkMode ? 'text-indigo-300' : 'text-indigo-600'} transition-colors">
+											StratiqAI Community
+										</span>
+										<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5">
+											Monday: Latest design news & community highlights
+										</p>
+									</div>
+								</label>
+
+								<label class="flex items-start gap-3 cursor-pointer group">
+									<input
+										type="checkbox"
+										bind:checked={jobs}
+										class="mt-0.5 w-4 h-4 {darkMode ? 'bg-slate-700 border-slate-600 text-indigo-600 focus:ring-indigo-500' : 'bg-white border-slate-300 text-indigo-600 focus:ring-indigo-500'} border rounded focus:ring-2"
+									/>
+									<div class="flex-1">
+										<span class="block text-sm font-medium {darkMode ? 'text-white' : 'text-slate-900'} group-hover:{darkMode ? 'text-indigo-300' : 'text-indigo-600'} transition-colors">
+											StratiqAI Jobs
+										</span>
+										<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5">
+											Friday: New career and freelance project opportunities
+										</p>
+									</div>
+								</label>
+							</div>
+						</div>
+
+						<!-- Save Button -->
+						<div class="pt-6 {darkMode ? 'border-slate-700' : 'border-slate-200'} border-t flex justify-end">
+							<button
+								type="submit"
+								class="px-5 py-2.5 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+							>
+								Save changes
+							</button>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
