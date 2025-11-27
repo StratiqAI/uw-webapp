@@ -11,9 +11,10 @@
 
 	interface Props {
 		data: MapWidget['data'];
+		darkMode?: boolean;
 	}
 
-	let { data }: Props = $props();
+	let { data, darkMode = false }: Props = $props();
 	let widgetData = $state(data);
 
 	let consumer = mapStore.registerConsumer<MapWidget['data']>(

@@ -7,7 +7,13 @@
 	import { createDropHandlers } from '$lib/dashboard/utils/drag-drop';
 	import type { Widget } from '$lib/dashboard/types/widget';
 
-	let containerEl: HTMLElement;
+	interface Props {
+		darkMode?: boolean;
+	}
+
+	let { darkMode = false }: Props = $props();
+
+	let containerEl = $state<HTMLElement>();
 
 	const dropHandlers = createDropHandlers({
 		onDragOver: (x: number, y: number) => {
@@ -75,7 +81,7 @@
 	{...dropHandlers}
 >
 	{#each dashboard.widgets as widget (widget.id)}
-		<WidgetWrapper {widget} onDragStart={handleWidgetDragStart} onDragEnd={handleWidgetDragEnd} />
+		<WidgetWrapper {widget} {darkMode} onDragStart={handleWidgetDragStart} onDragEnd={handleWidgetDragEnd} />
 	{/each}
 
 	{#if dashboard.dragState.isDragging && dashboard.dragState.ghostPosition}

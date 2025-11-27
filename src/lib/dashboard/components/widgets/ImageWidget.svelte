@@ -4,9 +4,10 @@
 
 	interface Props {
 		data: ImageWidget['data'];
+		darkMode?: boolean;
 	}
 
-	let { data }: Props = $props();
+	let { data, darkMode = false }: Props = $props();
 	let widgetData = $state(data);
 
 	let consumer = mapStore.registerConsumer<ImageWidget['data']>(

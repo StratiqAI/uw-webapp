@@ -4,10 +4,11 @@
 
 	interface Props {
 		widget: Widget;
+		darkMode?: boolean;
 		onAction: (action: WidgetAction) => void;
 	}
 
-	let { widget, onAction }: Props = $props();
+	let { widget, darkMode = false, onAction }: Props = $props();
 
 	let isOpen = $state(false);
 	let dropdownEl = $state<HTMLElement>();
@@ -223,7 +224,7 @@
 	<button
 		bind:this={buttonEl}
 		onclick={toggleDropdown}
-		class="dropdown-button absolute right-2 top-2 z-[9999] rounded-md border border-gray-200 bg-white/80 p-1.5 opacity-0 shadow-sm transition-opacity hover:bg-white group-hover:opacity-100"
+		class="dropdown-button absolute right-2 top-2 z-[9999] rounded-md border {darkMode ? 'border-slate-700 bg-slate-800/80 hover:bg-slate-800' : 'border-slate-200 bg-white/80 hover:bg-white'} p-1.5 opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
 		aria-label="Widget menu"
 		aria-expanded={isOpen}
 	>
@@ -259,7 +260,7 @@
         <circle cx="41" cy="170" r="8" fill="#4a5568"/>
         <circle cx="159" cy="170" r="8" fill="#4a5568"/>
       </svg> -->
-        <img src="/images/icons/robot2.png" alt="Robot" class="h-8 w-8 text-gray-200 dark:text-gray-800" />
+        <img src="/images/icons/robot2.png" alt="Robot" class="h-8 w-8" />
 		<!-- <svg class="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 			<path
 				stroke-linecap="round"
@@ -274,18 +275,18 @@
 	{#if isOpen && buttonRect}
 		<div
 			bind:this={dropdownEl}
-			class="dropdown-menu animate-in w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-xl"
+			class="dropdown-menu animate-in w-48 rounded-lg border {darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'} py-1 shadow-xl"
 			style={dropdownStyle}
 		>
 			{#each menuItems as item}
 				{#if item.divider}
-					<div class="my-1 border-t border-gray-100"></div>
+					<div class="my-1 border-t {darkMode ? 'border-slate-700' : 'border-slate-200'}"></div>
 				{:else}
 					<button
 						onclick={(e) => handleAction(item.action, e)}
-						class="menu-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 {item.action ===
+						class="menu-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm {darkMode ? 'text-slate-200 hover:bg-slate-700 hover:text-white' : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'} {item.action ===
 						'remove'
-							? 'text-red-600 hover:bg-red-50 hover:text-red-700'
+							? darkMode ? 'text-red-400 hover:bg-red-900/20 hover:text-red-300' : 'text-red-600 hover:bg-red-50 hover:text-red-700'
 							: ''}"
 					>
 						<svg

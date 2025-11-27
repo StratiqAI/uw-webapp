@@ -45,6 +45,7 @@
 
 	interface Props {
 		data: ParagraphWidget['data'];
+		darkMode?: boolean;
 		/** Optional custom channel ID (defaults to 'paragraph-content') */
 		channelId?: string;
 		/** Optional custom widget ID for consumer registration */
@@ -63,6 +64,7 @@
 
 	const {
 		data,
+		darkMode = false,
 		channelId = PARAGRAPH_WIDGET_DATA_CHANNEL_ID,
 		widgetId = PARAGRAPH_WIDGET_ID,
 		defaultPrompt = 'Write a paragraph about the economy around the property',
@@ -280,7 +282,7 @@
 	<div class="flip-card h-full">
 		<!-- FRONT SIDE -->
 		<div
-			class="flip-card-front absolute h-full w-full overflow-auto rounded-lg bg-white shadow-sm dark:bg-gray-800"
+			class="flip-card-front absolute h-full w-full overflow-auto rounded-lg {darkMode ? 'bg-slate-800' : 'bg-white'} shadow-sm"
 		>
 			<!-- Error Display -->
 			{#if error}
@@ -301,14 +303,14 @@
 					<div class="flex items-center gap-1">
 						<div
 							class="h-2 w-2 rounded-full"
-							class:bg-green-500={connectionState === 'Researching'}
-							class:dark:bg-green-400={connectionState === 'Researching'}
-							class:bg-yellow-500={connectionState === 'Ready'}
-							class:dark:bg-yellow-400={connectionState === 'Ready'}
-							class:bg-blue-500={connectionState === 'Complete'}
-							class:dark:bg-blue-400={connectionState === 'Complete'}
+							class:bg-green-500={connectionState === 'Researching' && !darkMode}
+							class:bg-green-400={connectionState === 'Researching' && darkMode}
+							class:bg-yellow-500={connectionState === 'Ready' && !darkMode}
+							class:bg-yellow-400={connectionState === 'Ready' && darkMode}
+							class:bg-blue-500={connectionState === 'Complete' && !darkMode}
+							class:bg-blue-400={connectionState === 'Complete' && darkMode}
 						></div>
-						<span class="text-xs text-gray-600 dark:text-gray-400">
+						<span class="text-xs {darkMode ? 'text-slate-300' : 'text-slate-600'}">
 							{connectionState}
 						</span>
 					</div>
@@ -318,7 +320,7 @@
 			<!-- Content Display -->
 			<div class="px-4 pb-4 pt-4" class:loading={isLoading}>
 				{#if widgetData.title}
-					<h3 class="mb-3 text-xl font-semibold text-gray-800 dark:text-gray-100">
+					<h3 class="mb-3 text-xl font-semibold {darkMode ? 'text-slate-100' : 'text-slate-800'}">
 						{widgetData.title}
 					</h3>
 				{/if}
@@ -341,7 +343,7 @@
 
 				<!-- Update Timestamp -->
 				{#if formattedUpdateTime}
-					<div class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+					<div class="mt-4 text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'}">
 						Last updated: {formattedUpdateTime}
 					</div>
 				{/if}
@@ -350,13 +352,13 @@
 
 		<!-- BACK SIDE -->
 		<div
-			class="flip-card-back absolute h-full w-full overflow-auto rounded-lg bg-gradient-to-br from-blue-50 to-indigo-100 shadow-sm dark:from-blue-900 dark:to-indigo-950"
+			class="flip-card-back absolute h-full w-full overflow-auto rounded-lg bg-gradient-to-br {darkMode ? 'from-blue-900 to-indigo-950' : 'from-blue-50 to-indigo-100'} shadow-sm"
 		>
 			<div class="flex h-full flex-col p-6">
 				<!-- Header -->
 				<div class="mb-6 flex items-center gap-3">
 					<div
-						class="flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 dark:bg-blue-500"
+						class="flex h-12 w-12 items-center justify-center rounded-full {darkMode ? 'bg-blue-500' : 'bg-blue-600'}"
 					>
 						<svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path
@@ -368,10 +370,10 @@
 						</svg>
 					</div>
 					<div>
-						<h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">
+						<h3 class="text-xl font-bold {darkMode ? 'text-slate-100' : 'text-slate-900'}">
 							AI Local Economy Agent
 						</h3>
-						<p class="text-sm text-gray-600 dark:text-gray-300">
+						<p class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'}">
 							The Local Economy Agent specializes in providing detailed economic analysis in
 							targeted markets
 						</p>
@@ -389,14 +391,14 @@
 					<div class="flex-1">
 						<label
 							for="custom-prompt-{widgetId}"
-							class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200"
+							class="mb-2 block text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'}"
 						>
 							Enter custom instructions for this agent
 						</label>
 						<textarea
 							id="custom-prompt-{widgetId}"
 							bind:value={customPromptInput}
-							class="h-16 w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
+							class="h-16 w-full rounded-lg border {darkMode ? 'border-slate-600 bg-slate-800 text-slate-100 placeholder-slate-500' : 'border-slate-300 bg-white text-slate-900 placeholder-slate-400'} px-4 py-3 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
 							placeholder="Example: Write a paragraph about the economy around the property"
 							onkeydown={(e) => {
 								if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -407,11 +409,11 @@
 								}
 							}}
 						></textarea>
-						<p class="mt-2 text-xs text-gray-600 dark:text-gray-300">
-							💡 Tip: Press <kbd class="rounded bg-gray-200 px-1.5 py-0.5 dark:bg-gray-700"
+						<p class="mt-2 text-xs {darkMode ? 'text-slate-300' : 'text-slate-600'}">
+							💡 Tip: Press <kbd class="rounded {darkMode ? 'bg-slate-700' : 'bg-slate-200'} px-1.5 py-0.5"
 								>Ctrl+Enter</kbd
 							>
-							to submit, <kbd class="rounded bg-gray-200 px-1.5 py-0.5 dark:bg-gray-700">Esc</kbd> to
+							to submit, <kbd class="rounded {darkMode ? 'bg-slate-700' : 'bg-slate-200'} px-1.5 py-0.5">Esc</kbd> to
 							cancel
 						</p>
 					</div>
@@ -421,14 +423,14 @@
 						<button
 							type="button"
 							onclick={handleFormCancel}
-							class="rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 dark:focus:ring-gray-600"
+							class="rounded-lg border {darkMode ? 'border-slate-600 bg-slate-700 text-slate-200 hover:bg-slate-600 focus:ring-slate-600' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 focus:ring-slate-300'} px-5 py-2.5 text-sm font-medium focus:outline-none focus:ring-2"
 						>
 							Cancel
 						</button>
 						<button
 							type="submit"
 							disabled={!customPromptInput.trim() || isLoading}
-							class="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
+							class="flex items-center gap-2 rounded-lg {darkMode ? 'bg-blue-500 hover:bg-blue-600' : 'bg-blue-600 hover:bg-blue-700'} px-5 py-2.5 text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							{#if isLoading}
 								<Spinner size="4" />
@@ -494,9 +496,6 @@
 		color: rgb(55 65 81);
 	}
 
-	:global(.dark) .custom-prose {
-		color: rgb(209 213 219);
-	}
 
 	/* Keyboard shortcut keys */
 	kbd {

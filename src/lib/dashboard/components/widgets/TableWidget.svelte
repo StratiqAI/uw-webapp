@@ -4,9 +4,10 @@
 
 	interface Props {
 		data: TableWidget['data'];
+		darkMode?: boolean;
 	}
 
-	let { data }: Props = $props();
+	let { data, darkMode = false }: Props = $props();
 	let widgetData = $state(data);
 
 	let consumer = mapStore.registerConsumer<TableWidget['data']>(
@@ -61,15 +62,15 @@
 <div class="table-widget flex h-full flex-col">
 	<div class="flex-1 overflow-auto">
 		{#if widgetData.title}
-			<h3 class="mb-2 text-lg font-medium text-gray-700 dark:text-gray-200">{widgetData.title}</h3>
+			<h3 class="mb-2 text-lg font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'}">{widgetData.title}</h3>
 		{/if}
 		<table class="w-full text-sm">
-			<thead class="sticky top-0 bg-gray-50 dark:bg-gray-800">
+			<thead class="sticky top-0 {darkMode ? 'bg-slate-800' : 'bg-slate-50'}">
 				<tr>
 					{#each widgetData.headers as header}
 						<th
-							class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200 {widgetData.sortable
-								? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700'
+							class="px-3 py-2 text-left font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'} {widgetData.sortable
+								? darkMode ? 'cursor-pointer hover:bg-slate-700' : 'cursor-pointer hover:bg-slate-100'
 								: ''}"
 							onclick={() => handleSort(header)}
 						>
@@ -83,11 +84,11 @@
 					{/each}
 				</tr>
 			</thead>
-			<tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+			<tbody class="divide-y {darkMode ? 'divide-slate-700' : 'divide-slate-200'}">
 				{#each paginatedRows as row}
-					<tr class="hover:bg-gray-50 dark:hover:bg-gray-800">
+					<tr class={darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}>
 						{#each widgetData.headers as header}
-							<td class="px-3 py-2 text-gray-600 dark:text-gray-300">
+							<td class="px-3 py-2 {darkMode ? 'text-slate-300' : 'text-slate-600'}">
 								{row[header] || ''}
 							</td>
 						{/each}
@@ -98,19 +99,19 @@
 	</div>
 
 	{#if widgetData.paginated}
-		<div class="mt-2 flex items-center justify-between border-t dark:border-gray-700 pt-2">
+		<div class="mt-2 flex items-center justify-between border-t {darkMode ? 'border-slate-700' : 'border-slate-200'} pt-2">
 			<button
-				class="rounded bg-gray-100 dark:bg-gray-700 px-3 py-1 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
+				class="rounded {darkMode ? 'bg-slate-700 text-slate-200 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'} px-3 py-1 text-sm disabled:opacity-50"
 				disabled={currentPage === 1}
 				onclick={() => currentPage--}
 			>
 				Previous
 			</button>
-			<span class="text-sm text-gray-600 dark:text-gray-400">
+			<span class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'}">
 				Page {currentPage} of {Math.ceil(widgetData.rows.length / itemsPerPage)}
 			</span>
 			<button
-				class="rounded bg-gray-100 dark:bg-gray-700 px-3 py-1 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
+				class="rounded {darkMode ? 'bg-slate-700 text-slate-200 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'} px-3 py-1 text-sm disabled:opacity-50"
 				disabled={currentPage >= Math.ceil(widgetData.rows.length / itemsPerPage)}
 				onclick={() => currentPage++}
 			>

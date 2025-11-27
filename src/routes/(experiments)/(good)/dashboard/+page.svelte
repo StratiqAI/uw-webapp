@@ -23,6 +23,11 @@
 	function toggleDarkMode() {
 		darkMode = !darkMode;
 	}
+	
+	// Update context when dark mode changes
+	$effect(() => {
+		setContext('darkMode', darkMode);
+	});
 
 	onMount(() => {
 		// Try to load saved dashboard
@@ -162,7 +167,7 @@
 					</div>
 				{:else}
 					<div class="min-h-[800px]">
-						<Dashboard />
+						<Dashboard {darkMode} />
 					</div>
 				{/if}
 			</div>

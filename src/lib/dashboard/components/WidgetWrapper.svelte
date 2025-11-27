@@ -15,11 +15,12 @@
 
 	interface Props {
 		widget: Widget;
+		darkMode?: boolean;
 		onDragStart: (widget: Widget) => void;
 		onDragEnd: () => void;
 	}
 
-	let { widget, onDragStart, onDragEnd }: Props = $props();
+	let { widget, darkMode = false, onDragStart, onDragEnd }: Props = $props();
 	let showEditDialog = $state(false);
 	let widgetAIGenerateFn: ((prompt: string) => Promise<void>) | null = null;
 	let widgetFlipFn: (() => void) | null = null;
@@ -125,50 +126,51 @@
 	ondragend={dragHandlers.handleDragEnd}
 >
 	<div
-		class="widget-content h-full overflow-hidden rounded-lg border border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-600 shadow-md transition-shadow hover:shadow-lg"
+		class="widget-content h-full overflow-hidden rounded-lg border {darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'} shadow-md transition-shadow hover:shadow-lg"
 	>
 		<!-- Widget Header (if title is set) -->
 		{#if widget.title}
-			<div class="widget-header border-b border-gray-200  dark:bg-gray-800 dark:border-gray-600 bg-gray-50 px-4 py-2">
-				<h3 class="text-sm font-medium text-gray-700">{widget.title}</h3>
+			<div class="widget-header border-b {darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-slate-50'} px-4 py-2">
+				<h3 class="text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'}">{widget.title}</h3>
 				{#if widget.description}
-					<p class="mt-0.5 text-xs text-gray-500">{widget.description}</p>
+					<p class="mt-0.5 text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'}">{widget.description}</p>
 				{/if}
 			</div>
 		{/if}
 
 		<!-- Dropdown Menu -->
-		<WidgetDropdown {widget} onAction={handleWidgetAction} />
+		<WidgetDropdown {widget} {darkMode} onAction={handleWidgetAction} />
 
 		<!-- Widget Body -->
-		<div class="widget-body bg-gray-50 dark:bg-gray-800 {widget.title ? 'p-4' : 'h-full p-4'}">
+		<div class="widget-body {darkMode ? 'bg-slate-800' : 'bg-slate-50'} {widget.title ? 'p-4' : 'h-full p-4'}">
 			{#if widget.type === 'title'}
-				<TitleWidget data={widget.data} />
+				<TitleWidget data={widget.data} {darkMode} />
 			{:else if widget.type === 'paragraph'}
 				<ParagraphWidget 
 					data={widget.data} 
+					{darkMode}
 					onAIGenerationReady={handleAIGenerationReady}
 					onFlipControlReady={handleFlipControlReady}
 				/>
 			{:else if widget.type === 'table'}
-				<TableWidget data={widget.data} />
+				<TableWidget data={widget.data} {darkMode} />
 			{:else if widget.type === 'image'}
-				<ImageWidget data={widget.data} />
+				<ImageWidget data={widget.data} {darkMode} />
 			{:else if widget.type === 'lineChart'}
-				<LineChartWidget data={widget.data} />
+				<LineChartWidget data={widget.data} {darkMode} />
 			{:else if widget.type === 'barChart'}
-				<BarChartWidget data={widget.data} />
+				<BarChartWidget data={widget.data} {darkMode} />
 			{:else if widget.type === 'metric'}
-				<MetricWidget data={widget.data} />
+				<MetricWidget data={widget.data} {darkMode} />
 			{:else if widget.type === 'map'}
-				<MapWidget data={widget.data} />
+				<MapWidget data={widget.data} {darkMode} />
 			{/if}
 		</div>
 
 		<!-- Lock indicator -->
 		{#if widget.locked}
 			<div class="absolute left-2 top-2 opacity-0 transition-opacity group-hover:opacity-100">
-				<svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<svg class="h-4 w-4 {darkMode ? 'text-slate-400' : 'text-gray-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path
 						stroke-linecap="round"
 						stroke-linejoin="round"
@@ -192,14 +194,14 @@
 		class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 p-4"
 		style="z-index: 10000;"
 	>
-		<div class="w-full max-w-md rounded-lg bg-gray-50 dark:bg-gray-800 p-6">
-			<h3 class="mb-4 text-lg font-semibold">Edit Widget</h3>
+		<div class="w-full max-w-md rounded-lg {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border p-6 shadow-xl">
+			<h3 class="mb-4 text-lg font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">Edit Widget</h3>
 
 			<div class="space-y-4">
 				<div>
 					<label
 						for="widget-title-{widget.id}"
-						class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200"
+						class="mb-1 block text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'}"
 					>
 						Widget Title
 					</label>
@@ -208,7 +210,7 @@
 						type="text"
 						value={widget.title || ''}
 						oninput={(e) => dashboard.updateWidget(widget.id, { title: e.currentTarget.value })}
-						class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+						class="w-full rounded-md border {darkMode ? 'border-slate-600 bg-slate-700 text-white placeholder-slate-400' : 'border-slate-300 bg-white text-slate-900'} px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
 						placeholder="Enter widget title..."
 					/>
 				</div>
@@ -216,7 +218,7 @@
 				<div>
 					<label
 						for="widget-description-{widget.id}"
-						class="mb-1 block text-sm font-medium text-gray-700"
+						class="mb-1 block text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'}"
 					>
 						Description
 					</label>
@@ -225,26 +227,26 @@
 						value={widget.description || ''}
 						oninput={(e) =>
 							dashboard.updateWidget(widget.id, { description: e.currentTarget.value })}
-						class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+						class="w-full rounded-md border {darkMode ? 'border-slate-600 bg-slate-700 text-white placeholder-slate-400' : 'border-slate-300 bg-white text-slate-900'} px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
 						rows="3"
 						placeholder="Enter widget description..."
 					></textarea>
 				</div>
 
 				<div>
-					<div class="mb-1 block text-sm font-medium text-gray-700">Widget Type</div>
-					<p class="rounded bg-gray-50 px-3 py-2 text-sm text-gray-600">
+					<div class="mb-1 block text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'}">Widget Type</div>
+					<p class="rounded {darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-50 text-slate-600'} px-3 py-2 text-sm">
 						{widget.type}
 					</p>
 				</div>
 
 				<div>
-					<div class="mb-1 block text-sm font-medium text-gray-700">Position & Size</div>
-					<div class="grid grid-cols-2 gap-2 text-sm text-gray-600">
-						<div class="rounded bg-gray-50 px-3 py-2">
+					<div class="mb-1 block text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'}">Position & Size</div>
+					<div class="grid grid-cols-2 gap-2 text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'}">
+						<div class="rounded {darkMode ? 'bg-slate-700' : 'bg-slate-50'} px-3 py-2">
 							Column: {widget.gridColumn}, Row: {widget.gridRow}
 						</div>
-						<div class="rounded bg-gray-50 px-3 py-2">
+						<div class="rounded {darkMode ? 'bg-slate-700' : 'bg-slate-50'} px-3 py-2">
 							Width: {widget.colSpan}, Height: {widget.rowSpan}
 						</div>
 					</div>
@@ -254,7 +256,7 @@
 			<div class="mt-6 flex justify-end gap-2">
 				<button
 					onclick={() => (showEditDialog = false)}
-					class="rounded bg-gray-200 px-4 py-2 text-sm text-gray-800 hover:bg-gray-300"
+					class="px-4 py-2 text-sm font-medium {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'} rounded-md transition-colors"
 				>
 					Close
 				</button>

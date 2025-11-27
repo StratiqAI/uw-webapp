@@ -4,9 +4,10 @@
 
 	interface Props {
 		data: TitleWidget['data'];
+		darkMode?: boolean;
 	}
 
-	let { data }: Props = $props();
+	let { data, darkMode = false }: Props = $props();
 	let widgetData = $state(data);
 
 	let consumer = mapStore.registerConsumer<TitleWidget['data']>(
@@ -26,9 +27,9 @@
 	});
 </script>
 
-<div class="title-widget flex h-full flex-col bg-gray-50 dark:bg-gray-800 justify-center text-{widgetData.alignment || 'left'}">
-	<h2 class="text-2xl font-bold text-gray-800 dark:text-gray-100">{widgetData.title}</h2>
+<div class="title-widget flex h-full flex-col {darkMode ? 'bg-slate-800' : 'bg-slate-50'} justify-center text-{widgetData.alignment || 'left'}">
+	<h2 class="text-2xl font-bold {darkMode ? 'text-slate-100' : 'text-slate-800'}">{widgetData.title}</h2>
 	{#if widgetData.subtitle}
-		<p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{widgetData.subtitle}</p>
+		<p class="mt-1 text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'}">{widgetData.subtitle}</p>
 	{/if}
 </div>
