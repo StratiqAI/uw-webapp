@@ -3,7 +3,7 @@
 	import type { CurrentUser } from '$lib/types/auth';
 	import { goto } from '$app/navigation';
 
-	let { currentUser = $bindable(), darkMode = false } = $props<{ currentUser?: CurrentUser; darkMode?: boolean }>();
+	let { currentUser = $bindable(), darkMode = false, isSidebarOpen = false } = $props<{ currentUser?: CurrentUser; darkMode?: boolean; isSidebarOpen?: boolean }>();
 
 	function handleSignOut() {
 		goto('/auth/logout');
@@ -11,14 +11,28 @@
 </script>
 
 {#if currentUser?.isAuthenticated}
-	<div class="flex items-center {darkMode ? 'justify-start' : 'justify-center'} w-full">
+	<div 
+		id="user-drop"
+		class="relative flex items-center {isSidebarOpen ? 'justify-start gap-3' : 'justify-center'} w-full cursor-pointer"
+	>
+		<div class="flex items-center gap-3 w-full">
 		<Avatar
-			id="user-drop"
 			src="/images/remove/dh.jpg"
-			class="cursor-pointer hover:opacity-80 transition-opacity"
-		/>
+				class="hover:opacity-80 transition-opacity flex-shrink-0"
+			/>
+			{#if isSidebarOpen}
+				<div class="flex-1 min-w-0 text-left">
+					<div class="text-sm font-medium {darkMode ? 'text-white' : 'text-slate-900'} truncate">
+						{currentUser?.name || currentUser?.givenName || 'User'}
+					</div>
+					<div class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} truncate">
+						{currentUser?.email || 'No email'}
+					</div>
+				</div>
+			{/if}
+		</div>
 	</div>
-	<Dropdown triggeredBy="#user-drop" class={darkMode ? 'dark' : ''}>
+	<Dropdown triggeredBy="#user-drop" placement="top" class={darkMode ? 'dark' : ''} style="z-index: 10000;">
 		<DropdownHeader class={darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}>
 			<span class="block text-sm {darkMode ? 'text-white' : 'text-slate-900'}">{currentUser?.name || currentUser?.givenName || 'User'}</span>
 			<span class="block truncate text-sm font-medium {darkMode ? 'text-slate-400' : 'text-slate-600'}">{currentUser?.email || 'No email'}</span>

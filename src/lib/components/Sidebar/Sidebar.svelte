@@ -75,7 +75,7 @@
 	];
 </script>
 
-<div class="group relative flex h-full w-full flex-col {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border-r shadow-sm">
+<div class="group relative flex h-full w-full flex-col {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border-r shadow-sm overflow-visible">
 	<!-- Logo and Header -->
 	<div class="relative {isSidebarOpen ? 'p-5' : 'p-3'} border-b {darkMode ? 'border-slate-700 bg-gradient-to-r from-slate-800 to-slate-800' : 'border-slate-200 bg-gradient-to-r from-slate-50 to-white'}">
 		<div class="flex items-center {isSidebarOpen ? 'justify-between' : 'justify-center'}">
@@ -99,31 +99,6 @@
 					</div>
 				{/if}
 			</div>
-			{#if isSidebarOpen}
-				<button 
-					onclick={toggleSidebar} 
-					class="p-1.5 {darkMode ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'} rounded-md transition-colors"
-					aria-label="Collapse sidebar"
-				>
-					<svg
-						class="h-5 w-5"
-						aria-hidden="true"
-						xmlns="http://www.w3.org/2000/svg"
-						width="24"
-						height="24"
-						fill="none"
-						viewBox="0 0 24 24"
-					>
-						<path
-							stroke="currentColor"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M5 12h14M5 12l4-4m-4 4 4 4"
-						/>
-					</svg>
-				</button>
-			{/if}
 		</div>
 	</div>
 
@@ -150,6 +125,32 @@
 					stroke-linejoin="round"
 					stroke-width="2"
 					d="M19 12H5m7-7l7 7-7 7"
+				/>
+			</svg>
+		</button>
+	{:else}
+		<!-- Collapse button when expanded - appears on hover -->
+		<button 
+			onclick={toggleSidebar} 
+			class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full p-2.5 {darkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'} border border-l-0 rounded-r-lg shadow-lg transition-all opacity-0 group-hover:opacity-100 z-50 pointer-events-none group-hover:pointer-events-auto"
+			aria-label="Collapse sidebar"
+			title="Collapse sidebar"
+		>
+			<svg
+				class="h-5 w-5"
+				aria-hidden="true"
+				xmlns="http://www.w3.org/2000/svg"
+				width="24"
+				height="24"
+				fill="none"
+				viewBox="0 0 24 24"
+			>
+				<path
+					stroke="currentColor"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					stroke-width="2"
+					d="M5 12h14M5 12l4-4m-4 4 4 4"
 				/>
 			</svg>
 		</button>
@@ -205,9 +206,9 @@
 	</nav>
 
 	<!-- Footer -->
-	<div class="{isSidebarOpen ? 'p-5' : 'p-3'} border-t {darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-slate-50'}">
-		<div class="flex items-center {isSidebarOpen ? 'justify-start' : 'justify-center'}">
-			<UserDropdown {currentUser} {darkMode} />
+	<div class="{isSidebarOpen ? 'p-4' : 'p-3'} border-t {darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50/50'} relative z-50 overflow-visible">
+		<div class="flex items-center {isSidebarOpen ? 'justify-start gap-3' : 'justify-center'} relative">
+			<UserDropdown {currentUser} {darkMode} {isSidebarOpen} />
 		</div>
 	</div>
 </div>
