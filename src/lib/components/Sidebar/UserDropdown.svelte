@@ -3,7 +3,7 @@
 	import type { CurrentUser } from '$lib/types/auth';
 	import { goto } from '$app/navigation';
 
-	let { currentUser = $bindable() } = $props<{ currentUser?: CurrentUser }>();
+	let { currentUser = $bindable(), darkMode = false } = $props<{ currentUser?: CurrentUser; darkMode?: boolean }>();
 
 	function handleSignOut() {
 		goto('/auth/logout');
@@ -11,29 +11,28 @@
 </script>
 
 {#if currentUser?.isAuthenticated}
-	<div class="flex items-center justify-center">
+	<div class="flex items-center {darkMode ? 'justify-start' : 'justify-center'} w-full">
 		<Avatar
 			id="user-drop"
 			src="/images/remove/dh.jpg"
-			class="cursor-pointer"
-			dot={{ color: 'green' }}
+			class="cursor-pointer hover:opacity-80 transition-opacity"
 		/>
 	</div>
-	<Dropdown triggeredBy="#user-drop">
-		<DropdownHeader>
-			<span class="block text-sm">{currentUser?.name || currentUser?.givenName || 'User'}</span>
-			<span class="block truncate text-sm font-medium">{currentUser?.email || 'No email'}</span>
+	<Dropdown triggeredBy="#user-drop" class={darkMode ? 'dark' : ''}>
+		<DropdownHeader class={darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}>
+			<span class="block text-sm {darkMode ? 'text-white' : 'text-slate-900'}">{currentUser?.name || currentUser?.givenName || 'User'}</span>
+			<span class="block truncate text-sm font-medium {darkMode ? 'text-slate-400' : 'text-slate-600'}">{currentUser?.email || 'No email'}</span>
 		</DropdownHeader>
 		<DropdownGroup>
-			<ul class="p-2 text-start text-sm font-medium text-gray-900 dark:text-white">
+			<ul class="p-2 text-start text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-900'}">
 				<li>
 					<a
 						href="/user/account"
 						title=""
-						class="group flex items-center gap-2 rounded-md px-3 py-2 text-gray-900 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-600"
+						class="group flex items-center gap-2 rounded-md px-3 py-2 {darkMode ? 'text-slate-200 hover:bg-slate-700 hover:text-white' : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'} transition-colors"
 					>
 						<svg
-							class="h-4 w-4 text-gray-500 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"
+							class="h-4 w-4 {darkMode ? 'text-slate-400 group-hover:text-white' : 'text-slate-500 group-hover:text-slate-900'}"
 							aria-hidden="true"
 							xmlns="http://www.w3.org/2000/svg"
 							width="24"
@@ -54,10 +53,10 @@
 					<a
 						href="/user/settings"
 						title=""
-						class="group flex items-center gap-2 rounded-md px-3 py-2 text-gray-900 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-600"
+						class="group flex items-center gap-2 rounded-md px-3 py-2 {darkMode ? 'text-slate-200 hover:bg-slate-700 hover:text-white' : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'} transition-colors"
 					>
 						<svg
-							class="h-4 w-4 text-gray-500 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"
+							class="h-4 w-4 {darkMode ? 'text-slate-400 group-hover:text-white' : 'text-slate-500 group-hover:text-slate-900'}"
 							aria-hidden="true"
 							xmlns="http://www.w3.org/2000/svg"
 							width="24"
@@ -74,22 +73,14 @@
 						Settings
 					</a>
 				</li>
-				<!-- <li>
-					<a href="/user/privacy" title="" class="group flex items-center gap-2 rounded-md px-3 py-2 text-gray-900 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-600">
-						<svg class="h-4 w-4 text-gray-500 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-							<path fill-rule="evenodd" d="M8 10V7a4 4 0 1 1 8 0v3h1a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h1Zm2-3a2 2 0 1 1 4 0v3h-4V7Zm2 6a1 1 0 0 1 1 1v3a1 1 0 1 1-2 0v-3a1 1 0 0 1 1-1Z" clip-rule="evenodd" />
-						</svg>
-						Privacy
-					</a>
-				</li> -->
 				<li>
 					<a
 						href="/user/notifications"
 						title=""
-						class="group flex items-center gap-2 rounded-md px-3 py-2 text-gray-900 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-600"
+						class="group flex items-center gap-2 rounded-md px-3 py-2 {darkMode ? 'text-slate-200 hover:bg-slate-700 hover:text-white' : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'} transition-colors"
 					>
 						<svg
-							class="h-4 w-4 text-gray-500 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"
+							class="h-4 w-4 {darkMode ? 'text-slate-400 group-hover:text-white' : 'text-slate-500 group-hover:text-slate-900'}"
 							aria-hidden="true"
 							xmlns="http://www.w3.org/2000/svg"
 							width="24"
@@ -107,12 +98,12 @@
 			</ul>
 		</DropdownGroup>
 		<DropdownGroup>
-			<ul class="p-2 text-start text-sm font-medium text-gray-900 dark:text-white">
+			<ul class="p-2 text-start text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-900'}">
 				<li>
 					<button
 						onclick={() => (window.location.href = '/auth/logout')}
 						title=""
-						class="group flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-500 dark:hover:bg-gray-600"
+						class="group flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm {darkMode ? 'text-red-400 hover:bg-red-900/20 hover:text-red-300' : 'text-red-600 hover:bg-red-50 hover:text-red-700'} transition-colors"
 					>
 						<svg
 							class="h-4 w-4"

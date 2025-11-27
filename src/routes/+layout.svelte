@@ -7,8 +7,8 @@
 
 	let isSidebarOpen = $state(false);
 	let sidebarWidthCollapsed = `w-14`;
-	let sidebarWidthExpanded = `w-40`;
-	let mainMarginLeftExpanded = `ml-40`;
+	let sidebarWidthExpanded = `w-72`;
+	let mainMarginLeftExpanded = `ml-72`;
 	let mainMarginLeftCollapsed = `ml-14`;
 
 
