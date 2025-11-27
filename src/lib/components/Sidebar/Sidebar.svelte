@@ -29,6 +29,12 @@
 			icon: `<path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="M9 8h10M9 12h10M9 16h10M4.99 8H5m-.02 4h.01m0 4H5"/>`
 		},
 		{
+			label: 'Dashboard',
+			href: '/dashboard',
+			activeKey: '/dashboard',
+			icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 3h8v8H3V3Zm10 0h8v5h-8V3ZM3 14h8v7H3v-7Zm10 3h8v4h-8v-4Z"/>`
+		},
+		{
 			label: 'Workflows',
 			href: '/workflow',
 			activeKey: '/workflow',
@@ -47,10 +53,10 @@
 			icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 3v4a1 1 0 0 1-1 1H5m5 10v-2m3 2v-6m3 6v-3m4-11v16a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7.914a1 1 0 0 1 .293-.707l3.914-3.914A1 1 0 0 1 9.914 3H18a1 1 0 0 1 1 1Z"/>`
 		},
 		{
-			label: 'Data Layers',
+			label: 'Data Sources',
 			href: '/data-layers',
 			activeKey: '/data-layer',
-			icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4h16v16H4V4zm2 2v12h12V6H6zm2 2h8v2H8V8zm0 4h8v2H8v-2zm0 4h5v2H8v-2z"/>`
+			icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>`
 		},
 		{
 			label: 'Reports',

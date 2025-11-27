@@ -45,7 +45,7 @@
 	>
 		<Sidebar bind:isSidebarOpen onclick={toggleSidebar} currentUser={data.currentUser} />
 	</aside>
-	<main class={`flex-1 overflow-y-auto transition-width duration-300 ${isSidebarOpen ? `${mainMarginLeftExpanded}` : `${mainMarginLeftCollapsed}`} space-y-6 rounded-2xl bg-white bg-gradient-to-br from-zinc-50 via-red-50 to-indigo-50  shadow-md`}>
+	<main class={`flex-1 overflow-y-auto transition-width duration-300 ${isSidebarOpen ? `${mainMarginLeftExpanded}` : `${mainMarginLeftCollapsed}`} space-y-6 bg-white bg-gradient-to-br from-zinc-50 via-red-50 to-indigo-50  shadow-md`}>
 		{@render children()}
 	</main>
 </div>

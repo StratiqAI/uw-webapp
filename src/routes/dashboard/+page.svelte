@@ -92,7 +92,7 @@
 		<!-- Header -->
 		<div class="h-14 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border-b flex items-center justify-between px-6 shadow-sm">
 			<div class="flex items-center gap-4">
-				<h1 class="text-2xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'} tracking-tight">Dashboard Builder</h1>
+				<h1 class="text-2xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'} tracking-tight">Dashboards</h1>
 				<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
 				<span class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'}">
 					{dashboard.widgets.length} {dashboard.widgets.length === 1 ? 'widget' : 'widgets'}

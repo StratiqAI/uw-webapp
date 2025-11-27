@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { logger } from '$lib/logging/debug';
+	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Props Section
@@ -17,6 +18,10 @@
 
 	// Get idToken from server-side load function
 	let idToken = componentProps.data.idToken!;
+
+	// Use unified dark mode store
+	let darkMode = $derived.by(() => darkModeStore.darkMode);
+	let toggleDarkMode = darkModeStore.toggle;
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Realtime Section
@@ -56,6 +61,31 @@
 		keyFor: (it) => it.id
 	});
 
+	// Search state
+	let searchFilter = $state('');
+	let showEmailInfo = $state(false);
+
+	// Personalized pipeline email
+	let pipelineEmail = $derived.by(() => {
+		if (currentUser?.email) {
+			const localPart = currentUser.email.split('@')[0];
+			return `${localPart}-pipeline@stratiqai.com`;
+		}
+		return 'your-email-pipeline@stratiqai.com';
+	});
+
+	// Filtered projects
+	let filteredProjects = $derived(
+		projects.filter((project) => {
+			if (!searchFilter) return true;
+			const searchLower = searchFilter.toLowerCase();
+			return (
+				project.name?.toLowerCase().includes(searchLower) ||
+				project.description?.toLowerCase().includes(searchLower)
+			);
+		})
+	);
+
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Effects Section
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -87,9 +117,6 @@
 					},
 					error: (err: any) => console.error('project creation sub error', err)
 				},
-				// Note: Removed S_PROJECT_UPDATED because it doesn't include the required id parameter
-				// and would subscribe to ALL project updates, which is inefficient.
-				// Individual project pages should use S_PROJECT_UPDATED_BY_ID to subscribe to specific projects.
 				{
 					query: S_PROJECT_DELETED,
 					variables: { ownerId: currentUser?.sub || '' },
@@ -107,22 +134,11 @@
 	// Reactive error message, initially null
 	let errorMsg = $state<string | null>(null);
 
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	// Flowbite Svelte Components
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
-	import { Avatar, Breadcrumb, BreadcrumbItem, Button, Heading, P } from 'flowbite-svelte';
-
-	import { Input, Table, TableBody, TableBodyCell, TableBodyRow, TableHead } from 'flowbite-svelte';
-	import { TableHeadCell, Toolbar, ToolbarButton } from 'flowbite-svelte';
-	import { PlusOutline, TrashBinSolid } from 'flowbite-svelte-icons';
-
 	// Local Components
 	import DeleteModal from '$lib/components/Dialog/DeleteModal.svelte';
 	import ProjectModal from './ProjectModal.svelte';
 	import MetaTag from './MetaTag.svelte';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
-
 
 	// State
 	let openProject: boolean = $state(false); // modal control
@@ -156,145 +172,215 @@
 
 <MetaTag {path} {description} {title} {subtitle} />
 
-<main class="relative h-full w-full overflow-y-auto bg-white dark:bg-gray-800">
-	<h1 class="hidden">Projects</h1>
-	<div class="p-4">
-		<Breadcrumb class="mb-5">
-			<BreadcrumbItem home>Home</BreadcrumbItem>
-			<BreadcrumbItem href="/projects">Projects</BreadcrumbItem>
-			<BreadcrumbItem>List</BreadcrumbItem>
-		</Breadcrumb>
-
-		<!-- {#if currentUser?.isAuthenticated}
-			<p>Hi {currentUser.givenName + ' ' + currentUser.familyName}</p>
-		{:else}
-			<a href="/auth/login">Sign in</a>
-		{/if} -->
-
-		<Toolbar embedded class="w-full py-4 text-gray-500  dark:text-gray-300">
-			<Heading tag="h1" class="pr-8 text-xl font-semibold text-gray-900 sm:text-2xl dark:text-white"
-				>Investment Pipeline</Heading
-			>
-			<Input placeholder="Search for projects" class="me-4 w-80 border xl:w-96" />
-			<div class="ml-16 justify-center space-x-2">
-				<P class="text-center text-sm"
-					>Forward documents to <span class="font-bold">daniel-pipeline@stratiqai.com</span> for automated
-					pipeline analysis</P
-				>
-			</div>
-			<!-- <div class="border-l border-gray-100 pl-2 dark:border-gray-700">
-				<ToolbarButton
-					color="dark"
-					class="m-0 rounded p-1 hover:bg-gray-100 focus:ring-0 dark:hover:bg-gray-700"
-				>
-					<CogSolid size="lg" />
-				</ToolbarButton>
-				<ToolbarButton
-					color="dark"
-					class="m-0 rounded p-1 hover:bg-gray-100 focus:ring-0 dark:hover:bg-gray-700"
-				>
-					<TrashBinSolid size="lg" />
-				</ToolbarButton>
-				<ToolbarButton
-					color="dark"
-					class="m-0 rounded p-1 hover:bg-gray-100 focus:ring-0 dark:hover:bg-gray-700"
-				>
-					<ExclamationCircleSolid size="lg" />
-				</ToolbarButton>
-				<ToolbarButton
-					color="dark"
-					class="m-0 rounded p-1 hover:bg-gray-100 focus:ring-0 dark:hover:bg-gray-700"
-				>
-					<DotsVerticalOutline size="lg" />
-				</ToolbarButton>
-			</div>
-
-			onclick={() => {
-				const id = uuidv4();
-				window.location.href = `/projects/workspace/${id}/get-started?new=1`;
-			}}
-			onclick={() => (openProject = true)}
-			-->
-			{#snippet end()}
-				<div class="flex items-center space-x-2">
-					<Button size="sm" class="gap-2 whitespace-nowrap px-3" onclick={createNewProjectHandler}>
-						<PlusOutline size="sm" />Add Project
-					</Button>
-					<!-- <Button size="sm" color="alternative" class="gap-2 px-3">
-						<DownloadSolid size="md" class="-ml-1" />Export
-					</Button> -->
+<div class="flex h-screen w-full overflow-hidden {darkMode ? 'bg-slate-900' : 'bg-slate-50'} transition-colors">
+	<!-- Main Content Area -->
+	<div class="flex-1 flex flex-col overflow-hidden {darkMode ? 'bg-slate-900' : 'bg-white'}">
+		<!-- Header -->
+		<div class="h-14 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border-b flex items-center justify-between px-6 shadow-sm">
+			<div class="flex items-center gap-4">
+				<div class="w-10 h-10 {darkMode ? 'bg-indigo-900' : 'bg-indigo-100'} rounded-lg flex items-center justify-center">
+					<svg class="w-5 h-5 {darkMode ? 'text-indigo-300' : 'text-indigo-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 8h10M9 12h10M9 16h10M4.99 8H5m-.02 4h.01m0 4H5"></path>
+					</svg>
 				</div>
-			{/snippet}
-		</Toolbar>
-	</div>
-	<Table>
-		<TableHead class=" bg-gray-100 dark:border-gray-700">
-			<!-- <TableHeadCell class="w-4 p-4"><Checkbox /></TableHeadCell> -->
-			{#each ['Name', 'Actions'] as title}
-				<TableHeadCell class="p-4 font-medium">{title}</TableHeadCell>
-			{/each}
-		</TableHead>
-		<TableBody>
-			{#each projects as project}
-				<TableBodyRow class="border-gray-200 text-base">
-					<!-- <TableBodyCell class="w-4 p-4"><Checkbox /></TableBodyCell> -->
-					<TableBodyCell class="mr-12 flex items-center space-x-2 whitespace-nowrap p-0">
-						<a
-							href={`/projects/workspace/${project.id}/get-started`}
-							class="group flex items-center space-x-6"
+				<h1 class="text-2xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'} tracking-tight">Investment Pipeline</h1>
+				<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
+				<span class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'}">
+					{filteredProjects.length} {filteredProjects.length === 1 ? 'project' : 'projects'}
+				</span>
+			</div>
+			<div class="flex items-center gap-2">
+				<button
+					class="p-2 {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'} rounded-md transition-colors"
+					onclick={toggleDarkMode}
+					aria-label="Toggle dark mode"
+					title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+				>
+					{#if darkMode}
+						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+						</svg>
+					{:else}
+						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+						</svg>
+					{/if}
+				</button>
+			</div>
+		</div>
+
+		<!-- Search and Actions Bar -->
+		<div class="{darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border-b px-6 py-4">
+			<div class="flex items-center justify-between gap-4">
+				<div class="flex-1 relative max-w-md">
+					<input
+						type="text"
+						bind:value={searchFilter}
+						placeholder="Search projects..."
+						class="w-full px-4 py-2 pl-10 {darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
+					/>
+					<svg class="absolute left-3 top-2.5 w-5 h-5 {darkMode ? 'text-slate-400' : 'text-slate-500'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+					</svg>
+					{#if searchFilter}
+						<button
+							onclick={() => searchFilter = ''}
+							class="absolute right-3 top-2.5 p-1 {darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'} rounded transition-colors"
+							aria-label="Clear filter"
 						>
-							<Avatar size="lg" cornerStyle="rounded" />
+							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+							</svg>
+						</button>
+					{/if}
+				</div>
+				<div class="flex items-center gap-2">
+					<!-- Email Forwarding Info -->
+					<div class="relative">
+						<button
+							onclick={() => showEmailInfo = !showEmailInfo}
+							onmouseleave={() => showEmailInfo = false}
+							class="p-2 {darkMode ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'} rounded-lg transition-colors relative"
+							aria-label="Email forwarding information"
+							title="Email forwarding information"
+						>
+							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+							</svg>
+						</button>
+						{#if showEmailInfo}
 							<div
-								class="max-w-xs break-words text-sm font-normal text-gray-500 dark:text-gray-300"
+								class="absolute right-0 top-full mt-2 w-80 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border rounded-lg shadow-xl p-4 z-50"
+								onmouseenter={() => showEmailInfo = true}
+								onmouseleave={() => showEmailInfo = false}
 							>
-								<div
-									class="text-base font-semibold text-gray-900 group-hover:underline dark:text-white"
-								>
-									{project.name}
-								</div>
-								<div
-									class="max-w-xl overflow-hidden text-ellipsis break-words text-sm font-normal text-gray-500 dark:text-gray-300"
-								>
-									{project.description || ''}
+								<div class="flex items-start gap-3">
+									<div class="w-8 h-8 flex-shrink-0 {darkMode ? 'bg-indigo-900' : 'bg-indigo-100'} rounded-lg flex items-center justify-center">
+										<svg class="w-4 h-4 {darkMode ? 'text-indigo-300' : 'text-indigo-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+										</svg>
+									</div>
+									<div class="flex-1 min-w-0">
+										<h4 class="text-sm font-semibold {darkMode ? 'text-white' : 'text-slate-900'} mb-1">Email Documents</h4>
+										<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'} mb-2">
+											Forward documents to your personalized email address for automated pipeline analysis.
+										</p>
+										<div class="flex items-center gap-2 p-2 {darkMode ? 'bg-slate-700' : 'bg-slate-50'} rounded border {darkMode ? 'border-slate-600' : 'border-slate-200'}">
+											<code class="text-xs font-mono {darkMode ? 'text-indigo-300' : 'text-indigo-600'} break-all">
+												{pipelineEmail}
+											</code>
+											<button
+												onclick={(e) => {
+													e.stopPropagation();
+													navigator.clipboard.writeText(pipelineEmail);
+													// Could add a toast notification here
+												}}
+												class="p-1 {darkMode ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-600' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200'} rounded transition-colors flex-shrink-0"
+												title="Copy email address"
+											>
+												<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+												</svg>
+											</button>
+										</div>
+									</div>
 								</div>
 							</div>
-						</a>
-					</TableBodyCell>
-					<!-- <TableBodyCell
-						class="max-w-sm overflow-hidden truncate  text-base font-normal text-gray-500 xl:max-w-xs dark:text-gray-300"
+						{/if}
+					</div>
+					<button
+						onclick={createNewProjectHandler}
+						class="px-4 py-2 text-sm font-medium {darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-lg transition-colors flex items-center gap-2 shadow-sm hover:shadow-md"
 					>
-						<div class="text-base font-semibold text-gray-900 dark:text-white">
-							{project.details?.streetAddress || ''}
-						</div>
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+						</svg>
+						Add Project
+					</button>
+				</div>
+			</div>
+		</div>
 
-						<div class="text-sm font-normal text-gray-500 dark:text-gray-300">
-							{(project.details?.city || '') + ' ' + (project.details?.state || '') + ' ' + (project.details?.zip || '')}
+		<!-- Projects List -->
+		<div class="flex-1 overflow-y-auto {darkMode ? 'bg-slate-900' : 'bg-slate-50'}">
+			<div class="px-6 py-6">
+				{#if filteredProjects.length > 0}
+					<div class="space-y-3">
+						{#each filteredProjects as project}
+							<div
+								class="{darkMode ? 'bg-slate-800 border-slate-700 hover:border-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-300'} border rounded-lg p-4 transition-all hover:shadow-lg group"
+							>
+								<div class="flex items-center justify-between">
+									<a
+										href={`/projects/workspace/${project.id}/get-started`}
+										class="flex-1 flex items-center gap-4 group/link"
+									>
+										<div class="w-12 h-12 flex-shrink-0 {darkMode ? 'bg-indigo-900' : 'bg-indigo-100'} rounded-lg flex items-center justify-center">
+											<svg class="w-6 h-6 {darkMode ? 'text-indigo-300' : 'text-indigo-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+											</svg>
+										</div>
+										<div class="flex-1 min-w-0">
+											<h3 class="text-base font-semibold {darkMode ? 'text-white' : 'text-slate-900'} mb-1 group-hover/link:text-indigo-400 transition-colors">
+												{project.name}
+											</h3>
+											{#if project.description}
+												<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-600'} line-clamp-2">
+													{project.description}
+												</p>
+											{/if}
+										</div>
+										<svg class="w-5 h-5 {darkMode ? 'text-slate-500 group-hover/link:text-indigo-400' : 'text-slate-400 group-hover/link:text-indigo-600'} transition-colors flex-shrink-0 opacity-0 group-hover/link:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+										</svg>
+									</a>
+									<button
+										onclick={() => ((current_project = project), (openDelete = true))}
+										class="ml-4 p-2 {darkMode ? 'text-slate-400 hover:text-red-400 hover:bg-red-900/20' : 'text-slate-400 hover:text-red-600 hover:bg-red-50'} rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+										aria-label="Delete project"
+										title="Delete project"
+									>
+										<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+										</svg>
+									</button>
+								</div>
+							</div>
+						{/each}
+					</div>
+				{:else if searchFilter}
+					<div class="text-center py-12">
+						<svg class="w-16 h-16 mx-auto {darkMode ? 'text-slate-600' : 'text-slate-300'} mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+						</svg>
+						<p class="text-base font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">No projects found</p>
+						<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'}">Try adjusting your search terms</p>
+					</div>
+				{:else}
+					<div class="text-center py-12">
+						<div class="w-16 h-16 mx-auto {darkMode ? 'bg-slate-800' : 'bg-slate-100'} rounded-lg flex items-center justify-center mb-4">
+							<svg class="w-8 h-8 {darkMode ? 'text-slate-400' : 'text-slate-500'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+							</svg>
 						</div>
-					</TableBodyCell> -->
-					<!-- <TableBodyCell class="">{project.details?.assetType || ''}</TableBodyCell> -->
-					<TableBodyCell class="space-x-2 p-4">
-						<!-- <Button
-							size="sm"
-							class="gap-2 px-3"
-							onclick={() => ((current_project = project), (openProject = true))}
+						<p class="text-base font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">No projects yet</p>
+						<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mb-4">Create your first project to get started</p>
+						<button
+							onclick={createNewProjectHandler}
+							class="px-4 py-2 text-sm font-medium {darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-lg transition-colors inline-flex items-center gap-2"
 						>
-							<EditOutline size="sm" /> Edit
-						</Button> -->
-						<Button
-							color="red"
-							size="sm"
-							class="gap-2 px-3"
-							onclick={() => ((current_project = project), (openDelete = true))}
-						>
-							<TrashBinSolid size="sm" />
-						</Button>
-					</TableBodyCell>
-				</TableBodyRow>
-			{/each}
-		</TableBody>
-	</Table>
-</main>
-<!-- onclick={() => ((current_project = project), (openDelete = true))} -->
+							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+							</svg>
+							Create Your First Project
+						</button>
+					</div>
+				{/if}
+			</div>
+		</div>
+	</div>
+</div>
+
 <!-- Modals -->
 <ProjectModal bind:open={openProject} data={current_project} {idToken} />
 <DeleteModal bind:open={openDelete} data={current_project} {idToken} mutation={M_DELETE_PROJECT} />
