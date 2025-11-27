@@ -677,7 +677,9 @@
 	];
 
 	// State
-	let darkMode = $state(false);
+	import { darkModeStore } from '$lib/stores/darkMode.svelte';
+	let darkMode = $derived.by(() => darkModeStore.darkMode);
+	let toggleDarkMode = darkModeStore.toggle;
 	let customAINodes = $state<ElementType[]>([]);
 	let aiGalleryFilter = $state('');
 	let creatingCustomAI = $state(false);
@@ -767,15 +769,7 @@
 		creatingCustomAI = false;
 	}
 
-	// Toggle dark mode
-	function toggleDarkMode() {
-		darkMode = !darkMode;
-		if (darkMode) {
-			document.documentElement.classList.add('dark');
-		} else {
-			document.documentElement.classList.remove('dark');
-		}
-	}
+	// Dark mode toggle is now handled by the unified store
 
 	// Get query description
 	function getQueryDescription(queryId: string): string {
@@ -827,10 +821,7 @@
 
 	onMount(() => {
 		loadCustomAINodes();
-		// Check for dark mode preference
-		if (typeof window !== 'undefined') {
-			darkMode = document.documentElement.classList.contains('dark');
-		}
+		// Dark mode is initialized by the store
 	});
 </script>
 

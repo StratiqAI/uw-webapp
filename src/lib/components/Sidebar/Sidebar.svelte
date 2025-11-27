@@ -2,6 +2,7 @@
 	import UserDropdown from './UserDropdown.svelte';
 	import type { CurrentUser } from '$lib/types/auth';
 	import { getContext } from 'svelte';
+	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 
 	let active = $state('upload');
 	let {
@@ -16,26 +17,9 @@
 
 	let isCollapsed = $derived(!isSidebarOpen);
 	
-	// Get dark mode from context if available, default to false
-	let darkMode = $state(false);
-	$effect(() => {
-		try {
-			const contextDarkMode = getContext<boolean>('darkMode');
-			if (contextDarkMode !== undefined) {
-				darkMode = contextDarkMode;
-			}
-		} catch {
-			// Context not available, use default
-		}
-	});
-
-	function toggleDarkMode() {
-		darkMode = !darkMode;
-		// Optionally save to localStorage for persistence
-		try {
-			localStorage.setItem('darkMode', String(darkMode));
-		} catch {}
-	}
+	// Use unified dark mode store
+	let darkMode = $derived.by(() => darkModeStore.darkMode);
+	let toggleDarkMode = darkModeStore.toggle;
 
 	const navItems = [
 		{

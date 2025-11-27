@@ -8,6 +8,7 @@
 	import { dashboardWidgets } from './config';
 
 	import { onMount, setContext } from 'svelte';
+	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 
 	interface Props {
 		data: PageData;
@@ -15,14 +16,13 @@
 
 	let { data }: Props = $props();
 	let isLoading = $state(true);
-	let darkMode = $state(false);
+
+	// Use unified dark mode store
+	let darkMode = $derived.by(() => darkModeStore.darkMode);
+	let toggleDarkMode = darkModeStore.toggle;
 
 	// Set page data context for child components
 	setContext('pageData', { currentUser: data.currentUser });
-
-	function toggleDarkMode() {
-		darkMode = !darkMode;
-	}
 	
 	// Update context when dark mode changes
 	$effect(() => {

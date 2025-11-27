@@ -28,6 +28,7 @@
 -->
 
 <script lang="ts">
+	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	// Types
 	type ElementType = {
 		id: string;
@@ -2639,7 +2640,8 @@
 	let aiQueryPrompt = $state('');
 	let aiQueryModel = $state('gpt-4o');
 	let aiQuerySystemPrompt = $state('');
-	let darkMode = $state(false);
+	let darkMode = $derived.by(() => darkModeStore.darkMode);
+	let toggleDarkMode = darkModeStore.toggle;
 	let zoomLevel = $state(1);
 	let showingWorkflowJSON = $state(false);
 	let workflowJSON = $state('');
@@ -3305,9 +3307,7 @@
 	}
 
 	// Toggle dark mode
-	function toggleDarkMode() {
-		darkMode = !darkMode;
-	}
+	// Dark mode toggle is now handled by the unified store
 
 	// Generate workflow JSON
 	function generateWorkflowJSON() {

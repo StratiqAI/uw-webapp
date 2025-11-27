@@ -2,6 +2,8 @@
 	import Sidebar from '$lib/components/Sidebar/Sidebar.svelte';
 	import '../app.css';
 	import type { LayoutData } from './$types';
+	import { darkModeStore } from '$lib/stores/darkMode.svelte';
+	import { setContext, onMount } from 'svelte';
 	// console.log('In file +layout.svelte');
 	let { children, data } = $props<{ children: any; data: LayoutData }>();
 
@@ -11,6 +13,15 @@
 	let mainMarginLeftExpanded = `ml-72`;
 	let mainMarginLeftCollapsed = `ml-14`;
 
+	// Initialize dark mode store and provide via context
+	onMount(() => {
+		darkModeStore.initialize();
+	});
+	
+	// Provide dark mode store functions via context
+	setContext('toggleDarkMode', darkModeStore.toggle);
+	setContext('setDarkMode', darkModeStore.set);
+	setContext('darkModeStore', darkModeStore);
 
 	if (typeof localStorage !== 'undefined') {
 		const saved = localStorage.getItem('sidebar-open') === 'true';
