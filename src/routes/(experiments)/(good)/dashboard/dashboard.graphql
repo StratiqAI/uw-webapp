@@ -1,0 +1,652 @@
+# =============================================================================
+# GraphQL Schema for Dashboard and Widget Management
+#
+# This schema defines the data model for storing dashboards and their
+# widgets. It is designed for AWS AppSync and leverages directives for
+# authorization. The API supports creating, updating, deleting, and querying
+# dashboards with their associated widgets.
+#
+# TypeScript Compatibility:
+# - This schema is designed to be compatible with the TypeScript types defined
+#   in src/lib/dashboard/types/widget.ts
+# - WidgetType enum values map as follows:
+#   TypeScript -> GraphQL: 'table' -> TABLE, 'lineChart' -> LINECHART,
+#   'barChart' -> BARCHART, etc.
+# - BaseWidget interface matches TypeScript BaseWidget (createdAt, updatedAt,
+#   dashboardId are optional for compatibility)
+# - All widget data structures match their TypeScript counterparts
+# =============================================================================
+
+# ---------------------------
+# Enums
+# ---------------------------
+
+# WidgetType enum - values map to TypeScript WidgetType:
+# TypeScript: 'table', 'title', 'paragraph', 'image', 'lineChart', 'barChart', 'metric', 'map'
+# GraphQL:    TABLE,  TITLE,  PARAGRAPH,  IMAGE,  LINECHART,  BARCHART,  METRIC,  MAP
+enum WidgetType {
+  TABLE
+  TITLE
+  PARAGRAPH
+  IMAGE
+  LINECHART
+  BARCHART
+  METRIC
+  MAP
+}
+
+enum Alignment {
+  LEFT
+  CENTER
+  RIGHT
+}
+
+enum ObjectFit {
+  COVER
+  CONTAIN
+  FILL
+}
+
+enum ChartOrientation {
+  VERTICAL
+  HORIZONTAL
+}
+
+enum ChangeType {
+  INCREASE
+  DECREASE
+}
+
+enum MapType {
+  LEAFLET
+  GOOGLE
+  MAPBOX
+}
+
+enum SortDirection {
+  ASC
+  DESC
+}
+
+# ---------------------------
+# Core Data Types
+# ---------------------------
+
+# Represents a dashboard containing multiple widgets
+type Dashboard @aws_cognito_user_pools @aws_iam {
+  # Unique identifier for the dashboard
+  id: ID!
+
+  # Dashboard name/title
+  name: String!
+
+  # Optional description
+  description: String
+
+  # Grid configuration
+  gridColumns: Int!
+  gridRows: Int!
+  gap: Int!
+  minCellHeight: Int!
+
+  # List of widgets in this dashboard
+  widgets(limit: Int, nextToken: String, sortDirection: SortDirection): WidgetConnection!
+
+  # Timestamps
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+
+  # Ownership and sharing (if needed)
+  tenantId: ID
+  ownerId: ID
+}
+
+# Base widget interface - all widgets share these common fields
+# Matches TypeScript BaseWidget interface from widget.ts
+# Note: createdAt, updatedAt, and dashboardId are database fields
+# and are optional to maintain compatibility with TypeScript types
+interface BaseWidget {
+  # Unique identifier for the widget
+  id: ID!
+
+  # Widget type (enum values map to TypeScript: table->TABLE, lineChart->LINECHART, etc.)
+  type: WidgetType!
+
+  # Grid position
+  gridColumn: Int!
+  gridRow: Int!
+
+  # Grid size
+  colSpan: Int!
+  rowSpan: Int!
+
+  # Constraints (all optional, matching TypeScript WidgetConstraints)
+  minWidth: Int
+  minHeight: Int
+  maxWidth: Int
+  maxHeight: Int
+
+  # Optional metadata (matching TypeScript BaseWidget)
+  locked: Boolean
+  title: String
+  description: String
+
+  # Database fields (optional for TypeScript compatibility)
+  # These are populated by AppSync/DynamoDB but not required in TypeScript BaseWidget
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+  dashboardId: ID
+}
+
+# ---------------------------
+# Widget Data Types (for type-safe data structures)
+# ---------------------------
+
+# Supporting types for charts
+# ChartDataset matches both LineChartWidget and BarChartWidget data structures
+# LineChartWidget uses: { label, data, color? }
+# BarChartWidget uses: { label, data, backgroundColor? }
+# Both are compatible - color/backgroundColor are optional
+type ChartDataset {
+  label: String!
+  data: [Float!]!
+  color: String # Used by LineChartWidget
+  backgroundColor: String # Used by BarChartWidget
+}
+
+type ChartOptions {
+  responsive: Boolean
+  maintainAspectRatio: Boolean
+}
+
+# ---------------------------
+# Specific Widget Types (implementing BaseWidget interface)
+# ---------------------------
+
+# Table widget
+type TableWidget implements BaseWidget @aws_cognito_user_pools @aws_iam {
+  # BaseWidget fields
+  id: ID!
+  type: WidgetType!
+  gridColumn: Int!
+  gridRow: Int!
+  colSpan: Int!
+  rowSpan: Int!
+  minWidth: Int
+  minHeight: Int
+  maxWidth: Int
+  maxHeight: Int
+  locked: Boolean
+  title: String
+  description: String
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+  dashboardId: ID
+
+  # Table-specific data (matching TypeScript TableWidget.data)
+  data: TableWidgetData!
+}
+
+# Table widget data structure
+type TableWidgetData {
+  title: String
+  headers: [String!]!
+  rows: [AWSJSON!]! # Array of row objects (key-value pairs)
+  sortable: Boolean
+  paginated: Boolean
+}
+
+# Title widget
+type TitleWidget implements BaseWidget @aws_cognito_user_pools @aws_iam {
+  # BaseWidget fields
+  id: ID!
+  type: WidgetType!
+  gridColumn: Int!
+  gridRow: Int!
+  colSpan: Int!
+  rowSpan: Int!
+  minWidth: Int
+  minHeight: Int
+  maxWidth: Int
+  maxHeight: Int
+  locked: Boolean
+  title: String
+  description: String
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+  dashboardId: ID
+
+  # Title-specific data (matching TypeScript TitleWidget.data)
+  data: TitleWidgetData!
+}
+
+# Title widget data structure
+type TitleWidgetData {
+  title: String!
+  subtitle: String
+  alignment: Alignment
+}
+
+# Paragraph widget
+type ParagraphWidget implements BaseWidget @aws_cognito_user_pools @aws_iam {
+  # BaseWidget fields
+  id: ID!
+  type: WidgetType!
+  gridColumn: Int!
+  gridRow: Int!
+  colSpan: Int!
+  rowSpan: Int!
+  minWidth: Int
+  minHeight: Int
+  maxWidth: Int
+  maxHeight: Int
+  locked: Boolean
+  title: String
+  description: String
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+  dashboardId: ID
+
+  # Paragraph-specific data (matching TypeScript ParagraphWidget.data)
+  # Note: title can be null in TypeScript, markdown can be null
+  data: ParagraphWidgetData!
+}
+
+# Paragraph widget data structure (matching TypeScript ParagraphWidget.data)
+type ParagraphWidgetData {
+  title: String # Can be null in TypeScript
+  content: String!
+  markdown: Boolean # Can be null in TypeScript
+}
+
+# Image widget
+type ImageWidget implements BaseWidget @aws_cognito_user_pools @aws_iam {
+  # BaseWidget fields
+  id: ID!
+  type: WidgetType!
+  gridColumn: Int!
+  gridRow: Int!
+  colSpan: Int!
+  rowSpan: Int!
+  minWidth: Int
+  minHeight: Int
+  maxWidth: Int
+  maxHeight: Int
+  locked: Boolean
+  title: String
+  description: String
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+  dashboardId: ID
+
+  # Image-specific data (matching TypeScript ImageWidget.data)
+  data: ImageWidgetData!
+}
+
+# Image widget data structure
+type ImageWidgetData {
+  title: String
+  src: String!
+  alt: String!
+  objectFit: ObjectFit
+}
+
+# Line chart widget
+type LineChartWidget implements BaseWidget @aws_cognito_user_pools @aws_iam {
+  # BaseWidget fields
+  id: ID!
+  type: WidgetType!
+  gridColumn: Int!
+  gridRow: Int!
+  colSpan: Int!
+  rowSpan: Int!
+  minWidth: Int
+  minHeight: Int
+  maxWidth: Int
+  maxHeight: Int
+  locked: Boolean
+  title: String
+  description: String
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+  dashboardId: ID
+
+  # Line chart-specific data (matching TypeScript LineChartWidget.data)
+  data: LineChartWidgetData!
+}
+
+# Line chart widget data structure
+type LineChartWidgetData {
+  datasets: [ChartDataset!]!
+  labels: [String!]!
+  options: ChartOptions
+}
+
+# Bar chart widget
+type BarChartWidget implements BaseWidget @aws_cognito_user_pools @aws_iam {
+  # BaseWidget fields
+  id: ID!
+  type: WidgetType!
+  gridColumn: Int!
+  gridRow: Int!
+  colSpan: Int!
+  rowSpan: Int!
+  minWidth: Int
+  minHeight: Int
+  maxWidth: Int
+  maxHeight: Int
+  locked: Boolean
+  title: String
+  description: String
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+  dashboardId: ID
+
+  # Bar chart-specific data (matching TypeScript BarChartWidget.data)
+  data: BarChartWidgetData!
+}
+
+# Bar chart widget data structure
+type BarChartWidgetData {
+  datasets: [ChartDataset!]!
+  labels: [String!]!
+  orientation: ChartOrientation
+}
+
+# Metric widget
+type MetricWidget implements BaseWidget @aws_cognito_user_pools @aws_iam {
+  # BaseWidget fields
+  id: ID!
+  type: WidgetType!
+  gridColumn: Int!
+  gridRow: Int!
+  colSpan: Int!
+  rowSpan: Int!
+  minWidth: Int
+  minHeight: Int
+  maxWidth: Int
+  maxHeight: Int
+  locked: Boolean
+  title: String
+  description: String
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+  dashboardId: ID
+
+  # Metric-specific data (matching TypeScript MetricWidget.data)
+  # Note: value is string | number in TypeScript, stored as String in GraphQL
+  data: MetricWidgetData!
+}
+
+# Metric widget data structure
+type MetricWidgetData {
+  label: String!
+  value: String! # Can be string or number, stored as string
+  change: Float
+  changeType: ChangeType
+  unit: String
+}
+
+# Map widget
+type MapWidget implements BaseWidget @aws_cognito_user_pools @aws_iam {
+  # BaseWidget fields
+  id: ID!
+  type: WidgetType!
+  gridColumn: Int!
+  gridRow: Int!
+  colSpan: Int!
+  rowSpan: Int!
+  minWidth: Int
+  minHeight: Int
+  maxWidth: Int
+  maxHeight: Int
+  locked: Boolean
+  title: String
+  description: String
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+  dashboardId: ID
+
+  # Map-specific data (matching TypeScript MapWidget.data)
+  data: MapWidgetData!
+}
+
+# Map widget data structure
+type MapWidgetData {
+  title: String
+  description: String
+  lat: Float!
+  lon: Float!
+  zoom: Int!
+  mapType: MapType!
+  apiKey: String!
+}
+
+# Union type for all widget types
+union Widget =
+    TableWidget
+  | TitleWidget
+  | ParagraphWidget
+  | ImageWidget
+  | LineChartWidget
+  | BarChartWidget
+  | MetricWidget
+  | MapWidget
+
+# ---------------------------
+# Input Types for Mutations
+# ---------------------------
+
+# Input for creating a dashboard
+input CreateDashboardInput {
+  name: String!
+  description: String
+  gridColumns: Int
+  gridRows: Int
+  gap: Int
+  minCellHeight: Int
+  tenantId: ID
+  ownerId: ID
+}
+
+# Input for updating a dashboard
+input UpdateDashboardInput {
+  id: ID!
+  name: String
+  description: String
+  gridColumns: Int
+  gridRows: Int
+  gap: Int
+  minCellHeight: Int
+}
+
+# Input for deleting a dashboard
+input DeleteDashboardInput {
+  id: ID!
+}
+
+# Input for creating a widget
+input CreateWidgetInput {
+  dashboardId: ID!
+  type: WidgetType!
+  gridColumn: Int!
+  gridRow: Int!
+  colSpan: Int!
+  rowSpan: Int!
+  minWidth: Int
+  minHeight: Int
+  maxWidth: Int
+  maxHeight: Int
+  locked: Boolean
+  title: String
+  description: String
+  data: AWSJSON! # Widget-specific data as JSON
+}
+
+# Input for updating a widget
+input UpdateWidgetInput {
+  id: ID!
+  gridColumn: Int
+  gridRow: Int
+  colSpan: Int
+  rowSpan: Int
+  minWidth: Int
+  minHeight: Int
+  maxWidth: Int
+  maxHeight: Int
+  locked: Boolean
+  title: String
+  description: String
+  data: AWSJSON
+}
+
+# Input for deleting a widget
+input DeleteWidgetInput {
+  id: ID!
+}
+
+# Input for bulk widget operations
+input BulkCreateWidgetsInput {
+  dashboardId: ID!
+  widgets: [CreateWidgetInput!]!
+}
+
+input BulkUpdateWidgetsInput {
+  widgets: [UpdateWidgetInput!]!
+}
+
+input BulkDeleteWidgetsInput {
+  widgetIds: [ID!]!
+}
+
+# ---------------------------
+# Connection Types for Pagination
+# ---------------------------
+
+type DashboardConnection {
+  items: [Dashboard!]!
+  nextToken: String
+}
+
+type WidgetConnection {
+  items: [Widget!]!
+  nextToken: String
+}
+
+# ---------------------------
+# Response Types
+# ---------------------------
+
+type BulkWidgetOperationResult {
+  created: [Widget!]!
+  updated: [Widget!]!
+  deleted: [ID!]!
+  errors: [String!]!
+}
+
+# ---------------------------
+# Queries (Read Operations)
+# ---------------------------
+
+type Query @aws_cognito_user_pools @aws_iam {
+  # Fetch a single dashboard by ID
+  getDashboard(id: ID!): Dashboard
+    @aws_iam
+    @aws_cognito_user_pools(cognito_groups: ["SystemAdmins", "TenantAdmins", "Users"])
+
+  # Fetch a paginated list of dashboards
+  listDashboards(limit: Int, nextToken: String, ownerId: ID, tenantId: ID): DashboardConnection!
+    @aws_iam
+    @aws_cognito_user_pools(cognito_groups: ["SystemAdmins", "TenantAdmins", "Users"])
+
+  # Fetch a single widget by ID (returns union type)
+  getWidget(id: ID!): Widget
+    @aws_iam
+    @aws_cognito_user_pools(cognito_groups: ["SystemAdmins", "TenantAdmins", "Users"])
+
+  # Fetch all widgets for a specific dashboard
+  listWidgetsByDashboard(
+    dashboardId: ID!
+    limit: Int
+    nextToken: String
+    sortDirection: SortDirection
+  ): WidgetConnection!
+    @aws_iam
+    @aws_cognito_user_pools(cognito_groups: ["SystemAdmins", "TenantAdmins", "Users"])
+}
+
+# ---------------------------
+# Mutations (Create, Update, Delete Operations)
+# ---------------------------
+
+type Mutation @aws_cognito_user_pools @aws_iam {
+  # Dashboard operations
+  createDashboard(input: CreateDashboardInput!): Dashboard!
+    @aws_iam
+    @aws_cognito_user_pools(cognito_groups: ["SystemAdmins", "TenantAdmins", "Users"])
+
+  updateDashboard(input: UpdateDashboardInput!): Dashboard!
+    @aws_iam
+    @aws_cognito_user_pools(cognito_groups: ["SystemAdmins", "TenantAdmins", "Users"])
+
+  deleteDashboard(input: DeleteDashboardInput!): Dashboard
+    @aws_iam
+    @aws_cognito_user_pools(cognito_groups: ["SystemAdmins", "TenantAdmins", "Users"])
+
+  # Widget operations (return union type)
+  createWidget(input: CreateWidgetInput!): Widget!
+    @aws_iam
+    @aws_cognito_user_pools(cognito_groups: ["SystemAdmins", "TenantAdmins", "Users"])
+
+  updateWidget(input: UpdateWidgetInput!): Widget!
+    @aws_iam
+    @aws_cognito_user_pools(cognito_groups: ["SystemAdmins", "TenantAdmins", "Users"])
+
+  deleteWidget(input: DeleteWidgetInput!): Widget
+    @aws_iam
+    @aws_cognito_user_pools(cognito_groups: ["SystemAdmins", "TenantAdmins", "Users"])
+
+  # Bulk widget operations
+  bulkCreateWidgets(input: BulkCreateWidgetsInput!): BulkWidgetOperationResult!
+    @aws_iam
+    @aws_cognito_user_pools(cognito_groups: ["SystemAdmins", "TenantAdmins", "Users"])
+
+  bulkUpdateWidgets(input: BulkUpdateWidgetsInput!): BulkWidgetOperationResult!
+    @aws_iam
+    @aws_cognito_user_pools(cognito_groups: ["SystemAdmins", "TenantAdmins", "Users"])
+
+  bulkDeleteWidgets(input: BulkDeleteWidgetsInput!): BulkWidgetOperationResult!
+    @aws_iam
+    @aws_cognito_user_pools(cognito_groups: ["SystemAdmins", "TenantAdmins", "Users"])
+}
+
+# ---------------------------
+# Subscriptions (Real-time Events)
+# ---------------------------
+
+type Subscription @aws_cognito_user_pools @aws_iam {
+  # Subscribe to dashboard creation events
+  onCreateDashboard(ownerId: ID): Dashboard
+    @aws_subscribe(mutations: ["createDashboard"])
+
+  # Subscribe to dashboard update events
+  onUpdateDashboard(id: ID!): Dashboard
+    @aws_subscribe(mutations: ["updateDashboard"])
+
+  # Subscribe to dashboard deletion events
+  onDeleteDashboard(ownerId: ID): Dashboard
+    @aws_subscribe(mutations: ["deleteDashboard"])
+
+  # Subscribe to widget creation events for a specific dashboard (returns union type)
+  onCreateWidget(dashboardId: ID!): Widget
+    @aws_subscribe(mutations: ["createWidget"])
+
+  # Subscribe to widget update events (returns union type)
+  onUpdateWidget(dashboardId: ID!): Widget
+    @aws_subscribe(mutations: ["updateWidget"])
+
+  # Subscribe to widget deletion events (returns union type)
+  onDeleteWidget(dashboardId: ID!): Widget
+    @aws_subscribe(mutations: ["deleteWidget"])
+}
+

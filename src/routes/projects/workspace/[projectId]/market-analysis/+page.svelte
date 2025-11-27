@@ -21,7 +21,7 @@
 	// Set page data context for child components
 	setContext('pageData', { currentUser: data.currentUser });
 
-	const marketingWidgets: Widget[] = [
+	const dashboardWidgets: Widget[] = [
 		{
 			id: 'widget-1',
 			type: 'title',
@@ -288,7 +288,7 @@
 		// If no saved dashboard, load defaults
 		if (!hasLoadedDashboard) {
 			console.info('No saved dashboard found, loading defaults');
-			marketingWidgets.forEach((widget) => {
+			dashboardWidgets.forEach((widget) => {
 				dashboard.addWidget(widget);
 			});
 		}

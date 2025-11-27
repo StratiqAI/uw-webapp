@@ -4,7 +4,7 @@ import { PUBLIC_GEOAPIFY_API_KEY } from '$env/static/public';
 import SimpleWidgetExample from '$lib/dashboard/examples/SimpleWidgetExample.svelte';
 import SimplifiedParagraphDisplay from '$lib/dashboard/examples/SimplifiedParagraphDisplay.svelte';
 
-export const marketingWidgets: Widget[] = [
+export const dashboardWidgets: Widget[] = [
 	{
 		id: 'widget-1',
 		type: 'title',
