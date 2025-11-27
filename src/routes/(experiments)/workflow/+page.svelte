@@ -412,6 +412,7 @@
 	let gridElements = $state<GridElement[]>([]);
 	let connections = $state<Connection[]>([]);
 	let draggedElementType = $state<ElementType | null>(null);
+	let nodeFilter = $state('');
 	let draggedGridElement = $state<GridElement | null>(null);
 	let dragOffset = $state({ x: 0, y: 0 });
 	let connectingFrom = $state<ConnectionPoint | null>(null);
@@ -992,11 +993,37 @@
 			<p class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'} mt-1.5 font-medium">Build automated workflows</p>
 		</div>
 
+		<!-- Filter Input -->
+		<div class="px-5 pt-5 pb-3 border-b {darkMode ? 'border-slate-700' : 'border-slate-200'}">
+			<div class="relative">
+				<input
+					type="text"
+					bind:value={nodeFilter}
+					placeholder="Search nodes..."
+					class="w-full px-3 py-2 pl-9 {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-400' : 'bg-slate-100 text-slate-900 border-slate-300 placeholder-slate-500'} rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+				/>
+				<svg class="absolute left-2.5 top-2.5 w-4 h-4 {darkMode ? 'text-slate-400' : 'text-slate-500'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+				</svg>
+				{#if nodeFilter}
+					<button
+						onclick={() => nodeFilter = ''}
+						class="absolute right-2.5 top-2.5 w-5 h-5 {darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'} rounded-full hover:bg-slate-600/20 transition-colors flex items-center justify-center"
+						aria-label="Clear search"
+					>
+						<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+						</svg>
+					</button>
+				{/if}
+			</div>
+		</div>
+
 		<div class="flex-1 overflow-y-auto p-5 space-y-6">
 			<div>
 				<h3 class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-wider mb-3">Property Data</h3>
 				<div class="space-y-2.5">
-					{#each elementTypes.filter((t) => t.type === 'input') as elementType}
+					{#each elementTypes.filter((t) => t.type === 'input' && (!nodeFilter || t.label.toLowerCase().includes(nodeFilter.toLowerCase()) || t.id.toLowerCase().includes(nodeFilter.toLowerCase()))) as elementType}
 						<button
 							class="w-full p-3.5 {getSidebarButtonColor(elementType.type)} rounded-lg cursor-move transition-all flex items-center gap-3 border shadow-sm hover:shadow-md hover:scale-[1.02] group"
 							onmousedown={(e) => startDragFromSidebar(elementType, e)}
@@ -1016,7 +1043,7 @@
 			<div>
 				<h3 class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-wider mb-3">Financial Calculations</h3>
 				<div class="space-y-2.5">
-					{#each elementTypes.filter((t) => t.type === 'process') as elementType}
+					{#each elementTypes.filter((t) => t.type === 'process' && (!nodeFilter || t.label.toLowerCase().includes(nodeFilter.toLowerCase()) || t.id.toLowerCase().includes(nodeFilter.toLowerCase()))) as elementType}
 						<button
 							class="w-full p-3.5 {getSidebarButtonColor(elementType.type)} rounded-lg cursor-move transition-all flex items-center gap-3 border shadow-sm hover:shadow-md hover:scale-[1.02] group"
 							onmousedown={(e) => startDragFromSidebar(elementType, e)}
@@ -1036,7 +1063,7 @@
 			<div>
 				<h3 class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-wider mb-3">AI Analysis</h3>
 				<div class="space-y-2.5">
-					{#each elementTypes.filter((t) => t.type === 'ai') as elementType}
+					{#each elementTypes.filter((t) => t.type === 'ai' && (!nodeFilter || t.label.toLowerCase().includes(nodeFilter.toLowerCase()) || t.id.toLowerCase().includes(nodeFilter.toLowerCase()))) as elementType}
 						<button
 							class="w-full p-3.5 {getSidebarButtonColor(elementType.type)} rounded-lg cursor-move transition-all flex items-center gap-3 border shadow-sm hover:shadow-md hover:scale-[1.02] group"
 							onmousedown={(e) => startDragFromSidebar(elementType, e)}
@@ -1056,7 +1083,7 @@
 			<div>
 				<h3 class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-wider mb-3">Reports & Outputs</h3>
 				<div class="space-y-2.5">
-					{#each elementTypes.filter((t) => t.type === 'output') as elementType}
+					{#each elementTypes.filter((t) => t.type === 'output' && (!nodeFilter || t.label.toLowerCase().includes(nodeFilter.toLowerCase()) || t.id.toLowerCase().includes(nodeFilter.toLowerCase()))) as elementType}
 						<button
 							class="w-full p-3.5 {getSidebarButtonColor(elementType.type)} rounded-lg cursor-move transition-all flex items-center gap-3 border shadow-sm hover:shadow-md hover:scale-[1.02] group"
 							onmousedown={(e) => startDragFromSidebar(elementType, e)}
