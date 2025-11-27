@@ -427,6 +427,8 @@
 	let zoomLevel = $state(1);
 	let panX = $state(0);
 	let panY = $state(0);
+	let isPanning = $state(false);
+	let panStart = $state({ x: 0, y: 0 });
 
 	// Generate unique ID
 	function generateId(): string {
@@ -466,7 +468,14 @@
 	function handleMouseMove(event: MouseEvent) {
 		currentMousePos = { x: event.clientX, y: event.clientY };
 
-		if (draggedGridElement && gridContainer) {
+		if (isPanning && gridContainer) {
+			// Pan the canvas
+			const deltaX = event.clientX - panStart.x;
+			const deltaY = event.clientY - panStart.y;
+			panX += deltaX;
+			panY += deltaY;
+			panStart = { x: event.clientX, y: event.clientY };
+		} else if (draggedGridElement && gridContainer) {
 			const rect = gridContainer.getBoundingClientRect();
 			// Account for zoom and pan when updating position
 			draggedGridElement.x = (event.clientX - rect.left - panX) / zoomLevel - dragOffset.x;
@@ -476,6 +485,8 @@
 
 	// Handle mouse up
 	function handleMouseUp(event: MouseEvent) {
+		isPanning = false;
+		
 		if (draggedElementType && gridContainer) {
 			const rect = gridContainer.getBoundingClientRect();
 			// Account for zoom and pan when placing new element
@@ -653,18 +664,42 @@
 		connectingFrom = null;
 	}
 
+	// Start panning
+	function startPanning(event: MouseEvent) {
+		// Don't pan if dragging from sidebar, clicking on node, or connection point
+		if (draggedElementType || draggedGridElement || connectingFrom) {
+			return;
+		}
+		
+		// Check if clicking on a node or connection point
+		const target = event.target as HTMLElement;
+		if (
+			target.closest('.absolute[style*="left"]') || // Node element
+			target.classList.contains('connection-point') ||
+			target.closest('.connection-point')
+		) {
+			return; // Don't pan if clicking on a node or connection point
+		}
+		
+		// Start panning
+		isPanning = true;
+		panStart = { x: event.clientX, y: event.clientY };
+		event.preventDefault();
+		event.stopPropagation();
+	}
+
 	// Color mapping - Professional color scheme for grid nodes
 	function getElementColor(type: 'input' | 'process' | 'output' | 'ai'): string {
 		if (darkMode) {
 			switch (type) {
 				case 'input':
-					return 'bg-slate-800';
+					return 'bg-slate-600';
 				case 'process':
-					return 'bg-slate-800';
+					return 'bg-slate-600';
 				case 'output':
-					return 'bg-slate-800';
+					return 'bg-slate-600';
 				case 'ai':
-					return 'bg-slate-800';
+					return 'bg-slate-600';
 			}
 		} else {
 			switch (type) {
@@ -684,24 +719,24 @@
 		if (darkMode) {
 			switch (type) {
 				case 'input':
-					return 'border-slate-600';
+					return 'border-slate-400';
 				case 'process':
-					return 'border-slate-600';
+					return 'border-slate-400';
 				case 'output':
-					return 'border-emerald-500/50';
+					return 'border-emerald-300';
 				case 'ai':
-					return 'border-indigo-500/50';
+					return 'border-indigo-300';
 			}
 		} else {
 			switch (type) {
 				case 'input':
-					return 'border-slate-200';
+					return 'border-slate-300';
 				case 'process':
-					return 'border-slate-200';
+					return 'border-slate-300';
 				case 'output':
-					return 'border-emerald-200';
+					return 'border-emerald-300';
 				case 'ai':
-					return 'border-indigo-200';
+					return 'border-indigo-300';
 			}
 		}
 	}
@@ -710,13 +745,13 @@
 		if (darkMode) {
 			switch (type) {
 				case 'input':
-					return 'bg-slate-700';
+					return 'bg-slate-600';
 				case 'process':
-					return 'bg-slate-700';
+					return 'bg-slate-600';
 				case 'output':
-					return 'bg-emerald-900/40';
+					return 'bg-emerald-800';
 				case 'ai':
-					return 'bg-indigo-900/40';
+					return 'bg-indigo-800';
 			}
 		} else {
 			switch (type) {
@@ -736,13 +771,13 @@
 		if (darkMode) {
 			switch (type) {
 				case 'input':
-					return 'text-slate-200';
+					return 'text-slate-100';
 				case 'process':
-					return 'text-slate-200';
+					return 'text-slate-100';
 				case 'output':
-					return 'text-emerald-300';
+					return 'text-emerald-200';
 				case 'ai':
-					return 'text-indigo-300';
+					return 'text-indigo-200';
 			}
 		} else {
 			switch (type) {
@@ -770,9 +805,9 @@
 				case 'process':
 					return '';
 				case 'output':
-					return 'ring-emerald-500/20';
+					return 'ring-emerald-500/40';
 				case 'ai':
-					return 'ring-indigo-500/20';
+					return 'ring-indigo-500/40';
 			}
 		} else {
 			switch (type) {
@@ -821,9 +856,9 @@
 			case 'process':
 				return darkMode ? 'bg-slate-600' : 'bg-slate-100';
 			case 'output':
-				return darkMode ? 'bg-emerald-600/30' : 'bg-emerald-50';
+				return darkMode ? 'bg-emerald-700' : 'bg-emerald-50';
 			case 'ai':
-				return darkMode ? 'bg-indigo-600/30' : 'bg-indigo-50';
+				return darkMode ? 'bg-indigo-700' : 'bg-indigo-50';
 		}
 	}
 
@@ -924,27 +959,25 @@
 
 	// Handle mouse wheel zoom
 	function handleWheel(event: WheelEvent) {
-		if (event.ctrlKey || event.metaKey) {
-			event.preventDefault();
-			const delta = event.deltaY > 0 ? -0.1 : 0.1;
-			const newZoom = Math.max(0.5, Math.min(2, zoomLevel + delta));
+		event.preventDefault();
+		const delta = event.deltaY > 0 ? -0.1 : 0.1;
+		const newZoom = Math.max(0.5, Math.min(2, zoomLevel + delta));
+		
+		// Zoom towards mouse position
+		if (gridContainer) {
+			const rect = gridContainer.getBoundingClientRect();
+			const mouseX = event.clientX - rect.left;
+			const mouseY = event.clientY - rect.top;
 			
-			// Zoom towards mouse position
-			if (gridContainer) {
-				const rect = gridContainer.getBoundingClientRect();
-				const mouseX = event.clientX - rect.left;
-				const mouseY = event.clientY - rect.top;
-				
-				// Calculate zoom point relative to container
-				const zoomPointX = (mouseX - panX) / zoomLevel;
-				const zoomPointY = (mouseY - panY) / zoomLevel;
-				
-				zoomLevel = newZoom;
-				
-				// Adjust pan to zoom towards mouse position
-				panX = mouseX - zoomPointX * zoomLevel;
-				panY = mouseY - zoomPointY * zoomLevel;
-			}
+			// Calculate zoom point relative to container
+			const zoomPointX = (mouseX - panX) / zoomLevel;
+			const zoomPointY = (mouseY - panY) / zoomLevel;
+			
+			zoomLevel = newZoom;
+			
+			// Adjust pan to zoom towards mouse position
+			panX = mouseX - zoomPointX * zoomLevel;
+			panY = mouseY - zoomPointY * zoomLevel;
 		}
 	}
 </script>
@@ -1074,7 +1107,7 @@
 						onclick={zoomOut}
 						disabled={zoomLevel <= 0.5}
 						aria-label="Zoom out"
-						title="Zoom out (Ctrl + Scroll)"
+							title="Zoom out (Scroll)"
 					>
 						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"></path>
@@ -1088,7 +1121,7 @@
 						onclick={zoomIn}
 						disabled={zoomLevel >= 2}
 						aria-label="Zoom in"
-						title="Zoom in (Ctrl + Scroll)"
+							title="Zoom in (Scroll)"
 					>
 						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"></path>
@@ -1136,8 +1169,9 @@
 		<!-- Grid Canvas -->
 		<div
 			bind:this={gridContainer}
-			class="flex-1 relative {darkMode ? 'bg-slate-900' : 'bg-slate-50'} overflow-hidden"
-			style="background-image: linear-gradient(to right, {darkMode ? '#1e293b' : '#e2e8f0'} 1px, transparent 1px), linear-gradient(to bottom, {darkMode ? '#1e293b' : '#e2e8f0'} 1px, transparent 1px); background-size: {20 * zoomLevel}px {20 * zoomLevel}px; background-position: {panX}px {panY}px; opacity: {darkMode ? '0.3' : '1'};"
+			class="flex-1 relative {darkMode ? 'bg-slate-900' : 'bg-slate-50'} overflow-hidden {isPanning ? 'cursor-grabbing' : 'cursor-default'}"
+			style="background-image: linear-gradient(to right, {darkMode ? '#1e293b' : '#e2e8f0'} 1px, transparent 1px), linear-gradient(to bottom, {darkMode ? '#1e293b' : '#e2e8f0'} 1px, transparent 1px); background-size: {20 * zoomLevel}px {20 * zoomLevel}px; background-position: {panX}px {panY}px;"
+			onmousedown={startPanning}
 			onclick={handleGridClick}
 			onkeydown={(e) => e.key === 'Escape' && handleGridClick()}
 			onwheel={handleWheel}
@@ -1161,7 +1195,7 @@
 						orient="auto"
 						markerUnits="userSpaceOnUse"
 					>
-						<polygon points="0 0, 10 3, 0 6" fill={darkMode ? '#94a3b8' : '#475569'} />
+						<polygon points="0 0, 10 3, 0 6" fill={darkMode ? '#cbd5e1' : '#475569'} />
 					</marker>
 				</defs>
 
@@ -1174,7 +1208,7 @@
 						<path
 							d="M {fromPos.x} {fromPos.y} C {fromPos.x + 100} {fromPos.y}, {toPos.x -
 								100} {toPos.y}, {toPos.x} {toPos.y}"
-							stroke={darkMode ? '#94a3b8' : '#475569'}
+							stroke={darkMode ? '#cbd5e1' : '#475569'}
 							stroke-width="2.5"
 							fill="none"
 							marker-end="url(#arrowhead)"
@@ -1209,19 +1243,19 @@
 				</svg>
 
 				<!-- Grid Elements -->
-			{#each gridElements as element (element.id)}
-				<div
-					class="absolute {getElementColor(
-						element.type.type
-					)} rounded-xl shadow-md cursor-move border-2 {getElementBorderColor(
-						element.type.type
-					)} {draggedGridElement?.id === element.id ? '' : 'hover:shadow-xl hover:scale-[1.02] transition-all'} {getNodeAccentColor(element.type.type) ? getNodeAccentColor(element.type.type) + ' ring-1' : ''}"
-					style="left: {element.x}px; top: {element.y}px; width: {element.width}px; height: {element.height}px; {draggedGridElement?.id === element.id ? 'transition: none;' : ''}"
-					onmousedown={(e) => startDragOnGrid(element, e)}
-					ondblclick={(e) => handleElementDoubleClick(element, e)}
-					role="button"
-					tabindex="0"
-				>
+				{#each gridElements as element (element.id)}
+					<div
+						class="absolute {getElementColor(
+							element.type.type
+						)} rounded-xl {darkMode ? 'shadow-2xl shadow-black/50' : 'shadow-lg'} cursor-move border-2 {getElementBorderColor(
+							element.type.type
+						)} {draggedGridElement?.id === element.id ? '' : 'hover:shadow-2xl hover:scale-[1.02] transition-all'} {getNodeAccentColor(element.type.type) ? getNodeAccentColor(element.type.type) + ' ring-1' : ''}"
+						style="left: {element.x}px; top: {element.y}px; width: {element.width}px; height: {element.height}px; {draggedGridElement?.id === element.id ? 'transition: none;' : ''}"
+						onmousedown={(e) => { startDragOnGrid(element, e); e.stopPropagation(); }}
+						ondblclick={(e) => handleElementDoubleClick(element, e)}
+						role="button"
+						tabindex="0"
+					>
 					<div class="relative w-full h-full p-4 flex flex-col items-center justify-center group">
 						<!-- Delete Button -->
 						<button
@@ -1249,29 +1283,29 @@
 
 						<!-- Output Display -->
 						{#if element.output !== undefined}
-							<div class="text-[10px] mt-1.5 opacity-90 truncate max-w-full px-2 py-1 font-mono {darkMode ? 'bg-slate-700/50 text-slate-300' : 'bg-slate-100 text-slate-600'} rounded border {darkMode ? 'border-slate-600' : 'border-slate-200'}">
+							<div class="text-[10px] mt-1.5 truncate max-w-full px-2 py-1 font-mono {darkMode ? 'bg-slate-700 text-slate-200' : 'bg-slate-100 text-slate-600'} rounded border {darkMode ? 'border-slate-600' : 'border-slate-200'}">
 								{String(element.output).slice(0, 20)}
 							</div>
 						{/if}
 
 						<!-- Connection Points -->
 						<button
-							class="connection-point absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 {darkMode ? 'bg-slate-700 border-slate-600' : 'bg-white border-slate-300'} border-2 rounded-full hover:bg-indigo-500 hover:border-indigo-600 hover:scale-125 hover:shadow-md transition-all cursor-crosshair z-10"
+							class="connection-point absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 {darkMode ? 'bg-slate-600 border-slate-500' : 'bg-white border-slate-300'} border-2 rounded-full hover:bg-indigo-500 hover:border-indigo-600 hover:scale-125 hover:shadow-md transition-all cursor-crosshair z-10"
 							onclick={(e) => handleConnectionPointClick(element.id, 'top', e)}
 							aria-label="Top connection point"
 						></button>
 						<button
-							class="connection-point absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-4 h-4 {darkMode ? 'bg-slate-700 border-slate-600' : 'bg-white border-slate-300'} border-2 rounded-full hover:bg-indigo-500 hover:border-indigo-600 hover:scale-125 hover:shadow-md transition-all cursor-crosshair z-10"
+							class="connection-point absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-4 h-4 {darkMode ? 'bg-slate-600 border-slate-500' : 'bg-white border-slate-300'} border-2 rounded-full hover:bg-indigo-500 hover:border-indigo-600 hover:scale-125 hover:shadow-md transition-all cursor-crosshair z-10"
 							onclick={(e) => handleConnectionPointClick(element.id, 'right', e)}
 							aria-label="Right connection point"
 						></button>
 						<button
-							class="connection-point absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-4 h-4 {darkMode ? 'bg-slate-700 border-slate-600' : 'bg-white border-slate-300'} border-2 rounded-full hover:bg-indigo-500 hover:border-indigo-600 hover:scale-125 hover:shadow-md transition-all cursor-crosshair z-10"
+							class="connection-point absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-4 h-4 {darkMode ? 'bg-slate-600 border-slate-500' : 'bg-white border-slate-300'} border-2 rounded-full hover:bg-indigo-500 hover:border-indigo-600 hover:scale-125 hover:shadow-md transition-all cursor-crosshair z-10"
 							onclick={(e) => handleConnectionPointClick(element.id, 'bottom', e)}
 							aria-label="Bottom connection point"
 						></button>
 						<button
-							class="connection-point absolute top-1/2 left-0 -translate-x-1/2 -translate-y-1/2 w-4 h-4 {darkMode ? 'bg-slate-700 border-slate-600' : 'bg-white border-slate-300'} border-2 rounded-full hover:bg-indigo-500 hover:border-indigo-600 hover:scale-125 hover:shadow-md transition-all cursor-crosshair z-10"
+							class="connection-point absolute top-1/2 left-0 -translate-x-1/2 -translate-y-1/2 w-4 h-4 {darkMode ? 'bg-slate-600 border-slate-500' : 'bg-white border-slate-300'} border-2 rounded-full hover:bg-indigo-500 hover:border-indigo-600 hover:scale-125 hover:shadow-md transition-all cursor-crosshair z-10"
 							onclick={(e) => handleConnectionPointClick(element.id, 'left', e)}
 							aria-label="Left connection point"
 						></button>
