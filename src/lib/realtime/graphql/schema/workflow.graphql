@@ -1,0 +1,159 @@
+# =============================================================================
+# GraphQL Schema for Workflow Builder
+#
+# This schema defines the data model for visual workflow builder with nodes
+# and connections. Workflows can contain various element types (input, process,
+# output, AI) and connections between them.
+# =============================================================================
+
+# ---------------------------
+# Enums
+# ---------------------------
+
+enum ElementTypeEnum {
+  INPUT
+  PROCESS
+  OUTPUT
+  AI
+}
+
+enum ConnectionSide {
+  TOP
+  RIGHT
+  BOTTOM
+  LEFT
+}
+
+# ---------------------------
+# Input Types
+# ---------------------------
+
+input AIQueryDataInput {
+  prompt: String!
+  model: String!
+  systemPrompt: String
+}
+
+input WorkflowElementInput {
+  id: ID!
+  elementTypeId: String!
+  x: Float!
+  y: Float!
+  width: Float!
+  height: Float!
+  aiQueryData: AIQueryDataInput
+}
+
+input WorkflowConnectionInput {
+  id: ID!
+  fromElementId: ID!
+  toElementId: ID!
+  fromSide: ConnectionSide!
+  toSide: ConnectionSide!
+}
+
+input CreateWorkflowInput {
+  name: String!
+  description: String
+  elements: [WorkflowElementInput!]
+  connections: [WorkflowConnectionInput!]
+}
+
+input UpdateWorkflowInput {
+  id: ID!
+  name: String
+  description: String
+  elements: [WorkflowElementInput!]
+  connections: [WorkflowConnectionInput!]
+}
+
+# ---------------------------
+# Types
+# ---------------------------
+
+type AIQueryData {
+  prompt: String!
+  model: String!
+  systemPrompt: String
+}
+
+type WorkflowElement {
+  id: ID!
+  elementTypeId: String!
+  x: Float!
+  y: Float!
+  width: Float!
+  height: Float!
+  aiQueryData: AIQueryData
+}
+
+type WorkflowConnection {
+  id: ID!
+  fromElementId: ID!
+  toElementId: ID!
+  fromSide: ConnectionSide!
+  toSide: ConnectionSide!
+}
+
+type Workflow @aws_cognito_user_pools @aws_iam {
+  id: ID!
+  name: String!
+  description: String
+  ownerId: ID!
+  tenant: String!
+  sharingMode: String!
+  elements: [WorkflowElement!]!
+  connections: [WorkflowConnection!]!
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+type WorkflowConnectionPage {
+  items: [Workflow!]!
+  nextToken: String
+}
+
+# ---------------------------
+# Queries
+# ---------------------------
+
+type Query {
+  # Get a workflow by ID
+  getWorkflow(id: ID!): Workflow
+  
+  # List workflows for the current user
+  listMyWorkflows(limit: Int, nextToken: String): WorkflowConnectionPage!
+  
+  # List workflows by owner
+  listWorkflowsByOwner(ownerId: ID!, limit: Int, nextToken: String): WorkflowConnectionPage!
+}
+
+# ---------------------------
+# Mutations
+# ---------------------------
+
+type Mutation {
+  # Create a new workflow
+  createWorkflow(input: CreateWorkflowInput!): Workflow!
+  
+  # Update an existing workflow
+  updateWorkflow(input: UpdateWorkflowInput!): Workflow!
+  
+  # Delete a workflow
+  deleteWorkflow(id: ID!): Workflow!
+}
+
+# ---------------------------
+# Subscriptions
+# ---------------------------
+
+type Subscription {
+  # Subscribe to workflow updates
+  onWorkflowUpdated(id: ID!): Workflow
+    @aws_subscribe(mutations: ["updateWorkflow"])
+  
+  # Subscribe to workflow deletion
+  onWorkflowDeleted(id: ID!): Workflow
+    @aws_subscribe(mutations: ["deleteWorkflow"])
+}
+
