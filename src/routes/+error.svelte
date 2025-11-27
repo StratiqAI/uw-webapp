@@ -2,17 +2,20 @@
 	import { Heading, P } from 'flowbite-svelte';
 
 	import Button from '$lib/ui/Button.svelte';
+	import { darkModeStore } from '$lib/stores/darkMode.svelte';
+
+	let darkMode = $derived.by(() => darkModeStore.darkMode);
 </script>
 
 
-<div class="h-screen w-screen bg-gray-100 flex items-center">
-	<div class="container flex flex-col md:flex-row items-center justify-center px-5 text-gray-700">
+<div class="h-screen w-screen {darkMode ? 'bg-slate-900' : 'bg-gray-100'} flex items-center">
+	<div class="container flex flex-col md:flex-row items-center justify-center px-5 {darkMode ? 'text-slate-200' : 'text-gray-700'}">
    		<div class="max-w-md">
-      		<div class="text-5xl font-dark font-bold">404</div>
+      		<div class="text-5xl font-dark font-bold {darkMode ? 'text-white' : 'text-gray-900'}">404</div>
             <p
-              class="text-2xl md:text-3xl font-light leading-normal"
+              class="text-2xl md:text-3xl font-light leading-normal {darkMode ? 'text-slate-300' : 'text-gray-700'}"
             >Sorry we couldn't find this page. </p>
-          <p class="mb-8">But dont worry, you can find plenty of other things on our homepage.</p>
+          <p class="mb-8 {darkMode ? 'text-slate-400' : 'text-gray-600'}">But dont worry, you can find plenty of other things on our homepage.</p>
           
           <Button href="/" >back to homepage</Button>
     </div>
