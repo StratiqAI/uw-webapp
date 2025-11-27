@@ -847,9 +847,9 @@
 					</div>
 					<div>
 						<h1 class="text-2xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">
-							AI Query Library
+							Agent Library
 						</h1>
-						<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-0.5">Browse and manage AI analysis queries</p>
+						<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-0.5">Create, browse and manage AI analysis</p>
 					</div>
 				</div>
 				<div class="flex items-center gap-3">
@@ -989,13 +989,13 @@
 				<svg class="w-16 h-16 mx-auto {darkMode ? 'text-slate-600' : 'text-slate-300'} mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
 				</svg>
-				<p class="text-base font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">No custom queries yet</p>
-				<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mb-4">Create your first custom AI query to get started</p>
+				<p class="text-base font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">No custom agents yet</p>
+				<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mb-4">Create your first custom agent to get started</p>
 				<button
 					onclick={() => creatingCustomAI = true}
 					class="px-4 py-2 text-sm font-medium {darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-lg transition-colors"
 				>
-					Create Your First Custom Query
+					Create Your First Agent
 				</button>
 			</div>
 		{/if}

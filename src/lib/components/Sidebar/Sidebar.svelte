@@ -29,6 +29,14 @@
 		}
 	});
 
+	function toggleDarkMode() {
+		darkMode = !darkMode;
+		// Optionally save to localStorage for persistence
+		try {
+			localStorage.setItem('darkMode', String(darkMode));
+		} catch {}
+	}
+
 	const navItems = [
 		{
 			label: 'Projects',
@@ -43,7 +51,7 @@
 			icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5ZM14 5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V5ZM4 16a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3ZM14 13a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-6Z"/>`
 		},
 		{
-			label: 'AI Library',
+			label: 'Agent Library',
 			href: '/library',
 			activeKey: '/library',
 			icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"/>`
@@ -208,7 +216,7 @@
 	<!-- Footer -->
 	<div class="{isSidebarOpen ? 'p-4' : 'p-3'} border-t {darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50/50'} relative z-50 overflow-visible">
 		<div class="flex items-center {isSidebarOpen ? 'justify-start gap-3' : 'justify-center'} relative">
-			<UserDropdown {currentUser} {darkMode} {isSidebarOpen} />
+			<UserDropdown {currentUser} {darkMode} {isSidebarOpen} onToggleDarkMode={toggleDarkMode} />
 		</div>
 	</div>
 </div>
