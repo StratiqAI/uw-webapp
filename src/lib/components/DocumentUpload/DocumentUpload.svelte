@@ -100,7 +100,7 @@
     onError={handleError}
 >
 	{#if uploader.activeUploads > 0}
-		<p class="mt-2 text-xs text-blue-600">
+		<p class="mt-2 text-xs text-blue-600 dark:text-indigo-400">
 			Uploading {uploader.activeUploads} file{uploader.activeUploads > 1 ? 's' : ''}...
 		</p>
 	{/if}

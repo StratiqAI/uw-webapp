@@ -37,16 +37,19 @@
 	<div class="mx-auto max-w-4xl px-6 py-8">
 		<!-- Welcome Section -->
 		<div class="mb-8">
-			<h2 class="text-xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'} mb-2">
-				Welcome to Your Workspace
-			</h2>
-			<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-600'}">
+			<div class="flex items-center gap-3 mb-3">
+				<div class="w-1 h-8 {darkMode ? 'bg-indigo-500' : 'bg-indigo-600'} rounded-full"></div>
+				<h2 class="text-xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">
+					Welcome to Your <span class="{darkMode ? 'text-indigo-400' : 'text-indigo-600'}">Workspace</span>
+				</h2>
+			</div>
+			<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-600'} ml-4">
 				Get started by uploading your first property or document to begin your analysis.
 			</p>
 		</div>
 
 		<!-- Upload Section -->
-		<div class="{darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg border shadow-sm">
+		<div class="{darkMode ? 'bg-gradient-to-br from-slate-800 via-slate-800 to-indigo-900/20 border-indigo-500/30' : 'bg-gradient-to-br from-white via-indigo-50/50 to-white border-indigo-200'} rounded-lg border-2 shadow-lg hover:shadow-xl transition-shadow">
 			<div class="p-6">
 				<DocumentUpload idToken={cognitoIdToken} projectId={projectId} metadata={fileMetadata} />
 			</div>
@@ -56,10 +59,10 @@
 		<div class="mt-6 text-center">
 			<a 
 				href="/blog/uploading-your-first-property" 
-				class="text-sm {darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-900'} hover:underline transition-colors inline-flex items-center gap-1"
+				class="text-sm {darkMode ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-700'} font-medium hover:underline transition-colors inline-flex items-center gap-2 group"
 			>
 				<span>Learn more about uploading documents</span>
-				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<svg class="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
 				</svg>
 			</a>

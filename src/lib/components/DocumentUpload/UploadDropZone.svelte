@@ -85,7 +85,7 @@
 		aria-hidden="true"
 	/>
 
-	<svg class="mb-4 h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	<svg class="mb-4 h-10 w-10 text-gray-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 		<path
 			stroke-linecap="round"
 			stroke-linejoin="round"
@@ -94,12 +94,12 @@
 		/>
 	</svg>
 
-	<p class="text-lg font-medium">Upload sources</p>
-	<p class="text-center text-sm">
+	<p class="text-lg font-medium text-gray-900 dark:text-white">Upload sources</p>
+	<p class="text-center text-sm text-gray-700 dark:text-slate-300">
 		Drag & drop or
-		<span class="font-semibold text-blue-600">browse files</span>
+		<span class="font-semibold text-blue-600 dark:text-indigo-400">browse files</span>
 	</p>
-	<p class="mt-2 text-xs text-gray-500">
+	<p class="mt-2 text-xs text-gray-500 dark:text-slate-400">
 		Supported: {acceptedFileTypes.toUpperCase()} (max {maxFileSize / (1024 * 1024)}MB)
 	</p>
 

@@ -16,7 +16,7 @@
   }: TabButtonProps = $props();
 
   const defaultClasses: string =
-    'inline-block text-sm font-medium text-center disabled:cursor-not-allowed p-4 py-3 px-4 text-gray-500 rounded-lg hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white';
+    'inline-block text-sm font-medium text-center disabled:cursor-not-allowed py-2 px-4 rounded-lg transition-all duration-200 border border-transparent';
 
   const mergedClasses: string = $derived(`${defaultClasses} ${className}`.trim());
 </script>

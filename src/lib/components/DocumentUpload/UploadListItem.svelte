@@ -44,18 +44,18 @@
 			</button>
 		{:else if item.status === 'existing'}
 			<!-- Existing documents don't have remove button for now -->
-			<span class="text-gray-400">—</span>
+			<span class="text-gray-400 dark:text-slate-500">—</span>
 		{/if}
 	</td>
 	<td class="px-4 py-2">
 		<div class="break-words">
-			<span class="block font-medium">{displayName}</span>
+			<span class="block font-medium text-gray-900 dark:text-white">{displayName}</span>
 			{#if fileSize !== undefined}
-				<span class="text-xs text-gray-500">
+				<span class="text-xs text-gray-500 dark:text-slate-400">
 					{(fileSize / (1024 * 1024)).toFixed(2)} MB
 				</span>
 			{:else if item.status === 'existing'}
-				<span class="text-xs text-gray-500">Existing document</span>
+				<span class="text-xs text-gray-500 dark:text-slate-400">Existing document</span>
 			{/if}
 		</div>
 		{#if progress !== undefined && uploadStatus !== 'success' && uploadStatus !== 'error'}
@@ -63,29 +63,29 @@
 				<div class="flex items-center gap-2">
 					<progress class="flex-1" max="100" value={progress} aria-label="Upload progress"
 					></progress>
-					<span class="text-xs text-gray-600">{progress}%</span>
+					<span class="text-xs text-gray-600 dark:text-slate-400">{progress}%</span>
 				</div>
 			</div>
 		{/if}
 	</td>
 	<td class="px-4 py-2 text-center text-xs">
 		{#if item.status === 'existing'}
-			<span class="text-gray-600">✓ Existing</span>
+			<span class="text-gray-600 dark:text-slate-400">✓ Existing</span>
 		{:else if uploadStatus === 'success'}
-			<span class="text-green-600">{statusText(uploadStatus)}</span>
+			<span class="text-green-600 dark:text-green-400">{statusText(uploadStatus)}</span>
 		{:else if uploadStatus === 'error'}
-			<div class="text-red-600" title={item.uploadFile?.result?.message}>
+			<div class="text-red-600 dark:text-red-400" title={item.uploadFile?.result?.message}>
 				<span>{statusText(uploadStatus)}</span>
 				<button
 					type="button"
-					class="ml-2 underline hover:text-red-800"
+					class="ml-2 underline hover:text-red-800 dark:hover:text-red-300"
 					onclick={() => onRetry?.({ item })}
 				>
 					Retry
 				</button>
 			</div>
 		{:else if uploadStatus}
-			<span class="text-blue-600">{statusText(uploadStatus)}</span>
+			<span class="text-blue-600 dark:text-indigo-400">{statusText(uploadStatus)}</span>
 		{/if}
 	</td>
 </tr>

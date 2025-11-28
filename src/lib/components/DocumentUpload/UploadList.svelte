@@ -31,16 +31,16 @@
 		{#if statusCounts.uploading > 0 || statusCounts.error > 0 || statusCounts.existing > 0}
 			<div class="mb-2 flex gap-4 text-sm">
 				{#if statusCounts.existing > 0}
-					<span class="text-gray-600">📄 {statusCounts.existing} existing</span>
+					<span class="text-gray-600 dark:text-slate-400">📄 {statusCounts.existing} existing</span>
 				{/if}
 				{#if statusCounts.success > 0}
-					<span class="text-green-600">✓ {statusCounts.success} uploaded</span>
+					<span class="text-green-600 dark:text-green-400">✓ {statusCounts.success} uploaded</span>
 				{/if}
 				{#if statusCounts.uploading > 0}
-					<span class="text-blue-600">↻ {statusCounts.uploading} in progress</span>
+					<span class="text-blue-600 dark:text-indigo-400">↻ {statusCounts.uploading} in progress</span>
 				{/if}
 				{#if statusCounts.error > 0}
-					<span class="text-red-600">✗ {statusCounts.error} failed</span>
+					<span class="text-red-600 dark:text-red-400">✗ {statusCounts.error} failed</span>
 				{/if}
 			</div>
 		{/if}
