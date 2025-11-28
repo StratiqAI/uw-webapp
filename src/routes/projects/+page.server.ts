@@ -13,12 +13,10 @@ import type { PageServerLoad } from './$types';
 // Import the GraphQL helper for making HTTP requests to AppSync
 import { gql } from '$lib/realtime/graphql/requestHandler';
 
-// Import the GraphQL query and mutation strings
-import { GraphQLOperationGenerator, ProjectSchemas } from '@stratiqai/types';
-const projectGenerator = new GraphQLOperationGenerator("Project", ProjectSchemas);
-const Q_LIST_USER_PROJECTS = projectGenerator.generateListQuery();
+// Import GraphQL operations
+import { Q_LIST_USER_PROJECTS } from '$lib/realtime/graphql/queries/Project';
 
-// Import the UserItem type definition
+// Import the Project type definition
 import type { Project } from '@stratiqai/types';
 
 // Define the server-side load function for this page

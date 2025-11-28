@@ -16,7 +16,7 @@
 
 	// Type imports
 	import type { LayoutProps } from './$types';
-	import { GraphQLOperationGenerator, ProjectDocumentLinkSchemas, ProjectSchemas, type Project, type ProjectDocumentLink } from '@stratiqai/types';
+	import { GraphQLOperationGenerator, DocLinkSchemas, ProjectSchemas, type Project, type DocLink } from '@stratiqai/types';
 
 	// Import Logging
 	import { logger } from '$lib/logging/debug';
@@ -75,9 +75,9 @@
 
 	
 	// Instantiate a GraphQLOperationGenerator for the Project model
-	const projectDocumentLinkGenerator = new GraphQLOperationGenerator('ProjectDocumentLink', ProjectDocumentLinkSchemas);
-	const S_ON_CREATE_PROJECT_DOCUMENT_LINK = projectDocumentLinkGenerator.generateSubscription({eventType: 'create', includeRelations: true, filterBy: "parentId", filterType: "ID!"});
-	const S_ON_DELETE_PROJECT_DOCUMENT_LINK = projectDocumentLinkGenerator.generateSubscription({eventType: 'delete', includeRelations: true, filterBy: "parentId", filterType: "ID!"});
+	const docLinkGenerator = new GraphQLOperationGenerator('DocLink', DocLinkSchemas);
+	const S_ON_CREATE_DOC_LINK = docLinkGenerator.generateSubscription({eventType: 'create', includeRelations: true, filterBy: "parentId", filterType: "ID!"});
+	const S_ON_DELETE_DOC_LINK = docLinkGenerator.generateSubscription({eventType: 'delete', includeRelations: true, filterBy: "parentId", filterType: "ID!"});
 	
 	// console.log("S_ON_CREATE_PROJECT_DOCUMENT_LINK", S_ON_CREATE_PROJECT_DOCUMENT_LINK);
 	// console.log("S_ON_UPDATE_PROJECT_DOCUMENT_LINK", S_ON_UPDATE_PROJECT_DOCUMENT_LINK);
@@ -150,32 +150,32 @@
 				error: (err: any) => console.error('project sub error', err)
 			},
 			{
-				query: S_ON_CREATE_PROJECT_DOCUMENT_LINK,
+				query: S_ON_CREATE_DOC_LINK,
 				variables: { parentId: projectFromServer.id },
-				path: 'onCreateProjectDocumentLink',
-				next: (link: ProjectDocumentLink) => {
+				path: 'onCreateDocLink',
+				next: (link: DocLink) => {
 					// Add the new ProjectDocumentLink to the project's projectDocumentLinks collection
 					if (browser) {
-						addProjectDocumentLink(link);
-						logger(`ProjectDocumentLink ${link.id} created and added to project:`, link);
+						addDocLink(link);
+						logger(`DocLink ${link.id} created and added to project:`, link);
 					}
 				},
-				error: (err: any) => console.error('projectDocumentLink create sub error', err)
+				error: (err: any) => console.error('docLink create sub error', err)
 			},
 
 			{
-				query: S_ON_DELETE_PROJECT_DOCUMENT_LINK,
+				query: S_ON_DELETE_DOC_LINK,
 				variables: { parentId: projectFromServer.id },
-				path: 'onDeleteProjectDocumentLink',
-				next: (link: ProjectDocumentLink | { id: string }) => {
+				path: 'onDeleteDocLink',
+				next: (link: DocLink | { id: string }) => {
 					// Remove the ProjectDocumentLink from the project's projectDocumentLinks collection
 					if (browser) {
 						const linkId = link.id;
-						removeProjectDocumentLink(linkId);
-						logger(`ProjectDocumentLink ${linkId} deleted and removed from project`);
+						removeDocLink(linkId);
+						logger(`DocLink ${linkId} deleted and removed from project`);
 					}
 				},
-				error: (err: any) => console.error('projectDocumentLink delete sub error', err)
+				error: (err: any) => console.error('docLink delete sub error', err)
 			}
 		];
 

@@ -1,10 +1,11 @@
 // External packages
 import { error } from '@sveltejs/kit';
-import { GraphQLOperationGenerator, ProjectSchemas } from '@stratiqai/types';
+import { ProjectSchemas } from '@stratiqai/types';
 import type { Project } from '@stratiqai/types';
 
 // Internal imports
 import { gql } from '$lib/realtime/graphql/requestHandler';
+import { Q_GET_PROJECT_BY_ID_WITH_DOCLINKS } from '$lib/realtime/graphql/queries/Project';
 
 // Local type imports
 import type { LayoutServerLoad } from './$types';
@@ -67,11 +68,6 @@ type GraphQLProjectResponse = {
 	getProject: Project | null;
 };
 
-// Instantiate a GraphQLOperationGenerator for the Project model
-const projectGenerator = new GraphQLOperationGenerator('Project', ProjectSchemas);
-// Generate a GraphQL query for fetching a project by ID, including relations (e.g., documents)
-const Q_GET_PROJECT_BY_ID = projectGenerator.generateGetQuery({ includeRelations: true });
-
 /**
  * Server-side layout loader for project workspace pages.
  * This function loads project data, validates it, and supports handling
@@ -116,10 +112,12 @@ export const load: LayoutServerLoad = async ({ params, cookies, url, parent }) =
 	// ============================================================================
 	// Fetch the project from the GraphQL API using the generated query and projectId
 	const response = await gql<GraphQLProjectResponse>(
-		Q_GET_PROJECT_BY_ID,
+		Q_GET_PROJECT_BY_ID_WITH_DOCLINKS,
 		{ id: projectId },
 		idToken // Pass the AWS Cognito ID Token for authentication
 	);
+
+	console.log('response', response);
 
 	// If no project found, respond with 404 (Not Found)
 	if (!response?.getProject) {
@@ -132,13 +130,14 @@ export const load: LayoutServerLoad = async ({ params, cookies, url, parent }) =
 	// Validate the received project data against the Zod schema
 	const validationResult = projectSchema.safeParse(response.getProject);
 	if (!validationResult.success) {
-		// If validation fails, log the error and return 500 (Internal Server Error)
-		console.error('Project validation failed:', validationResult.error);
+		// If validation fails, log detailed error information and return 500 (Internal Server Error)
+		console.error('Project validation failed:', JSON.stringify(validationResult.error.errors, null, 2));
+		console.error('Received project data:', JSON.stringify(response.getProject, null, 2));
 		throw error(500, 'Invalid project data received from server');
 	}
 
 	const project = validationResult.data;
-
+	// const project = response.getProject;
 	// ============================================================================
 	// 7. RETURN DATA
 	// ============================================================================

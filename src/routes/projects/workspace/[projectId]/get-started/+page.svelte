@@ -21,7 +21,7 @@
 	const fileMetadata = $derived.by(() => {
 		if (!currentUser?.sub || !projectId) return null;
 		return {
-			tenantId: currentUser.tenant || 'default',
+			tenantId: project?.tenantId || currentUser.tenant || 'default',
 			ownerId: currentUser.sub,
 			parentId: projectId
 		};
