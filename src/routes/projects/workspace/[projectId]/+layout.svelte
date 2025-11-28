@@ -95,8 +95,7 @@
 
 	import RightChatDrawer from '$lib/components/RightChatDrawer.svelte';
 	import WorkspaceHeaderBar from '$lib/components/workspace/WorkspaceHeaderBar.svelte';
-
-	import TabButton from '$lib/ui/TabButton.svelte';
+	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Initialize the WebSocket Client
@@ -297,7 +296,7 @@
 
 <!-- Full viewport split: main app + right chat drawer -->
 <div
-	class="flex min-h-[100svh] w-full bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100"
+	class="flex min-h-[100svh] w-full {darkModeStore.darkMode ? 'bg-slate-900' : 'bg-slate-50'} text-gray-900"
 	style={`padding-right:${ui.sidebarOpen ? ui.sidebarWidth : 0}px`}
 >
 	<!-- Main app area -->
@@ -306,21 +305,8 @@
 			projectName={project?.name ?? (isNewProject ? 'New Project' : 'Loading...')}
 		/>
 
-		<div class="grid flex-1 grid-cols-6 gap-6 px-4 py-4">
-			<div class="col-span-6">
-				<!-- Workspace Navigation -->
-				<div class="mb-4 flex flex-wrap gap-2">
-					<TabButton href="get-started">Get Started</TabButton>
-					<TabButton href="document-analysis">Document Analysis</TabButton>
-					<TabButton href="market-analysis">Market Analysis</TabButton>
-					<TabButton href="property-analysis">Financial Analysis</TabButton>
-					<TabButton href="investment-analysis">Location/Site</TabButton>
-					<TabButton href="investment-analysis">Political/Legal</TabButton>
-					<TabButton href="investment-analysis">Insight/Sensitivity</TabButton>
-					<TabButton href="investment-analysis">Reports</TabButton>
-				</div>
-				{@render children()}
-			</div>
+		<div class="flex-1 overflow-auto {darkModeStore.darkMode ? 'bg-slate-900' : 'bg-slate-50'}">
+			{@render children()}
 		</div>
 	</div>
 
