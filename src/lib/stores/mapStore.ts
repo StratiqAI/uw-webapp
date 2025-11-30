@@ -1,86 +1,95 @@
-// stores/MapStore.ts
-import { writable, derived, type Writable, type Readable } from 'svelte/store';
+import { writable, type Writable, type Readable, get } from 'svelte/store';
+import { schemaRegistry } from '$lib/stores/SchemaRegistry';
 
-class MapStore {
-  private store: Writable<Map<string, string[]>>;
-  public subscribe: Writable<Map<string, string[]>>['subscribe'];
-  private itemStores = new Map<string, Readable<string[]>>();
-
-  constructor() {
-    this.store = writable(new Map());
-    this.subscribe = this.store.subscribe;
-  }
-
-  // Subscribe to a specific key's array
-  subscribeToKey(key: string): Readable<string[]> {
-    // Return cached store if it exists
-    if (this.itemStores.has(key)) {
-      return this.itemStores.get(key)!;
-    }
-
-    // Create a derived store for this specific key
-    const itemStore = derived(
-      this.store,
-      $store => $store.get(key) || []
-    );
-
-    this.itemStores.set(key, itemStore);
-    return itemStore;
-  }
-
-  // Add a string to a specific key's array
-  addToKey(key: string, value: string): void {
-    this.store.update(map => {
-      const newMap = new Map(map);
-      const current = newMap.get(key) || [];
-      newMap.set(key, [...current, value]);
-      return newMap;
-    });
-  }
-
-  // Remove a string from a specific key's array
-  removeFromKey(key: string, index: number): void {
-    this.store.update(map => {
-      const newMap = new Map(map);
-      const current = newMap.get(key);
-      if (current) {
-        newMap.set(key, current.filter((_, i) => i !== index));
-      }
-      return newMap;
-    });
-  }
-
-  // Set an entire array for a key
-  setKey(key: string, values: string[]): void {
-    this.store.update(map => {
-      const newMap = new Map(map);
-      newMap.set(key, values);
-      return newMap;
-    });
-  }
-
-  // Delete a key entirely
-  deleteKey(key: string): void {
-    this.store.update(map => {
-      const newMap = new Map(map);
-      newMap.delete(key);
-      return newMap;
-    });
-    
-    // Clean up cached store
-    this.itemStores.delete(key);
-  }
-
-  // Clear all data
-  clear(): void {
-    this.store.set(new Map());
-    this.itemStores.clear();
-  }
-
-  // Get all keys
-  getKeys(): Readable<string[]> {
-    return derived(this.store, $store => Array.from($store.keys()));
-  }
+interface Entry {
+	store: Writable<unknown>;
+	schemaId?: string; // Enforced schema
+	producers: Set<string>;
+	consumers: Set<string>;
+	lastValue: unknown;
 }
 
+export class MapStore {
+	private registry = new Map<string, Entry>();
+
+	private ensure(topic: string): Entry {
+		if (!this.registry.has(topic)) {
+			this.registry.set(topic, {
+				store: writable(undefined),
+				producers: new Set(),
+				consumers: new Set(),
+				lastValue: undefined
+			});
+		}
+		return this.registry.get(topic)!;
+	}
+
+	/**
+	 * Bind a topic to a Schema ID.
+	 * All future publishes will be validated.
+	 */
+	enforceTopicSchema(topic: string, schemaId: string) {
+		const entry = this.ensure(topic);
+		entry.schemaId = schemaId;
+	}
+
+	getStream(topic: string): Readable<unknown> & { get: () => unknown } {
+		const entry = this.ensure(topic);
+		return {
+			subscribe: entry.store.subscribe,
+			get: () => get(entry.store)
+		};
+	}
+
+	getPublisher(topic: string, producerId: string) {
+		const entry = this.ensure(topic);
+		entry.producers.add(producerId);
+
+		return {
+			publish: (data: unknown) => {
+				// Validation Gate
+				if (entry.schemaId) {
+					const validator = schemaRegistry.getValidator(entry.schemaId);
+					if (validator) {
+						const result = validator(data);
+
+						if (!result.success) {
+							// In production: Publish to 'sys:errors' topic
+							console.error(`[MapStore] Validation Failed for ${topic}:`, result.error);
+							return;
+						}
+
+						// Update store with sanitized/parsed data
+						entry.lastValue = result.data;
+						entry.store.set(result.data);
+						return;
+					}
+				}
+
+				// Unchecked Publish (System topics)
+				entry.lastValue = data;
+				entry.store.set(data);
+			},
+			dispose: () => {
+				entry.producers.delete(producerId);
+			}
+		};
+	}
+
+	/**
+	 * Debugging: Get a snapshot of all active topics.
+	 */
+	getInspectorData() {
+		return Array.from(this.registry.entries()).map(([topic, entry]) => ({
+			topic,
+			schemaId: entry.schemaId,
+			producers: entry.producers.size,
+			consumers: entry.consumers.size,
+			hasValue: entry.lastValue !== undefined
+		}));
+	}
+}
+
+// Export singleton instance
 export const mapStore = new MapStore();
+

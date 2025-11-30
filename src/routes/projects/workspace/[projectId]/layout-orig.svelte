@@ -13,7 +13,7 @@
 		addImageToDocument,
 		addInsightToDocument
 	} from '$lib/stores/appStateStore';
-	import { mapStore } from '$lib/stores/mapStore';
+	import { mapStore } from '$lib/stores/MapStore';
 	import { setContext } from 'svelte';
 
 	// Type imports
@@ -145,7 +145,10 @@
 					next: (newDocument: any) => {
 						if (browser) {
 							addDocument(newDocument);
-							mapStore.addToKey('documents', newDocument);
+							// Publish document to MapStore topic for reactive components
+							const pub = mapStore.getPublisher('documents', 'layout-handler');
+							pub.publish(newDocument);
+							pub.dispose();
 							logger('Document created:', newDocument);
 						}
 					},

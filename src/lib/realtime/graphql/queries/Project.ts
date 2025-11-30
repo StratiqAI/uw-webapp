@@ -10,7 +10,6 @@ export const Q_LIST_USER_PROJECTS = `
 				ownerId
 				tenantId
 				sharedWith
-				sharingMode
 				updatedAt
 			}
 			nextToken
@@ -27,8 +26,6 @@ export const Q_GET_PROJECT_BY_ID_WITH_DOCLINKS = `
 			entityType
 			tenantId
 			ownerId
-			parentId
-			parentType
 			createdAt
 			updatedAt
 			name
@@ -64,8 +61,7 @@ export const M_CREATE_PROJECT = `
 			entityType
 			tenantId
 			ownerId
-			parentId
-			parentType
+
 			name
 			description
 			sharingMode

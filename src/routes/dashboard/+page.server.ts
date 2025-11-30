@@ -2,11 +2,8 @@
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { gql } from '$lib/realtime/graphql/requestHandler';
-import { GraphQLOperationGenerator, ProjectSchemas } from '@stratiqai/types';
+import { Q_LIST_USER_PROJECTS } from '$lib/realtime/graphql/queries/Project';
 import type { Project } from '@stratiqai/types';
-
-const projectGenerator = new GraphQLOperationGenerator('Project', ProjectSchemas);
-const Q_LIST_USER_PROJECTS = projectGenerator.generateListQuery();
 
 export const load: PageServerLoad = async ({ cookies }) => {
 	const idToken = cookies.get('id_token');
