@@ -9,6 +9,12 @@ const state = $state({ darkMode: false });
 function initialize() {
 	if (typeof window === 'undefined') return;
 
+	// Sync with what's already on the document (set by blocking script in app.html)
+	if (typeof document !== 'undefined' && document.documentElement.classList.contains('dark')) {
+		state.darkMode = true;
+		return; // Already set, don't override
+	}
+
 	try {
 		const saved = localStorage.getItem('darkMode');
 		if (saved !== null) {
@@ -22,7 +28,7 @@ function initialize() {
 		console.warn('Failed to load dark mode preference:', e);
 	}
 
-	// Apply to document
+	// Apply to document (should already be set, but ensure sync)
 	updateDocumentClass();
 }
 
@@ -55,10 +61,8 @@ function updateDocumentClass() {
 	}
 }
 
-// Initialize on module load
-if (typeof window !== 'undefined') {
-	initialize();
-}
+// Don't auto-initialize on module load - let the blocking script in app.html handle it first
+// The layout will sync the store state after mount
 
 export const darkModeStore = {
 	get darkMode() {

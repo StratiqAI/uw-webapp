@@ -2,6 +2,30 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
+		<!-- Blocking script to prevent dark mode flash - must run before any styles -->
+		<script>
+			(function() {
+				try {
+					const saved = localStorage.getItem('darkMode');
+					let isDark = false;
+					
+					if (saved !== null) {
+						isDark = saved === 'true';
+					} else {
+						// Check system preference
+						isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+					}
+					
+					if (isDark) {
+						document.documentElement.classList.add('dark');
+					} else {
+						document.documentElement.classList.remove('dark');
+					}
+				} catch (e) {
+					// Silently fail if localStorage is not available
+				}
+			})();
+		</script>
 		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<link rel="preconnect" href="https://fonts.googleapis.com">

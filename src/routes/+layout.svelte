@@ -14,8 +14,16 @@
 	let mainMarginLeftCollapsed = `ml-14`;
 
 	// Initialize dark mode store and provide via context
+	// Note: Dark mode class is already applied via blocking script in app.html
+	// This just syncs the store state with what's already applied
 	onMount(() => {
-		darkModeStore.initialize();
+		// Sync store with what's already on the document (from blocking script)
+		if (typeof document !== 'undefined') {
+			const isDark = document.documentElement.classList.contains('dark');
+			darkModeStore.set(isDark);
+		} else {
+			darkModeStore.initialize();
+		}
 	});
 	
 	// Provide dark mode store functions via context

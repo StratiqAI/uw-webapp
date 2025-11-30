@@ -28,8 +28,9 @@
 
 	function register() {
 		try {
-			// Deep clone to ensure we're registering a snapshot
-			const snapshot = structuredClone(schema);
+			// Deep clone using JSON serialization to ensure we're registering a clean snapshot
+			// This avoids issues with structuredClone on Svelte reactive objects
+			const snapshot = JSON.parse(JSON.stringify(schema)) as DynamicSchemaDefinition;
 			schemaRegistry.register(snapshot);
 			alert(`Registered ${schema.id} successfully!`);
 		} catch (e: any) {
