@@ -39,7 +39,7 @@
 	import RightChatDrawer from '$lib/components/RightChatDrawer.svelte';
 	import WorkspaceHeaderBar from '$lib/components/workspace/WorkspaceHeaderBar.svelte';
 	import SourceCards from '$lib/components/workspace/SourceCards.svelte';
-	import TabButton from '$lib/ui/TabButton.svelte';
+	import TabButton from '$lib/components/ui/TabButton.svelte';
 	
 	// WebSocket client
 	import { AppSyncWsClient } from '$lib/realtime/websocket/AppSyncWsClient';

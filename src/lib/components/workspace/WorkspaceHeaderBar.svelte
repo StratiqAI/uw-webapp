@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { ui } from '$lib/stores/ui.svelte';
-	import Button from '$lib/ui/Button.svelte';
+	import Button from '$lib/components/ui/Button.svelte';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import TabButton from '$lib/ui/TabButton.svelte';
+	import TabButton from '$lib/components/ui/TabButton.svelte';
 
 	let { projectName } = $props<{ projectName: string }>();
 

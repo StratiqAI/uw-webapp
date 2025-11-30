@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Button from "$lib/ui/Button.svelte";
+	import Button from "$lib/components/ui/Button.svelte";
 
 	export let title: string;
 	export let value: number;

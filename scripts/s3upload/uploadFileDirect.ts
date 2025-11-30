@@ -139,7 +139,7 @@ function parseMetadata(): FileMetadata {
 	return {
 		tenantId: 'acme-corp',
 		ownerId: 'a1b2c3d4-e5f6-7890-1234-567890abcdef',
-		parentId: 'PROJ#123'
+		parentId: 'PROJECT#123'
 	};
 }
 
@@ -161,10 +161,10 @@ async function main() {
 		console.error('  S3_BUCKET_NAME, TENANT_ID, OWNER_ID, PARENT_ID\n');
 		console.error('Examples:');
 		console.error(
-			'  tsx uploadFileDirect.ts ./test-document.txt my-bucket acme-corp user-123 PROJ#456'
+			'  tsx uploadFileDirect.ts ./test-document.txt my-bucket acme-corp user-123 PROJECT#456'
 		);
 		console.error(
-			'  S3_BUCKET_NAME=my-bucket TENANT_ID=acme-corp OWNER_ID=user-123 PARENT_ID=PROJ#456 tsx uploadFileDirect.ts ./test-document.txt'
+			'  S3_BUCKET_NAME=my-bucket TENANT_ID=acme-corp OWNER_ID=user-123 PARENT_ID=PROJECT#456 tsx uploadFileDirect.ts ./test-document.txt'
 		);
 		process.exit(1);
 	}

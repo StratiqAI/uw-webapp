@@ -8,7 +8,7 @@ const PUBLIC_GRAPHQL_HTTP_ENDPOINT = "https://m7iq4vqmt5bnxfyyx64xxctq2y.appsync
 const fileMetadata = {
   tenantId: "acme-corp",
   ownerId: "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-  parentId: "PROJ#123"
+  parentId: "PROJECT#123"
 };
 
 /**

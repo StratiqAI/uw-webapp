@@ -1,7 +1,7 @@
 <script>
 	import { Heading, P } from 'flowbite-svelte';
 
-	import Button from '$lib/ui/Button.svelte';
+	import Button from '$lib/components/ui/Button.svelte';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 
 	let darkMode = $derived.by(() => darkModeStore.darkMode);
