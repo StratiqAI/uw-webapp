@@ -85,10 +85,28 @@ export class MapStore {
 		entry.schemaId = schemaId;
 	}
 
-	getStream(topic: string): Readable<unknown> & { get: () => unknown } {
+	getStream(topic: string, consumerId?: string): Readable<unknown> & { get: () => unknown } {
 		const entry = this.ensure(topic);
+		
+		// Track consumer if ID provided
+		if (consumerId) {
+			entry.consumers.add(consumerId);
+		}
+		
 		return {
-			subscribe: entry.store.subscribe,
+			subscribe: (callback: (value: unknown) => void) => {
+				// Track consumer with auto-generated ID if not provided
+				const id = consumerId || `consumer-${crypto.randomUUID()}`;
+				entry.consumers.add(id);
+				
+				const unsubscribe = entry.store.subscribe(callback);
+				
+				// Return unsubscribe that also removes consumer tracking
+				return () => {
+					unsubscribe();
+					entry.consumers.delete(id);
+				};
+			},
 			get: () => get(entry.store)
 		};
 	}
@@ -164,6 +182,84 @@ export class MapStore {
 			consumers: entry.consumers.size,
 			hasValue: entry.lastValue !== undefined
 		}));
+	}
+
+	/**
+	 * Dump all MapStore state to console for debugging
+	 * Shows topics, producers, consumers, schemas, and data
+	 */
+	dump() {
+		console.group('🗺️ MapStore Dump');
+		console.log(`Instance ID: ${this.instanceId}`);
+		console.log(`BroadcastChannel: ${this.channel ? 'Active' : 'Inactive'}`);
+		console.log(`Total Topics: ${this.registry.size}`);
+		console.log('');
+
+		if (this.registry.size === 0) {
+			console.log('No topics registered yet.');
+			console.groupEnd();
+			return;
+		}
+
+		// Group by topic
+		for (const [topic, entry] of this.registry.entries()) {
+			console.group(`📌 Topic: ${topic}`);
+			
+			// Schema
+			if (entry.schemaId) {
+				console.log(`🔒 Schema: ${entry.schemaId}`);
+			} else {
+				console.log('🔓 Schema: None (unvalidated)');
+			}
+
+			// Producers
+			if (entry.producers.size > 0) {
+				console.log(`📤 Producers (${entry.producers.size}):`, Array.from(entry.producers));
+			} else {
+				console.log('📤 Producers: None');
+			}
+
+			// Consumers
+			if (entry.consumers.size > 0) {
+				console.log(`📥 Consumers (${entry.consumers.size}):`, Array.from(entry.consumers));
+			} else {
+				console.log('📥 Consumers: None');
+			}
+
+			// Data
+			if (entry.lastValue !== undefined) {
+				console.log('💾 Data:', entry.lastValue);
+				try {
+					console.log('💾 Data (JSON):', JSON.stringify(entry.lastValue, null, 2));
+				} catch (e) {
+					console.log('💾 Data (not JSON-serializable)');
+				}
+			} else {
+				console.log('💾 Data: No value set');
+			}
+
+			// Current store value
+			const currentValue = get(entry.store);
+			if (currentValue !== undefined && currentValue !== entry.lastValue) {
+				console.warn('⚠️ Store value differs from lastValue:', currentValue);
+			}
+
+			console.groupEnd();
+		}
+
+		console.log('');
+		console.log('📊 Summary:');
+		const summary = {
+			totalTopics: this.registry.size,
+			topicsWithSchema: Array.from(this.registry.values()).filter(e => e.schemaId).length,
+			topicsWithProducers: Array.from(this.registry.values()).filter(e => e.producers.size > 0).length,
+			topicsWithConsumers: Array.from(this.registry.values()).filter(e => e.consumers.size > 0).length,
+			topicsWithData: Array.from(this.registry.values()).filter(e => e.lastValue !== undefined).length,
+			totalProducers: Array.from(this.registry.values()).reduce((sum, e) => sum + e.producers.size, 0),
+			totalConsumers: Array.from(this.registry.values()).reduce((sum, e) => sum + e.consumers.size, 0)
+		};
+		console.table(summary);
+		console.groupEnd();
 	}
 }
 

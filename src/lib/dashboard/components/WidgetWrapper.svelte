@@ -144,7 +144,7 @@
 		<!-- Widget Body -->
 		<div class="widget-body {darkMode ? 'bg-slate-800' : 'bg-slate-50'} {widget.title ? 'p-4' : 'h-full p-4'}">
 			{#if widget.type === 'title'}
-				<TitleWidget data={widget.data} {darkMode} />
+				<TitleWidget data={widget.data} widgetId={widget.id} {darkMode} />
 			{:else if widget.type === 'paragraph'}
 				<ParagraphWidget 
 					data={widget.data} 

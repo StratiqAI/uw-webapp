@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { schemaRegistry } from '$lib/stores/SchemaRegistry';
-	import type { DynamicSchemaDefinition } from '$lib/types/models';
-	import FieldRow from './FieldRow.svelte';
+	import type { DynamicSchemaDefinition, JsonSchemaDefinition } from '$lib/types/models';
+	import JsonSchemaFieldRow from './JsonSchemaFieldRow.svelte';
 
 	interface Props {
 		darkMode?: boolean;
@@ -12,24 +12,44 @@
 	let schema: DynamicSchemaDefinition = $state({
 		id: 'my:schema-v1',
 		name: 'New Schema',
-		fields: []
+		jsonSchema: {
+			type: 'object',
+			properties: {},
+			required: []
+		}
 	});
 
 	let jsonPreview = $derived(JSON.stringify(schema, null, 2));
 
 	function addRootField() {
-		schema.fields.push({ name: 'root_field', type: 'string', required: true });
-		schema.fields = [...schema.fields];
+		const fieldName = `field_${Object.keys(schema.jsonSchema.properties || {}).length + 1}`;
+		if (!schema.jsonSchema.properties) {
+			schema.jsonSchema.properties = {};
+		}
+		schema.jsonSchema.properties[fieldName] = {
+			type: 'string'
+		};
+		if (!schema.jsonSchema.required) {
+			schema.jsonSchema.required = [];
+		}
+		// Trigger reactivity
+		schema.jsonSchema = { ...schema.jsonSchema };
 	}
 
-	function removeRootField(index: number) {
-		schema.fields = schema.fields.filter((_, i) => i !== index);
+	function removeRootField(fieldName: string) {
+		if (schema.jsonSchema.properties) {
+			delete schema.jsonSchema.properties[fieldName];
+		}
+		if (schema.jsonSchema.required) {
+			schema.jsonSchema.required = schema.jsonSchema.required.filter((r) => r !== fieldName);
+		}
+		// Trigger reactivity
+		schema.jsonSchema = { ...schema.jsonSchema };
 	}
 
 	function register() {
 		try {
-			// Deep clone using JSON serialization to ensure we're registering a clean snapshot
-			// This avoids issues with structuredClone on Svelte reactive objects
+			// Deep clone using JSON serialization
 			const snapshot = JSON.parse(JSON.stringify(schema)) as DynamicSchemaDefinition;
 			schemaRegistry.register(snapshot);
 			alert(`Registered ${schema.id} successfully!`);
@@ -43,30 +63,40 @@
 		schema = {
 			id: 'example:property-v1',
 			name: 'Property Example',
-			fields: [
-				{ name: 'id', type: 'string', required: true },
-				{ name: 'name', type: 'string', required: true },
-				{ name: 'address', type: 'string', required: true },
-				{
-					name: 'assetClass',
-					type: 'enum',
-					required: true,
-					options: ['Office', 'Industrial', 'Multifamily', 'Retail', 'Hotel']
+			jsonSchema: {
+				type: 'object',
+				properties: {
+					id: { type: 'string', description: 'Property identifier' },
+					name: { type: 'string', description: 'Property name' },
+					address: { type: 'string', description: 'Property address' },
+					assetClass: {
+						type: 'string',
+						enum: ['Office', 'Industrial', 'Multifamily', 'Retail', 'Hotel'],
+						description: 'Asset class type'
+					},
+					sqFt: { type: 'number', minimum: 0, description: 'Square footage' },
+					yearBuilt: {
+						type: 'number',
+						minimum: 1800,
+						maximum: 2100,
+						description: 'Year built'
+					},
+					units: {
+						type: 'array',
+						items: {
+							type: 'object',
+							properties: {
+								unitNumber: { type: 'string' },
+								rent: { type: 'number', minimum: 0 },
+								occupied: { type: 'boolean' }
+							},
+							required: ['unitNumber', 'rent', 'occupied']
+						},
+						description: 'List of units'
+					}
 				},
-				{ name: 'sqFt', type: 'number', required: true, min: 0 },
-				{ name: 'yearBuilt', type: 'number', required: false, min: 1800, max: 2100 },
-				{
-					name: 'units',
-					type: 'array',
-					required: false,
-					itemType: 'object',
-					subFields: [
-						{ name: 'unitNumber', type: 'string', required: true },
-						{ name: 'rent', type: 'number', required: true, min: 0 },
-						{ name: 'occupied', type: 'boolean', required: true }
-					]
-				}
-			]
+				required: ['id', 'name', 'address', 'assetClass', 'sqFt']
+			}
 		};
 	}
 
@@ -74,7 +104,11 @@
 		schema = {
 			id: 'my:schema-v1',
 			name: 'New Schema',
-			fields: []
+			jsonSchema: {
+				type: 'object',
+				properties: {},
+				required: []
+			}
 		};
 	}
 </script>
@@ -125,26 +159,51 @@
 			</div>
 		</div>
 
-		<h3 class="font-semibold mb-3 {darkMode ? 'text-slate-200' : 'text-slate-700'}">Fields</h3>
+		<h3 class="font-semibold mb-3 {darkMode ? 'text-slate-200' : 'text-slate-700'}">Properties</h3>
 		<div class="space-y-3 mb-4">
-			{#each schema.fields as field, index}
-				<div class="relative">
-					<FieldRow bind:field={schema.fields[index]} {darkMode} />
-					<button
-						onclick={() => removeRootField(index)}
-						class="absolute top-0 right-0 px-2 py-1 text-xs font-medium {darkMode ? 'bg-red-900/50 hover:bg-red-800 text-red-200' : 'bg-red-100 hover:bg-red-200 text-red-700'} rounded-md transition-colors"
-					>
-						Remove
-					</button>
-				</div>
-			{/each}
+			{#if schema.jsonSchema.properties}
+				{#each Object.entries(schema.jsonSchema.properties) as [fieldName, fieldSchema]}
+					<div class="relative">
+						<JsonSchemaFieldRow
+							{fieldName}
+							fieldSchema={schema.jsonSchema.properties[fieldName]}
+							required={schema.jsonSchema.required?.includes(fieldName) || false}
+							onUpdate={(name, updatedSchema, isRequired) => {
+								// Update property
+								if (name !== fieldName && schema.jsonSchema.properties) {
+									// Renamed
+									delete schema.jsonSchema.properties[fieldName];
+									schema.jsonSchema.properties[name] = updatedSchema;
+								} else if (schema.jsonSchema.properties) {
+									schema.jsonSchema.properties[fieldName] = updatedSchema;
+								}
+
+								// Update required array
+								if (!schema.jsonSchema.required) {
+									schema.jsonSchema.required = [];
+								}
+								if (isRequired && !schema.jsonSchema.required.includes(name)) {
+									schema.jsonSchema.required.push(name);
+								} else if (!isRequired) {
+									schema.jsonSchema.required = schema.jsonSchema.required.filter((r) => r !== name);
+								}
+
+								// Trigger reactivity
+								schema.jsonSchema = { ...schema.jsonSchema };
+							}}
+							onRemove={() => removeRootField(fieldName)}
+							{darkMode}
+						/>
+					</div>
+				{/each}
+			{/if}
 		</div>
 
 		<button
 			onclick={addRootField}
 			class="mt-4 w-full py-2.5 border-2 border-dashed {darkMode ? 'border-slate-600 text-slate-400 hover:border-slate-500 hover:text-slate-300' : 'border-slate-300 text-slate-500 hover:border-slate-400 hover:text-slate-600'} rounded-md transition-colors font-medium"
 		>
-			+ Add Root Field
+			+ Add Property
 		</button>
 
 		<button
@@ -172,7 +231,7 @@
 		<div
 			class="sticky top-0 {darkMode ? 'bg-slate-900' : 'bg-slate-800'} p-3 mb-3 rounded-md flex justify-between items-center border-b {darkMode ? 'border-slate-800' : 'border-slate-700'}"
 		>
-			<h3 class="font-semibold text-white">JSON Preview</h3>
+			<h3 class="font-semibold text-white">JSON Schema Preview</h3>
 			<button
 				onclick={() => {
 					navigator.clipboard.writeText(jsonPreview);

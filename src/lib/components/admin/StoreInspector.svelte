@@ -38,7 +38,7 @@
 			return;
 		}
 
-		const stream = mapStore.getStream(selectedTopic);
+		const stream = mapStore.getStream(selectedTopic, 'store-inspector');
 		const unsubscribe = stream.subscribe((val: unknown) => {
 			topicValue = val;
 		});
@@ -94,7 +94,26 @@
 		<div
 			class="p-4 border-b {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} sticky top-0 z-10"
 		>
-			<h2 class="font-semibold text-lg mb-1 {darkMode ? 'text-white' : 'text-slate-900'}">Active Topics</h2>
+			<div class="flex items-center justify-between mb-2">
+				<h2 class="font-semibold text-lg {darkMode ? 'text-white' : 'text-slate-900'}">Active Topics</h2>
+				<button
+					onclick={() => {
+						// Create a test topic to verify inspector works
+						const testTopic = `test:${Date.now()}`;
+						const pub = mapStore.getPublisher(testTopic, 'test-publisher');
+						pub.publish({ message: 'Test data', timestamp: Date.now() });
+						pub.dispose();
+						// Refresh inspector data
+						inspectorData = mapStore.getInspectorData();
+					}}
+					class="px-2 py-1 text-xs font-medium {darkMode
+						? 'bg-slate-700 hover:bg-slate-600 text-slate-200'
+						: 'bg-slate-100 hover:bg-slate-200 text-slate-700'} rounded transition-colors"
+					title="Create test topic"
+				>
+					+ Test
+				</button>
+			</div>
 			<div class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'}">
 				Total: {inspectorData.length} | Auto-refresh: 1s
 			</div>

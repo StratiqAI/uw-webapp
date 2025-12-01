@@ -5,10 +5,12 @@ import { mapStore } from '$lib/stores/MapStore';
  * useTopic (Read Only)
  * Returns reactive state for a topic.
  */
-export function useTopic<T = unknown>(topic: string) {
+export function useTopic<T = unknown>(topic: string, consumerId?: string) {
 	let current = $state<T | undefined>(undefined);
 
-	const stream = mapStore.getStream(topic);
+	// Generate consumer ID if not provided
+	const id = consumerId || `useTopic-${crypto.randomUUID()}`;
+	const stream = mapStore.getStream(topic, id);
 	const unsubscribe = stream.subscribe((val: unknown) => {
 		// Cast to T allowed for DX, but runtime is strictly 'unknown'
 		current = val as T;
@@ -42,9 +44,10 @@ export function usePublisher(topic: string, id: string = 'anon') {
  * Used for Forms/Editors. Handles Echo Cancellation.
  */
 export function useSync<T = any>(topic: string, debounceMs = 200) {
-	const stream = mapStore.getStream(topic);
+	const syncId = `sync-${crypto.randomUUID()}`;
+	const stream = mapStore.getStream(topic, syncId);
 	// Generate unique ID for this editor instance
-	const pub = mapStore.getPublisher(topic, `sync-${crypto.randomUUID()}`);
+	const pub = mapStore.getPublisher(topic, syncId);
 
 	// Local Mutable State
 	let localState = $state<T | undefined>(undefined);

@@ -34,16 +34,16 @@
 	import type { Project } from '@stratiqai/types';
 	import { GraphQLOperationGenerator, ProjectSchemas } from '@stratiqai/types';
 	const projectGenerator = new GraphQLOperationGenerator('Project', ProjectSchemas);
-	const S_PROJECT_CREATED = projectGenerator.generateSubscription({
-		eventType: 'create',
-		filterBy: 'ownerId',
-		filterType: 'ID!'
-	});
-	const S_PROJECT_DELETED = projectGenerator.generateSubscription({
-		eventType: 'delete',
-		filterBy: 'ownerId',
-		filterType: 'ID!'
-	});
+	// const S_PROJECT_CREATED = projectGenerator.generateSubscription({
+	// 	eventType: 'create',
+	// 	filterBy: 'ownerId',
+	// 	filterType: 'ID!'
+	// });
+	// const S_PROJECT_DELETED = projectGenerator.generateSubscription({
+	// 	eventType: 'delete',
+	// 	filterBy: 'ownerId',
+	// 	filterType: 'ID!'
+	// });
 	// Import GraphQL mutations
 	import { M_CREATE_PROJECT, M_DELETE_PROJECT } from '$lib/realtime/graphql/queries/Project';
 
@@ -107,23 +107,23 @@
 			graphqlHttpUrl: PUBLIC_GRAPHQL_HTTP_ENDPOINT,
 			auth: { mode: 'cognito', idToken },
 			subscriptions: [
-				{
-					query: S_PROJECT_CREATED,
-					variables: { ownerId: currentUser?.sub || '' },
-					path: 'onCreateProject',
-					next: (it: Project) => {
-						console.log('Project created subscription received:', it);
-						projectListOps.upsertMutable(projects, it);
-					},
-					error: (err: any) => console.error('project creation sub error', err)
-				},
-				{
-					query: S_PROJECT_DELETED,
-					variables: { ownerId: currentUser?.sub || '' },
-					path: 'onDeleteProject',
-					next: (it: Project) => projectListOps.removeMutable(projects, it),
-					error: (err: any) => console.error('project deletion sub error', err)
-				}
+				// {
+				// 	query: S_PROJECT_CREATED,
+				// 	variables: { ownerId: currentUser?.sub || '' },
+				// 	path: 'onCreateProject',
+				// 	next: (it: Project) => {
+				// 		console.log('Project created subscription received:', it);
+				// 		projectListOps.upsertMutable(projects, it);
+				// 	},
+				// 	error: (err: any) => console.error('project creation sub error', err)
+				// },
+				// {
+				// 	query: S_PROJECT_DELETED,
+				// 	variables: { ownerId: currentUser?.sub || '' },
+				// 	path: 'onDeleteProject',
+				// 	next: (it: Project) => projectListOps.removeMutable(projects, it),
+				// 	error: (err: any) => console.error('project deletion sub error', err)
+				// }
 			]
 		});
 

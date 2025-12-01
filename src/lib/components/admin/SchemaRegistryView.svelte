@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { schemaRegistry } from '$lib/stores/SchemaRegistry';
-	import type { DynamicSchemaDefinition, FieldDefinition } from '$lib/types/models';
+	import type { DynamicSchemaDefinition, JsonSchemaDefinition } from '$lib/types/models';
 	import { browser } from '$app/environment';
 
 	interface Props {
@@ -27,15 +27,22 @@
 		return () => clearInterval(interval);
 	});
 
-	function formatFieldType(field: FieldDefinition): string {
-		let typeStr = field.type;
-		if (field.type === 'array' && field.itemType) {
-			typeStr = `${field.type}<${field.itemType}>`;
+	function formatSchemaType(schema: JsonSchemaDefinition): string {
+		let typeStr = schema.type || 'unknown';
+		if (schema.type === 'array' && schema.items) {
+			typeStr = `array<${schema.items.type || 'any'}>`;
 		}
-		if (field.type === 'enum' && field.options) {
-			typeStr = `enum(${field.options.join(', ')})`;
+		if (schema.type === 'string' && schema.enum) {
+			typeStr = `enum(${schema.enum.join(', ')})`;
 		}
 		return typeStr;
+	}
+
+	function getPropertyCount(schema: JsonSchemaDefinition): number {
+		if (schema.type === 'object' && schema.properties) {
+			return Object.keys(schema.properties).length;
+		}
+		return 0;
 	}
 
 	function copySchemaJson(schema: DynamicSchemaDefinition) {
@@ -90,7 +97,8 @@
 						{schema.name}
 					</div>
 					<div class="text-xs {darkMode ? 'text-slate-500' : 'text-slate-400'} mt-1">
-						{schema.fields.length} {schema.fields.length === 1 ? 'field' : 'fields'}
+						{getPropertyCount(schema.jsonSchema)}{' '}
+						{getPropertyCount(schema.jsonSchema) === 1 ? 'property' : 'properties'}
 					</div>
 				</button>
 			{:else}
@@ -114,6 +122,11 @@
 						<div class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1">
 							ID: <code class="bg-slate-100 dark:bg-slate-800 px-1 rounded">{selectedSchema.id}</code>
 						</div>
+						{#if selectedSchema.description}
+							<div class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1">
+								{selectedSchema.description}
+							</div>
+						{/if}
 					</div>
 					<button
 						onclick={() => copySchemaJson(selectedSchema)}
@@ -123,91 +136,130 @@
 					</button>
 				</div>
 
-				<!-- Fields List -->
-				<div
-					class="rounded-lg border p-4 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}"
-				>
-					<h3 class="text-sm font-semibold mb-3 {darkMode ? 'text-slate-200' : 'text-slate-700'}">
-						Fields ({selectedSchema.fields.length})
-					</h3>
-					<div class="space-y-3">
-						{#each selectedSchema.fields as field}
-							<div
-								class="p-3 rounded border {darkMode ? 'bg-slate-700/50 border-slate-600' : 'bg-slate-50 border-slate-200'}"
-							>
-								<div class="flex items-center gap-2 mb-2">
-									<span class="font-semibold text-sm {darkMode ? 'text-white' : 'text-slate-900'}">
-										{field.name}
-									</span>
-									<span
-										class="px-2 py-0.5 text-xs rounded {darkMode
-											? 'bg-blue-900/50 text-blue-200'
-											: 'bg-blue-100 text-blue-700'}"
-									>
-										{formatFieldType(field)}
-									</span>
-									{#if field.required}
-										<span
-											class="px-2 py-0.5 text-xs rounded bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
-										>
-											Required
+				<!-- Properties List -->
+				{#if selectedSchema.jsonSchema.type === 'object' && selectedSchema.jsonSchema.properties}
+					<div
+						class="rounded-lg border p-4 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}"
+					>
+						<h3 class="text-sm font-semibold mb-3 {darkMode ? 'text-slate-200' : 'text-slate-700'}">
+							Properties ({Object.keys(selectedSchema.jsonSchema.properties).length})
+						</h3>
+						<div class="space-y-3">
+							{#each Object.entries(selectedSchema.jsonSchema.properties) as [propName, propSchema]}
+								<div
+									class="p-3 rounded border {darkMode ? 'bg-slate-700/50 border-slate-600' : 'bg-slate-50 border-slate-200'}"
+								>
+									<div class="flex items-center gap-2 mb-2">
+										<span class="font-semibold text-sm {darkMode ? 'text-white' : 'text-slate-900'}">
+											{propName}
 										</span>
+										<span
+											class="px-2 py-0.5 text-xs rounded {darkMode
+												? 'bg-blue-900/50 text-blue-200'
+												: 'bg-blue-100 text-blue-700'}"
+										>
+											{formatSchemaType(propSchema)}
+										</span>
+										{#if selectedSchema.jsonSchema.required?.includes(propName)}
+											<span
+												class="px-2 py-0.5 text-xs rounded bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
+											>
+												Required
+											</span>
+										{/if}
+									</div>
+									{#if propSchema.description}
+										<div class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'} mt-1">
+											{propSchema.description}
+										</div>
+									{/if}
+									{#if (propSchema.type === 'number' || propSchema.type === 'integer') &&
+										(propSchema.minimum !== undefined || propSchema.maximum !== undefined)}
+										<div class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'} mt-1">
+											Range: {propSchema.minimum !== undefined ? propSchema.minimum : '—'} to{' '}
+											{propSchema.maximum !== undefined ? propSchema.maximum : '—'}
+										</div>
+									{/if}
+									{#if propSchema.type === 'object' && propSchema.properties}
+										<div class="mt-2 ml-4 space-y-2">
+											<div class="text-xs font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'}">
+												Sub-properties:
+											</div>
+											{#each Object.entries(propSchema.properties) as [subPropName, subPropSchema]}
+												<div
+													class="pl-3 border-l-2 {darkMode ? 'border-slate-600' : 'border-slate-300'}"
+												>
+													<div class="flex items-center gap-2">
+														<span class="text-xs font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'}">
+															{subPropName}
+														</span>
+														<span
+															class="px-1.5 py-0.5 text-xs rounded {darkMode
+																? 'bg-blue-900/50 text-blue-200'
+																: 'bg-blue-100 text-blue-700'}"
+														>
+															{formatSchemaType(subPropSchema)}
+														</span>
+														{#if propSchema.required?.includes(subPropName)}
+															<span
+																class="px-1.5 py-0.5 text-xs rounded bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
+															>
+																Required
+															</span>
+														{/if}
+													</div>
+												</div>
+											{/each}
+										</div>
+									{/if}
+									{#if propSchema.type === 'array' && propSchema.items}
+										<div class="mt-2 ml-4">
+											<div class="text-xs font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'}">
+												Item type: {formatSchemaType(propSchema.items)}
+											</div>
+											{#if propSchema.items.type === 'object' && propSchema.items.properties}
+												<div class="mt-2 space-y-2">
+													{#each Object.entries(propSchema.items.properties) as [itemPropName, itemPropSchema]}
+														<div
+															class="pl-3 border-l-2 {darkMode ? 'border-slate-600' : 'border-slate-300'}"
+														>
+															<div class="flex items-center gap-2">
+																<span class="text-xs font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'}">
+																	{itemPropName}
+																</span>
+																<span
+																	class="px-1.5 py-0.5 text-xs rounded {darkMode
+																		? 'bg-blue-900/50 text-blue-200'
+																		: 'bg-blue-100 text-blue-700'}"
+																>
+																	{formatSchemaType(itemPropSchema)}
+																</span>
+																{#if propSchema.items.required?.includes(itemPropName)}
+																	<span
+																		class="px-1.5 py-0.5 text-xs rounded bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
+																	>
+																		Required
+																	</span>
+																{/if}
+															</div>
+														</div>
+													{/each}
+												</div>
+											{/if}
+										</div>
 									{/if}
 								</div>
-								{#if field.description}
-									<div class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'} mt-1">
-										{field.description}
-									</div>
-								{/if}
-								{#if field.type === 'number' && (field.min !== undefined || field.max !== undefined)}
-									<div class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'} mt-1">
-										Range: {field.min !== undefined ? field.min : '—'} to{' '}
-										{field.max !== undefined ? field.max : '—'}
-									</div>
-								{/if}
-								{#if field.subFields && field.subFields.length > 0}
-									<div class="mt-2 ml-4 space-y-2">
-										<div class="text-xs font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'}">
-											Sub-fields:
-										</div>
-										{#each field.subFields as subField}
-											<div
-												class="pl-3 border-l-2 {darkMode ? 'border-slate-600' : 'border-slate-300'}"
-											>
-												<div class="flex items-center gap-2">
-													<span class="text-xs font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'}">
-														{subField.name}
-													</span>
-													<span
-														class="px-1.5 py-0.5 text-xs rounded {darkMode
-															? 'bg-blue-900/50 text-blue-200'
-															: 'bg-blue-100 text-blue-700'}"
-													>
-														{formatFieldType(subField)}
-													</span>
-													{#if subField.required}
-														<span
-															class="px-1.5 py-0.5 text-xs rounded bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
-														>
-															Required
-														</span>
-													{/if}
-												</div>
-											</div>
-										{/each}
-									</div>
-								{/if}
-							</div>
-						{/each}
+							{/each}
+						</div>
 					</div>
-				</div>
+				{/if}
 
 				<!-- JSON View -->
 				<div
 					class="rounded-lg border p-4 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}"
 				>
 					<h3 class="text-sm font-semibold mb-3 {darkMode ? 'text-slate-200' : 'text-slate-700'}">
-						JSON Definition
+						JSON Schema Definition
 					</h3>
 					<pre
 						class="text-xs font-mono overflow-auto max-h-96 p-3 rounded {darkMode
@@ -224,4 +276,3 @@
 		{/if}
 	</div>
 </div>
-

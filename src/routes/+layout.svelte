@@ -4,6 +4,8 @@
 	import type { LayoutData } from './$types';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import { setContext, onMount } from 'svelte';
+	import { registerWidgetSchemas } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { browser } from '$app/environment';
 	// console.log('In file +layout.svelte');
 	let { children, data } = $props<{ children: any; data: LayoutData }>();
 
@@ -23,6 +25,15 @@
 			darkModeStore.set(isDark);
 		} else {
 			darkModeStore.initialize();
+		}
+
+		// Register widget schemas at app startup
+		if (browser) {
+			try {
+				registerWidgetSchemas();
+			} catch (error) {
+				console.error('Failed to register widget schemas:', error);
+			}
 		}
 	});
 	
