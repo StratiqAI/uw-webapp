@@ -7,31 +7,39 @@
 <script lang="ts">
 	import { PUBLIC_GEOAPIFY_API_KEY } from '$env/static/public';
 	import type { MapWidget } from '$lib/dashboard/types/widget';
-	import { mapStore } from '$lib/stores/mapObjectStore';
+	import { mapStore } from '$lib/stores/MapStore';
+	import { useTopic } from '$lib/hooks/mapStoreRunes.svelte';
+	import { getWidgetTopic, getWidgetSchemaId } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 
 	interface Props {
 		data: MapWidget['data'];
+		widgetId?: string;
 		darkMode?: boolean;
 	}
 
-	let { data, darkMode = false }: Props = $props();
-	let widgetData = $state(data);
+	let { data, widgetId = 'map-widget-default', darkMode = false }: Props = $props();
+	
+	// Use topic naming convention: widget:map:${widgetId}
+	const topic = $derived(getWidgetTopic('map', widgetId));
+	
+	// Subscribe to data updates using useTopic hook
+	const dataStream = useTopic(topic, `map-widget-consumer-${widgetId}`);
+	let widgetData = $derived(dataStream.current || data);
 
-	let consumer = mapStore.registerConsumer<MapWidget['data']>(
-		'map-content',
-		'map-widget'
-	);
-
-	console.log(`🗺️ MapWidget: Initialized`);
-	console.log('   Subscribing to content updates...\n');
-
-	// Subscribe to content updates
-	consumer.subscribe((data) => {
-		if (data) {
-			widgetData = data;
-			console.log('Map content updated:', data);
+	// Enforce schema on mount
+	onMount(() => {
+		if (browser) {
+			const schemaId = getWidgetSchemaId('map');
+			mapStore.enforceTopicSchema(topic, schemaId);
+			console.log(`🗺️ MapWidget:${widgetId} - Schema enforced: ${schemaId} on topic: ${topic}`);
 		}
 	});
+
+	console.log(`🗺️ MapWidget:${widgetId} - Initialized`);
+	console.log(`   Topic: ${topic}`);
+	console.log(`   Initial data:`, data);
 
 	const apiKey = PUBLIC_GEOAPIFY_API_KEY;
 
@@ -77,15 +85,15 @@
 
 	// --- Lifecycle with $effect ---
 	// $effect runs after the component mounts. It will automatically re-run if any of its
-	// dependencies change (though we don't have reactive dependencies here).
+	// dependencies change (widgetData changes will trigger re-render).
 	// Crucially, it provides a way to clean up when the component is destroyed.
 	$effect(() => {
 		// Ensure the container element is ready and Leaflet is loaded
-		if (!mapContainer || typeof L === 'undefined') {
+		if (!mapContainer || typeof L === 'undefined' || !widgetData) {
 			return;
 		}
 
-		// Get current widget data values
+		// Get current widget data values (reactive - will update when topic changes)
 		const currentLat = widgetData.lat;
 		const currentLon = widgetData.lon;
 		const currentZoom = widgetData.zoom;

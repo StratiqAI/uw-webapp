@@ -18,9 +18,8 @@
 	const topic = $derived(getWidgetTopic('title', widgetId));
 	
 	// Subscribe to data updates using useTopic hook
-	const dataStream = useTopic(topic);
+	const dataStream = useTopic(topic, `title-widget-consumer-${widgetId}`);
 	let widgetData = $derived(dataStream.current || data);
-	$inspect(`   Widget data:`, widgetData);
 	// Enforce schema on mount
 	onMount(() => {
 		if (browser) {

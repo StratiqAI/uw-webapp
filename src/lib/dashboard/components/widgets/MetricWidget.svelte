@@ -1,31 +1,39 @@
 <script lang="ts">
-    import type { MetricWidget } from '$lib/dashboard/types/widget';
-    import { mapStore } from '$lib/stores/mapObjectStore';
-    
-    interface Props {
-      data: MetricWidget['data'];
-      darkMode?: boolean;
-    }
-    
-    let { data, darkMode = false }: Props = $props();
-    let widgetData = $state(data);
-    
-    let consumer = mapStore.registerConsumer<MetricWidget['data']>(
-      'metric-content',
-      'metric-widget'
-    );
-    
-    console.log(`📊 MetricWidget: Initialized`);
-    console.log('   Subscribing to content updates...\n');
-    
-    // Subscribe to content updates
-    consumer.subscribe((data) => {
-      if (data) {
-        widgetData = data;
-        console.log('Metric content updated:', data);
-      }
-    });
-  </script>
+	import type { MetricWidget } from '$lib/dashboard/types/widget';
+	import { mapStore } from '$lib/stores/MapStore';
+	import { useTopic } from '$lib/hooks/mapStoreRunes.svelte';
+	import { getWidgetTopic, getWidgetSchemaId } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
+
+	interface Props {
+		data: MetricWidget['data'];
+		widgetId?: string;
+		darkMode?: boolean;
+	}
+
+	let { data, widgetId = 'metric-widget-default', darkMode = false }: Props = $props();
+	
+	// Use topic naming convention: widget:metric:${widgetId}
+	const topic = $derived(getWidgetTopic('metric', widgetId));
+	
+	// Subscribe to data updates using useTopic hook
+	const dataStream = useTopic(topic, `metric-widget-consumer-${widgetId}`);
+	let widgetData = $derived(dataStream.current || data);
+
+	// Enforce schema on mount
+	onMount(() => {
+		if (browser) {
+			const schemaId = getWidgetSchemaId('metric');
+			mapStore.enforceTopicSchema(topic, schemaId);
+			console.log(`📊 MetricWidget:${widgetId} - Schema enforced: ${schemaId} on topic: ${topic}`);
+		}
+	});
+
+	console.log(`📊 MetricWidget:${widgetId} - Initialized`);
+	console.log(`   Topic: ${topic}`);
+	console.log(`   Initial data:`, data);
+</script>
   
   <div class="metric-widget h-full flex flex-col justify-center">
     <p class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'} mb-1">{widgetData.label}</p>

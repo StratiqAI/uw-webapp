@@ -1,30 +1,38 @@
 <script lang="ts">
 	import type { TableWidget } from '$lib/dashboard/types/widget';
-	import { mapStore } from '$lib/stores/mapObjectStore';
+	import { mapStore } from '$lib/stores/MapStore';
+	import { useTopic } from '$lib/hooks/mapStoreRunes.svelte';
+	import { getWidgetTopic, getWidgetSchemaId } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 
 	interface Props {
 		data: TableWidget['data'];
+		widgetId?: string;
 		darkMode?: boolean;
 	}
 
-	let { data, darkMode = false }: Props = $props();
-	let widgetData = $state(data);
+	let { data, widgetId = 'table-widget-default', darkMode = false }: Props = $props();
+	
+	// Use topic naming convention: widget:table:${widgetId}
+	const topic = $derived(getWidgetTopic('table', widgetId));
+	
+	// Subscribe to data updates using useTopic hook
+	const dataStream = useTopic(topic, `table-widget-consumer-${widgetId}`);
+	let widgetData = $derived(dataStream.current || data);
 
-	let consumer = mapStore.registerConsumer<TableWidget['data']>(
-		'table-content',
-		'table-widget'
-	);
-
-	console.log(`📋 TableWidget: Initialized`);
-	console.log('   Subscribing to content updates...\n');
-
-	// Subscribe to content updates
-	consumer.subscribe((data) => {
-		if (data) {
-			widgetData = data;
-			console.log('Table content updated:', data);
+	// Enforce schema on mount
+	onMount(() => {
+		if (browser) {
+			const schemaId = getWidgetSchemaId('table');
+			mapStore.enforceTopicSchema(topic, schemaId);
+			console.log(`📋 TableWidget:${widgetId} - Schema enforced: ${schemaId} on topic: ${topic}`);
 		}
 	});
+
+	console.log(`📋 TableWidget:${widgetId} - Initialized`);
+	console.log(`   Topic: ${topic}`);
+	console.log(`   Initial data:`, data);
 
 	let sortColumn = $state<string | null>(null);
 	let sortDirection = $state<'asc' | 'desc'>('asc');

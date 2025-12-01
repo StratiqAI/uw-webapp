@@ -1,30 +1,38 @@
 <script lang="ts">
 	import type { ImageWidget } from '$lib/dashboard/types/widget';
-	import { mapStore } from '$lib/stores/mapObjectStore';
+	import { mapStore } from '$lib/stores/MapStore';
+	import { useTopic } from '$lib/hooks/mapStoreRunes.svelte';
+	import { getWidgetTopic, getWidgetSchemaId } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 
 	interface Props {
 		data: ImageWidget['data'];
+		widgetId?: string;
 		darkMode?: boolean;
 	}
 
-	let { data, darkMode = false }: Props = $props();
-	let widgetData = $state(data);
+	let { data, widgetId = 'image-widget-default', darkMode = false }: Props = $props();
+	
+	// Use topic naming convention: widget:image:${widgetId}
+	const topic = $derived(getWidgetTopic('image', widgetId));
+	
+	// Subscribe to data updates using useTopic hook
+	const dataStream = useTopic(topic, `image-widget-consumer-${widgetId}`);
+	let widgetData = $derived(dataStream.current || data);
 
-	let consumer = mapStore.registerConsumer<ImageWidget['data']>(
-		'image-content',
-		'image-widget'
-	);
-
-	console.log(`🖼️ ImageWidget: Initialized`);
-	console.log('   Subscribing to content updates...\n');
-
-	// Subscribe to content updates
-	consumer.subscribe((data) => {
-		if (data) {
-			widgetData = data;
-			console.log('Image content updated:', data);
+	// Enforce schema on mount
+	onMount(() => {
+		if (browser) {
+			const schemaId = getWidgetSchemaId('image');
+			mapStore.enforceTopicSchema(topic, schemaId);
+			console.log(`🖼️ ImageWidget:${widgetId} - Schema enforced: ${schemaId} on topic: ${topic}`);
 		}
 	});
+
+	console.log(`🖼️ ImageWidget:${widgetId} - Initialized`);
+	console.log(`   Topic: ${topic}`);
+	console.log(`   Initial data:`, data);
 </script>
 
 <div class="image-widget h-full">

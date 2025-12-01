@@ -153,17 +153,17 @@
 					onFlipControlReady={handleFlipControlReady}
 				/>
 			{:else if widget.type === 'table'}
-				<TableWidget data={widget.data} {darkMode} />
+				<TableWidget data={widget.data} widgetId={widget.id} {darkMode} />
 			{:else if widget.type === 'image'}
-				<ImageWidget data={widget.data} {darkMode} />
+				<ImageWidget data={widget.data} widgetId={widget.id} {darkMode} />
 			{:else if widget.type === 'lineChart'}
-				<LineChartWidget data={widget.data} {darkMode} />
+				<LineChartWidget data={widget.data} widgetId={widget.id} {darkMode} />
 			{:else if widget.type === 'barChart'}
-				<BarChartWidget data={widget.data} {darkMode} />
+				<BarChartWidget data={widget.data} widgetId={widget.id} {darkMode} />
 			{:else if widget.type === 'metric'}
-				<MetricWidget data={widget.data} {darkMode} />
+				<MetricWidget data={widget.data} widgetId={widget.id} {darkMode} />
 			{:else if widget.type === 'map'}
-				<MapWidget data={widget.data} {darkMode} />
+				<MapWidget data={widget.data} widgetId={widget.id} {darkMode} />
 			{/if}
 		</div>
 
