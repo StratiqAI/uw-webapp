@@ -7,7 +7,7 @@
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import { mapStore } from '$lib/stores/MapStore';
 
-	let activeTab = $state<'builder' | 'inspector' | 'registry' | 'publisher' | 'editor'>('builder');
+	let activeTab = $state<'builder' | 'inspector' | 'registry' | 'publisher' | 'editor'>('editor');
 	let darkMode = $derived.by(() => darkModeStore.darkMode);
 	let toggleDarkMode = darkModeStore.toggle;
 
