@@ -23,7 +23,9 @@
     /** click to skip the animation */
     skipOnClick = true,
     /** optional callback when typing completes */
-    onDone = undefined as undefined | (() => void)
+    onDone = undefined as undefined | (() => void),
+    /** dark mode styling */
+    darkMode = false
   } = $props<{
     text: string;
     speed?: number;
@@ -36,6 +38,7 @@
     instant?: boolean;
     skipOnClick?: boolean;
     onDone?: () => void;
+    darkMode?: boolean;
   }>();
 
   // ---- state (runes) ----
@@ -151,7 +154,7 @@
 </script>
 
 <!-- Accessible live region so screen readers announce updates politely -->
-<span class="ai-writer" aria-live="polite" role="status" on:click={handleClick}>
+<span class="ai-writer {darkMode ? 'text-slate-200' : 'text-slate-700'}" aria-live="polite" role="status" on:click={handleClick}>
   {output}
   {#if cursorStyle && !done}
     <span class="cursor {cursorStyle}" aria-hidden="true"></span>

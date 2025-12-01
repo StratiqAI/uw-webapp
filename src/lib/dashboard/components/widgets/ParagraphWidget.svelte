@@ -333,9 +333,9 @@
 					{#key widgetData.content}
 						<div class="custom-prose max-w-none">
 							{#if widgetData.markdown}
-								<TypeWriter text={widgetData.content} speed={2} />
+								<TypeWriter text={widgetData.content} speed={2} {darkMode} />
 							{:else}
-								<TypeWriter text={widgetData.content} speed={2} />
+								<TypeWriter text={widgetData.content} speed={2} {darkMode} />
 							{/if}
 						</div>
 					{/key}
@@ -493,7 +493,6 @@
 	/* Custom prose styles */
 	.custom-prose {
 		line-height: 1.75;
-		color: rgb(55 65 81);
 	}
 
 
