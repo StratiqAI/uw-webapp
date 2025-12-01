@@ -272,5 +272,26 @@ export const dashboardWidgets: Widget[] = [
 			change: 12.5,
 			changeType: 'increase'
 		}
+	},
+	{
+		id: 'widget-barchart-1',
+		type: 'barChart',
+		gridColumn: 1,
+		gridRow: 10,
+		colSpan: 6,
+		rowSpan: 3,
+		minWidth: 3,
+		minHeight: 2,
+		data: {
+			labels: ['Manufacturing', 'Business Services', 'Government', 'Hospitality', 'Financial', 'Utilities'],
+			datasets: [
+				{
+					label: 'Percentage',
+					data: [10, 16, 10, 10, 10, 10],
+					backgroundColor: '#3b82f6'
+				}
+			],
+			orientation: 'vertical'
+		}
 	}
 ];

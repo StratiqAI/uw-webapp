@@ -71,9 +71,17 @@
 		}
 		// Handle anyOf (nullable types)
 		if (schema.anyOf && schema.anyOf.length > 0) {
-			const nonNullSchema = schema.anyOf.find(s => s.type !== 'null' && s.type);
+			const nonNullSchema = schema.anyOf.find(s => {
+				if (Array.isArray(s.type)) {
+					return s.type.some(t => t !== 'null');
+				}
+				return s.type && s.type !== 'null';
+			});
 			if (nonNullSchema) {
-				if (nonNullSchema.type === 'string') return '';
+				const resolvedType = Array.isArray(nonNullSchema.type) 
+					? nonNullSchema.type.find(t => t !== 'null')
+					: nonNullSchema.type;
+				if (resolvedType === 'string') return '';
 				return null;
 			}
 		}

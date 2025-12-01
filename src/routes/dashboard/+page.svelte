@@ -62,6 +62,30 @@
 			selectedProjectId = projects[0].id;
 		}
 
+		// Handle responsive grid adjustment
+		function updateGridSize() {
+			const width = window.innerWidth;
+			let gridColumns: number;
+			let minRows = 12; // Minimum rows to accommodate bar chart at row 10-12
+			
+			if (width < 640) {
+				gridColumns = 4;
+			} else if (width < 1024) {
+				gridColumns = 8;
+			} else {
+				gridColumns = 12;
+			}
+			
+			// Ensure grid has enough rows for all widgets
+			dashboard.ensureGridCapacity();
+			const requiredRows = Math.max(minRows, dashboard.config.gridRows);
+			
+			dashboard.updateGridConfig({ gridColumns, gridRows: requiredRows });
+		}
+
+		// Set initial grid size before loading widgets
+		updateGridSize();
+
 		// Initialize dashboard for the selected project
 		const hasLoadedDashboard = dashboard.initialize(selectedProjectId);
 
@@ -71,20 +95,25 @@
 			dashboardWidgets.forEach((widget) => {
 				dashboard.addWidget(widget);
 			});
+		} else {
+			// If saved dashboard exists, ensure all config widgets are present
+			// This handles the case where new widgets are added to config but not in saved dashboard
+			dashboardWidgets.forEach((configWidget) => {
+				const exists = dashboard.widgets.some(w => w.id === configWidget.id);
+				if (!exists) {
+					console.info(`Adding missing widget from config: ${configWidget.id}`);
+					dashboard.addWidget(configWidget);
+				}
+			});
 		}
 
-		// Handle responsive grid adjustment
-		function updateGridSize() {
-			const width = window.innerWidth;
-			if (width < 640) {
-				dashboard.updateGridConfig({ gridColumns: 4, gridRows: 12 });
-			} else if (width < 1024) {
-				dashboard.updateGridConfig({ gridColumns: 8, gridRows: 10 });
-			} else {
-				dashboard.updateGridConfig({ gridColumns: 12, gridRows: 8 });
-			}
-		}
-
+		// Ensure grid has enough capacity for all widgets (after loading)
+		dashboard.ensureGridCapacity();
+		
+		// Update grid size again after widgets are loaded to ensure proper sizing
+		updateGridSize();
+		
+		// Update grid size again after widgets are loaded to ensure proper sizing
 		updateGridSize();
 		window.addEventListener('resize', updateGridSize);
 
