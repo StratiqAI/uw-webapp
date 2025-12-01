@@ -86,9 +86,13 @@ export function getWidgetSchemaId(widgetType: WidgetType): string {
  * 
  * @param widgetType - The widget type
  * @param widgetId - The widget instance ID
+ * @param topicOverride - Optional topic override (if provided, returns this instead)
  * @returns The topic name (e.g., 'widget:title:abc123')
  */
-export function getWidgetTopic(widgetType: WidgetType, widgetId: string): string {
+export function getWidgetTopic(widgetType: WidgetType, widgetId: string, topicOverride?: string): string {
+	if (topicOverride) {
+		return topicOverride;
+	}
 	return `widget:${widgetType}:${widgetId}`;
 }
 

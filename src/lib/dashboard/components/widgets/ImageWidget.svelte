@@ -9,17 +9,18 @@
 	interface Props {
 		data: ImageWidget['data'];
 		widgetId?: string;
+		topicOverride?: string;
 		darkMode?: boolean;
 	}
 
-	let { data, widgetId = 'image-widget-default', darkMode = false }: Props = $props();
+	let { data, widgetId = 'image-widget-default', topicOverride, darkMode = false }: Props = $props();
 	
-	// Use topic naming convention: widget:image:${widgetId}
-	const topic = $derived(getWidgetTopic('image', widgetId));
+	// Use topic override if provided, otherwise use default topic naming convention
+	const topic = $derived(getWidgetTopic('image', widgetId, topicOverride));
 	
 	// Subscribe to data updates using useTopic hook
-	const dataStream = useTopic(topic, `image-widget-consumer-${widgetId}`);
-	let widgetData = $derived(dataStream.current || data);
+	const dataStream = useTopic<ImageWidget['data']>(topic, `image-widget-consumer-${widgetId}`);
+	let widgetData = $derived<ImageWidget['data']>(dataStream.current || data);
 
 	// Enforce schema on mount
 	onMount(() => {

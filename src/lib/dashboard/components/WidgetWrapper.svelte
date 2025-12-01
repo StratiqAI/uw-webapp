@@ -2,6 +2,8 @@
 	import type { Widget, WidgetAction } from '$lib/dashboard/types/widget';
 	import { createDragHandlers } from '$lib/dashboard/utils/drag-drop';
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
+	import { mapStore } from '$lib/stores/MapStore';
+	import { getWidgetTopic, getWidgetSchemaId } from '$lib/dashboard/setup/widgetSchemaRegistration';
 	import ResizeHandles from './ResizeHandles.svelte';
 	import WidgetDropdown from './WidgetDropdown.svelte';
 	import TitleWidget from '$lib/dashboard/components/widgets/TitleWidget.svelte';
@@ -12,6 +14,7 @@
 	import BarChartWidget from '$lib/dashboard/components/widgets/BarChartWidget.svelte';
 	import MetricWidget from '$lib/dashboard/components/widgets/MetricWidget.svelte';
 	import MapWidget from '$lib/dashboard/components/widgets/MapWidget.svelte';
+	import SchemaWidget from '$lib/dashboard/components/widgets/SchemaWidget.svelte';
 
 	interface Props {
 		widget: Widget;
@@ -21,9 +24,55 @@
 	}
 
 	let { widget, darkMode = false, onDragStart, onDragEnd }: Props = $props();
+	
 	let showEditDialog = $state(false);
 	let widgetAIGenerateFn: ((prompt: string) => Promise<void>) | null = null;
 	let widgetFlipFn: (() => void) | null = null;
+	let selectedTopic = $state<string>('');
+	let previewData = $state<unknown>(null);
+	let previewUnsubscribe: (() => void) | null = null;
+
+	const currentTopic = $derived(widget.topicOverride || getWidgetTopic(widget.type, widget.id));
+	const schemaId = $derived.by(() => {
+		try {
+			return getWidgetSchemaId(widget.type);
+		} catch {
+			return widget.type === 'schema' ? (widget.data as any).schemaId : null;
+		}
+	});
+	const availableTopics = $derived.by(() => {
+		return schemaId ? mapStore.getTopicsBySchema(schemaId) : [];
+	});
+
+	// Subscribe to preview data when topic is selected
+	$effect(() => {
+		if (previewUnsubscribe) {
+			previewUnsubscribe();
+			previewUnsubscribe = null;
+		}
+
+		if (!selectedTopic || !showEditDialog) {
+			previewData = null;
+			return;
+		}
+
+		try {
+			const stream = mapStore.getStream(selectedTopic, 'widget-config-preview');
+			previewData = stream.get();
+			previewUnsubscribe = stream.subscribe((value) => {
+				previewData = value;
+			});
+		} catch {
+			previewData = null;
+		}
+
+		return () => {
+			if (previewUnsubscribe) {
+				previewUnsubscribe();
+				previewUnsubscribe = null;
+			}
+		};
+	});
 
 	const dragHandlers = createDragHandlers(widget, {
 		onDragStart,
@@ -41,14 +90,15 @@
 
 	function handleWidgetAction(action: WidgetAction) {
 		switch (action) {
-			case 'customInstructions':
-				if (widgetFlipFn) {
-					widgetFlipFn();
-				}
+			case 'configure':
+			case 'edit':
+			case 'settings':
+				selectedTopic = currentTopic;
+				showEditDialog = true;
 				break;
 
-			case 'edit':
-				showEditDialog = true;
+			case 'customInstructions':
+				widgetFlipFn?.();
 				break;
 
 			case 'duplicate':
@@ -79,10 +129,6 @@
 				refreshWidgetData();
 				break;
 
-			case 'settings':
-				showEditDialog = true;
-				break;
-
 			case 'remove':
 				if (confirm(`Are you sure you want to remove this ${widget.type} widget?`)) {
 					dashboard.removeWidget(widget.id);
@@ -92,8 +138,7 @@
 	}
 
 	function exportWidgetData() {
-		const dataStr = JSON.stringify(widget.data, null, 2);
-		const blob = new Blob([dataStr], { type: 'application/json' });
+		const blob = new Blob([JSON.stringify(widget.data, null, 2)], { type: 'application/json' });
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
 		a.href = url;
@@ -103,13 +148,18 @@
 	}
 
 	function refreshWidgetData() {
-		// Implement data refresh logic here
 		console.log('Refreshing widget data:', widget.id);
-		// You could emit an event or call an API to refresh the widget's data
 	}
 
-	// Calculate z-index for layering
-	let zIndex = $derived(dashboard.getWidgetZIndex(widget.id));
+	function applyTopicChange() {
+		const defaultTopic = getWidgetTopic(widget.type, widget.id);
+		const newTopicOverride = selectedTopic === defaultTopic ? undefined : selectedTopic;
+		dashboard.updateWidget(widget.id, { topicOverride: newTopicOverride });
+		console.log(`✅ Changed topic for ${widget.id}: ${currentTopic} → ${selectedTopic}`);
+		showEditDialog = false;
+	}
+
+	const zIndex = $derived(dashboard.getWidgetZIndex(widget.id));
 </script>
 
 <div
@@ -144,26 +194,29 @@
 		<!-- Widget Body -->
 		<div class="widget-body {darkMode ? 'bg-slate-800' : 'bg-slate-50'} {widget.title ? 'p-4' : 'h-full p-4'}">
 			{#if widget.type === 'title'}
-				<TitleWidget data={widget.data} widgetId={widget.id} {darkMode} />
+				<TitleWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
 			{:else if widget.type === 'paragraph'}
 				<ParagraphWidget 
 					data={widget.data} 
+					widgetId={widget.id}
 					{darkMode}
 					onAIGenerationReady={handleAIGenerationReady}
 					onFlipControlReady={handleFlipControlReady}
 				/>
 			{:else if widget.type === 'table'}
-				<TableWidget data={widget.data} widgetId={widget.id} {darkMode} />
+				<TableWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
 			{:else if widget.type === 'image'}
-				<ImageWidget data={widget.data} widgetId={widget.id} {darkMode} />
+				<ImageWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
 			{:else if widget.type === 'lineChart'}
-				<LineChartWidget data={widget.data} widgetId={widget.id} {darkMode} />
+				<LineChartWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
 			{:else if widget.type === 'barChart'}
-				<BarChartWidget data={widget.data} widgetId={widget.id} {darkMode} />
+				<BarChartWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
 			{:else if widget.type === 'metric'}
-				<MetricWidget data={widget.data} widgetId={widget.id} {darkMode} />
+				<MetricWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
 			{:else if widget.type === 'map'}
-				<MapWidget data={widget.data} widgetId={widget.id} {darkMode} />
+				<MapWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
+			{:else if widget.type === 'schema'}
+				<SchemaWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
 			{/if}
 		</div>
 
@@ -188,78 +241,183 @@
 	{/if}
 </div>
 
-<!-- Edit Dialog -->
+<!-- Configure Dialog -->
 {#if showEditDialog}
 	<div
-		class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 p-4"
-		style="z-index: 10000;"
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="dialog-title"
+		tabindex="-1"
+		class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm p-4 z-[10000]"
+		onclick={(e) => {
+			if (e.target === e.currentTarget) showEditDialog = false;
+		}}
+		onkeydown={(e) => {
+			if (e.key === 'Escape') showEditDialog = false;
+		}}
 	>
-		<div class="w-full max-w-md rounded-lg {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border p-6 shadow-xl">
-			<h3 class="mb-4 text-lg font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">Edit Widget</h3>
-
-			<div class="space-y-4">
-				<div>
-					<label
-						for="widget-title-{widget.id}"
-						class="mb-1 block text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'}"
-					>
-						Widget Title
-					</label>
-					<input
-						id="widget-title-{widget.id}"
-						type="text"
-						value={widget.title || ''}
-						oninput={(e) => dashboard.updateWidget(widget.id, { title: e.currentTarget.value })}
-						class="w-full rounded-md border {darkMode ? 'border-slate-600 bg-slate-700 text-white placeholder-slate-400' : 'border-slate-300 bg-white text-slate-900'} px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-						placeholder="Enter widget title..."
-					/>
-				</div>
-
-				<div>
-					<label
-						for="widget-description-{widget.id}"
-						class="mb-1 block text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'}"
-					>
-						Description
-					</label>
-					<textarea
-						id="widget-description-{widget.id}"
-						value={widget.description || ''}
-						oninput={(e) =>
-							dashboard.updateWidget(widget.id, { description: e.currentTarget.value })}
-						class="w-full rounded-md border {darkMode ? 'border-slate-600 bg-slate-700 text-white placeholder-slate-400' : 'border-slate-300 bg-white text-slate-900'} px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-						rows="3"
-						placeholder="Enter widget description..."
-					></textarea>
-				</div>
-
-				<div>
-					<div class="mb-1 block text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'}">Widget Type</div>
-					<p class="rounded {darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-50 text-slate-600'} px-3 py-2 text-sm">
-						{widget.type}
-					</p>
-				</div>
-
-				<div>
-					<div class="mb-1 block text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'}">Position & Size</div>
-					<div class="grid grid-cols-2 gap-2 text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'}">
-						<div class="rounded {darkMode ? 'bg-slate-700' : 'bg-slate-50'} px-3 py-2">
-							Column: {widget.gridColumn}, Row: {widget.gridRow}
-						</div>
-						<div class="rounded {darkMode ? 'bg-slate-700' : 'bg-slate-50'} px-3 py-2">
-							Width: {widget.colSpan}, Height: {widget.rowSpan}
-						</div>
+		<div
+			class="w-full max-w-2xl rounded-xl {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border shadow-2xl overflow-hidden"
+		>
+			<!-- Header -->
+			<div class="px-6 py-4 border-b {darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-gradient-to-r from-indigo-50 to-purple-50'}">
+				<div class="flex items-center justify-between">
+					<div>
+						<h3 id="dialog-title" class="text-xl font-bold {darkMode ? 'text-white' : 'text-slate-900'}">Configure Widget</h3>
+						<p class="mt-1 text-sm {darkMode ? 'text-slate-400' : 'text-slate-600'}">
+							{widget.type} • {schemaId || 'No schema'}
+						</p>
 					</div>
+					<button
+						onclick={() => (showEditDialog = false)}
+						class="rounded-lg p-2 {darkMode ? 'hover:bg-slate-700 text-slate-400 hover:text-slate-200' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-700'} transition-colors"
+						aria-label="Close"
+					>
+						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+						</svg>
+					</button>
 				</div>
 			</div>
 
-			<div class="mt-6 flex justify-end gap-2">
+			<!-- Content -->
+			<div class="p-6 max-h-[70vh] overflow-y-auto">
+				<div class="space-y-6">
+					<!-- Widget Title -->
+					<div>
+						<label
+							for="widget-title-{widget.id}"
+							class="mb-2 block text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'}"
+						>
+							Widget Title
+						</label>
+						<input
+							id="widget-title-{widget.id}"
+							type="text"
+							value={widget.title || ''}
+							oninput={(e) => dashboard.updateWidget(widget.id, { title: e.currentTarget.value })}
+							class="w-full rounded-lg border {darkMode ? 'border-slate-600 bg-slate-700 text-white placeholder-slate-400' : 'border-slate-300 bg-white text-slate-900'} px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+							placeholder="Enter widget title..."
+						/>
+					</div>
+
+					<!-- Description -->
+					<div>
+						<label
+							for="widget-description-{widget.id}"
+							class="mb-2 block text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'}"
+						>
+							Description
+						</label>
+						<textarea
+							id="widget-description-{widget.id}"
+							value={widget.description || ''}
+							oninput={(e) =>
+								dashboard.updateWidget(widget.id, { description: e.currentTarget.value })}
+							class="w-full rounded-lg border {darkMode ? 'border-slate-600 bg-slate-700 text-white placeholder-slate-400' : 'border-slate-300 bg-white text-slate-900'} px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all resize-none"
+							rows="2"
+							placeholder="Enter widget description..."
+						></textarea>
+					</div>
+
+					<!-- Topic Selection -->
+					<div>
+						<div class="mb-3 flex items-center justify-between">
+							<label
+								for="widget-topic-select-{widget.id}"
+								class="block text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'}"
+							>
+								Data Source Topic
+							</label>
+							<span class="text-xs px-2 py-1 rounded-full {darkMode ? 'bg-slate-700 text-slate-300' : 'bg-indigo-100 text-indigo-700'}">
+								{availableTopics.length} available
+							</span>
+						</div>
+						
+						<select
+							id="widget-topic-select-{widget.id}"
+							bind:value={selectedTopic}
+							class="w-full rounded-lg border {darkMode ? 'border-slate-600 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-900'} px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all font-mono text-sm"
+						>
+							{#each availableTopics as topic}
+								<option value={topic}>{topic}</option>
+							{/each}
+						</select>
+						
+						{#if selectedTopic}
+							<div class="mt-2 flex items-center gap-2 text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'}">
+								{#if selectedTopic === currentTopic}
+									<span class="flex items-center gap-1">
+										<svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+											<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+										</svg>
+										Currently subscribed
+									</span>
+								{:else}
+									<span class="flex items-center gap-1">
+										<svg class="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+											<path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+										</svg>
+										Will change on apply
+									</span>
+								{/if}
+							</div>
+						{/if}
+					</div>
+
+					<!-- Data Preview -->
+					{#if selectedTopic}
+						<div>
+							<div class="mb-2 flex items-center justify-between">
+								<span class="block text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'}">
+									Data Preview
+								</span>
+								{#if previewData == null}
+									<span class="text-xs px-2 py-1 rounded-full {darkMode ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-500'}">
+										No data yet
+									</span>
+								{/if}
+							</div>
+							<div class="rounded-lg border {darkMode ? 'border-slate-600 bg-slate-900' : 'border-slate-200 bg-slate-50'} p-4 max-h-64 overflow-auto">
+								{#if previewData == null}
+									<div class="text-center py-8">
+										<svg class="w-12 h-12 mx-auto mb-2 {darkMode ? 'text-slate-600' : 'text-slate-300'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+										</svg>
+										<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'}">No data available on this topic</p>
+									</div>
+								{:else}
+									<pre class="text-xs font-mono {darkMode ? 'text-slate-300' : 'text-slate-700'} whitespace-pre-wrap break-words">{JSON.stringify(previewData, null, 2)}</pre>
+								{/if}
+							</div>
+						</div>
+					{/if}
+				</div>
+			</div>
+
+			<!-- Footer -->
+			<div class="px-6 py-4 border-t {darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-slate-50'} flex justify-end gap-3">
 				<button
 					onclick={() => (showEditDialog = false)}
-					class="px-4 py-2 text-sm font-medium {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'} rounded-md transition-colors"
+					class="px-5 py-2.5 text-sm font-medium {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200'} rounded-lg transition-colors"
 				>
-					Close
+					Cancel
 				</button>
+				{#if selectedTopic !== currentTopic}
+					<button
+						onclick={applyTopicChange}
+						class="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 rounded-lg transition-all shadow-lg hover:shadow-xl"
+					>
+						Apply Changes
+					</button>
+				{:else}
+					<button
+						onclick={() => (showEditDialog = false)}
+						class="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 rounded-lg transition-all shadow-lg hover:shadow-xl"
+					>
+						Done
+					</button>
+				{/if}
 			</div>
 		</div>
 	</div>

@@ -172,6 +172,19 @@ export class MapStore {
 	}
 
 	/**
+	 * Get all topics that have a specific schema ID
+	 */
+	getTopicsBySchema(schemaId: string): string[] {
+		const topics: string[] = [];
+		for (const [topic, entry] of this.registry.entries()) {
+			if (entry.schemaId === schemaId) {
+				topics.push(topic);
+			}
+		}
+		return topics;
+	}
+
+	/**
 	 * Debugging: Get a snapshot of all active topics.
 	 */
 	getInspectorData() {

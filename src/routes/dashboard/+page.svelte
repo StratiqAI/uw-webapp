@@ -8,6 +8,7 @@
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
 	import { DashboardStorage } from '$lib/dashboard/utils/storage';
 	import { dashboardWidgets } from './config';
+	import { publishWidgetData } from '$lib/dashboard/setup/widgetDataPublishers';
 
 	import { onMount, setContext } from 'svelte';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
@@ -95,16 +96,32 @@
 			dashboardWidgets.forEach((widget) => {
 				dashboard.addWidget(widget);
 			});
+			// Publish initial data for all widgets after a small delay to ensure widgets are mounted
+			setTimeout(() => {
+				publishWidgetData(dashboardWidgets);
+			}, 100);
 		} else {
 			// If saved dashboard exists, ensure all config widgets are present
 			// This handles the case where new widgets are added to config but not in saved dashboard
+			const addedWidgets: typeof dashboardWidgets = [];
 			dashboardWidgets.forEach((configWidget) => {
 				const exists = dashboard.widgets.some(w => w.id === configWidget.id);
 				if (!exists) {
 					console.info(`Adding missing widget from config: ${configWidget.id}`);
 					dashboard.addWidget(configWidget);
+					addedWidgets.push(configWidget);
 				}
 			});
+			// Publish data for newly added widgets
+			if (addedWidgets.length > 0) {
+				setTimeout(() => {
+					publishWidgetData(addedWidgets);
+				}, 100);
+			}
+			// Also publish data for existing widgets (in case they don't have data yet)
+			setTimeout(() => {
+				publishWidgetData(dashboard.widgets.filter(w => dashboardWidgets.some(cw => cw.id === w.id)));
+			}, 100);
 		}
 
 		// Ensure grid has enough capacity for all widgets (after loading)

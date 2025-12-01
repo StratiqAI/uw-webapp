@@ -16,17 +16,18 @@
 	interface Props {
 		data: MapWidget['data'];
 		widgetId?: string;
+		topicOverride?: string;
 		darkMode?: boolean;
 	}
 
-	let { data, widgetId = 'map-widget-default', darkMode = false }: Props = $props();
+	let { data, widgetId = 'map-widget-default', topicOverride, darkMode = false }: Props = $props();
 	
-	// Use topic naming convention: widget:map:${widgetId}
-	const topic = $derived(getWidgetTopic('map', widgetId));
+	// Use topic override if provided, otherwise use default topic naming convention
+	const topic = $derived(getWidgetTopic('map', widgetId, topicOverride));
 	
 	// Subscribe to data updates using useTopic hook
-	const dataStream = useTopic(topic, `map-widget-consumer-${widgetId}`);
-	let widgetData = $derived(dataStream.current || data);
+	const dataStream = useTopic<MapWidget['data']>(topic, `map-widget-consumer-${widgetId}`);
+	let widgetData = $derived<MapWidget['data']>(dataStream.current || data);
 
 	// Enforce schema on mount
 	onMount(() => {

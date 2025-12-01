@@ -9,17 +9,18 @@
 	interface Props {
 		data: MetricWidget['data'];
 		widgetId?: string;
+		topicOverride?: string;
 		darkMode?: boolean;
 	}
 
-	let { data, widgetId = 'metric-widget-default', darkMode = false }: Props = $props();
+	let { data, widgetId = 'metric-widget-default', topicOverride, darkMode = false }: Props = $props();
 	
-	// Use topic naming convention: widget:metric:${widgetId}
-	const topic = $derived(getWidgetTopic('metric', widgetId));
+	// Use topic override if provided, otherwise use default topic naming convention
+	const topic = $derived(getWidgetTopic('metric', widgetId, topicOverride));
 	
 	// Subscribe to data updates using useTopic hook
-	const dataStream = useTopic(topic, `metric-widget-consumer-${widgetId}`);
-	let widgetData = $derived(dataStream.current || data);
+	const dataStream = useTopic<MetricWidget['data']>(topic, `metric-widget-consumer-${widgetId}`);
+	let widgetData = $derived<MetricWidget['data']>(dataStream.current || data);
 
 	// Enforce schema on mount
 	onMount(() => {

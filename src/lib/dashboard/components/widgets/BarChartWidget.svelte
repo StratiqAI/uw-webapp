@@ -9,17 +9,18 @@
 	interface Props {
 		data: BarChartWidget['data'];
 		widgetId?: string;
+		topicOverride?: string;
 		darkMode?: boolean;
 	}
 
-	let { data, widgetId = 'barchart-widget-default', darkMode = false }: Props = $props();
+	let { data, widgetId = 'barchart-widget-default', topicOverride, darkMode = false }: Props = $props();
 	
-	// Use topic naming convention: widget:barChart:${widgetId}
-	const topic = $derived(getWidgetTopic('barChart', widgetId));
+	// Use topic override if provided, otherwise use default topic naming convention
+	const topic = $derived(getWidgetTopic('barChart', widgetId, topicOverride));
 	
 	// Subscribe to data updates using useTopic hook
-	const dataStream = useTopic(topic, `barchart-widget-consumer-${widgetId}`);
-	let widgetData = $derived(dataStream.current || data);
+	const dataStream = useTopic<BarChartWidget['data']>(topic, `barchart-widget-consumer-${widgetId}`);
+	let widgetData = $derived<BarChartWidget['data']>(dataStream.current || data);
 
 	// Enforce schema on mount
 	onMount(() => {

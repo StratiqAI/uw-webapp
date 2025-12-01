@@ -9,17 +9,18 @@
 	interface Props {
 		data: LineChartWidget['data'];
 		widgetId?: string;
+		topicOverride?: string;
 		darkMode?: boolean;
 	}
 
-	let { data, widgetId = 'linechart-widget-default', darkMode = false }: Props = $props();
+	let { data, widgetId = 'linechart-widget-default', topicOverride, darkMode = false }: Props = $props();
 	
-	// Use topic naming convention: widget:lineChart:${widgetId}
-	const topic = $derived(getWidgetTopic('lineChart', widgetId));
+	// Use topic override if provided, otherwise use default topic naming convention
+	const topic = $derived(getWidgetTopic('lineChart', widgetId, topicOverride));
 	
 	// Subscribe to data updates using useTopic hook
-	const dataStream = useTopic(topic, `linechart-widget-consumer-${widgetId}`);
-	let widgetData = $derived(dataStream.current || data);
+	const dataStream = useTopic<LineChartWidget['data']>(topic, `linechart-widget-consumer-${widgetId}`);
+	let widgetData = $derived<LineChartWidget['data']>(dataStream.current || data);
 
 	// Enforce schema on mount
 	onMount(() => {
@@ -41,9 +42,13 @@
   <div class="line-chart-widget h-full flex items-center justify-center {darkMode ? 'bg-slate-800' : 'bg-slate-50'} rounded">
     <div class="text-center">
       <p class="{darkMode ? 'text-slate-300' : 'text-slate-600'} mb-2">Line Chart</p>
-      <p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'}">
-        {widgetData.datasets.length} dataset(s) with {widgetData.labels.length} points
-      </p>
+      {#if widgetData && 'datasets' in widgetData && 'labels' in widgetData}
+        <p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'}">
+          {widgetData.datasets?.length || 0} dataset(s) with {widgetData.labels?.length || 0} points
+        </p>
+      {:else}
+        <p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'}">No data available</p>
+      {/if}
       <!-- Integrate Chart.js or similar library here -->
     </div>
   </div>

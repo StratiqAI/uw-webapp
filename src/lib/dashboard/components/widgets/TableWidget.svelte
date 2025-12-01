@@ -9,17 +9,18 @@
 	interface Props {
 		data: TableWidget['data'];
 		widgetId?: string;
+		topicOverride?: string;
 		darkMode?: boolean;
 	}
 
-	let { data, widgetId = 'table-widget-default', darkMode = false }: Props = $props();
+	let { data, widgetId = 'table-widget-default', topicOverride, darkMode = false }: Props = $props();
 	
-	// Use topic naming convention: widget:table:${widgetId}
-	const topic = $derived(getWidgetTopic('table', widgetId));
+	// Use topic override if provided, otherwise use default topic naming convention
+	const topic = $derived(getWidgetTopic('table', widgetId, topicOverride));
 	
 	// Subscribe to data updates using useTopic hook
-	const dataStream = useTopic(topic, `table-widget-consumer-${widgetId}`);
-	let widgetData = $derived(dataStream.current || data);
+	const dataStream = useTopic<TableWidget['data']>(topic, `table-widget-consumer-${widgetId}`);
+	let widgetData = $derived<TableWidget['data']>(dataStream.current || data);
 
 	// Enforce schema on mount
 	onMount(() => {

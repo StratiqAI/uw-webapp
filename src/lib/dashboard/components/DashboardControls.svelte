@@ -294,6 +294,16 @@
 					}
 				} as Widget;
 
+			case 'schema':
+				return {
+					...baseWidget,
+					type: 'schema',
+					data: {
+						schemaId: 'example-schema', // Default schema ID - user can change this
+						data: {}
+					}
+				} as Widget;
+
 			default:
 				return null;
 		}
@@ -319,7 +329,8 @@
 		{ type: 'image', label: 'Image', icon: '🖼️' },
 		{ type: 'map', label: 'Map', icon: '🗺️' },
 		{ type: 'lineChart', label: 'Line Chart', icon: '📈' },
-		{ type: 'barChart', label: 'Bar Chart', icon: '📊' }
+		{ type: 'barChart', label: 'Bar Chart', icon: '📊' },
+		{ type: 'schema', label: 'Schema Widget', icon: '📋' }
 	];
 </script>
 

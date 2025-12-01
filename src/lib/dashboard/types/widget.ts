@@ -7,7 +7,8 @@ export type WidgetType =
 	| 'lineChart'
 	| 'barChart'
 	| 'metric'
-	| 'map';
+	| 'map'
+	| 'schema';
 
 export interface Position {
 	gridColumn: number;
@@ -32,10 +33,12 @@ export interface BaseWidget extends Position, Size, WidgetConstraints {
 	locked?: boolean;
 	title?: string; // Optional widget title for display
 	description?: string; // Optional widget description
+	topicOverride?: string; // Optional topic override - if set, widget subscribes to this topic instead of default
 }
 
 // Widget Action Types
 export type WidgetAction =
+	| 'configure'
 	| 'customInstructions'
 	| 'edit'
 	| 'duplicate'
@@ -130,6 +133,14 @@ export interface MapWidget extends BaseWidget {
 	};
 }
 
+export interface SchemaWidget extends BaseWidget {
+	type: 'schema';
+	data: {
+		schemaId: string; // Schema ID from SchemaRegistry
+		data?: unknown; // Optional initial data
+	};
+}
+
 export interface MetricWidget extends BaseWidget {
 	type: 'metric';
 	data: {
@@ -149,7 +160,8 @@ export type Widget =
 	| LineChartWidget
 	| BarChartWidget
 	| MetricWidget
-	| MapWidget;
+	| MapWidget
+	| SchemaWidget;
 
 export interface DashboardConfig {
 	gridColumns: number;

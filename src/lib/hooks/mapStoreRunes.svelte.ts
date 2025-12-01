@@ -4,6 +4,8 @@ import { mapStore } from '$lib/stores/MapStore';
 /**
  * useTopic (Read Only)
  * Returns reactive state for a topic.
+ * 
+ * Note: If the topic changes reactively (via $derived), use useReactiveTopic instead.
  */
 export function useTopic<T = unknown>(topic: string, consumerId?: string) {
 	let current = $state<T | undefined>(undefined);
@@ -17,6 +19,58 @@ export function useTopic<T = unknown>(topic: string, consumerId?: string) {
 	});
 
 	onDestroy(unsubscribe);
+
+	return {
+		get current() {
+			return current;
+		}
+	};
+}
+
+/**
+ * useReactiveTopic (Read Only)
+ * Returns reactive state for a topic that may change.
+ * Automatically re-subscribes when the topic changes.
+ */
+export function useReactiveTopic<T = unknown>(topic: () => string, consumerId: () => string) {
+	let current = $state<T | undefined>(undefined);
+	let unsubscribe: (() => void) | null = null;
+
+	$effect(() => {
+		// Clean up previous subscription
+		if (unsubscribe) {
+			unsubscribe();
+			unsubscribe = null;
+		}
+
+		// Get current topic and consumer ID
+		const currentTopic = topic();
+		const id = consumerId();
+		
+		// Create new subscription
+		const stream = mapStore.getStream(currentTopic, id);
+		
+		// Get initial value
+		const initialValue = stream.get();
+		if (initialValue !== undefined) {
+			current = initialValue as T;
+		}
+		
+		// Subscribe to updates
+		unsubscribe = stream.subscribe((val: unknown) => {
+			// Only update if we're still subscribed to the same topic
+			if (currentTopic === topic()) {
+				current = val as T;
+			}
+		});
+
+		return () => {
+			if (unsubscribe) {
+				unsubscribe();
+				unsubscribe = null;
+			}
+		};
+	});
 
 	return {
 		get current() {
