@@ -77,21 +77,21 @@
 		{
 			id: 'input-property-data',
 			type: 'input',
-			label: 'Property Data',
+			label: 'Document Knowledge Base',
 			icon: '🏢',
 			execute: (input) => input || { address: '', sqft: 0, yearBuilt: 0, propertyType: 'Office' }
 		},
 		{
 			id: 'input-financial-metrics',
 			type: 'input',
-			label: 'Financial Metrics',
-			icon: '$',
+			label: 'MCP Server',
+			icon: 'M',
 			execute: (input) => input || { purchasePrice: 0, annualRent: 0, operatingExpenses: 0 }
 		},
 		{
 			id: 'input-market-data',
 			type: 'input',
-			label: 'Market Data',
+			label: 'US Census',
 			icon: '📊',
 			execute: (input) => input || { marketCapRate: 0, comparableSales: [], marketTrends: '' }
 		},
@@ -3446,7 +3446,7 @@
 		<div class="flex-1 overflow-y-auto p-5 space-y-6">
 			<div>
 				<div class="flex items-center justify-between mb-3">
-					<h3 class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-wider">Property Data</h3>
+					<h3 class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-wider">Input Nodes</h3>
 					<button
 						onclick={() => showingInputGallery = true}
 						class="px-2 py-1 text-xs font-medium {darkMode ? 'text-indigo-400 hover:text-indigo-300 hover:bg-indigo-900/20' : 'text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50'} rounded transition-colors flex items-center gap-1"

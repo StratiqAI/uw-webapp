@@ -113,7 +113,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, url, parent }) =
 	// Fetch the project from the GraphQL API using the generated query and projectId
 	const response = await gql<GraphQLProjectResponse>(
 		Q_GET_PROJECT_BY_ID_WITH_DOCLINKS,
-		{ id: projectId },
+		{key :{id: projectId }},
 		idToken // Pass the AWS Cognito ID Token for authentication
 	);
 

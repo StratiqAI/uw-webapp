@@ -20,6 +20,38 @@ export const Q_LIST_USER_PROJECTS = `
 
 
 export const Q_GET_PROJECT_BY_ID_WITH_DOCLINKS = `
+  query GetProjectDeep($key: PrimaryKeyInput!) {
+    getProject(key: $key) {
+			id
+			entityType
+			tenantId
+			ownerId
+			createdAt
+			updatedAt
+			name
+			description
+      docLinks {
+        items {
+			id
+			entityType
+			tenantId
+			ownerId
+			parentId
+			parentType
+			createdAt
+			updatedAt
+			documentId
+			filename
+			vectorStoreId
+			openAIFileId
+			status
+        }
+      }
+    }
+  }
+`;
+
+export const Q_GET_PROJECT_BY_ID_WITH_DOCLINKS_OLD = `
 	query getProject($id: ID!) {
 		getProject(id: $id) {
 			id

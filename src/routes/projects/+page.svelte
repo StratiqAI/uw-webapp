@@ -156,7 +156,8 @@
 
 		// Prepare input for create project mutation - only name is required
 		const input = {
-			name: 'New Project'
+			name: 'New Project',
+			sharingMode: "PRIVATE"
 		};
 
 		try {

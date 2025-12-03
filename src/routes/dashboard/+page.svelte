@@ -8,7 +8,7 @@
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
 	import { DashboardStorage } from '$lib/dashboard/utils/storage';
 	import { dashboardWidgets } from './config';
-	import { initializeWidgetPublishers } from '$lib/dashboard/setup/widgetPublishers';
+	import { publishWidgetData } from '$lib/dashboard/setup/widgetDataPublishers';
 
 	import { onMount, setContext } from 'svelte';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
@@ -96,9 +96,9 @@
 			dashboardWidgets.forEach((widget) => {
 				dashboard.addWidget(widget);
 			});
-			// Initialize publishers for all widgets after a small delay to ensure widgets are mounted
+			// Publish initial data for all widgets after a small delay to ensure widgets are mounted
 			setTimeout(() => {
-				initializeWidgetPublishers(dashboardWidgets);
+				publishWidgetData(dashboardWidgets);
 			}, 100);
 		} else {
 			// If saved dashboard exists, ensure all config widgets are present
@@ -112,15 +112,15 @@
 					addedWidgets.push(configWidget);
 				}
 			});
-			// Initialize publishers for newly added widgets
+			// Publish data for newly added widgets
 			if (addedWidgets.length > 0) {
 				setTimeout(() => {
-					initializeWidgetPublishers(addedWidgets);
+					publishWidgetData(addedWidgets);
 				}, 100);
 			}
-			// Also initialize publishers for existing widgets (in case they don't have publishers yet)
+			// Also publish data for existing widgets (in case they don't have data yet)
 			setTimeout(() => {
-				initializeWidgetPublishers(dashboard.widgets.filter(w => dashboardWidgets.some(cw => cw.id === w.id)));
+				publishWidgetData(dashboard.widgets.filter(w => dashboardWidgets.some(cw => cw.id === w.id)));
 			}, 100);
 		}
 

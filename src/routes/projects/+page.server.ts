@@ -14,7 +14,7 @@ import type { PageServerLoad } from './$types';
 import { gql } from '$lib/realtime/graphql/requestHandler';
 
 // Import GraphQL operations
-import { Q_LIST_USER_PROJECTS } from '$lib/realtime/graphql/queries/Project';
+import { Q_LIST_PROJECTS } from '$lib/realtime/graphql/ops';
 
 // Import the Project type definition
 import type { Project } from '@stratiqai/types';
@@ -29,7 +29,7 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
 
 		// Call the GraphQL endpoint with the Q_LIST query and a limit of 50 items
 		// The response is expected to have a listProjects object with an items array
-		const response = await gql<{ listProjects: { items: Project[]; nextToken?: string | null } }>(Q_LIST_USER_PROJECTS, { limit: 50 }, idToken);
+		const response = await gql<{ listProjects: { items: Project[]; nextToken?: string | null } }>(Q_LIST_PROJECTS, { limit: 50 }, idToken);
 		// Log the full response for debugging purposes
 		// console.log('GraphQL response:', JSON.stringify(response, null, 2));
 		

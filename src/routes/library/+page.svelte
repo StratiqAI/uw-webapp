@@ -838,9 +838,9 @@
 					</div>
 					<div>
 						<h1 class="text-2xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">
-							Agent Library
+							The Automated Professional Library
 						</h1>
-						<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-0.5">Create, browse and manage AI analysis</p>
+						<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-0.5">Packages of AI Agents, Workflows and Dashboards that are right for the job</p>
 					</div>
 				</div>
 				<div class="flex items-center gap-3">

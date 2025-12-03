@@ -3,11 +3,10 @@
 	import StoreInspector from '$lib/components/admin/StoreInspector.svelte';
 	import SchemaRegistryView from '$lib/components/admin/SchemaRegistryView.svelte';
 	import SchemaPublisher from '$lib/components/admin/SchemaPublisher.svelte';
-	import TopicEditor from '$lib/components/admin/TopicEditor.svelte';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import { mapStore } from '$lib/stores/MapStore';
 
-	let activeTab = $state<'builder' | 'inspector' | 'registry' | 'publisher' | 'editor'>('editor');
+	let activeTab = $state<'builder' | 'inspector' | 'registry' | 'publisher'>('builder');
 	let darkMode = $derived.by(() => darkModeStore.darkMode);
 	let toggleDarkMode = darkModeStore.toggle;
 
@@ -138,18 +137,6 @@
 			>
 				Schema Publisher
 			</button>
-			<button
-				class="px-4 py-2 text-sm font-medium rounded-md transition-colors {activeTab === 'editor'
-					? darkMode
-						? 'bg-indigo-600 text-white'
-						: 'bg-indigo-600 text-white'
-					: darkMode
-						? 'text-slate-300 hover:text-white hover:bg-slate-700'
-						: 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'}"
-				onclick={() => (activeTab = 'editor')}
-			>
-				Topic Editor
-			</button>
 		</div>
 
 		<!-- Content -->
@@ -163,8 +150,6 @@
 					<SchemaRegistryView {darkMode} />
 				{:else if activeTab === 'publisher'}
 					<SchemaPublisher {darkMode} />
-				{:else if activeTab === 'editor'}
-					<TopicEditor {darkMode} />
 				{/if}
 			</div>
 		</div>
