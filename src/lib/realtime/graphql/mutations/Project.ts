@@ -4,26 +4,22 @@ import { gql } from "$lib/realtime/graphql/requestHandler";
 export const M_CREATE_PROJECT = `
     mutation createProject($input: CreateProjectInput!) {
         createProject(input: $input) {
-            id
-            name
-            ownerId
-            tenant
-            sharingMode
-            createdAt
-            details {
+            project {
                 id
-                projectId
+                entityType
+                tenantId
                 ownerId
-                tenant
-                description
-                streetAddress
-                city
-                state
-                zip
-                assetType
-                sharingMode
                 createdAt
                 updatedAt
+                name
+                description
+                status
+                sharingMode
+            }
+            userErrors {
+                message
+                code
+                field
             }
         }
     }
@@ -32,28 +28,24 @@ export const M_CREATE_PROJECT = `
 
 
 export const M_UPDATE_PROJECT = `
-    mutation updateProject($input: UpdateProjectInput!) {
-        updateProject(input: $input) {
-            id
-            name
-            ownerId
-            tenant
-            sharingMode
-            createdAt
-            details {
+    mutation updateProject($id: ID!, $input: UpdateProjectInput!) {
+        updateProject(id: $id, input: $input) {
+            project {
                 id
-                projectId
+                entityType
+                tenantId
                 ownerId
-                tenant
-                description
-                streetAddress
-                city
-                state
-                zip
-                assetType
-                sharingMode
                 createdAt
                 updatedAt
+                name
+                description
+                status
+                sharingMode
+            }
+            userErrors {
+                message
+                code
+                field
             }
         }
     }
@@ -90,12 +82,23 @@ export const M_SHARE_PROJECT = `
 export const M_DELETE_PROJECT = `
     mutation deleteProject($id: ID!) {
         deleteProject(id: $id) {
-            id
-            name
-            ownerId
-            tenant
-            sharingMode
-            createdAt
+            project {
+                id
+                entityType
+                tenantId
+                ownerId
+                createdAt
+                updatedAt
+                name
+                description
+                status
+                sharingMode
+            }
+            userErrors {
+                message
+                code
+                field
+            }
         }
     }
 `;
@@ -232,12 +235,28 @@ export async function updateProject(project: Project, idToken: string) {
     const mutation = M_UPDATE_PROJECT;
     // Extract only the fields that can be updated according to UpdateProjectInput
     const input = {
-        projectId: project.id,
         name: project.name
     };
     try {
-        const res = await gql<{ updateProject: Project }>(mutation, { input }, idToken);
-        return res.updateProject;
+        const res = await gql<{ updateProject: { project: Project | null; userErrors: Array<{ message: string; code: string; field?: string[] }> } }>(
+            mutation, 
+            { id: project.id, input }, 
+            idToken
+        );
+        
+        // Check for user errors
+        if (res.updateProject.userErrors && res.updateProject.userErrors.length > 0) {
+            const errorMessages = res.updateProject.userErrors.map(e => e.message).join(', ');
+            console.error('GraphQL user errors:', res.updateProject.userErrors);
+            throw new Error(`Error updating project: ${errorMessages}`);
+        }
+        
+        if (!res.updateProject.project) {
+            console.error('Project update returned null project');
+            throw new Error('Error updating project: No project returned');
+        }
+        
+        return res.updateProject.project;
     } catch (e) {
         console.error('Error updating project:', e);
         throw e;

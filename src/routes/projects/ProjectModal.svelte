@@ -45,18 +45,55 @@
 			if (data && data.id) {
 				// Update existing project
 				const projectInput = {
-					projectId: data.id,
 					name: formValues.name
 				};
-				const projectRes = await gql<{ updateProject: any }>(M_UPDATE_PROJECT, { input: projectInput }, idToken);
-				projectId = projectRes.updateProject.id;
+				const projectRes = await gql<{ updateProject: { project: any | null; userErrors: Array<{ message: string; code: string; field?: string[] }> } }>(
+					M_UPDATE_PROJECT, 
+					{ id: data.id, input: projectInput }, 
+					idToken
+				);
+				
+				// Check for user errors
+				if (projectRes.updateProject.userErrors && projectRes.updateProject.userErrors.length > 0) {
+					const errorMessages = projectRes.updateProject.userErrors.map((e: any) => e.message).join(', ');
+					console.error('GraphQL user errors:', projectRes.updateProject.userErrors);
+					alert(`Error updating project: ${errorMessages}`);
+					return;
+				}
+				
+				if (!projectRes.updateProject.project) {
+					console.error('Project update returned null project');
+					alert('Error updating project: No project returned');
+					return;
+				}
+				
+				projectId = projectRes.updateProject.project.id;
 			} else {
 				// Create new project
 				const projectInput = {
 					name: formValues.name
 				};
-				const projectRes = await gql<{ createProject: any }>(M_CREATE_PROJECT, { input: projectInput }, idToken);
-				projectId = projectRes.createProject.id;
+				const projectRes = await gql<{ createProject: { project: any | null; userErrors: Array<{ message: string; code: string; field?: string[] }> } }>(
+					M_CREATE_PROJECT, 
+					{ input: projectInput }, 
+					idToken
+				);
+				
+				// Check for user errors
+				if (projectRes.createProject.userErrors && projectRes.createProject.userErrors.length > 0) {
+					const errorMessages = projectRes.createProject.userErrors.map((e: any) => e.message).join(', ');
+					console.error('GraphQL user errors:', projectRes.createProject.userErrors);
+					alert(`Error creating project: ${errorMessages}`);
+					return;
+				}
+				
+				if (!projectRes.createProject.project) {
+					console.error('Project creation returned null project');
+					alert('Error creating project: No project returned');
+					return;
+				}
+				
+				projectId = projectRes.createProject.project.id;
 			}
 
 			// Step 2: Create or update ProjectDetail with address and property info

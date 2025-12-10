@@ -9,6 +9,7 @@
 	// Import the SvelteKit Types for the Page Properties
 	import type { PageProps } from './$types';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 
 	// Get the Props for the Component
 	let componentProps: PageProps = $props();
@@ -18,6 +19,10 @@
 
 	// Get idToken from server-side load function
 	let idToken = componentProps.data.idToken!;
+	
+	// Get scope from server-side load function (defaults to 'OWNED_BY_ME')
+	// This will be updated when the page reloads with a new scope parameter
+	let currentScope = $derived(componentProps.data?.scope || 'OWNED_BY_ME');
 
 	// Use unified dark mode store
 	let darkMode = $derived.by(() => darkModeStore.darkMode);
@@ -32,8 +37,8 @@
 
 	// 2. Import types for user items
 	import type { Project } from '@stratiqai/types';
-	import { GraphQLOperationGenerator, ProjectSchemas } from '@stratiqai/types';
-	const projectGenerator = new GraphQLOperationGenerator('Project', ProjectSchemas);
+	import { GraphQLOperationGenerator, ProjectSchemaDefinition } from '@stratiqai/types';
+	const projectGenerator = new GraphQLOperationGenerator('Project', ProjectSchemaDefinition);
 	// const S_PROJECT_CREATED = projectGenerator.generateSubscription({
 	// 	eventType: 'create',
 	// 	filterBy: 'ownerId',
@@ -161,8 +166,24 @@
 		};
 
 		try {
-			const res = await gql<{ createProject: Project }>(M_CREATE_PROJECT, { input }, idToken);
-			const projectId = res.createProject.id;
+			const res = await gql<{ createProject: { project: Project | null; userErrors: Array<{ message: string; code: string; field?: string[] }> } }>(M_CREATE_PROJECT, { input }, idToken);
+			
+			// Check for user errors
+			if (res.createProject.userErrors && res.createProject.userErrors.length > 0) {
+				const errorMessages = res.createProject.userErrors.map(e => e.message).join(', ');
+				console.error('GraphQL user errors:', res.createProject.userErrors);
+				alert(`Error creating project: ${errorMessages}`);
+				return;
+			}
+			
+			// Check if project was created
+			if (!res.createProject.project) {
+				console.error('Project creation returned null project');
+				alert('Error creating project: No project returned');
+				return;
+			}
+			
+			const projectId = res.createProject.project.id;
 			await goto(`/projects/workspace/${projectId}/get-started`);
 		} catch (err) {
 			console.error('Error creating new project:', err);
@@ -298,6 +319,39 @@
 					{/if}
 				</div>
 				<div class="flex items-center gap-2">
+					<!-- Scope Toggle -->
+					<div class="flex items-center gap-2 rounded-lg border {darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'} p-1">
+						<button
+							onclick={() => {
+								goto(`/projects?scope=OWNED_BY_ME`, { noScroll: true });
+							}}
+							class="px-3 py-1.5 text-xs font-medium rounded transition-colors {currentScope === 'OWNED_BY_ME'
+								? darkMode
+									? 'bg-indigo-600 text-white'
+									: 'bg-indigo-100 text-indigo-700'
+								: darkMode
+									? 'text-slate-400 hover:text-slate-200'
+									: 'text-slate-600 hover:text-slate-900'}"
+							title="Show my projects"
+						>
+							My Projects
+						</button>
+						<button
+							onclick={() => {
+								goto(`/projects?scope=ALL_TENANT`, { noScroll: true });
+							}}
+							class="px-3 py-1.5 text-xs font-medium rounded transition-colors {currentScope === 'ALL_TENANT'
+								? darkMode
+									? 'bg-indigo-600 text-white'
+									: 'bg-indigo-100 text-indigo-700'
+								: darkMode
+									? 'text-slate-400 hover:text-slate-200'
+									: 'text-slate-600 hover:text-slate-900'}"
+							title="Show tenant projects"
+						>
+							Team Projects
+						</button>
+					</div>
 					<!-- Email Forwarding Info -->
 					<div class="relative">
 						<button

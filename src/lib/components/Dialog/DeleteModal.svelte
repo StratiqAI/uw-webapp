@@ -27,8 +27,25 @@
 	// $inspect(data);
 	async function deleteProject(id: string, idToken: string) {
 		try {
-			const res = await gql<{ deleteProject: Project }>(mutation, { id }, idToken);
-			return res.deleteProject;
+			const res = await gql<{ deleteProject: { project: Project | null; userErrors: Array<{ message: string; code: string; field?: string[] }> } }>(
+				mutation, 
+				{ id }, 
+				idToken
+			);
+			
+			// Check for user errors
+			if (res.deleteProject.userErrors && res.deleteProject.userErrors.length > 0) {
+				const errorMessages = res.deleteProject.userErrors.map(e => e.message).join(', ');
+				console.error('GraphQL user errors:', res.deleteProject.userErrors);
+				throw new Error(`Error deleting project: ${errorMessages}`);
+			}
+			
+			if (!res.deleteProject.project) {
+				console.error('Project deletion returned null project');
+				throw new Error('Error deleting project: No project returned');
+			}
+			
+			return res.deleteProject.project;
 		} catch (e) {
 			console.error('Error deleting project:', e);
 			throw e;

@@ -29,7 +29,19 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
 
 		// Call the GraphQL endpoint with the Q_LIST query and a limit of 50 items
 		// The response is expected to have a listProjects object with an items array
-		const response = await gql<{ listProjects: { items: Project[]; nextToken?: string | null } }>(Q_LIST_PROJECTS, { limit: 50 }, idToken);
+		// Default scope is 'OWNED_BY_ME' to show user's own projects
+		// Validate scope against ListScope enum values
+		const validScopes = ['OWNED_BY_ME', 'SHARED_WITH_ME', 'ALL_TENANT'] as const;
+		const requestedScope = url.searchParams.get('scope');
+		const scope = (requestedScope && validScopes.includes(requestedScope as any)) 
+			? requestedScope 
+			: 'OWNED_BY_ME';
+		const nextToken = url.searchParams.get('nextToken') || undefined;
+		const response = await gql<{ listProjects: { items: Project[]; nextToken?: string | null } }>(
+			Q_LIST_PROJECTS, 
+			{ limit: 50, nextToken, scope }, 
+			idToken
+		);
 		// Log the full response for debugging purposes
 		// console.log('GraphQL response:', JSON.stringify(response, null, 2));
 		
@@ -49,7 +61,8 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
 		return { 
 			items: response.listProjects.items || [], 
 			nextToken: response.listProjects.nextToken || null,
-			idToken: idToken 
+			idToken: idToken,
+			scope: scope
 		};
 	} catch (error: any) {
 		// If an error occurs, log it and return an empty items array with the error message

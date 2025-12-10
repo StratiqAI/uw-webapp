@@ -6,21 +6,30 @@
 export const M_CREATE_PROJECT = `
 mutation CreateProject($input: CreateProjectInput!) {
   createProject(input: $input) {
-    id
-    entityType
-    createdAt
-    updatedAt
-    tenantId
-    ownerId
-    name
-    description
+    project {
+      id
+      entityType
+      createdAt
+      updatedAt
+      tenantId
+      ownerId
+      name
+      description
+      status
+      sharingMode
+    }
+    userErrors {
+      message
+      code
+      field
+    }
   }
 }`;
 
 // Auto-generated GraphQL operation for Project (get)
 export const Q_GET_PROJECT = `
-query GetProject($key: PrimaryKeyInput!) {
-  getProject(key: $key) {
+query GetProject($id: ID!) {
+  getProject(id: $id) {
     id
     entityType
     createdAt
@@ -34,8 +43,8 @@ query GetProject($key: PrimaryKeyInput!) {
 
 // Auto-generated GraphQL operation for Project (list)
 export const Q_LIST_PROJECTS = `
-query ListProjectsWithPagination($limit: Int, $nextToken: String) {
-  listProjects(limit: $limit, nextToken: $nextToken) {
+query ListProjectsWithPagination($limit: Int, $nextToken: String, $scope: ListScope) {
+  listProjects(limit: $limit, nextToken: $nextToken, scope: $scope) {
     items {
       id
       entityType
@@ -52,31 +61,49 @@ query ListProjectsWithPagination($limit: Int, $nextToken: String) {
 
 // Auto-generated GraphQL operation for Project (update)
 export const M_UPDATE_PROJECT = `
-mutation UpdateProject($key: PrimaryKeyInput!, $input: UpdateProjectInput!) {
-  updateProject(key: $key, input: $input) {
-    id
-    entityType
-    createdAt
-    updatedAt
-    tenantId
-    ownerId
-    name
-    description
+mutation UpdateProject($id: ID!, $input: UpdateProjectInput!) {
+  updateProject(id: $id, input: $input) {
+    project {
+      id
+      entityType
+      createdAt
+      updatedAt
+      tenantId
+      ownerId
+      name
+      description
+      status
+      sharingMode
+    }
+    userErrors {
+      message
+      code
+      field
+    }
   }
 }`;
 
 // Auto-generated GraphQL operation for Project (delete)
 export const M_DELETE_PROJECT = `
-mutation DeleteProject($key: PrimaryKeyInput!) {
-  deleteProject(key: $key) {
-    id
-    entityType
-    createdAt
-    updatedAt
-    tenantId
-    ownerId
-    name
-    description
+mutation DeleteProject($id: ID!) {
+  deleteProject(id: $id) {
+    project {
+      id
+      entityType
+      createdAt
+      updatedAt
+      tenantId
+      ownerId
+      name
+      description
+      status
+      sharingMode
+    }
+    userErrors {
+      message
+      code
+      field
+    }
   }
 }`;
 
@@ -174,8 +201,8 @@ query GetProjectWithDocLinks($key: PrimaryKeyInput!) {
 
 // Auto-generated GraphQL operation for Project (listWith_docLinks)
 export const Q_LIST_PROJECTS_WITH_DOCLINKS = `
-query ListProjectsWithDocLinks($limit: Int, $nextToken: String) {
-  listProjects(limit: $limit, nextToken: $nextToken) {
+query ListProjectsWithDocLinks($limit: Int, $nextToken: String, $scope: ListScope) {
+  listProjects(limit: $limit, nextToken: $nextToken, scope: $scope) {
     items {
       id
       entityType
@@ -238,8 +265,8 @@ query GetProjectWithMessages($key: PrimaryKeyInput!) {
 
 // Auto-generated GraphQL operation for Project (listWith_messages)
 export const Q_LIST_PROJECTS_WITH_MESSAGES = `
-query ListProjectsWithMessages($limit: Int, $nextToken: String) {
-  listProjects(limit: $limit, nextToken: $nextToken) {
+query ListProjectsWithMessages($limit: Int, $nextToken: String, $scope: ListScope) {
+  listProjects(limit: $limit, nextToken: $nextToken, scope: $scope) {
     items {
       id
       entityType

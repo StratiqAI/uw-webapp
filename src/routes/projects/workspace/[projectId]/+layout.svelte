@@ -16,7 +16,7 @@
 
 	// Type imports
 	import type { LayoutProps } from './$types';
-	import { GraphQLOperationGenerator, DocLinkSchemas, ProjectSchemas, type Project, type DocLink } from '@stratiqai/types';
+	import { GraphQLOperationGenerator, DocLinkSchemaDefinition, ProjectSchemaDefinition, type Project, type DocLink } from '@stratiqai/types';
 
 	// Import Logging
 	import { logger } from '$lib/logging/debug';
@@ -67,7 +67,7 @@
 	// Define the public environment variables for GraphQL endpoint and API key
 	import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from '$env/static/public';
 
-    const projectGenerator = new GraphQLOperationGenerator('Project', ProjectSchemas);
+    const projectGenerator = new GraphQLOperationGenerator('Project', ProjectSchemaDefinition);
     const S_ON_UPDATE_PROJECT = projectGenerator.generateSubscription({eventType: 'update', includeRelations: true, filterBy: "id", filterType: "ID!"});
     console.log("S_ON_UPDATE_PROJECT", S_ON_UPDATE_PROJECT);
 
@@ -75,7 +75,7 @@
 
 	
 	// Instantiate a GraphQLOperationGenerator for the Project model
-	const docLinkGenerator = new GraphQLOperationGenerator('DocLink', DocLinkSchemas);
+	const docLinkGenerator = new GraphQLOperationGenerator('DocLink', DocLinkSchemaDefinition);
 	const S_ON_CREATE_DOC_LINK = docLinkGenerator.generateSubscription({eventType: 'create', includeRelations: true, filterBy: "parentId", filterType: "ID!"});
 	const S_ON_DELETE_DOC_LINK = docLinkGenerator.generateSubscription({eventType: 'delete', includeRelations: true, filterBy: "parentId", filterType: "ID!"});
 	

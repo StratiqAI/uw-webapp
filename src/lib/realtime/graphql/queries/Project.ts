@@ -1,16 +1,17 @@
 export const Q_LIST_USER_PROJECTS = `
-	query ListProjectsWithPagination($limit: Int, $nextToken: String) {
-		listProjects(nextToken: $nextToken, limit: $limit) {
+	query ListProjectsWithPagination($limit: Int, $nextToken: String, $scope: ListScope) {
+		listProjects(nextToken: $nextToken, limit: $limit, scope: $scope) {
 			items {
 				id
 				entityType
 				name
 				createdAt
+				updatedAt
 				description
 				ownerId
 				tenantId
-				sharedWith
-				updatedAt
+				status
+				sharingMode
 			}
 			nextToken
 		}
@@ -20,8 +21,8 @@ export const Q_LIST_USER_PROJECTS = `
 
 
 export const Q_GET_PROJECT_BY_ID_WITH_DOCLINKS = `
-  query GetProjectDeep($key: PrimaryKeyInput!) {
-    getProject(key: $key) {
+  query GetProjectDeep($id: ID!) {
+    getProject(id: $id) {
 			id
 			entityType
 			tenantId
@@ -37,13 +38,10 @@ export const Q_GET_PROJECT_BY_ID_WITH_DOCLINKS = `
 			tenantId
 			ownerId
 			parentId
-			parentType
 			createdAt
 			updatedAt
 			documentId
 			filename
-			vectorStoreId
-			openAIFileId
 			status
         }
       }
@@ -62,8 +60,6 @@ export const Q_GET_PROJECT_BY_ID_WITH_DOCLINKS_OLD = `
 			updatedAt
 			name
 			description
-			sharingMode
-			sharedWith
 			docLinks {
 				items {
 					id
@@ -89,17 +85,23 @@ export const Q_GET_PROJECT_BY_ID_WITH_DOCLINKS_OLD = `
 export const M_CREATE_PROJECT = `
 	mutation CreateProject($input: CreateProjectInput!) {
 		createProject(input: $input) {
-			id
-			entityType
-			tenantId
-			ownerId
-
-			name
-			description
-			sharingMode
-			sharedWith
-			createdAt
-			updatedAt
+			project {
+				id
+				entityType
+				tenantId
+				ownerId
+				createdAt
+				updatedAt
+				name
+				description
+				status
+				sharingMode
+			}
+			userErrors {
+				message
+				code
+				field
+			}
 		}
 	}
 `;
@@ -107,7 +109,23 @@ export const M_CREATE_PROJECT = `
 export const M_DELETE_PROJECT = `
 	mutation DeleteProject($id: ID!) {
 		deleteProject(id: $id) {
-			id
+			project {
+				id
+				entityType
+				tenantId
+				ownerId
+				createdAt
+				updatedAt
+				name
+				description
+				status
+				sharingMode
+			}
+			userErrors {
+				message
+				code
+				field
+			}
 		}
 	}
 `;
