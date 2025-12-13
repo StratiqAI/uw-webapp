@@ -1,11 +1,11 @@
 // External packages
 import { error } from '@sveltejs/kit';
-import { ProjectSchemaDefinition } from '@stratiqai/types';
-import type { Project } from '@stratiqai/types';
+import type { Project } from '@stratiqai/types-simple';
+import { Q_GET_PROJECT } from '@stratiqai/types-simple/operations';
+import { print } from 'graphql';
 
 // Internal imports
 import { gql } from '$lib/realtime/graphql/requestHandler';
-import { Q_GET_PROJECT_BY_ID_WITH_DOCLINKS } from '$lib/realtime/graphql/queries/Project';
 
 // Local type imports
 import type { LayoutServerLoad } from './$types';
@@ -60,8 +60,7 @@ import type { LayoutServerLoad } from './$types';
 // 1. SETUP & CONFIGURATION
 // ============================================================================
 
-// Use Zod schema for validating project data received from API
-const projectSchema = ProjectSchemaDefinition.schema;
+// Note: Schema validation removed - using TypeScript types from @stratiqai/types-simple
 
 // Type to describe the shape of GraphQL response for "getProject"
 type GraphQLProjectResponse = {
@@ -110,9 +109,9 @@ export const load: LayoutServerLoad = async ({ params, cookies, url, parent }) =
 	// ============================================================================
 	// 5. EXISTING PROJECT FLOW (normal case)
 	// ============================================================================
-	// Fetch the project from the GraphQL API using the generated query and projectId
+	// Fetch the project from the GraphQL API using the query from the new types library
 	const response = await gql<GraphQLProjectResponse>(
-		Q_GET_PROJECT_BY_ID_WITH_DOCLINKS,
+		print(Q_GET_PROJECT),
 		{ id: projectId },
 		idToken // Pass the AWS Cognito ID Token for authentication
 	);

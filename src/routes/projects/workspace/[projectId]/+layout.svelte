@@ -16,7 +16,9 @@
 
 	// Type imports
 	import type { LayoutProps } from './$types';
-	import { GraphQLOperationGenerator, DocLinkSchemaDefinition, ProjectSchemaDefinition, type Project, type DocLink } from '@stratiqai/types';
+	import type { Project, DocLink } from '@stratiqai/types-simple';
+	import { S_ON_UPDATE_PROJECT, S_ON_CREATE_DOCLINK } from '@stratiqai/types-simple/operations';
+	import { print } from 'graphql';
 
 	// Import Logging
 	import { logger } from '$lib/logging/debug';
@@ -66,22 +68,6 @@
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Define the public environment variables for GraphQL endpoint and API key
 	import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from '$env/static/public';
-
-    const projectGenerator = new GraphQLOperationGenerator('Project', ProjectSchemaDefinition);
-    const S_ON_UPDATE_PROJECT = projectGenerator.generateSubscription({eventType: 'update', includeRelations: true, filterBy: "id", filterType: "ID!"});
-    console.log("S_ON_UPDATE_PROJECT", S_ON_UPDATE_PROJECT);
-
-	// console.log("projectFromServer", projectFromServer);
-
-	
-	// Instantiate a GraphQLOperationGenerator for the Project model
-	const docLinkGenerator = new GraphQLOperationGenerator('DocLink', DocLinkSchemaDefinition);
-	const S_ON_CREATE_DOC_LINK = docLinkGenerator.generateSubscription({eventType: 'create', includeRelations: true, filterBy: "parentId", filterType: "ID!"});
-	const S_ON_DELETE_DOC_LINK = docLinkGenerator.generateSubscription({eventType: 'delete', includeRelations: true, filterBy: "parentId", filterType: "ID!"});
-	
-	// console.log("S_ON_CREATE_PROJECT_DOCUMENT_LINK", S_ON_CREATE_PROJECT_DOCUMENT_LINK);
-	// console.log("S_ON_UPDATE_PROJECT_DOCUMENT_LINK", S_ON_UPDATE_PROJECT_DOCUMENT_LINK);
-	// console.log("S_ON_DELETE_PROJECT_DOCUMENT_LINK", S_ON_DELETE_PROJECT_DOCUMENT_LINK);
 	
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Application Svelte Components Section
@@ -131,7 +117,7 @@
 		// Build subscription array dynamically based on project documents
 		const subscriptions = [
 			{
-				query: S_ON_UPDATE_PROJECT,
+				query: print(S_ON_UPDATE_PROJECT),
 				variables: { id: projectFromServer.id },
 				path: 'onUpdateProject',
 				next: (it: Project) => {
@@ -149,33 +135,34 @@
 				error: (err: any) => console.error('project sub error', err)
 			},
 			{
-				query: S_ON_CREATE_DOC_LINK,
+				query: print(S_ON_CREATE_DOCLINK),
 				variables: { parentId: projectFromServer.id },
-				path: 'onCreateDocLink',
+				path: 'onCreateDoclink',
 				next: (link: DocLink) => {
 					// Add the new ProjectDocumentLink to the project's projectDocumentLinks collection
 					if (browser) {
-						addDocLink(link);
+						addProjectDocumentLink(link);
 						logger(`DocLink ${link.id} created and added to project:`, link);
 					}
 				},
 				error: (err: any) => console.error('docLink create sub error', err)
 			},
 
-			{
-				query: S_ON_DELETE_DOC_LINK,
-				variables: { parentId: projectFromServer.id },
-				path: 'onDeleteDocLink',
-				next: (link: DocLink | { id: string }) => {
-					// Remove the ProjectDocumentLink from the project's projectDocumentLinks collection
-					if (browser) {
-						const linkId = link.id;
-						removeDocLink(linkId);
-						logger(`DocLink ${linkId} deleted and removed from project`);
-					}
-				},
-				error: (err: any) => console.error('docLink delete sub error', err)
-			}
+			// Note: S_ON_DELETE_DOCLINK requires a specific id, so we can't filter by parentId
+			// Deletions will be handled through other means (e.g., refetching the project)
+			// {
+			// 	query: print(S_ON_DELETE_DOCLINK),
+			// 	variables: { id: '...' }, // Would need specific doclink id
+			// 	path: 'onDeleteDoclink',
+			// 	next: (link: DocLink | { id: string }) => {
+			// 		if (browser) {
+			// 			const linkId = link.id;
+			// 			removeProjectDocumentLink(linkId);
+			// 			logger(`DocLink ${linkId} deleted and removed from project`);
+			// 		}
+			// 	},
+			// 	error: (err: any) => console.error('docLink delete sub error', err)
+			// }
 		];
 
 		// TODO: Document subscriptions need to be re-implemented

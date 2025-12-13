@@ -35,22 +35,10 @@
 	// 1. Import public environment variables for GraphQL endpoint and API key
 	import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from '$env/static/public';
 
-	// 2. Import types for user items
-	import type { Project } from '@stratiqai/types';
-	import { GraphQLOperationGenerator, ProjectSchemaDefinition } from '@stratiqai/types';
-	const projectGenerator = new GraphQLOperationGenerator('Project', ProjectSchemaDefinition);
-	// const S_PROJECT_CREATED = projectGenerator.generateSubscription({
-	// 	eventType: 'create',
-	// 	filterBy: 'ownerId',
-	// 	filterType: 'ID!'
-	// });
-	// const S_PROJECT_DELETED = projectGenerator.generateSubscription({
-	// 	eventType: 'delete',
-	// 	filterBy: 'ownerId',
-	// 	filterType: 'ID!'
-	// });
-	// Import GraphQL mutations
-	import { M_CREATE_PROJECT, M_DELETE_PROJECT } from '$lib/realtime/graphql/queries/Project';
+	// 2. Import types and operations from the new types library
+	import type { Project } from '@stratiqai/types-simple';
+	import { M_CREATE_PROJECT, M_DELETE_PROJECT } from '@stratiqai/types-simple/operations';
+	import { print } from 'graphql';
 
 	// 3. Import realtime subscription setup
 	import { AppSyncWsClient } from '$lib/realtime/websocket/AppSyncWsClient';
@@ -166,24 +154,16 @@
 		};
 
 		try {
-			const res = await gql<{ createProject: { project: Project | null; userErrors: Array<{ message: string; code: string; field?: string[] }> } }>(M_CREATE_PROJECT, { input }, idToken);
-			
-			// Check for user errors
-			if (res.createProject.userErrors && res.createProject.userErrors.length > 0) {
-				const errorMessages = res.createProject.userErrors.map(e => e.message).join(', ');
-				console.error('GraphQL user errors:', res.createProject.userErrors);
-				alert(`Error creating project: ${errorMessages}`);
-				return;
-			}
+			const res = await gql<{ createProject: Project }>(print(M_CREATE_PROJECT), { input }, idToken);
 			
 			// Check if project was created
-			if (!res.createProject.project) {
+			if (!res.createProject) {
 				console.error('Project creation returned null project');
 				alert('Error creating project: No project returned');
 				return;
 			}
 			
-			const projectId = res.createProject.project.id;
+			const projectId = res.createProject.id;
 			await goto(`/projects/workspace/${projectId}/get-started`);
 		} catch (err) {
 			console.error('Error creating new project:', err);
@@ -638,4 +618,4 @@
 
 <!-- Modals -->
 <ProjectModal bind:open={openProject} data={current_project} {idToken} />
-<DeleteModal bind:open={openDelete} data={current_project} {idToken} mutation={M_DELETE_PROJECT} />
+<DeleteModal bind:open={openDelete} data={current_project} {idToken} mutation={print(M_DELETE_PROJECT)} />

@@ -13,11 +13,12 @@ import type { PageServerLoad } from './$types';
 // Import the GraphQL helper for making HTTP requests to AppSync
 import { gql } from '$lib/realtime/graphql/requestHandler';
 
-// Import GraphQL operations
-import { Q_LIST_PROJECTS } from '$lib/realtime/graphql/ops';
+// Import GraphQL operations from the new types library
+import { Q_LIST_PROJECTS } from '@stratiqai/types-simple/operations';
+import { print } from 'graphql';
 
 // Import the Project type definition
-import type { Project } from '@stratiqai/types';
+import type { Project } from '@stratiqai/types-simple';
 
 // Define the server-side load function for this page
 export const load: PageServerLoad = async ({ params, cookies, url }) => {
@@ -38,7 +39,7 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
 			: 'OWNED_BY_ME';
 		const nextToken = url.searchParams.get('nextToken') || undefined;
 		const response = await gql<{ listProjects: { items: Project[]; nextToken?: string | null } }>(
-			Q_LIST_PROJECTS, 
+			print(Q_LIST_PROJECTS), 
 			{ limit: 50, nextToken, scope }, 
 			idToken
 		);
