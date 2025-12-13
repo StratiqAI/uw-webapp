@@ -4,14 +4,17 @@ import { gql } from "$lib/realtime/graphql/requestHandler";
 export const M_CREATE_PROJECT = `
     mutation createProject($input: CreateProjectInput!) {
         createProject(input: $input) {
-            project {
+            id
+            name
+            ownerId
+            tenant
+            sharingMode
+            createdAt
+            details {
                 id
-                entityType
-                tenantId
+                projectId
                 ownerId
-                createdAt
-                updatedAt
-                name
+                tenant
                 description
                 status
                 sharingMode
