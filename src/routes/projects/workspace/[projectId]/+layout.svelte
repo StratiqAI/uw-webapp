@@ -293,6 +293,9 @@
 	<div class="flex w-full min-w-0 flex-1 flex-col">
 		<WorkspaceHeaderBar
 			projectName={project?.name ?? (isNewProject ? 'New Project' : 'Loading...')}
+			project={project}
+			projectId={projectFromServer?.id}
+			idToken={data.idToken}
 		/>
 
 		<div class="flex-1 overflow-auto {darkModeStore.darkMode ? 'bg-slate-900' : 'bg-slate-50'}">

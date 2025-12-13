@@ -5,8 +5,92 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import TabButton from '$lib/components/ui/TabButton.svelte';
+	import { gql } from '$lib/realtime/graphql/requestHandler';
+	import { M_UPDATE_PROJECT } from '@stratiqai/types-simple/operations';
+	import { print } from 'graphql';
+	import type { Project } from '@stratiqai/types-simple';
+	import { setProject } from '$lib/stores/appStateStore';
 
-	let { projectName } = $props<{ projectName: string }>();
+	interface WorkspaceHeaderBarProps {
+		projectName: string;
+		project?: Project | null;
+		projectId?: string;
+		idToken?: string;
+	}
+
+	let { projectName, project, projectId, idToken }: WorkspaceHeaderBarProps = $props();
+	
+	// Editable project name state
+	let isEditingName = $state(false);
+	let editedName = $state(projectName);
+	let isSaving = $state(false);
+
+	// Update editedName when projectName changes
+	$effect(() => {
+		editedName = projectName;
+	});
+
+	// Handle saving the project name
+	async function saveProjectName() {
+		if (!project || !projectId || !idToken || !editedName.trim() || editedName === project.name) {
+			isEditingName = false;
+			editedName = projectName;
+			return;
+		}
+
+		isSaving = true;
+		try {
+			const res = await gql<{ updateProject: Project }>(
+				print(M_UPDATE_PROJECT),
+				{
+					id: projectId,
+					input: {
+						name: editedName.trim()
+					}
+				},
+				idToken
+			);
+
+			if (res.updateProject) {
+				// Update the project store
+				setProject(res.updateProject);
+				isEditingName = false;
+			}
+		} catch (error) {
+			console.error('Failed to update project name:', error);
+			alert('Failed to update project name. Please try again.');
+			editedName = projectName; // Revert on error
+		} finally {
+			isSaving = false;
+		}
+	}
+
+	function cancelEdit() {
+		editedName = projectName;
+		isEditingName = false;
+	}
+
+	function handleNameClick() {
+		if (project && projectId && idToken) {
+			isEditingName = true;
+			// Focus the input after it's rendered
+			setTimeout(() => {
+				const input = document.getElementById('project-name-input') as HTMLInputElement;
+				input?.focus();
+				input?.select();
+			}, 0);
+		}
+	}
+
+	function handleKeydown(event: KeyboardEvent) {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			saveProjectName();
+		} else if (event.key === 'Escape') {
+			event.preventDefault();
+			cancelEdit();
+		}
+	}
 
 	// Dark mode support
 	let darkMode = $derived.by(() => darkModeStore.darkMode);
@@ -86,10 +170,60 @@
 			</div>
 			<!-- Divider - hidden on mobile -->
 			<div class="hidden sm:block h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'} flex-shrink-0"></div>
-			<!-- Project name - hidden on small screens, shown on md+ -->
-			<span class="hidden md:inline-block text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'} truncate">
-				{projectName}
-			</span>
+			<!-- Project name - hidden on small screens, shown on md+, editable -->
+			{#if isEditingName}
+				<div class="hidden md:flex items-center gap-2 flex-1 min-w-0">
+					<input
+						id="project-name-input"
+						type="text"
+						bind:value={editedName}
+						onkeydown={handleKeydown}
+						onblur={saveProjectName}
+						disabled={isSaving}
+						class="px-2 py-1 text-sm rounded border-2 min-w-0 flex-1 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 {darkMode 
+							? 'bg-slate-700 border-indigo-500 text-white focus:ring-indigo-400 focus:border-indigo-400 disabled:opacity-50' 
+							: 'bg-white border-indigo-300 text-slate-900 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50'}"
+						placeholder="Project name"
+					/>
+					<button
+						onclick={saveProjectName}
+						disabled={isSaving}
+						class="p-1 {darkMode 
+							? 'text-green-400 hover:text-green-300 hover:bg-green-900/20' 
+							: 'text-green-600 hover:text-green-700 hover:bg-green-50'} rounded transition-colors disabled:opacity-50"
+						title="Save"
+					>
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+						</svg>
+					</button>
+					<button
+						onclick={cancelEdit}
+						disabled={isSaving}
+						class="p-1 {darkMode 
+							? 'text-red-400 hover:text-red-300 hover:bg-red-900/20' 
+							: 'text-red-600 hover:text-red-700 hover:bg-red-50'} rounded transition-colors disabled:opacity-50"
+						title="Cancel"
+					>
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+						</svg>
+					</button>
+				</div>
+			{:else}
+				<button
+					onclick={handleNameClick}
+					class="hidden md:inline-block text-sm {darkMode ? 'text-slate-300 hover:text-indigo-400' : 'text-slate-600 hover:text-indigo-600'} truncate max-w-xs px-2 py-1 rounded transition-colors hover:bg-opacity-10 {darkMode ? 'hover:bg-indigo-400' : 'hover:bg-indigo-600'} group"
+					title={project && projectId && idToken ? "Click to edit project name" : projectName}
+				>
+					<span class="group-hover:underline">{projectName}</span>
+					{#if project && projectId && idToken}
+						<svg class="inline-block w-3 h-3 ml-1.5 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+						</svg>
+					{/if}
+				</button>
+			{/if}
 		</div>
 		<div class="flex items-center gap-1 sm:gap-2 flex-shrink-0">
 			<!-- Dark mode toggle - always visible -->

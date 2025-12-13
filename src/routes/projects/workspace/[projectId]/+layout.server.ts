@@ -102,7 +102,8 @@ export const load: LayoutServerLoad = async ({ params, cookies, url, parent }) =
 			projectId,                        // Pass along projectId (usually "new")
 			currentUser: parentData.currentUser,
 			documents: [],                    // No documents for new project yet
-			isNewProject: true                // Indicates this is a "new" (not existing) project
+			isNewProject: true,               // Indicates this is a "new" (not existing) project
+			idToken                           // Pass idToken for client-side operations
 		};
 	}
 
@@ -144,6 +145,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, url, parent }) =
 	return {
 		project,                              // Fully validated project data
 		currentUser: parentData.currentUser,  // Carry currentUser forward for authorization/user context
-		isNewProject: false                   // Not a new project: this is loaded from API
+		isNewProject: false,                  // Not a new project: this is loaded from API
+		idToken                               // Pass idToken for client-side operations
 	};
 };
