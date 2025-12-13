@@ -192,6 +192,7 @@
 							? 'text-green-400 hover:text-green-300 hover:bg-green-900/20' 
 							: 'text-green-600 hover:text-green-700 hover:bg-green-50'} rounded transition-colors disabled:opacity-50"
 						title="Save"
+						aria-label="Save project name"
 					>
 						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
@@ -204,6 +205,7 @@
 							? 'text-red-400 hover:text-red-300 hover:bg-red-900/20' 
 							: 'text-red-600 hover:text-red-700 hover:bg-red-50'} rounded transition-colors disabled:opacity-50"
 						title="Cancel"
+						aria-label="Cancel editing project name"
 					>
 						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -213,12 +215,19 @@
 			{:else}
 				<button
 					onclick={handleNameClick}
-					class="hidden md:inline-block text-sm {darkMode ? 'text-slate-300 hover:text-indigo-400' : 'text-slate-600 hover:text-indigo-600'} truncate max-w-xs px-2 py-1 rounded transition-colors hover:bg-opacity-10 {darkMode ? 'hover:bg-indigo-400' : 'hover:bg-indigo-600'} group"
+					class="hidden md:inline-flex items-center gap-1.5 text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'} truncate max-w-xs px-2 py-1 rounded transition-all group"
 					title={project && projectId && idToken ? "Click to edit project name" : projectName}
 				>
-					<span class="group-hover:underline">{projectName}</span>
+					<span class="group-hover:text-indigo-400 dark:group-hover:text-indigo-400 transition-colors border-b border-transparent group-hover:border-indigo-400 dark:group-hover:border-indigo-400">
+						{projectName}
+					</span>
 					{#if project && projectId && idToken}
-						<svg class="inline-block w-3 h-3 ml-1.5 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<svg 
+							class="w-3.5 h-3.5 opacity-0 group-hover:opacity-70 transition-opacity flex-shrink-0 {darkMode ? 'text-indigo-400' : 'text-indigo-600'}" 
+							fill="none" 
+							stroke="currentColor" 
+							viewBox="0 0 24 24"
+						>
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
 						</svg>
 					{/if}
