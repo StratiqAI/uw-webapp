@@ -54,7 +54,8 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
       Bucket: USER_FILE_STAGING_BUCKET,
       Key: key,
       ContentType: contentType,
-      ACL: 'bucket-owner-full-control', // Required by bucket policy
+      // ACL removed: bucket-owner-full-control conflicts with Public Access Block settings
+      // Objects will be owned by the account that uploads them (via Identity Pool role)
       Metadata: Object.keys(s3Metadata).length > 0 ? s3Metadata : undefined,
       // Optional: ServerSideEncryption: "AES256",
       // Optional: ChecksumSHA256: fileHash ? Buffer.from(fileHash, 'hex').toString('base64') : undefined
@@ -62,6 +63,9 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   
     const url = await getSignedUrl(s3, cmd, { expiresIn: 900 }); // 15 min
   
+    console.log('Generated presigned URL:', url);
+    console.log('Key:', key);
+    console.log("++++++++++++++++++++++++++++++++")
     return json({ url, key });
   } catch (err) {
     console.error('Error generating presigned URL:', err);
