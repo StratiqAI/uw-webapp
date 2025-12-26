@@ -16,9 +16,12 @@
 
 	// Type imports
 	import type { LayoutProps } from './$types';
-	import type { Project, DocLink } from '@stratiqai/types-simple';
+	import type { Project, Doclink } from '@stratiqai/types-simple';
 	import { S_ON_UPDATE_PROJECT, S_ON_CREATE_DOCLINK } from '@stratiqai/types-simple/operations';
 	import { print } from 'graphql';
+	
+	// Import shared notification store and subscription
+	import { notificationStore, S_ON_CREATE_NOTIFICATION, type Notification } from '$lib/stores/notifications.svelte';
 
 	// Import Logging
 	import { logger } from '$lib/logging/debug';
@@ -36,7 +39,7 @@
 	let project = $derived($projectStoreEntity);
 
 	// Get project data from server (fetched server-side for security)
-	const projectFromServer: Project = data.project;
+	const projectFromServer: Project | null = data.project;
 	// let documents = $derived(data.documents);
 	// let projectId = $derived(data.projectId);
 	let isNewProject = $derived(data.isNewProject);
@@ -82,6 +85,7 @@
 	import RightChatDrawer from '$lib/components/RightChatDrawer.svelte';
 	import WorkspaceHeaderBar from '$lib/components/workspace/WorkspaceHeaderBar.svelte';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
+	import NotificationBell from '$lib/components/Notifications/NotificationBell.svelte';
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Initialize the WebSocket Client
@@ -97,9 +101,9 @@
 		console.log('Entered $effect.root');
 		if (typeof window === 'undefined') return; // SvelteKit guard
 
-		// Don't set up WebSocket for new projects
-		if (isNewProject) {
-			console.log('Skipping WebSocket setup for new project');
+		// Don't set up WebSocket for new projects or if project is null
+		if (isNewProject || !projectFromServer) {
+			console.log('Skipping WebSocket setup for new project or null project');
 			return;
 		}
 
@@ -138,7 +142,7 @@
 				query: print(S_ON_CREATE_DOCLINK),
 				variables: { parentId: projectFromServer.id },
 				path: 'onCreateDoclink',
-				next: (link: DocLink) => {
+				next: (link: Doclink) => {
 					// Add the new ProjectDocumentLink to the project's projectDocumentLinks collection
 					if (browser) {
 						addProjectDocumentLink(link);
@@ -146,6 +150,19 @@
 					}
 				},
 				error: (err: any) => console.error('docLink create sub error', err)
+			},
+			{
+				query: S_ON_CREATE_NOTIFICATION,
+				variables: { parentId: projectFromServer.id },
+				path: 'onCreateNotification',
+				next: (notification: Notification) => {
+					console.log('Notification received for project:', projectFromServer.id, notification);
+					// Add notification to the shared store
+					if (browser) {
+						notificationStore.addNotification(notification);
+					}
+				},
+				error: (err: any) => console.error('Notification subscription error for project', projectFromServer.id, err)
 			},
 
 			// Note: S_ON_DELETE_DOCLINK requires a specific id, so we can't filter by parentId
@@ -296,6 +313,7 @@
 			project={project}
 			projectId={projectFromServer?.id}
 			idToken={data.idToken}
+			notificationBellProps={{ projectName: project?.name }}
 		/>
 
 		<div class="flex-1 overflow-auto {darkModeStore.darkMode ? 'bg-slate-900' : 'bg-slate-50'}">

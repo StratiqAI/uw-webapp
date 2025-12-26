@@ -39,6 +39,9 @@
 	import type { Project } from '@stratiqai/types-simple';
 	import { M_CREATE_PROJECT, M_DELETE_PROJECT } from '@stratiqai/types-simple/operations';
 	import { print } from 'graphql';
+	
+	// Import shared notification store and subscription
+	import { notificationStore, S_ON_CREATE_NOTIFICATION, type Notification } from '$lib/stores/notifications.svelte';
 
 	// 3. Import realtime subscription setup
 	import { AppSyncWsClient } from '$lib/realtime/websocket/AppSyncWsClient';
@@ -96,6 +99,19 @@
 
 		logger('Setting up WebSocket with idToken:', idToken ? 'present' : 'missing');
 
+		// Create subscriptions for notifications for each project
+		const notificationSubscriptions = projects.map((project) => ({
+			query: S_ON_CREATE_NOTIFICATION,
+			variables: { parentId: project.id },
+			path: 'onCreateNotification',
+			next: (notification: Notification) => {
+				console.log('Notification received for project:', project.id, notification);
+				// Add notification to the shared store
+				notificationStore.addNotification(notification);
+			},
+			error: (err: any) => console.error('Notification subscription error for project', project.id, err)
+		}));
+
 		const client = new AppSyncWsClient({
 			graphqlHttpUrl: PUBLIC_GRAPHQL_HTTP_ENDPOINT,
 			auth: { mode: 'cognito', idToken },
@@ -116,7 +132,8 @@
 				// 	path: 'onDeleteProject',
 				// 	next: (it: Project) => projectListOps.removeMutable(projects, it),
 				// 	error: (err: any) => console.error('project deletion sub error', err)
-				// }
+				// },
+				...notificationSubscriptions
 			]
 		});
 
@@ -132,6 +149,7 @@
 	import ProjectModal from './ProjectModal.svelte';
 	import MetaTag from './MetaTag.svelte';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
+	import NotificationBell from '$lib/components/Notifications/NotificationBell.svelte';
 
 	// State
 	let openProject: boolean = $state(false); // modal control
@@ -219,6 +237,8 @@
 				</span>
 			</div>
 			<div class="flex items-center gap-2">
+				<!-- Notifications Bell -->
+				<NotificationBell {projects} />
 				<button
 					class="p-2 {darkMode
 						? 'text-slate-300 hover:bg-slate-700 hover:text-white'

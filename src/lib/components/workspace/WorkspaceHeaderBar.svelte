@@ -11,14 +11,25 @@
 	import type { Project } from '@stratiqai/types-simple';
 	import { setProject } from '$lib/stores/appStateStore';
 
+	import NotificationBellComponent from '$lib/components/Notifications/NotificationBell.svelte';
+
 	interface WorkspaceHeaderBarProps {
 		projectName: string;
 		project?: Project | null;
 		projectId?: string;
 		idToken?: string;
+		notificationBell?: any; // Svelte component
+		notificationBellProps?: { projectName?: string; projects?: Project[] };
 	}
 
-	let { projectName, project, projectId, idToken }: WorkspaceHeaderBarProps = $props();
+	let { 
+		projectName, 
+		project, 
+		projectId, 
+		idToken,
+		notificationBell = NotificationBellComponent,
+		notificationBellProps = {}
+	}: WorkspaceHeaderBarProps = $props();
 	
 	// Editable project name state
 	let isEditingName = $state(false);
@@ -235,8 +246,11 @@
 			{/if}
 		</div>
 		<div class="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+			<!-- Notifications Bell -->
+			<svelte:component this={notificationBell} {...notificationBellProps} />
 			<!-- Dark mode toggle - always visible -->
 			<button
+				type="button"
 				class="p-1.5 sm:p-2 {darkMode ? 'text-slate-300 hover:text-indigo-400 hover:bg-indigo-900/20' : 'text-slate-600 hover:text-indigo-600 hover:bg-indigo-50'} rounded-md transition-colors"
 				onclick={toggleDarkMode}
 				aria-label="Toggle dark mode"
