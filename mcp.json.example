@@ -1,0 +1,13 @@
+{
+	"mcpServers": {
+		"us-census": {
+			"command": "node",
+			"args": [
+				"/Users/danie/projects/StratiqAI/census-tools/packages/mcp-host/dist/index.js"
+			],
+			"env": {
+				"CENSUS_API_KEYS": "eb160b9b99cc1241c76b809a4a068e9f6dfc6506"
+			}
+		}
+	}
+}
