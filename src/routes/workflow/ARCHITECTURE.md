@@ -34,7 +34,19 @@ The Workflow System is a visual, drag-and-drop workflow builder designed specifi
 
 ### Architecture Overview
 
-The system follows a **single-component architecture** implemented as a monolithic Svelte component (`+page.svelte`, ~4,768 lines). The architecture can be broken down into several key layers:
+The system is currently in a **transitional state** from a monolithic architecture to a component-based architecture. The original implementation was a single-component architecture in a monolithic Svelte component (`+page.svelte`, ~4,768 lines). As of the refactoring effort, significant portions have been extracted into separate modules:
+
+**Current Architecture (Refactored)**:
+- **Components**: 8 extracted Svelte components (WorkflowCanvas, WorkflowSidebar, WorkflowNode, etc.)
+- **Services**: Business logic extracted to service modules (execution, serialization, connection, custom nodes)
+- **Types**: All type definitions extracted to separate type files
+- **Utils**: Utility functions extracted (styling, ID generation)
+
+**Remaining Monolithic Elements**:
+- `elementTypes` array (2400+ lines) still in `+page.svelte` (extraction pending)
+- Main component orchestration still in `+page.svelte`
+
+The architecture can be broken down into several key layers:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -259,31 +271,43 @@ let allElementTypes = $derived([...elementTypes, ...customAINodes]);
 
 ### 1. Code Organization & Maintainability
 
-**Current Issue**: The entire system is implemented in a single ~4,768 line Svelte file, making it difficult to maintain, test, and extend.
+**Original Issue**: The entire system was implemented in a single ~4,768 line Svelte file, making it difficult to maintain, test, and extend.
 
-**Recommendations**:
+**Status**: ✅ **Significant Progress Made** - Major refactoring effort completed
 
-- **Component Extraction**: Split into smaller, focused components:
+**Completed Extractions**:
 
+- ✅ **Component Extraction**: Split into 8 focused components:
   - `WorkflowCanvas.svelte` - Canvas rendering and interaction
   - `WorkflowSidebar.svelte` - Node library sidebar
   - `WorkflowNode.svelte` - Individual node component
   - `WorkflowConnection.svelte` - Connection line component
+  - `WorkflowConnectionPreview.svelte` - Temporary connection preview
   - `WorkflowResultsPanel.svelte` - Results display
   - `WorkflowToolbar.svelte` - Toolbar with zoom/pan/export controls
   - `AIQueryEditor.svelte` - AI node configuration modal
 
-- **Service Layer Extraction**: Move business logic to separate service files:
+- ✅ **Service Layer Extraction**: Business logic moved to service files:
+  - `workflowExecutionService.ts` - Execution engine logic with topological sort
+  - `workflowSerializationService.ts` - JSON export/import functionality
+  - `connectionService.ts` - Connection point position calculations
+  - `nodeLibraryService.ts` - Node library management functions
+  - `customNodeService.ts` - Custom AI node localStorage management and creation
+  - `nodeDefinitions.ts` - Element type definitions (structure created, full extraction pending)
 
-  - `workflowExecutionService.ts` - Execution engine logic
-  - `workflowSerializationService.ts` - JSON export/import
-  - `nodeLibraryService.ts` - Node type definitions and management
-  - `connectionService.ts` - Connection management and validation
+- ✅ **Type Definitions**: All types extracted to separate files:
+  - `types/workflow.ts` - Core workflow types (GridElement, WorkflowResult, WorkflowJSON)
+  - `types/node.ts` - Node-related types (ElementType, AIQueryData, NodeType)
+  - `types/connection.ts` - Connection types (Connection, ConnectionPoint, ConnectionSide)
+  - `types/index.ts` - Barrel export for easy importing
 
-- **Type Definitions**: Extract types to separate files:
-  - `types/workflow.ts` - Core workflow types
-  - `types/node.ts` - Node-related types
-  - `types/connection.ts` - Connection types
+- ✅ **Utility Functions**: Extracted to utility modules:
+  - `utils/nodeStyling.ts` - Color and theme utility functions for nodes
+  - `utils/idGenerator.ts` - Unique ID generation function
+
+**Remaining Work**:
+- ⚠️ **elementTypes Array**: The massive `elementTypes` array (2400+ lines) needs to be fully extracted from `+page.svelte` to `services/nodeDefinitions.ts`
+- 🔄 **Main Component Refactoring**: `+page.svelte` needs to be refactored to import and use all extracted components and services, removing duplicate code while maintaining functionality
 
 ### 2. Type Safety Improvements
 
@@ -458,7 +482,7 @@ The current single-file architecture, while functional, presents challenges for 
 
 Priority improvements should focus on:
 
-1. **Code organization** (breaking into smaller components)
-2. **Error handling** (making the system more resilient)
-3. **Backend integration** (enabling persistence and collaboration)
-4. **Testing** (ensuring reliability and preventing regressions)
+1. ✅ **Code organization** (breaking into smaller components) - **IN PROGRESS**: Major components, services, types, and utilities extracted. Remaining: elementTypes array extraction and main component refactoring
+2. **Error handling** (making the system more resilient) - **PENDING**
+3. **Backend integration** (enabling persistence and collaboration) - **PENDING**
+4. **Testing** (ensuring reliability and preventing regressions) - **PENDING**

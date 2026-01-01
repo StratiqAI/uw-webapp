@@ -29,6 +29,8 @@
 
 <script lang="ts">
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
+	import { generateId } from './utils/idGenerator';
+	import { loadCustomAINodes as loadCustomNodes, saveCustomAINodes, createCustomAINode as createCustomNode } from './services/customNodeService';
 	// Types
 	type ElementType = {
 		id: string;
@@ -2494,26 +2496,13 @@
 	let customAINodeSystemPrompt = $state('');
 	let aiGalleryFilter = $state('');
 
-	// Load custom AI nodes from localStorage on mount
-	function loadCustomAINodes() {
-		try {
-			const stored = localStorage.getItem('workflow-custom-ai-nodes');
-			if (stored) {
-				customAINodes = JSON.parse(stored);
-			}
-		} catch (e) {
-			console.error('Failed to load custom AI nodes:', e);
-		}
+	// Custom AI node functions - now imported from services/customNodeService.ts
+	function handleLoadCustomAINodes() {
+		customAINodes = loadCustomNodes();
 	}
 
-	// Save custom AI nodes to localStorage (without execute functions)
-	function saveCustomAINodes() {
-		try {
-			const serializable = customAINodes.map(({ execute, ...rest }) => rest);
-			localStorage.setItem('workflow-custom-ai-nodes', JSON.stringify(serializable));
-		} catch (e) {
-			console.error('Failed to save custom AI nodes:', e);
-		}
+	function handleSaveCustomAINodes() {
+		saveCustomAINodes(customAINodes);
 	}
 
 	// Create a custom AI node
@@ -2523,85 +2512,16 @@
 		}
 
 		const newId = `custom-ai-${Date.now()}`;
-		const nodePrompt = customAINodePrompt;
-		const nodeModel = customAINodeModel;
-		const nodeSystemPrompt = customAINodeSystemPrompt;
-		
-		const defaultAIQueryData: AIQueryData = {
-			prompt: nodePrompt,
-			model: nodeModel,
-			systemPrompt: nodeSystemPrompt || undefined
-		};
-		
-		const customNode: ElementType = {
-			id: newId,
-			type: 'ai',
-			label: customAINodeLabel.trim(),
-			icon: 'AI',
-			defaultAIQueryData,
-			execute: async (input: any, customData?: AIQueryData) => {
-				if (!customData) {
-					customData = defaultAIQueryData;
-				}
-
-				try {
-					let formattedPrompt = customData.prompt;
-					if (input !== null && input !== undefined) {
-						if (formattedPrompt.includes('{input}')) {
-							formattedPrompt = formattedPrompt.replace('{input}', JSON.stringify(input, null, 2));
-						} else {
-							formattedPrompt = `${formattedPrompt}\n\nInput: ${JSON.stringify(input, null, 2)}`;
-						}
-					}
-
-					const response = await fetch('/api/openai-responses', {
-						method: 'POST',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({
-							model: customData.model,
-							input: [
-								...(customData.systemPrompt ? [{ role: 'system', content: customData.systemPrompt }] : []),
-								{ role: 'user', content: formattedPrompt }
-							]
-						})
-					});
-
-					if (!response.ok) {
-						const error = await response.json();
-						throw new Error(error.error || 'Failed to call OpenAI API');
-					}
-
-					const result = await response.json();
-					
-					if (result.data) {
-						if (result.data.output && Array.isArray(result.data.output)) {
-							const firstOutput = result.data.output[0];
-							if (firstOutput?.content) {
-								return firstOutput.content;
-							}
-							if (typeof firstOutput === 'string') {
-								return firstOutput;
-							}
-						}
-						if (result.data.content) {
-							return result.data.content;
-						}
-						if (typeof result.data === 'string') {
-							return result.data;
-						}
-						return JSON.stringify(result.data);
-					}
-					
-					return 'No response';
-				} catch (error) {
-					console.error('AI Query error:', error);
-					return `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
-				}
-			}
-		};
+		const customNode = createCustomNode(
+			newId,
+			customAINodeLabel,
+			customAINodePrompt,
+			customAINodeModel,
+			customAINodeSystemPrompt
+		);
 
 		customAINodes = [...customAINodes, customNode];
-		saveCustomAINodes();
+		handleSaveCustomAINodes();
 
 		// Reset form
 		customAINodeLabel = '';
@@ -2614,7 +2534,7 @@
 	// Delete a custom AI node
 	function deleteCustomAINode(nodeId: string) {
 		customAINodes = customAINodes.filter(n => n.id !== nodeId);
-		saveCustomAINodes();
+		handleSaveCustomAINodes();
 	}
 
 	// Cancel creating custom AI node
@@ -2631,7 +2551,7 @@
 
 	// Load custom nodes on mount
 	if (typeof window !== 'undefined') {
-		loadCustomAINodes();
+		handleLoadCustomAINodes();
 	}
 	let gridContainer = $state<HTMLDivElement | null>(null);
 	let svgContainer = $state<SVGSVGElement | null>(null);
@@ -2651,10 +2571,7 @@
 	let isPanning = $state(false);
 	let panStart = $state({ x: 0, y: 0 });
 
-	// Generate unique ID
-	function generateId(): string {
-		return `el-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-	}
+	// Generate unique ID - now imported from utils/idGenerator.ts
 
 	// Drag from sidebar
 	function startDragFromSidebar(elementType: ElementType, event: MouseEvent) {

@@ -1,0 +1,120 @@
+<script lang="ts">
+	const {
+		zoomLevel = 1,
+		darkMode = false,
+		gridElementsCount = 0,
+		onZoomIn,
+		onZoomOut,
+		onResetZoom,
+		onClear,
+		onExportJSON,
+		onToggleDarkMode
+	}: {
+		zoomLevel?: number;
+		darkMode?: boolean;
+		gridElementsCount?: number;
+		onZoomIn?: () => void;
+		onZoomOut?: () => void;
+		onResetZoom?: () => void;
+		onClear?: () => void;
+		onExportJSON?: () => void;
+		onToggleDarkMode?: () => void;
+	} = $props();
+</script>
+
+<div class="h-14 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border-b flex items-center justify-between px-6 shadow-sm">
+	<div class="flex items-center gap-4">
+		<h2 class="text-base font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">Workflow Canvas</h2>
+		<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
+		<span class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'}">
+			{gridElementsCount} {gridElementsCount === 1 ? 'node' : 'nodes'}
+		</span>
+	</div>
+	<div class="flex items-center gap-2">
+		<!-- Zoom Controls -->
+		<div class="flex items-center gap-1 {darkMode ? 'bg-slate-700' : 'bg-slate-100'} rounded-md p-1">
+			{#if onZoomOut}
+				<button
+					class="p-1.5 {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-600' : 'text-slate-600 hover:text-slate-900 hover:bg-white'} rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+					onclick={onZoomOut}
+					disabled={zoomLevel <= 0.5}
+					aria-label="Zoom out"
+					title="Zoom out (Scroll)"
+				>
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"></path>
+					</svg>
+				</button>
+			{/if}
+			<span class="text-xs font-medium px-2 {darkMode ? 'text-slate-300' : 'text-slate-700'} min-w-[3rem] text-center">
+				{Math.round(zoomLevel * 100)}%
+			</span>
+			{#if onZoomIn}
+				<button
+					class="p-1.5 {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-600' : 'text-slate-600 hover:text-slate-900 hover:bg-white'} rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+					onclick={onZoomIn}
+					disabled={zoomLevel >= 2}
+					aria-label="Zoom in"
+					title="Zoom in (Scroll)"
+				>
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"></path>
+					</svg>
+				</button>
+			{/if}
+			{#if onResetZoom}
+				<button
+					class="p-1.5 {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-600' : 'text-slate-600 hover:text-slate-900 hover:bg-white'} rounded transition-colors"
+					onclick={onResetZoom}
+					aria-label="Reset zoom"
+					title="Reset zoom to 100%"
+				>
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+					</svg>
+				</button>
+			{/if}
+		</div>
+		<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
+		{#if onClear}
+			<button
+				class="px-3 py-1.5 text-sm font-medium {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'} rounded-md transition-colors"
+				onclick={onClear}
+			>
+				Clear
+			</button>
+		{/if}
+		{#if onExportJSON}
+			<button
+				class="p-2 {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'} rounded-md transition-colors"
+				onclick={onExportJSON}
+				aria-label="Export workflow JSON"
+				title="Export workflow as JSON"
+			>
+				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+				</svg>
+			</button>
+		{/if}
+		{#if onToggleDarkMode}
+			<button
+				class="p-2 {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'} rounded-md transition-colors"
+				onclick={onToggleDarkMode}
+				aria-label="Toggle dark mode"
+				title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+			>
+				{#if darkMode}
+					<!-- Sun icon for light mode -->
+					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+					</svg>
+				{:else}
+					<!-- Moon icon for dark mode -->
+					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+					</svg>
+				{/if}
+			</button>
+		{/if}
+	</div>
+</div>

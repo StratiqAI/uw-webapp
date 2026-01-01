@@ -1,5 +1,5 @@
 import type { GridElement } from '../types/workflow';
-import type { Connection, ConnectionSide } from '../types/connection';
+import type { ConnectionSide } from '../types/connection';
 
 export function getConnectionPointPos(
 	element: GridElement,
@@ -17,5 +17,7 @@ export function getConnectionPointPos(
 			return { x: centerX, y: element.y + element.height };
 		case 'left':
 			return { x: element.x, y: centerY };
+		default:
+			return { x: centerX, y: centerY };
 	}
 }

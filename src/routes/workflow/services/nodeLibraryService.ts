@@ -1,17 +1,23 @@
 import type { ElementType } from '../types/node';
+import { elementTypes } from './nodeDefinitions';
 
-// This will be populated with the full elementTypes array from +page.svelte
-// For now, this is a placeholder structure. The actual elementTypes array
-// should be moved here from the main component file.
-// The array is very large (2000+ lines) containing all node definitions.
-
+/**
+ * Get all default element types
+ */
 export function getElementTypes(): ElementType[] {
-	// This should return the full elementTypes array
-	// For now, return empty array - will be populated during refactoring
-	return [];
+	return elementTypes;
 }
 
-// This function can be used to get all element types including custom ones
+/**
+ * Get all element types including custom ones
+ */
 export function getAllElementTypes(customNodes: ElementType[] = []): ElementType[] {
 	return [...getElementTypes(), ...customNodes];
+}
+
+/**
+ * Get an element type by its ID
+ */
+export function getElementTypeById(id: string): ElementType | undefined {
+	return elementTypes.find((type) => type.id === id);
 }
