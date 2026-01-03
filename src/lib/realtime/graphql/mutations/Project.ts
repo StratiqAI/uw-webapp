@@ -1,58 +1,12 @@
-import type { Project } from "$lib/types/Project";
 import { gql } from "$lib/realtime/graphql/requestHandler";
+import { print } from 'graphql';
 
-export const M_CREATE_PROJECT = `
-    mutation createProject($input: CreateProjectInput!) {
-        createProject(input: $input) {
-            id
-            name
-            ownerId
-            tenant
-            sharingMode
-            createdAt
-            details {
-                id
-                projectId
-                ownerId
-                tenant
-                description
-                status
-                sharingMode
-            }
-            userErrors {
-                message
-                code
-                field
-            }
-        }
-    }
-`;
+// Re-export operations from @stratiqai/types-simple for backward compatibility
+// New code should import directly from '@stratiqai/types-simple'
+export { M_CREATE_PROJECT, M_UPDATE_PROJECT, M_DELETE_PROJECT } from '@stratiqai/types-simple';
 
-
-
-export const M_UPDATE_PROJECT = `
-    mutation updateProject($id: ID!, $input: UpdateProjectInput!) {
-        updateProject(id: $id, input: $input) {
-            project {
-                id
-                entityType
-                tenantId
-                ownerId
-                createdAt
-                updatedAt
-                name
-                description
-                status
-                sharingMode
-            }
-            userErrors {
-                message
-                code
-                field
-            }
-        }
-    }
-`;
+// Legacy operations that don't exist in types-simple (ProjectDetail, ProjectDocument, etc.)
+// These are kept for backward compatibility but should be migrated or removed
 
 export const M_SHARE_PROJECT = `
     mutation shareProject($input: ShareProjectInput!) {
@@ -82,29 +36,7 @@ export const M_SHARE_PROJECT = `
     }
 `;
 
-export const M_DELETE_PROJECT = `
-    mutation deleteProject($id: ID!) {
-        deleteProject(id: $id) {
-            project {
-                id
-                entityType
-                tenantId
-                ownerId
-                createdAt
-                updatedAt
-                name
-                description
-                status
-                sharingMode
-            }
-            userErrors {
-                message
-                code
-                field
-            }
-        }
-    }
-`;
+// M_DELETE_PROJECT is now exported from @stratiqai/types-simple above
 
 
 // Mutation for creating ProjectDetail
@@ -234,32 +166,27 @@ export const M_DELETE_PROJECT_DOCUMENT_LINK = `
     }
 `;
 
+import { print } from 'graphql';
+import type { Project } from '@stratiqai/types-simple';
+
 export async function updateProject(project: Project, idToken: string) {
-    const mutation = M_UPDATE_PROJECT;
     // Extract only the fields that can be updated according to UpdateProjectInput
     const input = {
         name: project.name
     };
     try {
-        const res = await gql<{ updateProject: { project: Project | null; userErrors: Array<{ message: string; code: string; field?: string[] }> } }>(
-            mutation, 
+        const res = await gql<{ updateProject: Project | null }>(
+            print(M_UPDATE_PROJECT), 
             { id: project.id, input }, 
             idToken
         );
         
-        // Check for user errors
-        if (res.updateProject.userErrors && res.updateProject.userErrors.length > 0) {
-            const errorMessages = res.updateProject.userErrors.map(e => e.message).join(', ');
-            console.error('GraphQL user errors:', res.updateProject.userErrors);
-            throw new Error(`Error updating project: ${errorMessages}`);
-        }
-        
-        if (!res.updateProject.project) {
+        if (!res.updateProject) {
             console.error('Project update returned null project');
             throw new Error('Error updating project: No project returned');
         }
         
-        return res.updateProject.project;
+        return res.updateProject;
     } catch (e) {
         console.error('Error updating project:', e);
         throw e;

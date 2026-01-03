@@ -5,7 +5,7 @@
 	import UploadDropZone from './UploadDropZone.svelte';
 	import UploadList from './UploadList.svelte';
 	import { project } from '$lib/stores/appStateStore';
-	import type { ProjectDocumentLink } from '@stratiqai/types';
+	import type { ProjectDocumentLink } from '$lib/types/Project';
 	import type { DocumentListItem } from './types';
 
 	import { SUPPORTED_FILE_TYPES, MAX_FILE_SIZE } from './constants';

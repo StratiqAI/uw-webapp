@@ -44,6 +44,42 @@
 		}
 		return 'Project';
 	}
+
+	/**
+	 * Extract processing status from notification properties
+	 * Processing status events store eventType in properties
+	 */
+	function getProcessingStatus(notification: Notification): string | null {
+		if (!notification.properties) return null;
+		try {
+			const props = typeof notification.properties === 'string' 
+				? JSON.parse(notification.properties) 
+				: notification.properties;
+			return props.eventType || null;
+		} catch {
+			return null;
+		}
+	}
+
+	/**
+	 * Get notification icon based on processing status
+	 */
+	function getNotificationIcon(status: string | null): string {
+		if (!status) return 'bell';
+		switch (status) {
+			case 'AnalysisStarted':
+			case 'PageAnalysisStarted':
+				return 'clock'; // Processing
+			case 'Complete':
+			case 'PageAnalysisComplete':
+			case 'Classified':
+				return 'check-circle'; // Success
+			case 'Error':
+				return 'exclamation-circle'; // Error
+			default:
+				return 'bell';
+		}
+	}
 </script>
 
 <div class="relative">

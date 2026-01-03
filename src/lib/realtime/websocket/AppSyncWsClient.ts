@@ -51,6 +51,7 @@
 // Import the public environment variables
 import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from '$env/static/public';
 import { logger } from '$lib/logging/debug';
+import { print, type DocumentNode } from 'graphql';
 
 // Websocket resources
 import type {
@@ -360,12 +361,15 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 				? { 'x-api-key': (this.auth as any).apiKey, host: this.httpHost }
 				: { Authorization: (this.auth as any).idToken, host: this.httpHost };
 
+		// Convert DocumentNode to string if needed
+		const queryString = typeof params.query === 'string' ? params.query : print(params.query);
+
 		const frame = {
 			id,
 			type: 'start',
 			payload: {
 				data: JSON.stringify({
-					query: params.query,
+					query: queryString,
 					variables: params.variables ?? {}
 				}),
 				extensions: { authorization: authExt }

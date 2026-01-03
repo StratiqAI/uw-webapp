@@ -12,7 +12,7 @@
 
 	import { onMount, setContext } from 'svelte';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
-	import type { Project } from '@stratiqai/types';
+	import type { Project } from '@stratiqai/types-simple';
 
 	interface Props {
 		data: PageData;

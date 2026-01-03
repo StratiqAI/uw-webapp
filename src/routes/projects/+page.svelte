@@ -37,7 +37,7 @@
 
 	// 2. Import types and operations from the new types library
 	import type { Project } from '@stratiqai/types-simple';
-	import { M_CREATE_PROJECT, M_DELETE_PROJECT } from '@stratiqai/types-simple/operations';
+	import { M_CREATE_PROJECT, M_DELETE_PROJECT } from '@stratiqai/types-simple';
 	import { print } from 'graphql';
 	
 	// Import shared notification store and subscription
@@ -101,7 +101,7 @@
 
 		// Create subscriptions for notifications for each project
 		const notificationSubscriptions = projects.map((project) => ({
-			query: S_ON_CREATE_NOTIFICATION,
+			query: print(S_ON_CREATE_NOTIFICATION),
 			variables: { parentId: project.id },
 			path: 'onCreateNotification',
 			next: (notification: Notification) => {
@@ -116,23 +116,6 @@
 			graphqlHttpUrl: PUBLIC_GRAPHQL_HTTP_ENDPOINT,
 			auth: { mode: 'cognito', idToken },
 			subscriptions: [
-				// {
-				// 	query: S_PROJECT_CREATED,
-				// 	variables: { ownerId: currentUser?.sub || '' },
-				// 	path: 'onCreateProject',
-				// 	next: (it: Project) => {
-				// 		console.log('Project created subscription received:', it);
-				// 		projectListOps.upsertMutable(projects, it);
-				// 	},
-				// 	error: (err: any) => console.error('project creation sub error', err)
-				// },
-				// {
-				// 	query: S_PROJECT_DELETED,
-				// 	variables: { ownerId: currentUser?.sub || '' },
-				// 	path: 'onDeleteProject',
-				// 	next: (it: Project) => projectListOps.removeMutable(projects, it),
-				// 	error: (err: any) => console.error('project deletion sub error', err)
-				// },
 				...notificationSubscriptions
 			]
 		});

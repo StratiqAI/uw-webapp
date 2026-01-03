@@ -17,7 +17,7 @@
 	// Type imports
 	import type { LayoutProps } from './$types';
 	import type { Project, Doclink } from '@stratiqai/types-simple';
-	import { S_ON_UPDATE_PROJECT, S_ON_CREATE_DOCLINK } from '@stratiqai/types-simple/operations';
+	import { S_ON_UPDATE_PROJECT, S_ON_CREATE_DOCLINK } from '@stratiqai/types-simple';
 	import { print } from 'graphql';
 	
 	// Import shared notification store and subscription
@@ -152,7 +152,7 @@
 				error: (err: any) => console.error('docLink create sub error', err)
 			},
 			{
-				query: S_ON_CREATE_NOTIFICATION,
+				query: print(S_ON_CREATE_NOTIFICATION),
 				variables: { parentId: projectFromServer.id },
 				path: 'onCreateNotification',
 				next: (notification: Notification) => {

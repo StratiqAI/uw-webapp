@@ -2,7 +2,8 @@
 	import { Button, Input, Label, Modal, Textarea, Checkbox, Select } from 'flowbite-svelte';
 	import type { UserModalProps } from '../../../../uw-ai-plane/types';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
-	import { M_CREATE_PROJECT, M_UPDATE_PROJECT } from '$lib/realtime/graphql/mutations/Project';
+	import { M_CREATE_PROJECT, M_UPDATE_PROJECT } from '@stratiqai/types-simple';
+	import { print } from 'graphql';
 	import { goto } from '$app/navigation';
 
 	// Using imported mutations from Project.ts
@@ -47,53 +48,37 @@
 				const projectInput = {
 					name: formValues.name
 				};
-				const projectRes = await gql<{ updateProject: { project: any | null; userErrors: Array<{ message: string; code: string; field?: string[] }> } }>(
-					M_UPDATE_PROJECT, 
+				const projectRes = await gql<{ updateProject: any | null }>(
+					print(M_UPDATE_PROJECT), 
 					{ id: data.id, input: projectInput }, 
 					idToken
 				);
 				
-				// Check for user errors
-				if (projectRes.updateProject.userErrors && projectRes.updateProject.userErrors.length > 0) {
-					const errorMessages = projectRes.updateProject.userErrors.map((e: any) => e.message).join(', ');
-					console.error('GraphQL user errors:', projectRes.updateProject.userErrors);
-					alert(`Error updating project: ${errorMessages}`);
-					return;
-				}
-				
-				if (!projectRes.updateProject.project) {
+				if (!projectRes.updateProject) {
 					console.error('Project update returned null project');
 					alert('Error updating project: No project returned');
 					return;
 				}
 				
-				projectId = projectRes.updateProject.project.id;
+				projectId = projectRes.updateProject.id;
 			} else {
 				// Create new project
 				const projectInput = {
 					name: formValues.name
 				};
-				const projectRes = await gql<{ createProject: { project: any | null; userErrors: Array<{ message: string; code: string; field?: string[] }> } }>(
-					M_CREATE_PROJECT, 
+				const projectRes = await gql<{ createProject: any | null }>(
+					print(M_CREATE_PROJECT), 
 					{ input: projectInput }, 
 					idToken
 				);
 				
-				// Check for user errors
-				if (projectRes.createProject.userErrors && projectRes.createProject.userErrors.length > 0) {
-					const errorMessages = projectRes.createProject.userErrors.map((e: any) => e.message).join(', ');
-					console.error('GraphQL user errors:', projectRes.createProject.userErrors);
-					alert(`Error creating project: ${errorMessages}`);
-					return;
-				}
-				
-				if (!projectRes.createProject.project) {
+				if (!projectRes.createProject) {
 					console.error('Project creation returned null project');
 					alert('Error creating project: No project returned');
 					return;
 				}
 				
-				projectId = projectRes.createProject.project.id;
+				projectId = projectRes.createProject.id;
 			}
 
 			// Step 2: Create or update ProjectDetail with address and property info

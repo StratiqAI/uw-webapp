@@ -3,37 +3,12 @@
  * Provides a centralized store for managing notifications across the application
  */
 
-// Notification type
-export type Notification = {
-	id: string;
-	entityType: string;
-	tenantId: string;
-	ownerId: string;
-	createdAt: string;
-	updatedAt: string;
-	deletedAt?: string | null;
-	parentId: string;
-	message: string;
-	properties?: any;
-};
+import type { Notification } from '@stratiqai/types-simple';
+import { S_ON_CREATE_NOTIFICATION } from '@stratiqai/types-simple';
 
-// Notification subscription query
-export const S_ON_CREATE_NOTIFICATION = `
-	subscription OnCreateNotification($parentId: ID) {
-		onCreateNotification(parentId: $parentId) {
-			id
-			entityType
-			tenantId
-			ownerId
-			createdAt
-			updatedAt
-			deletedAt
-			parentId
-			message
-			properties
-		}
-	}
-`;
+// Re-export for convenience
+export type { Notification };
+export { S_ON_CREATE_NOTIFICATION };
 
 class NotificationStore {
 	notifications = $state<Notification[]>([]);

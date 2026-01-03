@@ -14,7 +14,7 @@ import type { PageServerLoad } from './$types';
 import { gql } from '$lib/realtime/graphql/requestHandler';
 
 // Import GraphQL operations from the new types library
-import { Q_LIST_PROJECTS } from '@stratiqai/types-simple/operations';
+import { Q_LIST_PROJECTS } from '@stratiqai/types-simple';
 import { print } from 'graphql';
 
 // Import the Project type definition

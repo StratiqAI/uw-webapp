@@ -3,13 +3,16 @@
  *
  */
 
+import type { DocumentNode } from 'graphql';
+import { print } from 'graphql';
+
 // SubscribeOptions<T>: Options for subscribing to a GraphQL subscription.
-//   - query: The GraphQL subscription document string.
+//   - query: The GraphQL subscription document string or DocumentNode.
 //   - variables: Optional variables for the subscription operation.
 //   - next: Callback invoked with new data when received.
 //   - error: Optional callback invoked on subscription errors.
 export type SubscribeOptions<T = unknown> = {
-	query: string;
+	query: string | DocumentNode;
 	variables?: Record<string, any>;
 	next: (data: T) => void;
 	error?: (e: any) => void;
@@ -47,15 +50,15 @@ export interface RealtimeClientOptions {
 }
 
 // SubscriptionSpec<T>: Defines a single GraphQL subscription.
-//   - query: The GraphQL subscription document.
+//   - query: The GraphQL subscription document string or DocumentNode.
 //   - variables: Optional variables for the subscription.
 //   - path: Optional dot-path to extract data from the payload.
 //   - select: Optional custom function to extract/transform the payload.
 //   - next: Handler for new data (after extraction).
 //   - error: Optional error handler for subscription errors.
 export interface SubscriptionSpec<T> {
-	/** GraphQL subscription document (string or whatever your client expects) */
-	query: string;
+	/** GraphQL subscription document (string or DocumentNode) */
+	query: string | DocumentNode;
 	/** Optional variables to pass with the subscription */
 	variables?: Record<string, unknown>;
 	/**

@@ -1,7 +1,7 @@
 // External packages
 import { error } from '@sveltejs/kit';
 import type { Project } from '@stratiqai/types-simple';
-import { Q_GET_PROJECT } from '@stratiqai/types-simple/operations';
+import { Q_GET_PROJECT } from '@stratiqai/types-simple';
 import { print } from 'graphql';
 
 // Internal imports

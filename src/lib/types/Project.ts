@@ -35,16 +35,23 @@ export interface ProjectDocumentConnection {
 	nextToken?: string | null;
 }
 
-import type { ProjectDocumentLink, Project as StratiqProject } from '@stratiqai/types';
+import type { Doclink, Project as StratiqProject } from '@stratiqai/types-simple';
+
+// Type alias for backward compatibility - Doclink is the correct type name
+export type ProjectDocumentLink = Doclink;
 
 export interface ProjectDocumentLinkConnection {
-	items: ProjectDocumentLink[];
+	items: Doclink[];
 	nextToken?: string | null;
 }
 
-// Extend the Project type from stratiqai-types to include GraphQL Connection format
-export interface Project extends Omit<StratiqProject, 'projectDocumentLinks'> {
-	projectDocumentLinks?: ProjectDocumentLinkConnection | ProjectDocumentLink[] | null;
+// Extend the Project type from stratiqai-types-simple to include GraphQL Connection format
+// Note: Project.doclinks is the correct field name (not projectDocumentLinks)
+export interface Project extends Omit<StratiqProject, 'doclinks'> {
+	// Legacy field name for backward compatibility - maps to doclinks
+	projectDocumentLinks?: ProjectDocumentLinkConnection | Doclink[] | null;
+	// Correct field name from GraphQL schema
+	doclinks?: ProjectDocumentLinkConnection | Doclink[] | null;
 	documents?: ProjectDocumentConnection | null; // Legacy - deprecated
 }
 
