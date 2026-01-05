@@ -179,11 +179,11 @@
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	async function uploadFile(upload: UploadFile): Promise<void> {
 		try {
-			// Step 1: Hashing
-			uploader.updateFile(upload.id, { status: 'hashing', progress: PROGRESS_HASHING });
-			const sha256 = await calculateSHA256(upload.file);
+		// Step 1: Hashing
+		uploader.updateFile(upload.id, { status: 'hashing', progress: PROGRESS_HASHING });
+		const sha256 = await calculateSHA256(upload.file);
 
-			// Step 2: Get Presigned URL
+		// Step 2: Get Presigned URL
 			uploader.updateFile(upload.id, { progress: PROGRESS_GETTING_URL });
 			const { url } = await getPresignedUrl(
 				upload.file.name,

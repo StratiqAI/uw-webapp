@@ -8,9 +8,18 @@ import {
 	PROGRESS_HASHING,
 	PROGRESS_GETTING_URL,
 	PROGRESS_UPLOADING_MAX,
-	PROGRESS_COMPLETE
+	PROGRESS_COMPLETE,
+	LOG_PREFIX
 } from './constants';
 import type { UploadFile, PresignedUrlResponse, FileMetadata } from './types';
+import { addSubscription, ensureConnection, removeSubscription } from '$lib/stores/appSyncClientStore';
+import { S_ON_CREATE_TEXT, S_ON_CREATE_TABLE, S_ON_CREATE_IMAGE } from '@stratiqai/types-simple';
+import { print } from 'graphql';
+import type { Text, Table, Image } from '@stratiqai/types-simple';
+import type { SubscriptionSpec } from '$lib/realtime/websocket/types';
+import { logger } from '$lib/logging/debug';
+import { authStore } from '$lib/stores/auth.svelte';
+import { addProjectText, addProjectTable, addProjectImage } from '$lib/stores/projectEntitiesStore';
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // Uploader Store - Encapsulates all upload logic
@@ -26,6 +35,9 @@ export function createUploader(
 	let token = $state(idToken);
 	let project = $state(projectId);
 	let fileMetadata = $state(metadata);
+	
+	// Track active subscriptions per document (keyed by sha256/documentId)
+	const activeSubscriptions = new Map<string, SubscriptionSpec<any>[]>();
 
 	function updateFile(fileId: string, updates: Partial<UploadFile>) {
 		files = files.map((f) => (f.id === fileId ? { ...f, ...updates } : f));
@@ -48,6 +60,10 @@ export function createUploader(
 		try {
 			updateFile(upload.id, { status: 'hashing', progress: PROGRESS_HASHING });
 			const sha256 = await calculateSHA256(upload.file);
+
+			// Subscribe to document processing updates (text, table, image)
+			// This happens after SHA256 is computed but before upload begins
+			await setupDocumentSubscriptions(sha256);
 
 			updateFile(upload.id, { progress: PROGRESS_GETTING_URL });
 			
@@ -124,6 +140,9 @@ export function createUploader(
 		updateMetadata: (newMetadata: FileMetadata) => {
 			fileMetadata = newMetadata;
 		},
+		updateToken: (newToken: string | null) => {
+			token = newToken;
+		},
 		add: (filesToAdd: File[]) => {
 			const newUploads: UploadFile[] = filesToAdd.map((file) => ({
 				id: `${file.name}-${Date.now()}`,
@@ -169,8 +188,141 @@ export function createUploader(
 				}
 			});
 			uploadQueue = []; // Clear the queue
+			
+			// Clean up all subscriptions
+			for (const [documentId, specs] of activeSubscriptions.entries()) {
+				for (const spec of specs) {
+					removeSubscription(spec);
+				}
+			}
+			activeSubscriptions.clear();
 		}
 	};
+
+	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+	// Subscription Management (internal to createUploader)
+	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+	/**
+	 * Gets the current idToken from various sources (store, authStore, or cookies)
+	 */
+	async function getCurrentToken(): Promise<string | null> {
+		// First, check the uploader's token state
+		if (token) return token;
+		
+		// Second, check authStore
+		if (authStore.idToken) return authStore.idToken;
+		
+		// Third, try to get from cookies via API endpoint (client-side only)
+		if (typeof window !== 'undefined') {
+			try {
+				const response = await fetch('/api/ws-token');
+				if (response.ok) {
+					const data = await response.json();
+					if (data.token) {
+						// Update the token state for future use
+						token = data.token;
+						return data.token;
+					}
+				}
+			} catch (error) {
+				logger(`${LOG_PREFIX} Failed to fetch token from /api/ws-token:`, error);
+			}
+		}
+		
+		return null;
+	}
+
+	/**
+	 * Sets up GraphQL subscriptions for text, table, and image updates for a document
+	 * @param documentId - The SHA256 hash of the document (used as parentId in subscriptions)
+	 */
+	async function setupDocumentSubscriptions(documentId: string): Promise<void> {
+		// Skip if we already have subscriptions for this document
+		if (activeSubscriptions.has(documentId)) {
+			logger(`${LOG_PREFIX} Subscriptions already active for document: ${documentId}`);
+			return;
+		}
+
+		// Get the current token value from multiple sources
+		const currentToken = await getCurrentToken();
+
+		// Skip if we don't have idToken
+		if (!currentToken) {
+			logger(`${LOG_PREFIX} No idToken available, skipping subscriptions for document: ${documentId}`);
+			logger(`${LOG_PREFIX} Token state: token=${token ? 'present' : 'null'}, authStore.idToken=${authStore.idToken ? 'present' : 'null'}`);
+			return;
+		}
+
+		try {
+			// Ensure WebSocket connection is established
+			await ensureConnection(currentToken);
+
+			// Create subscription specs for text, table, and image updates
+			// Note: We need projectId to update the stores, so we'll use the project state
+			const currentProjectId = project;
+			
+			const subscriptions: SubscriptionSpec<any>[] = [
+				{
+					query: print(S_ON_CREATE_TEXT),
+					variables: { parentId: documentId },
+					path: 'onCreateText',
+					next: (text: Text) => {
+						logger(`${LOG_PREFIX} Text created for document ${documentId}:`, text);
+						// Update the project entities store so ProjectEntitiesDisplay can react
+						if (currentProjectId && typeof window !== 'undefined') {
+							addProjectText(currentProjectId, text);
+						}
+					},
+					error: (err: any) => {
+						console.error(`${LOG_PREFIX} Text subscription error for document ${documentId}:`, err);
+					}
+				},
+				{
+					query: print(S_ON_CREATE_TABLE),
+					variables: { parentId: documentId },
+					path: 'onCreateTable',
+					next: (table: Table) => {
+						logger(`${LOG_PREFIX} Table created for document ${documentId}:`, table);
+						// Update the project entities store so ProjectEntitiesDisplay can react
+						if (currentProjectId && typeof window !== 'undefined') {
+							addProjectTable(currentProjectId, table);
+						}
+					},
+					error: (err: any) => {
+						console.error(`${LOG_PREFIX} Table subscription error for document ${documentId}:`, err);
+					}
+				},
+				{
+					query: print(S_ON_CREATE_IMAGE),
+					variables: { parentId: documentId },
+					path: 'onCreateImage',
+					next: (image: Image) => {
+						logger(`${LOG_PREFIX} Image created for document ${documentId}:`, image);
+						// Update the project entities store so ProjectEntitiesDisplay can react
+						if (currentProjectId && typeof window !== 'undefined') {
+							addProjectImage(currentProjectId, image);
+						}
+					},
+					error: (err: any) => {
+						console.error(`${LOG_PREFIX} Image subscription error for document ${documentId}:`, err);
+					}
+				}
+			];
+
+			// Add all subscriptions
+			for (const spec of subscriptions) {
+				await addSubscription(currentToken, spec);
+				logger(`${LOG_PREFIX} Subscription added for document ${documentId}:`, spec);
+			}
+
+			// Store subscriptions for cleanup
+			activeSubscriptions.set(documentId, subscriptions);
+			logger(`${LOG_PREFIX} Subscriptions set up for document: ${documentId}`);
+		} catch (error) {
+			console.error(`${LOG_PREFIX} Failed to set up subscriptions for document ${documentId}:`, error);
+			// Don't throw - allow upload to continue even if subscriptions fail
+		}
+	}
 }
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-

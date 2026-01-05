@@ -1,5 +1,5 @@
 import type { Widget, DashboardConfig } from '$lib/dashboard/types/widget';
-import { mapStore } from '$lib/stores/mapObjectStore';
+import { mapStore } from '$lib/stores/MapStore';
 
 const STORAGE_KEYS = {
 	WIDGETS: 'dashboard_widgets',
@@ -82,13 +82,13 @@ export class DashboardStorage {
 		}
 
 		try {
-			// Capture current widget data from mapObjectStore
+			// Capture current widget data from mapStore
 			const allData = mapStore.getAllData();
 			const widgetData: WidgetDataSnapshot = {};
 			
 			allData.forEach(item => {
 				if (item.value !== undefined) {
-					widgetData[item.typeId] = item.value;
+					widgetData[item.typeId] = item.value; // typeId is actually topic name for compatibility
 				}
 			});
 
@@ -111,13 +111,13 @@ export class DashboardStorage {
 		}
 
 		try {
-			// Capture current widget data from mapObjectStore
+			// Capture current widget data from mapStore
 			const allData = mapStore.getAllData();
 			const widgetData: WidgetDataSnapshot = {};
 			
 			allData.forEach(item => {
 				if (item.value !== undefined) {
-					widgetData[item.typeId] = item.value;
+					widgetData[item.typeId] = item.value; // typeId is actually topic name for compatibility
 					console.log(`   ✅ Captured data for channel: ${item.typeId}`);
 				}
 			});
@@ -223,26 +223,26 @@ export class DashboardStorage {
 	}
 
 	/**
-	 * Restore widget data to mapObjectStore
+	 * Restore widget data to mapStore
 	 */
 	private static restoreWidgetData(widgetData: WidgetDataSnapshot): void {
-		console.log('\n📤 [DashboardStorage] Restoring widget data to mapObjectStore...');
+		console.log('\n📤 [DashboardStorage] Restoring widget data to mapStore...');
 		
-		Object.entries(widgetData).forEach(([channelId, data]) => {
+		Object.entries(widgetData).forEach(([topic, data]) => {
 			try {
-				// Register a temporary producer to restore the data
-				const producer = mapStore.registerProducer(
-					channelId,
+				// Create a temporary publisher to restore the data
+				const publisher = mapStore.getPublisher(
+					topic,
 					'dashboard-storage-restore'
 				);
 				
-				producer.publish(data);
-				console.log(`   ✅ Restored data for channel: ${channelId}`);
+				publisher.publish(data);
+				console.log(`   ✅ Restored data for topic: ${topic}`);
 				
-				// Unregister the temporary producer
-				mapStore.unregister('dashboard-storage-restore');
+				// Dispose the temporary publisher
+				publisher.dispose();
 			} catch (error) {
-				console.error(`   ❌ Failed to restore data for channel ${channelId}:`, error);
+				console.error(`   ❌ Failed to restore data for topic ${topic}:`, error);
 			}
 		});
 

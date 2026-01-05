@@ -4,6 +4,7 @@
 	import { createUploader } from './uploader.store.svelte';
 	import UploadDropZone from './UploadDropZone.svelte';
 	import UploadList from './UploadList.svelte';
+	import DocumentProcessingModal from '../DocumentProcessing/DocumentProcessingModal.svelte';
 	import { project } from '$lib/stores/appStateStore';
 	import type { ProjectDocumentLink } from '$lib/types/Project';
 	import type { DocumentListItem } from './types';
@@ -23,6 +24,13 @@
 	$effect(() => {
 		if (metadata && uploader.updateMetadata) {
 			uploader.updateMetadata(metadata);
+		}
+	});
+	
+	// Update uploader token when it changes reactively
+	$effect(() => {
+		if (uploader.updateToken) {
+			uploader.updateToken(idToken);
 		}
 	});
 	
@@ -91,6 +99,45 @@
 		// For now, we'll just log them.
 		console.error('Validation errors:', event.errors);
 	}
+
+	// Modal state
+	let selectedDocument = $state<{
+		documentId: string;
+		projectId: string;
+		filename: string;
+	} | null>(null);
+	let isModalOpen = $derived(selectedDocument !== null);
+
+	function handleDocumentClick(event: { item: DocumentListItem }) {
+		const item = event.item;
+		
+		// Get document ID and project ID
+		let documentId: string | null = null;
+		const currentProjectId = projectId;
+		
+		if (item.status === 'existing' && item.documentLink) {
+			// For existing documents, use the document link ID
+			// Note: This might need adjustment based on your data structure
+			documentId = item.documentLink.id;
+		} else if (item.status === 'upload' && item.uploadFile?.result?.success) {
+			// For uploaded files, we need to get the document ID from the upload result
+			// This might need to be stored in the upload result or fetched
+			// For now, use a placeholder - in production, this would come from the upload response
+			documentId = `doc-${item.id}`;
+		}
+
+		if (documentId && currentProjectId) {
+			selectedDocument = {
+				documentId,
+				projectId: currentProjectId,
+				filename: item.filename
+			};
+		}
+	}
+
+	function handleModalClose() {
+		selectedDocument = null;
+	}
 </script>
 
 <UploadDropZone 
@@ -120,4 +167,15 @@
 			uploader.retry(e.item.uploadFile.id);
 		}
 	}}
+	onClick={handleDocumentClick}
 />
+
+{#if selectedDocument}
+	<DocumentProcessingModal
+		documentId={selectedDocument.documentId}
+		projectId={selectedDocument.projectId}
+		filename={selectedDocument.filename}
+		isOpen={isModalOpen}
+		onClose={handleModalClose}
+	/>
+{/if}

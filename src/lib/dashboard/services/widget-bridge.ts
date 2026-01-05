@@ -34,7 +34,6 @@ import {
 // ============================================================================
 
 // These imports should be replaced with your actual store implementations
-// import { mapStore } from '$lib/stores/mapObjectStore';
 // import { jobUpdateStore } from '$lib/stores/jobUpdateStore';
 // import { DashboardStorage } from '$lib/dashboard/utils/storage';
 

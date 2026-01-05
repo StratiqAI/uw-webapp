@@ -44,9 +44,9 @@ export class MapStore {
 				};
 
 				// Handle channel errors gracefully
-				this.channel.onerror = (error) => {
-					console.warn('[MapStore] BroadcastChannel error:', error);
-				};
+				this.channel.addEventListener('messageerror', (event) => {
+					console.warn('[MapStore] BroadcastChannel message error:', event);
+				});
 			} catch (error) {
 				console.warn('[MapStore] Failed to initialize BroadcastChannel:', error);
 				// Continue without multi-tab sync if BroadcastChannel is not available
@@ -150,6 +150,24 @@ export class MapStore {
 						} as BroadcastMessage);
 					} catch (e) {
 						console.warn(`[MapStore] Data not serializable for topic ${topic}, skipping tab sync:`, e);
+					}
+				}
+			},
+			clear: () => {
+				// Clear the topic data
+				entry.lastValue = undefined;
+				entry.store.set(undefined);
+				
+				// Broadcast clear to other tabs
+				if (this.channel) {
+					try {
+						this.channel.postMessage({
+							topic,
+							data: undefined,
+							originId: this.instanceId
+						} as BroadcastMessage);
+					} catch (e) {
+						console.warn(`[MapStore] Failed to broadcast clear for topic ${topic}:`, e);
 					}
 				}
 			},
@@ -273,6 +291,109 @@ export class MapStore {
 		};
 		console.table(summary);
 		console.groupEnd();
+	}
+
+	/**
+	 * Clear all data but keep topics and registrations
+	 * Useful for resetting dashboard state
+	 */
+	clearData(): void {
+		this.registry.forEach(entry => {
+			entry.store.set(undefined);
+			entry.lastValue = undefined;
+		});
+	}
+
+	/**
+	 * Get information about all registered topics
+	 * Compatible with mapObjectStore.getTypeInfo() API
+	 */
+	getTypeInfo(): Array<{
+		typeId: string; // Using typeId for compatibility, but it's actually topic
+		producerCount: number;
+		consumerCount: number;
+		hasValue: boolean;
+	}> {
+		return Array.from(this.registry.entries()).map(([topic, entry]) => ({
+			typeId: topic, // Map topic to typeId for compatibility
+			producerCount: entry.producers.size,
+			consumerCount: entry.consumers.size,
+			hasValue: entry.lastValue !== undefined
+		}));
+	}
+
+	/**
+	 * Get all producers across all topics
+	 * Compatible with mapObjectStore.getAllProducers() API
+	 */
+	getAllProducers(): Array<{
+		registrationId: string;
+		typeId: string; // Using typeId for compatibility, but it's actually topic
+		role: 'producer' | 'both';
+	}> {
+		const producers: Array<{
+			registrationId: string;
+			typeId: string;
+			role: 'producer' | 'both';
+		}> = [];
+
+		for (const [topic, entry] of this.registry.entries()) {
+			for (const producerId of entry.producers) {
+				producers.push({
+					registrationId: producerId,
+					typeId: topic, // Map topic to typeId for compatibility
+					role: 'producer' // MapStore doesn't track 'both', only separate producers/consumers
+				});
+			}
+		}
+
+		return producers;
+	}
+
+	/**
+	 * Get all consumers across all topics
+	 * Compatible with mapObjectStore.getAllConsumers() API
+	 */
+	getAllConsumers(): Array<{
+		registrationId: string;
+		typeId: string; // Using typeId for compatibility, but it's actually topic
+		role: 'consumer' | 'both';
+	}> {
+		const consumers: Array<{
+			registrationId: string;
+			typeId: string;
+			role: 'consumer' | 'both';
+		}> = [];
+
+		for (const [topic, entry] of this.registry.entries()) {
+			for (const consumerId of entry.consumers) {
+				consumers.push({
+					registrationId: consumerId,
+					typeId: topic, // Map topic to typeId for compatibility
+					role: 'consumer' // MapStore doesn't track 'both', only separate producers/consumers
+				});
+			}
+		}
+
+		return consumers;
+	}
+
+	/**
+	 * Get all data stored across all topics
+	 * Compatible with mapObjectStore.getAllData() API
+	 */
+	getAllData(): Array<{
+		typeId: string; // Using typeId for compatibility, but it's actually topic
+		value: any;
+		producerCount: number;
+		consumerCount: number;
+	}> {
+		return Array.from(this.registry.entries()).map(([topic, entry]) => ({
+			typeId: topic, // Map topic to typeId for compatibility
+			value: entry.lastValue,
+			producerCount: entry.producers.size,
+			consumerCount: entry.consumers.size
+		}));
 	}
 }
 

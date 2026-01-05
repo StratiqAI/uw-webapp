@@ -32,10 +32,7 @@
 	// Realtime Section
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-	// 1. Import public environment variables for GraphQL endpoint and API key
-	import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from '$env/static/public';
-
-	// 2. Import types and operations from the new types library
+	// 1. Import types and operations from the new types library
 	import type { Project } from '@stratiqai/types-simple';
 	import { M_CREATE_PROJECT, M_DELETE_PROJECT } from '@stratiqai/types-simple';
 	import { print } from 'graphql';
@@ -43,16 +40,19 @@
 	// Import shared notification store and subscription
 	import { notificationStore, S_ON_CREATE_NOTIFICATION, type Notification } from '$lib/stores/notifications.svelte';
 
-	// 3. Import realtime subscription setup
-	import { AppSyncWsClient } from '$lib/realtime/websocket/AppSyncWsClient';
+	// 3. Import shared AppSync client store
+	import { addSubscription, removeSubscription, ensureConnection } from '$lib/stores/appSyncClientStore';
 
 	// 4. Import list operations for Project
 	import { createListOps } from '$lib/realtime/websocket/ListOperations';
 
-	// 6. Create reactive state for Project list
-	let projects = $state<Project[]>(componentProps.data?.items);
+	// 5. Import Project subscriptions
+	import { S_ON_CREATE_PROJECT, S_ON_UPDATE_PROJECT, S_ON_DELETE_PROJECT } from '@stratiqai/types-simple';
 
-	// 6. Create list operations for Project
+	// 6. Create reactive state for Project list
+	let projects = $state<Project[]>(componentProps.data?.items || []);
+
+	// 7. Create list operations for Project
 	export const projectListOps = createListOps<Project>({
 		keyFor: (it) => it.id
 	});
@@ -97,31 +97,112 @@
 			return;
 		}
 
-		logger('Setting up WebSocket with idToken:', idToken ? 'present' : 'missing');
+		logger('Setting up WebSocket subscriptions with idToken:', idToken ? 'present' : 'missing');
 
-		// Create subscriptions for notifications for each project
-		const notificationSubscriptions = projects.map((project) => ({
-			query: print(S_ON_CREATE_NOTIFICATION),
-			variables: { parentId: project.id },
-			path: 'onCreateNotification',
-			next: (notification: Notification) => {
-				console.log('Notification received for project:', project.id, notification);
-				// Add notification to the shared store
-				notificationStore.addNotification(notification);
-			},
-			error: (err: any) => console.error('Notification subscription error for project', project.id, err)
-		}));
+		// Ensure connection to shared AppSync client
+		ensureConnection(idToken).then(() => {
+			const ownerId = currentUser?.sub;
+			
+			// 1. Subscribe to CREATE events for new projects owned by the current user
+			if (ownerId) {
+				const createSub = {
+					query: S_ON_CREATE_PROJECT,
+					variables: { ownerId },
+					path: 'onCreateProject',
+					next: (project: Project) => {
+						console.log('Project created:', project);
+						// Only add if it matches the current scope
+						if (currentScope === 'OWNED_BY_ME' && project.ownerId === ownerId) {
+							projectListOps.upsertMutable(projects, project);
+						} else if (currentScope === 'ALL_TENANT') {
+							// For ALL_TENANT scope, also add projects from the same tenant
+							const tenantId = currentUser?.tenant || projects[0]?.tenantId;
+							if (project.tenantId === tenantId) {
+								projectListOps.upsertMutable(projects, project);
+							}
+						}
+					},
+					error: (err: any) => console.error('Project CREATE subscription error:', err)
+				};
+				addSubscription(idToken, createSub);
+			}
+			
+			// 2. For ALL_TENANT scope, also subscribe to tenant-wide project creation
+			if (currentScope === 'ALL_TENANT') {
+				const tenantId = currentUser?.tenant || projects[0]?.tenantId;
+				if (tenantId) {
+					const tenantCreateSub = {
+						query: S_ON_CREATE_PROJECT,
+						variables: { tenantId },
+						path: 'onCreateProject',
+						next: (project: Project) => {
+							console.log('Project created in tenant:', project);
+							// Only add if it's from the same tenant
+							if (project.tenantId === tenantId) {
+								projectListOps.upsertMutable(projects, project);
+							}
+						},
+						error: (err: any) => console.error('Project CREATE (tenant) subscription error:', err)
+					};
+					addSubscription(idToken, tenantCreateSub);
+				}
+			}
 
-		const client = new AppSyncWsClient({
-			graphqlHttpUrl: PUBLIC_GRAPHQL_HTTP_ENDPOINT,
-			auth: { mode: 'cognito', idToken },
-			subscriptions: [
-				...notificationSubscriptions
-			]
+			// 3. Subscribe to UPDATE and DELETE events for each existing project
+			const updateSubscriptions = projects.map((project) => ({
+				query: S_ON_UPDATE_PROJECT,
+				variables: { id: project.id },
+				path: 'onUpdateProject',
+				next: (updatedProject: Project) => {
+					console.log('Project updated:', updatedProject);
+					projectListOps.upsertMutable(projects, updatedProject);
+				},
+				error: (err: any) => console.error('Project UPDATE subscription error for', project.id, err)
+			}));
+
+			const deleteSubscriptions = projects.map((project) => ({
+				query: S_ON_DELETE_PROJECT,
+				variables: { id: project.id },
+				path: 'onDeleteProject',
+				next: (deletedProject: Project) => {
+					console.log('Project deleted:', deletedProject);
+					projectListOps.removeMutable(projects, deletedProject);
+				},
+				error: (err: any) => console.error('Project DELETE subscription error for', project.id, err)
+			}));
+
+			// Add all subscriptions
+			[...updateSubscriptions, ...deleteSubscriptions].forEach((sub) => {
+				addSubscription(idToken, sub);
+			});
+
+			// 4. Subscribe to notifications for each project
+			const notificationSubscriptions = projects.map((project) => ({
+				query: print(S_ON_CREATE_NOTIFICATION),
+				variables: { parentId: project.id },
+				path: 'onCreateNotification',
+				next: (notification: Notification) => {
+					console.log('Notification received for project:', project.id, notification);
+					notificationStore.addNotification(notification);
+				},
+				error: (err: any) => console.error('Notification subscription error for project', project.id, err)
+			}));
+
+			notificationSubscriptions.forEach((sub) => {
+				addSubscription(idToken, sub);
+			});
+		}).catch((error) => {
+			console.error('Failed to set up AppSync subscriptions:', error);
 		});
 
 		// Return disposer to clean up subscriptions on component unmount/HMR
-		return () => client.disconnect();
+		return () => {
+			// Note: The shared client manages subscriptions, but we should clean up
+			// when the component unmounts. However, since we're using a shared client,
+			// we might want to keep subscriptions active. For now, we'll let the
+			// shared client handle cleanup on app-level events (like logout).
+			console.log('Projects page unmounting - subscriptions remain active in shared client');
+		};
 	});
 
 	// Reactive error message, initially null

@@ -431,40 +431,6 @@ export function removeProjectDocumentLink(id: string): void {
 // };
 
 /**
- * Usage Examples:
- * 
- * // Update projectDocumentLinks directly
- * import { setProjectDocumentLinks, addProjectDocumentLink, updateProjectDocumentLink, removeProjectDocumentLink } from '$lib/stores/appStateStore';
- * 
- * // Set entire projectDocumentLinks collection
- * setProjectDocumentLinks({ items: [...links], nextToken: null });
- * 
- * // Add a new ProjectDocumentLink (handles both Connection and array formats)
- * addProjectDocumentLink(newLink);
- * 
- * // Update an existing ProjectDocumentLink
- * updateProjectDocumentLink(linkId, { filename: 'updated.pdf' });
- * 
- * // Remove a ProjectDocumentLink
- * removeProjectDocumentLink(linkId);
- * 
- * // Update any other nested property (for future use)
- * import { updateProjectNestedProperty, updateProjectNestedPropertyWith } from '$lib/stores/appStateStore';
- * 
- * // Direct property update
- * updateProjectNestedProperty('someProperty', newValue);
- * 
- * // Update with a function (useful for complex updates)
- * updateProjectNestedPropertyWith('someProperty', (current) => {
- *   // Transform current value
- *   return transformedValue;
- * });
- * 
- * // All updates are reactive - components using $project will automatically update
- * // Example in a component:
- * //   import { project } from '$lib/stores/appStateStore';
- * //   let project = $derived($project);
- * //   $effect(() => {
- * //     console.log('Project updated:', project?.projectDocumentLinks);
- * //   });
+ * For comprehensive usage documentation, see:
+ * @see {@link ../../docs/application_stores/appStateStore.md}
  */

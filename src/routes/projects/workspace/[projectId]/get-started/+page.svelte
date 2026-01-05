@@ -1,6 +1,7 @@
 <!-- +page.svelte -->
 <script lang="ts">
 	import DocumentUpload from '$lib/components/DocumentUpload/DocumentUpload.svelte';
+	import ProjectEntitiesDisplay from '$lib/components/ProjectEntities/ProjectEntitiesDisplay.svelte';
 	import { project as projectStore } from '$lib/stores/appStateStore.js';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
@@ -8,8 +9,8 @@
 
 	let { data } = $props();
 
-	// Use reactive auth store instead of static data
-	const cognitoIdToken = $derived(authStore.idToken);
+	// Use server-side idToken from page data, fallback to authStore if not available
+	const cognitoIdToken = $derived(data.idToken ?? authStore.idToken);
 	const currentUser = $derived(authStore.currentUser);
 
 	// Use reactive project store instead of static data
@@ -54,6 +55,15 @@
 				<DocumentUpload idToken={cognitoIdToken} projectId={projectId} metadata={fileMetadata} />
 			</div>
 		</div>
+
+		<!-- Real-time Entity Discovery -->
+		{#if projectId}
+			<div class="mt-8 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg border shadow-sm">
+				<div class="p-6">
+					<ProjectEntitiesDisplay {projectId} />
+				</div>
+			</div>
+		{/if}
 
 		<!-- Help Link -->
 		<div class="mt-6 text-center">

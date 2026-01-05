@@ -55,99 +55,149 @@
 	}
 
 	onMount(() => {
-		// Load selected project from storage or use first project
-		const savedProjectId = DashboardStorage.getSelectedProjectId();
-		if (savedProjectId && projects.some((p) => p.id === savedProjectId)) {
-			selectedProjectId = savedProjectId;
-		} else if (projects.length > 0) {
-			selectedProjectId = projects[0].id;
-		}
+		// Safety timeout to ensure loading state is cleared even if something goes wrong
+		const safetyTimeout = setTimeout(() => {
+			if (isLoading) {
+				console.warn('Dashboard loading timeout - forcing loading state to false');
+				isLoading = false;
+			}
+		}, 5000); // 5 second timeout
 
 		// Handle responsive grid adjustment
 		function updateGridSize() {
-			const width = window.innerWidth;
-			let gridColumns: number;
-			let minRows = 12; // Minimum rows to accommodate bar chart at row 10-12
-			
-			if (width < 640) {
-				gridColumns = 4;
-			} else if (width < 1024) {
-				gridColumns = 8;
-			} else {
-				gridColumns = 12;
+			try {
+				const width = window.innerWidth;
+				let gridColumns: number;
+				let minRows = 12; // Minimum rows to accommodate bar chart at row 10-12
+				
+				if (width < 640) {
+					gridColumns = 4;
+				} else if (width < 1024) {
+					gridColumns = 8;
+				} else {
+					gridColumns = 12;
+				}
+				
+				// Ensure grid has enough rows for all widgets
+				dashboard.ensureGridCapacity();
+				const requiredRows = Math.max(minRows, dashboard.config.gridRows);
+				
+				dashboard.updateGridConfig({ gridColumns, gridRows: requiredRows });
+			} catch (error) {
+				console.error('Error updating grid size:', error);
 			}
-			
-			// Ensure grid has enough rows for all widgets
-			dashboard.ensureGridCapacity();
-			const requiredRows = Math.max(minRows, dashboard.config.gridRows);
-			
-			dashboard.updateGridConfig({ gridColumns, gridRows: requiredRows });
 		}
 
-		// Set initial grid size before loading widgets
-		updateGridSize();
+		try {
+			// Load selected project from storage or use first project
+			const savedProjectId = DashboardStorage.getSelectedProjectId();
+			if (savedProjectId && projects.some((p) => p.id === savedProjectId)) {
+				selectedProjectId = savedProjectId;
+			} else if (projects.length > 0) {
+				selectedProjectId = projects[0].id;
+			}
 
-		// Initialize dashboard for the selected project
-		const hasLoadedDashboard = dashboard.initialize(selectedProjectId);
+			// Set initial grid size before loading widgets
+			updateGridSize();
 
-		// If no saved dashboard, load defaults
-		if (!hasLoadedDashboard) {
-			console.info('No saved dashboard found, loading defaults');
-			dashboardWidgets.forEach((widget) => {
-				dashboard.addWidget(widget);
-			});
-			// Publish initial data for all widgets after a small delay to ensure widgets are mounted
-			setTimeout(() => {
-				publishWidgetData(dashboardWidgets);
-			}, 100);
-		} else {
-			// If saved dashboard exists, ensure all config widgets are present
-			// This handles the case where new widgets are added to config but not in saved dashboard
-			const addedWidgets: typeof dashboardWidgets = [];
-			dashboardWidgets.forEach((configWidget) => {
-				const exists = dashboard.widgets.some(w => w.id === configWidget.id);
-				if (!exists) {
-					console.info(`Adding missing widget from config: ${configWidget.id}`);
-					dashboard.addWidget(configWidget);
-					addedWidgets.push(configWidget);
-				}
-			});
-			// Publish data for newly added widgets
-			if (addedWidgets.length > 0) {
+			// Initialize dashboard for the selected project
+			const hasLoadedDashboard = dashboard.initialize(selectedProjectId);
+
+			// If no saved dashboard, load defaults
+			if (!hasLoadedDashboard) {
+				console.info('No saved dashboard found, loading defaults');
+				dashboardWidgets.forEach((widget) => {
+					try {
+						dashboard.addWidget(widget);
+					} catch (error) {
+						console.error(`Failed to add widget ${widget.id}:`, error);
+					}
+				});
+				// Publish initial data for all widgets after a small delay to ensure widgets are mounted
 				setTimeout(() => {
-					publishWidgetData(addedWidgets);
+					try {
+						publishWidgetData(dashboardWidgets);
+					} catch (error) {
+						console.error('Error publishing widget data:', error);
+					}
+				}, 100);
+			} else {
+				// If saved dashboard exists, ensure all config widgets are present
+				// This handles the case where new widgets are added to config but not in saved dashboard
+				const addedWidgets: typeof dashboardWidgets = [];
+				dashboardWidgets.forEach((configWidget) => {
+					try {
+						const exists = dashboard.widgets.some(w => w.id === configWidget.id);
+						if (!exists) {
+							console.info(`Adding missing widget from config: ${configWidget.id}`);
+							dashboard.addWidget(configWidget);
+							addedWidgets.push(configWidget);
+						}
+					} catch (error) {
+						console.error(`Failed to add missing widget ${configWidget.id}:`, error);
+					}
+				});
+				// Publish data for newly added widgets
+				if (addedWidgets.length > 0) {
+					setTimeout(() => {
+						try {
+							publishWidgetData(addedWidgets);
+						} catch (error) {
+							console.error('Error publishing data for added widgets:', error);
+						}
+					}, 100);
+				}
+				// Also publish data for existing widgets (in case they don't have data yet)
+				setTimeout(() => {
+					try {
+						publishWidgetData(dashboard.widgets.filter(w => dashboardWidgets.some(cw => cw.id === w.id)));
+					} catch (error) {
+						console.error('Error publishing data for existing widgets:', error);
+					}
 				}, 100);
 			}
-			// Also publish data for existing widgets (in case they don't have data yet)
-			setTimeout(() => {
-				publishWidgetData(dashboard.widgets.filter(w => dashboardWidgets.some(cw => cw.id === w.id)));
-			}, 100);
+
+			// Ensure grid has enough capacity for all widgets (after loading)
+			dashboard.ensureGridCapacity();
+			
+			// Update grid size again after widgets are loaded to ensure proper sizing
+			updateGridSize();
+			
+			// Update grid size again after widgets are loaded to ensure proper sizing
+			updateGridSize();
+			window.addEventListener('resize', updateGridSize);
+
+			// Save dashboard before page unload if there are unsaved changes
+			window.addEventListener('beforeunload', (e) => {
+				try {
+					if (dashboard.hasUnsavedChanges && dashboard.autoSaveEnabled) {
+						dashboard.save();
+					}
+				} catch (error) {
+					console.error('Error saving dashboard on beforeunload:', error);
+				}
+			});
+
+			// Clear safety timeout since we completed successfully
+			clearTimeout(safetyTimeout);
+			isLoading = false;
+		} catch (error) {
+			console.error('Error initializing dashboard:', error);
+			// Ensure loading state is cleared even on error
+			clearTimeout(safetyTimeout);
+			isLoading = false;
 		}
 
-		// Ensure grid has enough capacity for all widgets (after loading)
-		dashboard.ensureGridCapacity();
-		
-		// Update grid size again after widgets are loaded to ensure proper sizing
-		updateGridSize();
-		
-		// Update grid size again after widgets are loaded to ensure proper sizing
-		updateGridSize();
-		window.addEventListener('resize', updateGridSize);
-
-		// Save dashboard before page unload if there are unsaved changes
-		window.addEventListener('beforeunload', (e) => {
-			if (dashboard.hasUnsavedChanges && dashboard.autoSaveEnabled) {
-				dashboard.save();
-			}
-		});
-
-		isLoading = false;
-
 		return () => {
+			clearTimeout(safetyTimeout);
 			window.removeEventListener('resize', updateGridSize);
 			// Save any pending changes
-			if (dashboard.hasUnsavedChanges && dashboard.autoSaveEnabled) {
-				dashboard.save();
+			try {
+				if (dashboard.hasUnsavedChanges && dashboard.autoSaveEnabled) {
+					dashboard.save();
+				}
+			} catch (error) {
+				console.error('Error saving dashboard on cleanup:', error);
 			}
 		};
 	});

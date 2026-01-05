@@ -7,19 +7,8 @@
  * - Dynamically managing subscriptions as components mount/unmount
  * - Automatically handling connection lifecycle and reconnection
  * 
- * Usage:
- * ```typescript
- * import { getAppSyncClient, ensureConnection } from '$lib/stores/appSyncClientStore';
- * 
- * // In a component:
- * const subscription = { query: '...', variables: {...}, next: (data) => {...} };
- * await ensureConnection(idToken);
- * const client = getAppSyncClient();
- * client.addSubscription(subscription);
- * 
- * // On cleanup:
- * client.removeSubscription(subscription);
- * ```
+ * For comprehensive usage documentation, see:
+ * @see {@link ../../docs/application_stores/appSyncClientStore.md}
  */
 
 import { AppSyncWsClient } from '$lib/realtime/websocket/AppSyncWsClient';

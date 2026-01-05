@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
-	import { mapStore } from '$lib/stores/mapObjectStore';
+	import { mapStore } from '$lib/stores/MapStore';
 	import type { ParagraphWidget, Widget, WidgetType } from '../types/widget';
 	import { findAvailablePosition } from '../utils/grid';
 	import { PUBLIC_GEOAPIFY_API_KEY } from '$env/static/public';
@@ -81,7 +81,7 @@
 	}
 
 	function handleUpdateParagraphWidget() {
-		let contentProducer = mapStore.registerProducer<ParagraphWidget['data']>(
+		const contentPublisher = mapStore.getPublisher(
 			'paragraph-content',
 			'content-generator-agent'
 		);
@@ -132,7 +132,7 @@
 		};
 
 		console.log(`🤖 AI Agent generated new content: "${topic.title}"`);
-		contentProducer.publish(data);
+		contentPublisher.publish(data);
 	}
 
 	function generateWidgetId(): string {

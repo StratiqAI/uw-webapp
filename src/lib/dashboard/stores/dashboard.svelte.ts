@@ -7,7 +7,7 @@ import type {
 } from '$lib/dashboard/types/widget';
 import { isValidPosition, findAvailablePosition } from '$lib/dashboard/utils/grid';
 import { DashboardStorage } from '$lib/dashboard/utils/storage';
-import { mapStore } from '$lib/stores/mapObjectStore';
+import { mapStore } from '$lib/stores/MapStore';
 
 // Constants for better maintainability
 const DEFAULT_CONFIG: DashboardConfig = {

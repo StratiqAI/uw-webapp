@@ -2,7 +2,7 @@
 // Type-safe bridge between AI JobSubmission -> mapObjectStore -> Widget components
 
 import { z } from 'zod';
-import { mapStore } from '$lib/stores/mapObjectStore';
+import { mapStore } from '$lib/stores/MapStore';
 import { jobUpdateStore, type JobUpdate } from '$lib/stores/jobUpdateStore';
 import { DashboardStorage } from '$lib/dashboard/utils/storage';
 import type { Readable } from 'svelte/store';
@@ -124,8 +124,15 @@ export function createWidgetPublisher<T extends WidgetType>(
 	publisherId: string
 ): ValidatedPublisher<WidgetDataTypeMap[T]> {
 	console.log(`\n🔧 [createWidgetPublisher] Called for channel: ${config.channelId}, publisher: ${publisherId}`);
-	const publisher = mapStore.registerProducer<WidgetDataTypeMap[T]>(config.channelId, publisherId);
-	console.log(`   ↳ Registered producer in mapStore`);
+	const mapStorePublisher = mapStore.getPublisher(config.channelId, publisherId);
+	
+	// Adapter to match expected interface (publish + clear)
+	const publisher = {
+		publish: (value: WidgetDataTypeMap[T]) => mapStorePublisher.publish(value),
+		clear: () => mapStorePublisher.clear()
+	};
+	
+	console.log(`   ↳ Registered publisher in mapStore`);
 
 	return new ValidatedPublisherImpl(
 		config.schema,
@@ -142,7 +149,14 @@ export function createWidgetConsumer<T extends WidgetType>(
 	consumerId: string
 ): ValidatedConsumer<WidgetDataTypeMap[T]> {
 	console.log(`\n🔧 [createWidgetConsumer] Called for channel: ${config.channelId}, consumer: ${consumerId}`);
-	const consumer = mapStore.registerConsumer<WidgetDataTypeMap[T]>(config.channelId, consumerId);
+	const stream = mapStore.getStream(config.channelId, consumerId);
+	
+	// Adapter to match expected interface (subscribe + get)
+	const consumer = {
+		subscribe: stream.subscribe,
+		get: () => stream.get() as WidgetDataTypeMap[T] | undefined
+	};
+	
 	console.log(`   ↳ Registered consumer in mapStore`);
 
 	return new ValidatedConsumerImpl(

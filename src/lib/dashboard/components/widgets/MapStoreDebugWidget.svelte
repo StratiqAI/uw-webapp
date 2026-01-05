@@ -8,7 +8,7 @@
 	 * 3. Log all data
 	 */
 
-	import { mapStore } from '$lib/stores/mapObjectStore';
+	import { mapStore } from '$lib/stores/MapStore';
 
 	function logAllConsumers() {
 		console.log('\n╔═══════════════════════════════════════════════════════════════╗');

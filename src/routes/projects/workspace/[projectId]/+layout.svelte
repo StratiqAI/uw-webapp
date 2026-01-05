@@ -16,12 +16,21 @@
 
 	// Type imports
 	import type { LayoutProps } from './$types';
-	import type { Project, Doclink } from '@stratiqai/types-simple';
-	import { S_ON_UPDATE_PROJECT, S_ON_CREATE_DOCLINK } from '@stratiqai/types-simple';
+	import type { Project, Doclink, Text, Table, Image } from '@stratiqai/types-simple';
+	import { 
+		S_ON_UPDATE_PROJECT, 
+		S_ON_CREATE_DOCLINK,
+		S_ON_CREATE_TEXT,
+		S_ON_CREATE_TABLE,
+		S_ON_CREATE_IMAGE
+	} from '@stratiqai/types-simple';
 	import { print } from 'graphql';
 	
 	// Import shared notification store and subscription
 	import { notificationStore, S_ON_CREATE_NOTIFICATION, type Notification } from '$lib/stores/notifications.svelte';
+
+	// Import project entities store for reactive UI updates
+	import { addProjectText, addProjectTable, addProjectImage } from '$lib/stores/projectEntitiesStore';
 
 	// Import Logging
 	import { logger } from '$lib/logging/debug';
@@ -163,8 +172,7 @@
 					}
 				},
 				error: (err: any) => console.error('Notification subscription error for project', projectFromServer.id, err)
-			},
-
+			}
 			// Note: S_ON_DELETE_DOCLINK requires a specific id, so we can't filter by parentId
 			// Deletions will be handled through other means (e.g., refetching the project)
 			// {

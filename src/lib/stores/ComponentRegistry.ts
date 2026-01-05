@@ -16,6 +16,9 @@ interface RegistryEntry {
  * 2. Topic pattern match (regex)
  * 3. Auto-generated UI (if schema exists)
  * 4. Raw JSON fallback
+ * 
+ * For comprehensive usage documentation, see:
+ * @see {@link ../../docs/application_stores/ComponentRegistry.md}
  */
 export class ComponentRegistry {
 	private exact = new Map<string, RegistryEntry>();
