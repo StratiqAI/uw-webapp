@@ -21,9 +21,39 @@
 	const uploader = createUploader(idToken, projectId, metadata ?? null);
 	
 	// Update uploader metadata when it changes reactively
+	// Always update, even if metadata is null, so the uploader knows the current state
 	$effect(() => {
-		if (metadata && uploader.updateMetadata) {
-			uploader.updateMetadata(metadata);
+		console.log('[DocumentUpload] [EFFECT] Metadata effect triggered:', {
+			hasMetadata: !!metadata,
+			metadata: metadata,
+			hasIdToken: !!idToken,
+			hasProjectId: !!projectId,
+			projectId: projectId,
+			hasUpdateMetadata: !!uploader.updateMetadata,
+			timestamp: new Date().toISOString()
+		});
+		
+		if (uploader.updateMetadata) {
+			const previousMetadata = uploader.files.length > 0 ? 'check uploader state' : 'no files yet';
+			uploader.updateMetadata(metadata ?? null);
+			
+			if (metadata) {
+				console.log('[DocumentUpload] [EFFECT] Metadata updated (non-null):', {
+					metadata: metadata,
+					previousState: previousMetadata,
+					uploaderFilesCount: uploader.files.length
+				});
+			} else {
+				console.warn('[DocumentUpload] [EFFECT] Metadata is null - uploads will fail until metadata is available:', {
+					hasIdToken: !!idToken,
+					hasProjectId: !!projectId,
+					projectId: projectId,
+					uploaderFilesCount: uploader.files.length,
+					activeUploads: uploader.activeUploads
+				});
+			}
+		} else {
+			console.error('[DocumentUpload] [EFFECT] uploader.updateMetadata is not available!');
 		}
 	});
 	
@@ -40,9 +70,10 @@
 	// Get projectDocumentLinks from the project store reactively
 	const projectDocumentLinks = $derived.by(() => {
 		const currentProject = $project;
-		if (!currentProject?.projectDocumentLinks) return [] as ProjectDocumentLink[];
+		// Check for doclinks (GraphQL field name) or projectDocumentLinks
+		const links = (currentProject as any)?.doclinks || (currentProject as any)?.projectDocumentLinks;
+		if (!links) return [] as ProjectDocumentLink[];
 		
-		const links = currentProject.projectDocumentLinks;
 		if (Array.isArray(links)) {
 			return links;
 		}
@@ -83,6 +114,17 @@
 	});
 
 	function handleFilesAdded(event: { validFiles: File[] }) {
+		console.log('[DocumentUpload] [HANDLE_FILES_ADDED] Files added:', {
+			validFilesCount: event.validFiles.length,
+			fileNames: event.validFiles.map(f => f.name),
+			hasMetadata: !!metadata,
+			metadata: metadata,
+			hasIdToken: !!idToken,
+			hasProjectId: !!projectId,
+			projectId: projectId,
+			timestamp: new Date().toISOString()
+		});
+		
 		// Prevent adding files that are already in the list (check both uploads and existing links)
 		const existingFileNames = new Set([
 			...uploadFiles.map((f) => f.file.name),
@@ -91,6 +133,25 @@
 		const newFiles = event.validFiles.filter(
 			(file) => !existingFileNames.has(file.name)
 		);
+		
+		console.log('[DocumentUpload] [HANDLE_FILES_ADDED] Filtered new files:', {
+			newFilesCount: newFiles.length,
+			newFileNames: newFiles.map(f => f.name),
+			existingCount: existingFileNames.size,
+			hasMetadata: !!metadata,
+			metadata: metadata
+		});
+		
+		if (newFiles.length > 0 && !metadata) {
+			console.error('[DocumentUpload] [HANDLE_FILES_ADDED] WARNING: Adding files but metadata is null!', {
+				newFiles: newFiles.map(f => f.name),
+				metadata: metadata,
+				hasIdToken: !!idToken,
+				hasProjectId: !!projectId,
+				projectId: projectId
+			});
+		}
+		
 		uploader.add(newFiles);
 	}
 

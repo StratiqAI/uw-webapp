@@ -66,6 +66,14 @@
 			if (projectFromServer && !isNewProject) {
 				projectStore.set(projectFromServer);
 				logger('Project synced to store from server:', projectFromServer);
+				console.log('[Layout] Project synced - name:', projectFromServer.name);
+			} else {
+				console.warn('[Layout] Project not synced:', {
+					hasProjectFromServer: !!projectFromServer,
+					isNewProject: isNewProject,
+					projectFromServerId: projectFromServer?.id,
+					projectFromServerName: projectFromServer?.name
+				});
 			}
 
 			if (currentUser) {
@@ -316,11 +324,11 @@
 	<!-- Main app area -->
 	<div class="flex w-full min-w-0 flex-1 flex-col">
 		<WorkspaceHeaderBar
-			projectName={project?.name ?? (isNewProject ? 'New Project' : 'Loading...')}
-			project={project}
-			projectId={projectFromServer?.id}
+			projectName={project?.name ?? projectFromServer?.name ?? (isNewProject ? 'New Project' : 'Loading...')}
+			project={project ?? projectFromServer}
+			projectId={projectFromServer?.id ?? project?.id}
 			idToken={data.idToken}
-			notificationBellProps={{ projectName: project?.name }}
+			notificationBellProps={{ projectName: project?.name ?? projectFromServer?.name }}
 		/>
 
 		<div class="flex-1 overflow-auto {darkModeStore.darkMode ? 'bg-slate-900' : 'bg-slate-50'}">

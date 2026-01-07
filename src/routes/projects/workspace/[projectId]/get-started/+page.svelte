@@ -11,7 +11,8 @@
 
 	// Use server-side idToken from page data, fallback to authStore if not available
 	const cognitoIdToken = $derived(data.idToken ?? authStore.idToken);
-	const currentUser = $derived(authStore.currentUser);
+	// Use server-side currentUser first (available during SSR), then fallback to authStore
+	const currentUser = $derived(data.currentUser ?? authStore.currentUser);
 
 	// Use reactive project store instead of static data
 	let project = $derived($projectStore);
@@ -23,13 +24,58 @@
 	let darkMode = $derived.by(() => darkModeStore.darkMode);
 
 	// Construct file metadata for S3 uploads
+	// This must be available before uploads can start
 	const fileMetadata = $derived.by(() => {
-		if (!currentUser?.sub || !projectId) return null;
-		return {
-			tenantId: project?.tenantId || currentUser.tenant || 'default',
+		// Check for required fields
+		const hasOwnerId = !!currentUser?.sub;
+		const hasProjectId = !!projectId;
+		
+		console.log('[get-started] [METADATA_DERIVED] Computing metadata:', {
+			hasCurrentUser: !!currentUser,
+			hasSub: hasOwnerId,
+			currentUserSub: currentUser?.sub,
+			currentUser: currentUser,
+			hasProjectId: hasProjectId,
+			projectId: projectId,
+			hasProject: !!project,
+			projectTenantId: project?.tenantId,
+			authStoreSub: authStore.currentUser?.sub,
+			authStoreTenant: authStore.currentUser?.tenant,
+			timestamp: new Date().toISOString()
+		});
+		
+		if (!hasOwnerId || !hasProjectId) {
+			console.warn('[get-started] [METADATA_DERIVED] Cannot create fileMetadata - missing required fields:', {
+				hasCurrentUser: !!currentUser,
+				hasSub: hasOwnerId,
+				currentUserSub: currentUser?.sub,
+				currentUser: currentUser,
+				hasProjectId: hasProjectId,
+				projectId: projectId,
+				authStoreSub: authStore.currentUser?.sub,
+				authStoreCurrentUser: authStore.currentUser,
+				stackTrace: new Error().stack
+			});
+			return null;
+		}
+		
+		const metadata = {
+			tenantId: project?.tenantId || currentUser.tenant || authStore.currentUser?.tenant || 'default',
 			ownerId: currentUser.sub,
 			parentId: projectId
 		};
+		
+		console.log('[get-started] [METADATA_DERIVED] File metadata created successfully:', {
+			metadata: metadata,
+			source: {
+				tenantIdFrom: project?.tenantId ? 'project' : currentUser.tenant ? 'currentUser' : authStore.currentUser?.tenant ? 'authStore' : 'default',
+				ownerIdFrom: 'currentUser',
+				parentIdFrom: 'projectId'
+			},
+			timestamp: new Date().toISOString()
+		});
+		
+		return metadata;
 	});
 </script>
 

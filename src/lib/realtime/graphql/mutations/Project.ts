@@ -166,29 +166,29 @@ export const M_DELETE_PROJECT_DOCUMENT_LINK = `
     }
 `;
 
-import { print } from 'graphql';
-import type { Project } from '@stratiqai/types-simple';
+// import { print } from 'graphql';
+// import type { Project } from '@stratiqai/types-simple';
 
-export async function updateProject(project: Project, idToken: string) {
-    // Extract only the fields that can be updated according to UpdateProjectInput
-    const input = {
-        name: project.name
-    };
-    try {
-        const res = await gql<{ updateProject: Project | null }>(
-            print(M_UPDATE_PROJECT), 
-            { id: project.id, input }, 
-            idToken
-        );
+// export async function updateProject(project: Project, idToken: string) {
+//     // Extract only the fields that can be updated according to UpdateProjectInput
+//     const input = {
+//         name: project.name
+//     };
+//     try {
+//         const res = await gql<{ updateProject: Project | null }>(
+//             print(M_UPDATE_PROJECT), 
+//             { id: project.id, input }, 
+//             idToken
+//         );
         
-        if (!res.updateProject) {
-            console.error('Project update returned null project');
-            throw new Error('Error updating project: No project returned');
-        }
+//         if (!res.updateProject) {
+//             console.error('Project update returned null project');
+//             throw new Error('Error updating project: No project returned');
+//         }
         
-        return res.updateProject;
-    } catch (e) {
-        console.error('Error updating project:', e);
-        throw e;
-    }
-}
+//         return res.updateProject;
+//     } catch (e) {
+//         console.error('Error updating project:', e);
+//         throw e;
+//     }
+// }

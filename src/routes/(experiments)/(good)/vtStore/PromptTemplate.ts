@@ -19,6 +19,25 @@
 import type { ValidatedTopicStore } from './ValidatedTopicStore.svelte';
 
 /**
+ * Interface representing a PromptTemplate entity
+ * Implements Node & Metadata pattern from GraphQL schema
+ */
+export interface IPromptTemplate {
+	id: string;
+	entityType: string;
+	tenantId: string;
+	ownerId: string;
+	createdAt: string;
+	updatedAt: string;
+	deletedAt?: string | null;
+	
+	parentId: string;
+	name: string;
+	template: string;
+	description?: string | null;
+}
+
+/**
  * Template variable resolver
  */
 export class PromptTemplate {

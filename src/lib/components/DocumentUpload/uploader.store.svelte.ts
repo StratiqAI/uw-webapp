@@ -36,6 +36,15 @@ export function createUploader(
 	let project = $state(projectId);
 	let fileMetadata = $state(metadata);
 	
+	// Debug: Log initial state
+	console.log(`${LOG_PREFIX} [INIT] Uploader created:`, {
+		hasToken: !!token,
+		hasProject: !!project,
+		hasMetadata: !!fileMetadata,
+		metadata: fileMetadata,
+		projectId: project
+	});
+	
 	// Track active subscriptions per document (keyed by sha256/documentId)
 	const activeSubscriptions = new Map<string, SubscriptionSpec<any>[]>();
 
@@ -58,8 +67,26 @@ export function createUploader(
 
 	async function uploadFile(upload: UploadFile): Promise<void> {
 		try {
+			console.log(`${LOG_PREFIX} [UPLOAD_START] Starting upload for:`, {
+				fileName: upload.file.name,
+				fileSize: upload.file.size,
+				hasToken: !!token,
+				hasProject: !!project,
+				hasMetadata: !!fileMetadata,
+				metadata: fileMetadata,
+				projectId: project,
+				timestamp: new Date().toISOString()
+			});
+			
 			updateFile(upload.id, { status: 'hashing', progress: PROGRESS_HASHING });
 			const sha256 = await calculateSHA256(upload.file);
+			
+			console.log(`${LOG_PREFIX} [UPLOAD_STEP] SHA256 calculated:`, {
+				fileName: upload.file.name,
+				sha256: sha256.substring(0, 16) + '...',
+				hasMetadata: !!fileMetadata,
+				metadata: fileMetadata
+			});
 
 			// Subscribe to document processing updates (text, table, image)
 			// This happens after SHA256 is computed but before upload begins
@@ -67,13 +94,82 @@ export function createUploader(
 
 			updateFile(upload.id, { progress: PROGRESS_GETTING_URL });
 			
-			// Capture metadata at the time of presigned URL request
-			// This ensures metadata is included in the presigned URL signature
-			const metadataAtRequestTime = fileMetadata;
+			// Wait for metadata to become available (with timeout)
+			// This handles the case where metadata is set reactively after the upload starts
+			let metadataAtRequestTime = fileMetadata;
+			console.log(`${LOG_PREFIX} [UPLOAD_STEP] Checking metadata before presigned URL:`, {
+				fileName: upload.file.name,
+				metadataAtRequestTime: metadataAtRequestTime,
+				hasMetadata: !!metadataAtRequestTime,
+				fileMetadataState: fileMetadata,
+				hasFileMetadataState: !!fileMetadata
+			});
 			
 			if (!metadataAtRequestTime) {
-				throw new Error('Metadata is required for upload but was not available');
+				console.warn(`${LOG_PREFIX} [UPLOAD_WAIT] Metadata not immediately available, waiting up to 2 seconds...`, {
+					fileName: upload.file.name,
+					currentMetadata: fileMetadata,
+					hasToken: !!token,
+					hasProject: !!project,
+					projectId: project
+				});
+				
+				const maxWaitTime = 2000; // 2 seconds
+				const checkInterval = 100; // Check every 100ms
+				const startTime = Date.now();
+				let checkCount = 0;
+				
+				while (!metadataAtRequestTime && (Date.now() - startTime) < maxWaitTime) {
+					await new Promise(resolve => setTimeout(resolve, checkInterval));
+					metadataAtRequestTime = fileMetadata;
+					checkCount++;
+					
+					if (checkCount % 5 === 0) { // Log every 500ms
+						console.log(`${LOG_PREFIX} [UPLOAD_WAIT] Still waiting for metadata (check ${checkCount}):`, {
+							fileName: upload.file.name,
+							elapsed: Date.now() - startTime,
+							hasMetadata: !!metadataAtRequestTime,
+							metadata: metadataAtRequestTime,
+							fileMetadataState: fileMetadata
+						});
+					}
+				}
+				
+				const elapsed = Date.now() - startTime;
+				console.log(`${LOG_PREFIX} [UPLOAD_WAIT] Wait complete:`, {
+					fileName: upload.file.name,
+					elapsed,
+					hasMetadata: !!metadataAtRequestTime,
+					metadata: metadataAtRequestTime,
+					checks: checkCount
+				});
 			}
+			
+			// Capture metadata at the time of presigned URL request
+			// This ensures metadata is included in the presigned URL signature
+			if (!metadataAtRequestTime) {
+				const errorMsg = `Metadata is required for upload but was not available after waiting. Token: ${token ? 'present' : 'null'}, Project: ${project ? 'present' : 'null'}, Metadata state: ${fileMetadata ? 'present' : 'null'}. Please ensure the project is fully loaded before uploading.`;
+				console.error(`${LOG_PREFIX} [UPLOAD_ERROR] ${errorMsg}`, {
+					fileName: upload.file.name,
+					token: token ? 'present' : 'null',
+					project: project ? 'present' : 'null',
+					fileMetadata: fileMetadata,
+					metadataAtRequestTime: metadataAtRequestTime,
+					uploaderState: {
+						token: !!token,
+						project: !!project,
+						fileMetadata: fileMetadata,
+						hasFileMetadata: !!fileMetadata
+					},
+					stackTrace: new Error().stack
+				});
+				throw new Error(errorMsg);
+			}
+			
+			console.log(`${LOG_PREFIX} [UPLOAD_STEP] Using metadata for presigned URL:`, {
+				fileName: upload.file.name,
+				metadata: metadataAtRequestTime
+			});
 			
 			const { url, key } = await getPresignedUrl(
 				upload.file.name,
@@ -138,12 +234,38 @@ export function createUploader(
 			return activeUploads;
 		},
 		updateMetadata: (newMetadata: FileMetadata) => {
+			const oldMetadata = fileMetadata;
 			fileMetadata = newMetadata;
+			console.log(`${LOG_PREFIX} [UPDATE_METADATA] Metadata updated:`, {
+				oldMetadata: oldMetadata,
+				newMetadata: newMetadata,
+				wasNull: !oldMetadata,
+				isNull: !newMetadata,
+				hasToken: !!token,
+				hasProject: !!project,
+				stackTrace: new Error().stack
+			});
 		},
 		updateToken: (newToken: string | null) => {
+			const oldToken = token;
 			token = newToken;
+			console.log(`${LOG_PREFIX} [UPDATE_TOKEN] Token updated:`, {
+				hadToken: !!oldToken,
+				hasToken: !!newToken,
+				hasMetadata: !!fileMetadata,
+				metadata: fileMetadata
+			});
 		},
 		add: (filesToAdd: File[]) => {
+			// Warn if metadata is not available when files are added
+			if (!fileMetadata) {
+				console.warn(`${LOG_PREFIX} Files added but metadata is not available yet. Upload will wait for metadata or fail if it doesn't become available.`, {
+					hasToken: !!token,
+					hasProject: !!project,
+					hasMetadata: !!fileMetadata
+				});
+			}
+			
 			const newUploads: UploadFile[] = filesToAdd.map((file) => ({
 				id: `${file.name}-${Date.now()}`,
 				file,
@@ -349,7 +471,9 @@ async function getPresignedUrl(
 	}
 	
 	if (!projectId) {
-		throw new Error('Project ID is required for upload');
+		const errorMsg = 'Project ID is required for upload';
+		console.error(`${LOG_PREFIX} ${errorMsg}. ProjectId: ${projectId}`);
+		throw new Error(errorMsg);
 	}
 	
 	const requestBody: {
@@ -371,7 +495,14 @@ async function getPresignedUrl(
 	});
 	if (!response.ok) {
 		const errorText = await response.text();
-		throw new Error(`Could not get upload URL: ${errorText}`);
+		const errorMsg = `Could not get upload URL (${response.status}): ${errorText}`;
+		console.error(`${LOG_PREFIX} ${errorMsg}`, {
+			status: response.status,
+			statusText: response.statusText,
+			errorText,
+			requestBody: { filename, contentType, fileHash, projectId, hasMetadata: !!metadata }
+		});
+		throw new Error(errorMsg);
 	}
 	return response.json();
 }
@@ -406,9 +537,17 @@ function uploadToS3(
 
 		xhr.onload = () => {
 			if (xhr.status >= 200 && xhr.status < 300) {
+				logger(`${LOG_PREFIX} Upload successful for ${upload.file.name}`);
 				resolve();
 			} else {
-				reject(new Error(`Upload failed with status ${xhr.status}`));
+				const errorMsg = `Upload failed with status ${xhr.status}${xhr.responseText ? `: ${xhr.responseText}` : ''}`;
+				console.error(`${LOG_PREFIX} ${errorMsg}`, {
+					status: xhr.status,
+					statusText: xhr.statusText,
+					responseText: xhr.responseText,
+					fileName: upload.file.name
+				});
+				reject(new Error(errorMsg));
 			}
 		};
 
