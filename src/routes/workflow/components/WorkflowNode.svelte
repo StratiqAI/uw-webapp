@@ -52,72 +52,115 @@
 			onConnectionPointClick(element.id, side, e);
 		}
 	}
+
+	function handleButtonClick(e: MouseEvent) {
+		e.stopPropagation();
+	}
 </script>
 
-<div
-	class="absolute {getElementColor(element.type.type, darkMode)} rounded-xl {darkMode ? 'shadow-2xl shadow-black/50' : 'shadow-lg'} cursor-move border-2 {getElementBorderColor(element.type.type, darkMode)} {isDragged ? '' : 'hover:shadow-2xl hover:scale-[1.02] transition-all'} {getNodeAccentColor(element.type.type, darkMode) ? getNodeAccentColor(element.type.type, darkMode) + ' ring-1' : ''}"
-	style="left: {element.x}px; top: {element.y}px; width: {element.width}px; height: {element.height}px; {isDragged ? 'transition: none;' : ''}"
-	onmousedown={handleDragStart}
-	ondblclick={handleDoubleClickEvent}
-	role="button"
-	tabindex="0"
->
-	<div class="relative w-full h-full p-4 flex flex-col items-center justify-center group">
-		<!-- Delete Button -->
-		{#if onDelete}
+<div class="absolute overflow-visible" style="left: {element.x}px; top: {element.y}px;">
+	<!-- Node Container -->
+	<div
+		class="{getElementColor(element.type.type, darkMode)} rounded-xl {darkMode ? 'shadow-2xl shadow-black/50' : 'shadow-lg'} cursor-move border-2 {getElementBorderColor(element.type.type, darkMode)} {isDragged ? '' : 'hover:shadow-2xl hover:scale-[1.02] transition-all'} {getNodeAccentColor(element.type.type, darkMode) ? getNodeAccentColor(element.type.type, darkMode) + ' ring-1' : ''}"
+		style="width: {element.width}px; height: {element.height}px; {isDragged ? 'transition: none;' : ''}"
+		onmousedown={handleDragStart}
+		ondblclick={handleDoubleClickEvent}
+		role="button"
+		tabindex="0"
+	>
+		<div class="relative w-full h-full flex flex-col items-center justify-center group overflow-visible">
+			<!-- Hover Options Icons (appear above node on hover) -->
+			<div class="absolute -top-12 left-1/2 -translate-x-1/2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-30 pointer-events-auto">
+			<!-- Play Button -->
 			<button
-				class="absolute -top-2 -right-2 w-5 h-5 {darkMode ? 'bg-slate-700 hover:bg-red-600' : 'bg-slate-200 hover:bg-red-500'} rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-10 shadow-lg hover:shadow-xl hover:scale-110"
-				onclick={handleDelete}
-				aria-label="Delete node"
-				title="Delete node"
+				class="w-5 h-5 {darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-slate-200 hover:bg-slate-300 text-slate-600'} rounded flex items-center justify-center transition-all hover:scale-110 shadow-sm"
+				aria-label="Run node"
+				title="Run node"
+				onclick={handleButtonClick}
 			>
-				<svg class="w-3 h-3 {darkMode ? 'text-slate-300 group-hover:text-white' : 'text-slate-600 group-hover:text-white'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+				<svg class="w-3 h-3 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+					<path d="M8 5v14l11-7z" />
 				</svg>
 			</button>
-		{/if}
+			<!-- Power Button -->
+			<button
+				class="w-5 h-5 {darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-slate-200 hover:bg-slate-300 text-slate-600'} rounded flex items-center justify-center transition-all hover:scale-110 shadow-sm"
+				aria-label="Toggle node"
+				title="Toggle node"
+				onclick={handleButtonClick}
+			>
+				<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+				</svg>
+			</button>
+				<!-- Delete Button -->
+				{#if onDelete}
+					<button
+						class="w-5 h-5 {darkMode ? 'bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white' : 'bg-slate-200 hover:bg-red-500 text-slate-600 hover:text-white'} rounded flex items-center justify-center transition-all hover:scale-110 shadow-sm"
+						onclick={handleDelete}
+						aria-label="Delete node"
+						title="Delete node"
+					>
+						<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+						</svg>
+					</button>
+				{/if}
+			<!-- More Options Button -->
+			<button
+				class="w-5 h-5 {darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-slate-200 hover:bg-slate-300 text-slate-600'} rounded flex items-center justify-center transition-all hover:scale-110 shadow-sm"
+				aria-label="More options"
+				title="More options"
+				onclick={handleButtonClick}
+			>
+				<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+					<path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+				</svg>
+			</button>
+			</div>
 
-		<!-- Icon Container -->
-		<div class="w-12 h-12 flex items-center justify-center {getNodeIconBgColor(element.type.type, darkMode)} rounded-lg mb-2.5 shadow-sm">
-			<span class="text-lg {getNodeIconTextColor(element.type.type, darkMode)} font-semibold">
-				{element.type.icon}
-			</span>
+			<!-- Icon Container (centered in node) -->
+			<div class="w-12 h-12 flex items-center justify-center {getNodeIconBgColor(element.type.type, darkMode)} rounded-lg shadow-sm">
+				<span class="text-lg {getNodeIconTextColor(element.type.type, darkMode)} font-semibold">
+					{element.type.icon}
+				</span>
+			</div>
+
+			<!-- Output Display (inside node, below icon) -->
+			{#if element.output !== undefined}
+				<div class="text-[10px] mt-2 truncate max-w-full px-2 py-1 font-mono {darkMode ? 'bg-slate-700 text-slate-200' : 'bg-slate-100 text-slate-600'} rounded border {darkMode ? 'border-slate-600' : 'border-slate-200'}">
+					{String(element.output).slice(0, 20)}
+				</div>
+			{/if}
+
+			<!-- Connection Points (only left input and right output) -->
+			{#if onConnectionPointClick}
+				<!-- Input Connection Point (left side - flat indicator) -->
+				<button
+					class="connection-point absolute top-1/2 left-0 -translate-y-1/2 -translate-x-1/2 flex items-center justify-center cursor-crosshair z-20 group/conn"
+					onclick={(e) => handleConnectionClick('left', e)}
+					aria-label="Input connection point"
+				>
+					<!-- Flat rectangular indicator -->
+					<div class="w-3 h-8 {darkMode ? 'bg-slate-500' : 'bg-slate-400'} group-hover/conn:bg-indigo-500 transition-colors rounded-sm"></div>
+				</button>
+				<!-- Output Connection Point (right side - circular, centered on edge) -->
+				<button
+					class="connection-point absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 flex items-center justify-center cursor-crosshair z-20 group/conn"
+					onclick={(e) => handleConnectionClick('right', e)}
+					aria-label="Output connection point"
+				>
+					<!-- Circle centered on edge -->
+					<div class="w-4 h-4 {darkMode ? 'bg-slate-600 border-slate-500' : 'bg-white border-slate-300'} border-2 rounded-full group-hover/conn:bg-indigo-500 group-hover/conn:border-indigo-600 transition-all group-hover/conn:scale-125 group-hover/conn:shadow-md"></div>
+				</button>
+			{/if}
 		</div>
+	</div>
 
-		<!-- Label -->
-		<div class="text-xs font-semibold {getNodeLabelColor(darkMode)} text-center leading-tight px-1 mb-1">
+	<!-- Description/Label (below the node) -->
+	<div class="text-center whitespace-nowrap pointer-events-none mt-3" style="width: {element.width}px;">
+		<div class="text-sm font-semibold {getNodeLabelColor(darkMode)} leading-tight">
 			{element.type.label}
 		</div>
-
-		<!-- Output Display -->
-		{#if element.output !== undefined}
-			<div class="text-[10px] mt-1.5 truncate max-w-full px-2 py-1 font-mono {darkMode ? 'bg-slate-700 text-slate-200' : 'bg-slate-100 text-slate-600'} rounded border {darkMode ? 'border-slate-600' : 'border-slate-200'}">
-				{String(element.output).slice(0, 20)}
-			</div>
-		{/if}
-
-		<!-- Connection Points -->
-		{#if onConnectionPointClick}
-			<button
-				class="connection-point absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 {darkMode ? 'bg-slate-600 border-slate-500' : 'bg-white border-slate-300'} border-2 rounded-full hover:bg-indigo-500 hover:border-indigo-600 hover:scale-125 hover:shadow-md transition-all cursor-crosshair z-10"
-				onclick={(e) => handleConnectionClick('top', e)}
-				aria-label="Top connection point"
-			></button>
-			<button
-				class="connection-point absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-4 h-4 {darkMode ? 'bg-slate-600 border-slate-500' : 'bg-white border-slate-300'} border-2 rounded-full hover:bg-indigo-500 hover:border-indigo-600 hover:scale-125 hover:shadow-md transition-all cursor-crosshair z-10"
-				onclick={(e) => handleConnectionClick('right', e)}
-				aria-label="Right connection point"
-			></button>
-			<button
-				class="connection-point absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-4 h-4 {darkMode ? 'bg-slate-600 border-slate-500' : 'bg-white border-slate-300'} border-2 rounded-full hover:bg-indigo-500 hover:border-indigo-600 hover:scale-125 hover:shadow-md transition-all cursor-crosshair z-10"
-				onclick={(e) => handleConnectionClick('bottom', e)}
-				aria-label="Bottom connection point"
-			></button>
-			<button
-				class="connection-point absolute top-1/2 left-0 -translate-x-1/2 -translate-y-1/2 w-4 h-4 {darkMode ? 'bg-slate-600 border-slate-500' : 'bg-white border-slate-300'} border-2 rounded-full hover:bg-indigo-500 hover:border-indigo-600 hover:scale-125 hover:shadow-md transition-all cursor-crosshair z-10"
-				onclick={(e) => handleConnectionClick('left', e)}
-				aria-label="Left connection point"
-			></button>
-		{/if}
 	</div>
 </div>

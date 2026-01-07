@@ -258,13 +258,13 @@
 	}
 </script>
 
-<div class="rounded-md border border-teal-300 bg-teal-50 p-4">
+<div class="rounded-md border border-teal-300 bg-teal-50 dark:border-teal-600 dark:bg-teal-900/30 p-4">
 	<div class="mb-4 flex items-center justify-between">
-		<strong class="block">Schema Builder:</strong>
+		<strong class="block dark:text-teal-200">Schema Builder:</strong>
 		<div class="flex gap-2">
 			<button
 				onclick={loadExampleSchema}
-				class="rounded bg-teal-600 px-3 py-1 text-xs text-white hover:bg-teal-700"
+				class="rounded bg-teal-600 px-3 py-1 text-xs text-white hover:bg-teal-700 dark:bg-teal-700 dark:hover:bg-teal-800"
 			>
 				Load Example
 			</button>
@@ -272,32 +272,32 @@
 	</div>
 
 	<div class="mb-4 space-y-2">
-		<div class="block text-sm font-medium">Topic Pattern:</div>
+		<div class="block text-sm font-medium dark:text-slate-200">Topic Pattern:</div>
 		<input
 			type="text"
 			bind:value={newSchemaPattern}
 			placeholder="e.g., app/schema/+ or app/users/#"
-			class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+			class="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-slate-100 px-3 py-2 text-sm"
 		/>
-		<p class="text-xs text-gray-600">
-			Use <code>+</code> for single-level wildcard, <code>#</code> for multi-level wildcard
+		<p class="text-xs text-gray-600 dark:text-gray-300">
+			Use <code class="dark:text-teal-300">+</code> for single-level wildcard, <code class="dark:text-teal-300">#</code> for multi-level wildcard
 		</p>
 	</div>
 
 	<div class="mb-4">
 		<div class="mb-2 flex items-center justify-between">
-			<div class="block text-sm font-medium">Properties:</div>
+			<div class="block text-sm font-medium dark:text-slate-200">Properties:</div>
 			<div class="flex gap-2">
 				<button
 					onclick={() => addSchemaField(true)}
-					class="rounded bg-amber-600 px-3 py-1 text-xs text-white hover:bg-amber-700"
+					class="rounded bg-amber-600 px-3 py-1 text-xs text-white hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-800"
 					title="Add reasoning field (best practice for AI)"
 				>
 					+ Reasoning
 				</button>
 				<button
 					onclick={() => addSchemaField(false)}
-					class="rounded bg-teal-600 px-3 py-1 text-xs text-white hover:bg-teal-700"
+					class="rounded bg-teal-600 px-3 py-1 text-xs text-white hover:bg-teal-700 dark:bg-teal-700 dark:hover:bg-teal-800"
 				>
 					+ Add Field
 				</button>
@@ -305,7 +305,7 @@
 		</div>
 		<div class="space-y-3">
 			{#each orderedFieldEntries as [fieldName, fieldSchema] (fieldName)}
-				<div class="rounded border border-gray-300 bg-white p-3">
+				<div class="rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-800 p-3">
 					<div class="mb-2 flex items-center gap-2">
 						{#key fieldName}
 							<input
@@ -325,14 +325,14 @@
 										e.currentTarget.blur();
 									}
 								}}
-								class="flex-1 rounded border border-gray-200 px-2 py-1 text-sm font-medium"
+								class="flex-1 rounded border border-gray-200 dark:border-gray-600 dark:bg-slate-700 dark:text-slate-100 px-2 py-1 text-sm font-medium"
 								placeholder="Field name"
 							/>
 						{/key}
 						<select
 							value={fieldSchema.type || 'string'}
 							onchange={(e) => updateSchemaFieldType(fieldName, e.currentTarget.value)}
-							class="rounded border border-gray-200 px-2 py-1 text-sm"
+							class="rounded border border-gray-200 dark:border-gray-600 dark:bg-slate-700 dark:text-slate-100 px-2 py-1 text-sm"
 						>
 							<option value="string">string</option>
 							<option value="number">number</option>
@@ -341,7 +341,7 @@
 							<option value="array">array</option>
 							<option value="object">object</option>
 						</select>
-						<label class="flex cursor-pointer items-center gap-1 text-sm">
+						<label class="flex cursor-pointer items-center gap-1 text-sm dark:text-slate-200">
 							<input
 								type="checkbox"
 								checked={newSchemaRequired.includes(fieldName)}
@@ -352,7 +352,7 @@
 						</label>
 						<button
 							onclick={() => removeSchemaField(fieldName)}
-							class="rounded bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
+							class="rounded bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700"
 						>
 							Remove
 						</button>
@@ -360,18 +360,18 @@
 
 					<!-- Description (Best Practice #2) -->
 					<div class="mb-2">
-						<div class="mb-1 block text-xs font-medium text-gray-700">
-							Description <span class="text-red-500">*</span>
+						<div class="mb-1 block text-xs font-medium text-gray-700 dark:text-slate-300">
+							Description <span class="text-red-500 dark:text-red-400">*</span>
 						</div>
 						<textarea
 							value={fieldSchema.description || ''}
 							oninput={(e) =>
 								updateSchemaField(fieldName, { description: e.currentTarget.value })}
 							placeholder="Clear instruction explaining what this field represents and any constraints..."
-							class="w-full rounded border border-gray-200 px-2 py-1 text-xs"
+							class="w-full rounded border border-gray-200 dark:border-gray-600 dark:bg-slate-700 dark:text-slate-100 px-2 py-1 text-xs"
 							rows="2"
 						></textarea>
-						<p class="mt-1 text-xs text-gray-500">
+						<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
 							Write as if giving direct instructions to the AI model
 						</p>
 					</div>
@@ -379,7 +379,7 @@
 					<!-- Enum (Best Practice #3) - for string types -->
 					{#if fieldSchema.type === 'string'}
 						<div class="mb-2">
-							<div class="mb-1 block text-xs font-medium text-gray-700">
+							<div class="mb-1 block text-xs font-medium text-gray-700 dark:text-slate-300">
 								Enum Values (comma-separated)
 							</div>
 							<input
@@ -397,16 +397,16 @@
 									}
 								}}
 								placeholder="e.g., low, medium, high, urgent"
-								class="w-full rounded border border-gray-200 px-2 py-1 text-xs"
+								class="w-full rounded border border-gray-200 dark:border-gray-600 dark:bg-slate-700 dark:text-slate-100 px-2 py-1 text-xs"
 							/>
-							<p class="mt-1 text-xs text-gray-500">
+							<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
 								Force the model to pick from a fixed list (prevents synonyms)
 							</p>
 						</div>
 
 						<!-- Pattern (Best Practice #7) -->
 						<div class="mb-2">
-							<div class="mb-1 block text-xs font-medium text-gray-700">Pattern (Regex)</div>
+							<div class="mb-1 block text-xs font-medium text-gray-700 dark:text-slate-300">Pattern (Regex)</div>
 							<input
 								type="text"
 								value={fieldSchema.pattern || ''}
@@ -421,9 +421,9 @@
 									}
 								}}
 								placeholder="e.g., ^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
-								class="w-full rounded border border-gray-200 px-2 py-1 text-xs font-mono"
+								class="w-full rounded border border-gray-200 dark:border-gray-600 dark:bg-slate-700 dark:text-slate-100 px-2 py-1 text-xs font-mono"
 							/>
-							<p class="mt-1 text-xs text-gray-500">
+							<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
 								Regex pattern for format validation (e.g., dates, hex codes, phone numbers)
 							</p>
 						</div>
@@ -433,7 +433,7 @@
 					{#if fieldSchema.type === 'number' || fieldSchema.type === 'integer'}
 						<div class="mb-2 grid grid-cols-2 gap-2">
 							<div>
-								<div class="mb-1 block text-xs font-medium text-gray-700">Minimum</div>
+								<div class="mb-1 block text-xs font-medium text-gray-700 dark:text-slate-300">Minimum</div>
 								<input
 									type="number"
 									value={fieldSchema.minimum ?? ''}
@@ -444,11 +444,11 @@
 											value ? { minimum: Number(value) } : { minimum: undefined }
 										);
 									}}
-									class="w-full rounded border border-gray-200 px-2 py-1 text-xs"
+									class="w-full rounded border border-gray-200 dark:border-gray-600 dark:bg-slate-700 dark:text-slate-100 px-2 py-1 text-xs"
 								/>
 							</div>
 							<div>
-								<div class="mb-1 block text-xs font-medium text-gray-700">Maximum</div>
+								<div class="mb-1 block text-xs font-medium text-gray-700 dark:text-slate-300">Maximum</div>
 								<input
 									type="number"
 									value={fieldSchema.maximum ?? ''}
@@ -459,7 +459,7 @@
 											value ? { maximum: Number(value) } : { maximum: undefined }
 										);
 									}}
-									class="w-full rounded border border-gray-200 px-2 py-1 text-xs"
+									class="w-full rounded border border-gray-200 dark:border-gray-600 dark:bg-slate-700 dark:text-slate-100 px-2 py-1 text-xs"
 								/>
 							</div>
 						</div>
@@ -467,7 +467,7 @@
 				</div>
 			{/each}
 			{#if Object.keys(newSchemaProperties).length === 0}
-				<p class="text-sm text-gray-500">
+				<p class="text-sm text-gray-500 dark:text-gray-400">
 					No properties yet. Click "+ Reasoning" (best practice) or "+ Add Field" to get started.
 				</p>
 			{/if}
@@ -475,8 +475,8 @@
 	</div>
 
 	<!-- Best Practices Checklist -->
-	<div class="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3">
-		<strong class="mb-2 block text-sm">Best Practices Checklist:</strong>
+	<div class="mb-4 rounded-md border border-amber-200 bg-amber-50 dark:border-amber-600 dark:bg-amber-900/30 p-3">
+		<strong class="mb-2 block text-sm dark:text-amber-200">Best Practices Checklist:</strong>
 		<div class="space-y-1 text-xs">
 			<div class="flex items-center gap-2">
 				<input
@@ -485,8 +485,8 @@
 					disabled
 					class="cursor-not-allowed"
 				/>
-				<span class={newSchemaPreview.additionalProperties === false ? '' : 'text-red-600'}>
-					<code>additionalProperties: false</code> (Best Practice #4)
+				<span class={newSchemaPreview.additionalProperties === false ? 'dark:text-slate-200' : 'text-red-600 dark:text-red-400'}>
+					<code class="dark:text-amber-300">additionalProperties: false</code> (Best Practice #4)
 				</span>
 			</div>
 			<div class="flex items-center gap-2">
@@ -500,11 +500,11 @@
 					class={
 						Object.keys(newSchemaProperties).length > 0 &&
 						newSchemaRequired.length === Object.keys(newSchemaProperties).length
-							? ''
-							: 'text-red-600'
+							? 'dark:text-slate-200'
+							: 'text-red-600 dark:text-red-400'
 					}
 				>
-					All fields in <code>required</code> array (Best Practice #5)
+					All fields in <code class="dark:text-amber-300">required</code> array (Best Practice #5)
 				</span>
 			</div>
 			<div class="flex items-center gap-2">
@@ -521,11 +521,11 @@
 					class={
 						Object.keys(newSchemaProperties).length > 0 &&
 						Object.values(newSchemaProperties).every((f: any) => f.description?.trim())
-							? ''
-							: 'text-red-600'
+							? 'dark:text-slate-200'
+							: 'text-red-600 dark:text-red-400'
 					}
 				>
-					Every property has a <code>description</code> (Best Practice #2)
+					Every property has a <code class="dark:text-amber-300">description</code> (Best Practice #2)
 				</span>
 			</div>
 			<div class="flex items-center gap-2">
@@ -535,8 +535,8 @@
 					disabled
 					class="cursor-not-allowed"
 				/>
-				<span class={newSchemaProperties.reasoning !== undefined ? '' : 'text-amber-600'}>
-					<code>reasoning</code> field included (Best Practice #1 - Recommended, Optional)
+				<span class={newSchemaProperties.reasoning !== undefined ? 'dark:text-slate-200' : 'text-amber-600 dark:text-amber-400'}>
+					<code class="dark:text-amber-300">reasoning</code> field included (Best Practice #1 - Recommended, Optional)
 				</span>
 			</div>
 			<div class="flex items-center gap-2">
@@ -551,11 +551,11 @@
 				<span
 					class={
 						Object.values(newSchemaProperties).some((f: any) => f.enum && Array.isArray(f.enum))
-							? ''
-							: 'text-gray-500'
+							? 'dark:text-slate-200'
+							: 'text-gray-500 dark:text-gray-400'
 					}
 				>
-					<code>enum</code> used for limited options (Best Practice #3 - Optional)
+					<code class="dark:text-amber-300">enum</code> used for limited options (Best Practice #3 - Optional)
 				</span>
 			</div>
 		</div>
@@ -563,13 +563,13 @@
 
 	<button
 		onclick={registerNewSchema}
-		class="mb-4 w-full rounded-md bg-teal-600 px-4 py-2 text-white hover:bg-teal-700"
+		class="mb-4 w-full rounded-md bg-teal-600 px-4 py-2 text-white hover:bg-teal-700 dark:bg-teal-700 dark:hover:bg-teal-800"
 	>
 		Register Schema to Store
 	</button>
 
-	<div class="rounded-md border border-teal-200 bg-teal-100 p-3">
-		<strong class="mb-2 block text-sm">Schema Preview:</strong>
-		<pre class="max-h-48 overflow-auto text-xs">{JSON.stringify(newSchemaPreview, null, 2)}</pre>
+	<div class="rounded-md border border-teal-200 bg-teal-100 dark:border-teal-700 dark:bg-teal-900/30 p-3">
+		<strong class="mb-2 block text-sm dark:text-teal-200">Schema Preview:</strong>
+		<pre class="max-h-48 overflow-auto text-xs dark:text-slate-200">{JSON.stringify(newSchemaPreview, null, 2)}</pre>
 	</div>
 </div>

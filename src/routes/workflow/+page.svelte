@@ -34,7 +34,7 @@
 	// Types
 	type ElementType = {
 		id: string;
-		type: 'input' | 'process' | 'output' | 'ai';
+		type: 'input' | 'process' | 'output' | 'ai' | 'comment';
 		label: string;
 		icon: string;
 		execute: (input: any, customData?: any) => any | Promise<any>;
@@ -56,6 +56,7 @@
 		height: number;
 		output?: any;
 		aiQueryData?: AIQueryData;
+		commentText?: string; // For comment elements
 	};
 
 	type Connection = {
@@ -2560,6 +2561,9 @@
 	let aiQueryPrompt = $state('');
 	let aiQueryModel = $state('gpt-4o');
 	let aiQuerySystemPrompt = $state('');
+	let editingComment = $state<GridElement | null>(null);
+	let commentText = $state('');
+	let commentTextareaRef = $state<HTMLTextAreaElement | null>(null);
 	let darkMode = $derived.by(() => darkModeStore.darkMode);
 	let toggleDarkMode = darkModeStore.toggle;
 	let zoomLevel = $state(1);
@@ -2570,6 +2574,8 @@
 	let panY = $state(0);
 	let isPanning = $state(false);
 	let panStart = $state({ x: 0, y: 0 });
+	let resizingElement = $state<GridElement | null>(null);
+	let resizeStart = $state({ x: 0, y: 0, width: 0, height: 0 });
 
 	// Generate unique ID - now imported from utils/idGenerator.ts
 
@@ -2588,6 +2594,9 @@
 		if ((event.target as HTMLElement).classList.contains('connection-point')) {
 			return; // Don't drag if clicking connection point
 		}
+		if ((event.target as HTMLElement).classList.contains('resize-handle')) {
+			return; // Don't drag if clicking resize handle
+		}
 		draggedGridElement = element;
 		if (gridContainer) {
 			const rect = gridContainer.getBoundingClientRect();
@@ -2602,6 +2611,25 @@
 		event.stopPropagation();
 	}
 
+	// Start resizing comment
+	function startResize(element: GridElement, event: MouseEvent) {
+		event.stopPropagation();
+		if (element.type.type !== 'comment') return;
+		
+		resizingElement = element;
+		if (gridContainer) {
+			const rect = gridContainer.getBoundingClientRect();
+			const elementScreenX = (element.x + element.width) * zoomLevel + panX;
+			const elementScreenY = (element.y + element.height) * zoomLevel + panY;
+			resizeStart = {
+				x: event.clientX,
+				y: event.clientY,
+				width: element.width,
+				height: element.height
+			};
+		}
+	}
+
 	// Handle mouse move
 	function handleMouseMove(event: MouseEvent) {
 		currentMousePos = { x: event.clientX, y: event.clientY };
@@ -2613,6 +2641,14 @@
 			panX += deltaX;
 			panY += deltaY;
 			panStart = { x: event.clientX, y: event.clientY };
+		} else if (resizingElement && gridContainer) {
+			// Resize comment element
+			const deltaX = (event.clientX - resizeStart.x) / zoomLevel;
+			const deltaY = (event.clientY - resizeStart.y) / zoomLevel;
+			const newWidth = Math.max(150, resizeStart.width + deltaX);
+			const newHeight = Math.max(80, resizeStart.height + deltaY);
+			resizingElement.width = newWidth;
+			resizingElement.height = newHeight;
 		} else if (draggedGridElement && gridContainer) {
 			const rect = gridContainer.getBoundingClientRect();
 			// Account for zoom and pan when updating position
@@ -2624,6 +2660,7 @@
 	// Handle mouse up
 	function handleMouseUp(event: MouseEvent) {
 		isPanning = false;
+		resizingElement = null;
 		
 		if (draggedElementType && gridContainer) {
 			const rect = gridContainer.getBoundingClientRect();
@@ -2693,10 +2730,20 @@
 		};
 
 		if (!connectingFrom) {
+			// Only allow output (right) side to be selected as source
+			if (side !== 'right') {
+				return; // Ignore clicks on non-output connection points
+			}
 			connectingFrom = point;
 		} else {
-			// Create connection
-			if (connectingFrom.elementId !== elementId) {
+			// Only allow input (left) side to be selected as destination
+			if (side !== 'left') {
+				// Reset connection attempt if clicking on non-input
+				connectingFrom = null;
+				return;
+			}
+			// Create connection (only from output to input)
+			if (connectingFrom.elementId !== elementId && connectingFrom.side === 'right') {
 				const newConnection: Connection = {
 					id: generateId(),
 					from: connectingFrom.elementId,
@@ -2802,10 +2849,25 @@
 		connectingFrom = null;
 	}
 
+	// Save comment edit
+	function saveComment() {
+		if (editingComment) {
+			editingComment.commentText = commentText;
+			editingComment = null;
+			commentText = '';
+		}
+	}
+
+	// Cancel comment edit
+	function cancelCommentEdit() {
+		editingComment = null;
+		commentText = '';
+	}
+
 	// Start panning
 	function startPanning(event: MouseEvent) {
-		// Don't pan if dragging from sidebar, clicking on node, or connection point
-		if (draggedElementType || draggedGridElement || connectingFrom) {
+		// Don't pan if dragging from sidebar, clicking on node, connection point, or resizing
+		if (draggedElementType || draggedGridElement || connectingFrom || resizingElement) {
 			return;
 		}
 		
@@ -3017,10 +3079,38 @@
 		return darkMode ? 'text-slate-200' : 'text-slate-900';
 	}
 
+	// Create a comment on the canvas
+	function createComment(x: number, y: number) {
+		const commentElementType: ElementType = {
+			id: 'comment',
+			type: 'comment',
+			label: 'Comment',
+			icon: '💬',
+			execute: () => null
+		};
+		
+		const newComment: GridElement = {
+			id: generateId(),
+			type: commentElementType,
+			x,
+			y,
+			width: 200,
+			height: 100,
+			commentText: 'Double-click to edit'
+		};
+		
+		gridElements = [...gridElements, newComment];
+		editingComment = newComment;
+		commentText = newComment.commentText || '';
+	}
+
 	// Handle double-click on element
 	function handleElementDoubleClick(element: GridElement, event: MouseEvent) {
 		event.stopPropagation();
-		if (element.type.type === 'ai') {
+		if (element.type.type === 'comment') {
+			editingComment = element;
+			commentText = element.commentText || '';
+		} else if (element.type.type === 'ai') {
 			editingAIQuery = element;
 			// Set default prompts based on AI node type
 			const defaultPrompts: Record<string, { prompt: string; systemPrompt: string }> = {
@@ -3238,7 +3328,8 @@
 				width: el.width,
 				height: el.height,
 				...(el.aiQueryData && { aiQueryData: el.aiQueryData }),
-				...(el.output !== undefined && { output: el.output })
+				...(el.output !== undefined && { output: el.output }),
+				...(el.commentText && { commentText: el.commentText })
 			})),
 			connections: connections.map((conn) => ({
 				id: conn.id,
@@ -3476,6 +3567,27 @@
 					{/each}
 				</div>
 			</div>
+
+			<div>
+				<h3 class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-wider mb-3">Tools</h3>
+				<button
+					class="w-full p-3.5 {darkMode ? 'bg-amber-900/30 hover:bg-amber-900/40 border-amber-600/50' : 'bg-amber-50 hover:bg-amber-100 border-amber-200'} rounded-lg cursor-pointer transition-all flex items-center gap-3 border shadow-sm hover:shadow-md hover:scale-[1.02] group"
+					onclick={() => {
+						if (gridContainer) {
+							const rect = gridContainer.getBoundingClientRect();
+							const centerX = (rect.width / 2 - panX) / zoomLevel;
+							const centerY = (rect.height / 2 - panY) / zoomLevel;
+							createComment(centerX - 100, centerY - 50);
+						}
+					}}
+					title="Add a comment to the canvas"
+				>
+					<span class="text-lg w-10 h-10 flex items-center justify-center {darkMode ? 'bg-amber-800/50' : 'bg-amber-100'} {darkMode ? 'text-amber-200' : 'text-amber-700'} rounded-lg transition-colors group-hover:scale-105">
+						💬
+					</span>
+					<span class="text-sm font-semibold flex-1 text-left {darkMode ? 'text-slate-200' : 'text-slate-900'}">Add Comment</span>
+				</button>
+			</div>
 		</div>
 
 		<div class="p-5 border-t {darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-slate-50'}">
@@ -3658,73 +3770,184 @@
 
 				<!-- Grid Elements -->
 				{#each gridElements as element (element.id)}
-					<div
-						class="absolute {getElementColor(
-							element.type.type
-						)} rounded-xl {darkMode ? 'shadow-2xl shadow-black/50' : 'shadow-lg'} cursor-move border-2 {getElementBorderColor(
-							element.type.type
-						)} {draggedGridElement?.id === element.id ? '' : 'hover:shadow-2xl hover:scale-[1.02] transition-all'} {getNodeAccentColor(element.type.type) ? getNodeAccentColor(element.type.type) + ' ring-1' : ''}"
-						style="left: {element.x}px; top: {element.y}px; width: {element.width}px; height: {element.height}px; {draggedGridElement?.id === element.id ? 'transition: none;' : ''}"
-						onmousedown={(e) => { startDragOnGrid(element, e); e.stopPropagation(); }}
-						ondblclick={(e) => handleElementDoubleClick(element, e)}
-						role="button"
-						tabindex="0"
-					>
-					<div class="relative w-full h-full p-4 flex flex-col items-center justify-center group">
-						<!-- Delete Button -->
-						<button
-							class="absolute -top-2 -right-2 w-5 h-5 {darkMode ? 'bg-slate-700 hover:bg-red-600' : 'bg-slate-200 hover:bg-red-500'} rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-10 shadow-lg hover:shadow-xl hover:scale-110"
-							onclick={(e) => deleteElement(element.id, e)}
-							aria-label="Delete node"
-							title="Delete node"
+					{#if element.type.type === 'comment'}
+						<!-- Comment Element -->
+						<div
+							class="absolute overflow-visible {getElementColor(
+								element.type.type
+							)} rounded-lg {darkMode ? 'shadow-lg shadow-black/30' : 'shadow-md'} cursor-move border-2 {getElementBorderColor(
+								element.type.type
+							)} {draggedGridElement?.id === element.id ? '' : 'hover:shadow-lg transition-all'} border-dashed"
+							style="left: {element.x}px; top: {element.y}px; width: {element.width}px; min-height: {element.height}px; {draggedGridElement?.id === element.id ? 'transition: none;' : ''}"
+							onmousedown={(e) => { startDragOnGrid(element, e); e.stopPropagation(); }}
+							ondblclick={(e) => handleElementDoubleClick(element, e)}
+							role="button"
+							tabindex="0"
 						>
-							<svg class="w-3 h-3 {darkMode ? 'text-slate-300 group-hover:text-white' : 'text-slate-600 group-hover:text-white'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
-							</svg>
-						</button>
-
-						<!-- Icon Container -->
-						<div class="w-12 h-12 flex items-center justify-center {getNodeIconBgColor(element.type.type)} rounded-lg mb-2.5 shadow-sm">
-							<span class="text-lg {getNodeIconTextColor(element.type.type)} font-semibold">
-								{element.type.icon}
-							</span>
-						</div>
-
-						<!-- Label -->
-						<div class="text-xs font-semibold {getNodeLabelColor()} text-center leading-tight px-1 mb-1">
-							{element.type.label}
-						</div>
-
-						<!-- Output Display -->
-						{#if element.output !== undefined}
-							<div class="text-[10px] mt-1.5 truncate max-w-full px-2 py-1 font-mono {darkMode ? 'bg-slate-700 text-slate-200' : 'bg-slate-100 text-slate-600'} rounded border {darkMode ? 'border-slate-600' : 'border-slate-200'}">
-								{String(element.output).slice(0, 20)}
+							<div class="relative w-full h-full p-3 group">
+								<!-- Delete Button (hover) -->
+								<button
+									class="absolute -top-2 -right-2 w-5 h-5 {darkMode ? 'bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white' : 'bg-slate-200 hover:bg-red-500 text-slate-600 hover:text-white'} rounded-full flex items-center justify-center transition-all hover:scale-110 shadow-sm opacity-0 group-hover:opacity-100 z-30"
+									onclick={(e) => deleteElement(element.id, e)}
+									aria-label="Delete comment"
+									title="Delete comment"
+								>
+									<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+									</svg>
+								</button>
+								
+								<!-- Resize Handle (bottom-right corner) -->
+								<div
+									class="resize-handle absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize opacity-0 group-hover:opacity-100 transition-opacity z-30"
+									onmousedown={(e) => startResize(element, e)}
+									title="Resize comment"
+									role="button"
+									tabindex="0"
+									aria-label="Resize comment"
+								>
+									<svg class="w-full h-full {darkMode ? 'text-amber-400' : 'text-amber-600'}" fill="currentColor" viewBox="0 0 24 24">
+										<path d="M22 22H20V20H22V22Z" />
+										<path d="M22 18H20V16H22V18Z" />
+										<path d="M18 22H16V20H18V22Z" />
+										<path d="M18 18H16V16H18V18Z" />
+										<path d="M14 22H12V20H14V22Z" />
+										<path d="M22 14H20V12H22V14Z" />
+									</svg>
+								</div>
+								
+								<!-- Comment Text -->
+								{#if editingComment?.id === element.id}
+									<textarea
+										bind:value={commentText}
+										bind:this={commentTextareaRef}
+										class="w-full h-full min-h-[80px] p-2 {darkMode ? 'bg-slate-800 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'} border rounded resize-none focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm"
+										placeholder="Enter your comment..."
+										onkeydown={(e) => {
+											if (e.key === 'Escape') {
+												cancelCommentEdit();
+											} else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+												saveComment();
+											}
+										}}
+										onclick={(e) => e.stopPropagation()}
+									></textarea>
+									<div class="mt-2 flex items-center justify-end gap-2 text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'}">
+										<span>Ctrl+Enter to save, Esc to cancel</span>
+									</div>
+								{:else}
+									<div class="text-sm {darkMode ? 'text-slate-200' : 'text-slate-700'} whitespace-pre-wrap break-words">
+										{element.commentText || 'Double-click to edit'}
+									</div>
+								{/if}
 							</div>
-						{/if}
+						</div>
+					{:else}
+						<!-- Regular Node Element -->
+						<div
+							class="absolute overflow-visible {getElementColor(
+								element.type.type
+							)} rounded-xl {darkMode ? 'shadow-2xl shadow-black/50' : 'shadow-lg'} cursor-move border-2 {getElementBorderColor(
+								element.type.type
+							)} {draggedGridElement?.id === element.id ? '' : 'hover:shadow-2xl hover:scale-[1.02] transition-all'} {getNodeAccentColor(element.type.type) ? getNodeAccentColor(element.type.type) + ' ring-1' : ''}"
+							style="left: {element.x}px; top: {element.y}px; width: {element.width}px; height: {element.height}px; {draggedGridElement?.id === element.id ? 'transition: none;' : ''}"
+							onmousedown={(e) => { startDragOnGrid(element, e); e.stopPropagation(); }}
+							ondblclick={(e) => handleElementDoubleClick(element, e)}
+							role="button"
+							tabindex="0"
+						>
+						<div class="relative w-full h-full flex flex-col items-center justify-center group overflow-visible">
+							<!-- Hover Options Icons (appear above node on hover) -->
+							<div class="absolute -top-12 left-1/2 -translate-x-1/2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-30 pointer-events-auto">
+								<!-- Play Button -->
+								<button
+									class="w-5 h-5 {darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-slate-200 hover:bg-slate-300 text-slate-600'} rounded flex items-center justify-center transition-all hover:scale-110 shadow-sm"
+									aria-label="Run node"
+									title="Run node"
+									onclick={(e) => e.stopPropagation()}
+								>
+									<svg class="w-3 h-3 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+										<path d="M8 5v14l11-7z" />
+									</svg>
+								</button>
+								<!-- Power Button -->
+								<button
+									class="w-5 h-5 {darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-slate-200 hover:bg-slate-300 text-slate-600'} rounded flex items-center justify-center transition-all hover:scale-110 shadow-sm"
+									aria-label="Toggle node"
+									title="Toggle node"
+									onclick={(e) => e.stopPropagation()}
+								>
+									<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+									</svg>
+								</button>
+								<!-- Delete Button -->
+								<button
+									class="w-5 h-5 {darkMode ? 'bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white' : 'bg-slate-200 hover:bg-red-500 text-slate-600 hover:text-white'} rounded flex items-center justify-center transition-all hover:scale-110 shadow-sm"
+									onclick={(e) => deleteElement(element.id, e)}
+									aria-label="Delete node"
+									title="Delete node"
+								>
+									<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+									</svg>
+								</button>
+								<!-- More Options Button -->
+								<button
+									class="w-5 h-5 {darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-slate-200 hover:bg-slate-300 text-slate-600'} rounded flex items-center justify-center transition-all hover:scale-110 shadow-sm"
+									aria-label="More options"
+									title="More options"
+									onclick={(e) => e.stopPropagation()}
+								>
+									<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+										<path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+									</svg>
+								</button>
+							</div>
 
-						<!-- Connection Points -->
+							<!-- Icon Container (centered in node) -->
+							<div class="w-12 h-12 flex items-center justify-center {getNodeIconBgColor(element.type.type)} rounded-lg shadow-sm">
+								<span class="text-lg {getNodeIconTextColor(element.type.type)} font-semibold">
+									{element.type.icon}
+								</span>
+							</div>
+
+							<!-- Output Display (inside node, below icon) -->
+							{#if element.output !== undefined}
+								<div class="text-[10px] mt-2 truncate max-w-full px-2 py-1 font-mono {darkMode ? 'bg-slate-700 text-slate-200' : 'bg-slate-100 text-slate-600'} rounded border {darkMode ? 'border-slate-600' : 'border-slate-200'}">
+									{String(element.output).slice(0, 20)}
+								</div>
+							{/if}
+
+						<!-- Connection Points (only left input and right output) -->
+						<!-- Input Connection Point (left side - flat indicator) -->
 						<button
-							class="connection-point absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 {darkMode ? 'bg-slate-600 border-slate-500' : 'bg-white border-slate-300'} border-2 rounded-full hover:bg-indigo-500 hover:border-indigo-600 hover:scale-125 hover:shadow-md transition-all cursor-crosshair z-10"
-							onclick={(e) => handleConnectionPointClick(element.id, 'top', e)}
-							aria-label="Top connection point"
-						></button>
-						<button
-							class="connection-point absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-4 h-4 {darkMode ? 'bg-slate-600 border-slate-500' : 'bg-white border-slate-300'} border-2 rounded-full hover:bg-indigo-500 hover:border-indigo-600 hover:scale-125 hover:shadow-md transition-all cursor-crosshair z-10"
-							onclick={(e) => handleConnectionPointClick(element.id, 'right', e)}
-							aria-label="Right connection point"
-						></button>
-						<button
-							class="connection-point absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-4 h-4 {darkMode ? 'bg-slate-600 border-slate-500' : 'bg-white border-slate-300'} border-2 rounded-full hover:bg-indigo-500 hover:border-indigo-600 hover:scale-125 hover:shadow-md transition-all cursor-crosshair z-10"
-							onclick={(e) => handleConnectionPointClick(element.id, 'bottom', e)}
-							aria-label="Bottom connection point"
-						></button>
-						<button
-							class="connection-point absolute top-1/2 left-0 -translate-x-1/2 -translate-y-1/2 w-4 h-4 {darkMode ? 'bg-slate-600 border-slate-500' : 'bg-white border-slate-300'} border-2 rounded-full hover:bg-indigo-500 hover:border-indigo-600 hover:scale-125 hover:shadow-md transition-all cursor-crosshair z-10"
+							class="connection-point absolute top-1/2 left-0 -translate-y-1/2 -translate-x-1/2 flex items-center justify-center cursor-crosshair z-20 group/conn"
 							onclick={(e) => handleConnectionPointClick(element.id, 'left', e)}
-							aria-label="Left connection point"
-						></button>
+							aria-label="Input connection point"
+						>
+							<!-- Flat rectangular indicator -->
+							<div class="w-3 h-8 {darkMode ? 'bg-slate-500' : 'bg-slate-400'} group-hover/conn:bg-indigo-500 transition-colors rounded-sm"></div>
+						</button>
+						<!-- Output Connection Point (right side - circular, centered on edge) -->
+						<button
+							class="connection-point absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 flex items-center justify-center cursor-crosshair z-20 group/conn"
+							onclick={(e) => handleConnectionPointClick(element.id, 'right', e)}
+							aria-label="Output connection point"
+						>
+							<!-- Circle centered on edge -->
+							<div class="w-4 h-4 {darkMode ? 'bg-slate-600 border-slate-500' : 'bg-white border-slate-300'} border-2 rounded-full group-hover/conn:bg-indigo-500 group-hover/conn:border-indigo-600 transition-all group-hover/conn:scale-125 group-hover/conn:shadow-md"></div>
+						</button>
+						</div>
+
+						<!-- Description/Label (below the node) -->
+						<div class="absolute top-full left-1/2 -translate-x-1/2 text-center whitespace-nowrap pointer-events-none mt-3" style="width: {element.width}px;">
+							<div class="text-sm font-semibold {getNodeLabelColor()} leading-tight">
+								{element.type.label}
+							</div>
+						</div>
 					</div>
-				</div>
+					{/if}
 				{/each}
 			</div>
 

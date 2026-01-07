@@ -20,9 +20,9 @@
 	let { storeTree, storeErrors }: Props = $props();
 </script>
 
-	<div class="rounded-md border border-purple-200 bg-purple-50 p-4">
-		<strong class="mb-2 block">Store Statistics:</strong>
-		<div class="space-y-1 text-sm">
+	<div class="rounded-md border border-purple-200 bg-purple-50 dark:border-purple-600 dark:bg-purple-900/30 p-4">
+		<strong class="mb-2 block dark:text-purple-200">Store Statistics:</strong>
+		<div class="space-y-1 text-sm dark:text-slate-200">
 			<!-- Check if store has any data at root level -->
 			<p>
 				<strong>Topics with data:</strong>

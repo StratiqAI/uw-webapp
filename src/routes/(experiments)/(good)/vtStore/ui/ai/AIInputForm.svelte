@@ -42,9 +42,9 @@
 
 <!-- Provider Selection -->
 <div class="space-y-2">
-	<div class="block text-sm font-medium">AI Provider:</div>
+	<div class="block text-sm font-medium dark:text-slate-200">AI Provider:</div>
 	<div class="flex gap-4">
-		<label class="flex cursor-pointer items-center gap-2">
+		<label class="flex cursor-pointer items-center gap-2 dark:text-slate-200">
 			<input
 				type="radio"
 				name="provider"
@@ -55,7 +55,7 @@
 			/>
 			<span>OpenAI</span>
 		</label>
-		<label class="flex cursor-pointer items-center gap-2">
+		<label class="flex cursor-pointer items-center gap-2 dark:text-slate-200">
 			<input
 				type="radio"
 				name="provider"
@@ -71,28 +71,28 @@
 
 <!-- Input Section -->
 <div class="space-y-2">
-	<label for="prompt" class="block text-sm font-medium">User Prompt:</label>
+	<label for="prompt" class="block text-sm font-medium dark:text-slate-200">User Prompt:</label>
 	<textarea
 		id="prompt"
 		bind:value={userPrompt}
 		rows="3"
-		class="w-full rounded-md border border-gray-300 px-3 py-2"
+		class="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-slate-100 px-3 py-2"
 		placeholder="Enter a prompt to generate data. See help below for template variables."
 	></textarea>
 	
 	<!-- Template Variable Help -->
-	<details class="text-xs text-gray-600">
-		<summary class="cursor-pointer font-medium text-gray-700 hover:text-gray-900">
+	<details class="text-xs text-gray-600 dark:text-gray-300">
+		<summary class="cursor-pointer font-medium text-gray-700 hover:text-gray-900 dark:text-gray-200 dark:hover:text-gray-100">
 			💡 How to use template variables
 		</summary>
-		<div class="mt-2 space-y-1 rounded-md bg-gray-50 p-3 text-xs">
-			<p class="font-medium">Reference data from previous AI requests in your prompts:</p>
-			<ul class="ml-4 list-disc space-y-1">
-				<li><code class="rounded bg-gray-200 px-1">{"{{store:app/users/item-1}}"}</code> - Reference a specific item</li>
-				<li><code class="rounded bg-gray-200 px-1">{"{{store:app/users/item-1.name}}"}</code> - Reference a nested property</li>
-				<li><code class="rounded bg-gray-200 px-1">{"{{store:app/users/+}}"}</code> - Reference all items matching a pattern</li>
+		<div class="mt-2 space-y-1 rounded-md bg-gray-50 dark:bg-slate-800 p-3 text-xs">
+			<p class="font-medium dark:text-slate-200">Reference data from previous AI requests in your prompts:</p>
+			<ul class="ml-4 list-disc space-y-1 dark:text-slate-300">
+				<li><code class="rounded bg-gray-200 dark:bg-slate-700 dark:text-slate-200 px-1">{"{{store:app/users/item-1}}"}</code> - Reference a specific item</li>
+				<li><code class="rounded bg-gray-200 dark:bg-slate-700 dark:text-slate-200 px-1">{"{{store:app/users/item-1.name}}"}</code> - Reference a nested property</li>
+				<li><code class="rounded bg-gray-200 dark:bg-slate-700 dark:text-slate-200 px-1">{"{{store:app/users/+}}"}</code> - Reference all items matching a pattern</li>
 			</ul>
-			<p class="mt-2 text-gray-600">
+			<p class="mt-2 text-gray-600 dark:text-gray-300">
 				<strong>Example:</strong> "Create a product recommendation based on {"{{store:app/users/item-1}}"}"
 			</p>
 		</div>
@@ -109,7 +109,7 @@
 	<button
 		onclick={onCallAI}
 		disabled={loading || registeredSchemas.length === 0}
-		class="w-full rounded-md bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+		class="w-full rounded-md bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
 	>
 		<!-- Dynamic button text based on loading state and selected provider -->
 		{loading

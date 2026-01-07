@@ -34,15 +34,15 @@
 	}: Props = $props();
 </script>
 
-<div class="rounded-md border border-indigo-300 bg-indigo-50 p-4">
+<div class="rounded-md border border-indigo-300 bg-indigo-50 dark:border-indigo-600 dark:bg-indigo-900/30 p-4">
 	<div class="mb-2 flex items-center justify-between">
 		<!-- Display title with count -->
-		<strong>{title} ({allUsers.length}):</strong>
+		<strong class="dark:text-indigo-200">{title} ({allUsers.length}):</strong>
 		<!-- Only show clear button if there are users to clear -->
 		{#if allUsers.length > 0}
 			<button
 				onclick={clearAllUsers}
-				class="rounded bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
+				class="rounded bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700"
 			>
 				Clear All
 			</button>
@@ -56,15 +56,15 @@
 				{@const age = data?.age ?? null}
 				{@const skill = data?.skill || 'Unknown'}
 				<div
-					class="group relative overflow-hidden rounded-lg border border-indigo-200 bg-white shadow-sm transition-all hover:border-indigo-300 hover:shadow-md"
+					class="group relative overflow-hidden rounded-lg border border-indigo-200 dark:border-indigo-700 bg-white dark:bg-slate-800 shadow-sm transition-all hover:border-indigo-300 dark:hover:border-indigo-600 hover:shadow-md"
 				>
 					<!-- User card content -->
 					<div class="p-5">
 						<!-- ID badge (small, subtle) -->
-						<div class="mb-3 text-xs text-gray-400">#{id.split('/').pop()}</div>
+						<div class="mb-3 text-xs text-gray-400 dark:text-gray-500">#{id.split('/').pop()}</div>
 
 						<!-- Name (prominent) -->
-						<h3 class="mb-4 text-lg font-semibold text-gray-900">{name}</h3>
+						<h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-slate-100">{name}</h3>
 
 						<!-- User details grid -->
 						<div class="space-y-3">
@@ -72,7 +72,7 @@
 							{#if age !== null}
 								<div class="flex items-center gap-3">
 									<div
-										class="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-indigo-600"
+										class="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300"
 									>
 										<svg
 											xmlns="http://www.w3.org/2000/svg"
@@ -90,8 +90,8 @@
 										</svg>
 									</div>
 									<div>
-										<div class="text-xs text-gray-500">Age</div>
-										<div class="text-sm font-medium text-gray-900">{age} years old</div>
+										<div class="text-xs text-gray-500 dark:text-gray-400">Age</div>
+										<div class="text-sm font-medium text-gray-900 dark:text-slate-200">{age} years old</div>
 									</div>
 								</div>
 							{/if}
@@ -99,7 +99,7 @@
 							<!-- Skill Level -->
 							<div class="flex items-center gap-3">
 								<div
-									class="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 text-purple-600"
+									class="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300"
 								>
 									<svg
 										xmlns="http://www.w3.org/2000/svg"
@@ -117,19 +117,19 @@
 									</svg>
 								</div>
 								<div class="flex-1">
-									<div class="text-xs text-gray-500">Skill Level</div>
+									<div class="text-xs text-gray-500 dark:text-gray-400">Skill Level</div>
 									<div class="mt-1">
 										<span
 											class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium {skill ===
 											'beginner'
-												? 'bg-green-100 text-green-800'
+												? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
 												: skill === 'intermediate'
-													? 'bg-yellow-100 text-yellow-800'
+													? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300'
 													: skill === 'advanced'
-														? 'bg-orange-100 text-orange-800'
+														? 'bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300'
 														: skill === 'expert'
-															? 'bg-red-100 text-red-800'
-															: 'bg-gray-100 text-gray-800'}"
+															? 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
+															: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'}"
 										>
 											{skill.charAt(0).toUpperCase() + skill.slice(1)}
 										</span>
@@ -143,7 +143,7 @@
 		</div>
 	{:else}
 		<!-- Show empty state message when no users exist -->
-		<p class="mt-4 text-sm text-gray-600">
+		<p class="mt-4 text-sm text-gray-600 dark:text-gray-300">
 			{emptyMessage}
 		</p>
 	{/if}

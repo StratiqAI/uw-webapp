@@ -49,6 +49,9 @@
 	
 	// AI components
 	import AIInputForm from './ui/ai/AIInputForm.svelte';
+	
+	// Dark mode
+	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 
 	// ============================================================================
 	// CONSTANTS & CONFIGURATION
@@ -140,6 +143,9 @@
 	
 	// Counter for generating unique topic IDs
 	let userCounter = $state(0);
+	
+	// Dark mode state
+	let darkMode = $derived.by(() => darkModeStore.darkMode);
 
 	// ============================================================================
 	// DERIVED STATE (Computed Values)
@@ -247,10 +253,10 @@
 	 MAIN LAYOUT
 	 ============================================================================ -->
 
-<div class="p-6">
+<div class="p-6 {darkMode ? 'bg-slate-900 text-slate-100' : 'bg-white text-slate-900'} min-h-screen">
 	<!-- Page Header -->
 	<header class="mb-6">
-		<h1 class="text-2xl font-bold">Validated Topic Store with AI</h1>
+		<h1 class="text-2xl font-bold {darkMode ? 'text-white' : 'text-slate-900'}">Validated Topic Store with AI</h1>
 	</header>
 
 	<!-- Main Content Grid -->
@@ -270,7 +276,7 @@
 			<!-- Error Display -->
 			{#if error}
 				<div
-					class="rounded-md border border-red-400 bg-red-100 p-4 text-red-700"
+					class="rounded-md border {darkMode ? 'border-red-500 bg-red-900/30' : 'border-red-400 bg-red-100'} p-4 {darkMode ? 'text-red-300' : 'text-red-700'}"
 					role="alert"
 					aria-live="polite"
 				>
@@ -281,9 +287,9 @@
 
 			<!-- Response Display -->
 			{#if response}
-				<div class="rounded-md border border-green-400 bg-green-100 p-4">
+				<div class="rounded-md border {darkMode ? 'border-green-500 bg-green-900/30' : 'border-green-400 bg-green-100'} p-4 {darkMode ? 'text-green-300' : 'text-green-700'}">
 					<strong>{getProviderDisplayName(provider)} Response:</strong>
-					<pre class="mt-2 overflow-auto text-sm">{JSON.stringify(response, null, 2)}</pre>
+					<pre class="mt-2 overflow-auto text-sm {darkMode ? 'text-slate-200' : 'text-slate-900'}">{JSON.stringify(response, null, 2)}</pre>
 				</div>
 			{/if}
 

@@ -30,7 +30,7 @@
 </script>
 
 <div class="space-y-2">
-	<label for="schema-select" class="block text-sm font-medium">Schema:</label>
+	<label for="schema-select" class="block text-sm font-medium dark:text-slate-200">Schema:</label>
 	<!-- 
 		Schema dropdown - disabled when loading or no schemas available
 		bind:value creates two-way binding with selectedSchemaPattern prop
@@ -39,7 +39,7 @@
 		id="schema-select"
 		bind:value={selectedSchemaPattern}
 		disabled={loading || registeredSchemas.length === 0}
-		class="w-full rounded-md border border-gray-300 px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
+		class="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-slate-100 px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
 	>
 		{#if registeredSchemas.length === 0}
 			<option value="">No schemas registered</option>
@@ -51,7 +51,7 @@
 		{/if}
 	</select>
 	{#if registeredSchemas.length === 0}
-		<p class="text-xs text-gray-500">
+		<p class="text-xs text-gray-500 dark:text-gray-400">
 			Register a schema using the Schema Builder below to get started.
 		</p>
 	{/if}

@@ -1,4 +1,4 @@
-export type NodeType = 'input' | 'process' | 'output' | 'ai';
+export type NodeType = 'input' | 'process' | 'output' | 'ai' | 'comment';
 
 export type AIQueryData = {
 	prompt: string;

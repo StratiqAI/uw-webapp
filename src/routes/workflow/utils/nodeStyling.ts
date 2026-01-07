@@ -1,6 +1,9 @@
 import type { NodeType } from '../types/node';
 
 export function getElementColor(type: NodeType, darkMode: boolean): string {
+	if (type === 'comment') {
+		return darkMode ? 'bg-amber-900/30' : 'bg-amber-50';
+	}
 	if (darkMode) {
 		return 'bg-slate-600';
 	} else {
@@ -9,6 +12,9 @@ export function getElementColor(type: NodeType, darkMode: boolean): string {
 }
 
 export function getElementBorderColor(type: NodeType, darkMode: boolean): string {
+	if (type === 'comment') {
+		return darkMode ? 'border-amber-600/50' : 'border-amber-300';
+	}
 	if (darkMode) {
 		switch (type) {
 			case 'input':
@@ -33,6 +39,9 @@ export function getElementBorderColor(type: NodeType, darkMode: boolean): string
 }
 
 export function getNodeIconBgColor(type: NodeType, darkMode: boolean): string {
+	if (type === 'comment') {
+		return darkMode ? 'bg-amber-800/50' : 'bg-amber-100';
+	}
 	if (darkMode) {
 		switch (type) {
 			case 'input':
@@ -57,6 +66,9 @@ export function getNodeIconBgColor(type: NodeType, darkMode: boolean): string {
 }
 
 export function getNodeIconTextColor(type: NodeType, darkMode: boolean): string {
+	if (type === 'comment') {
+		return darkMode ? 'text-amber-200' : 'text-amber-700';
+	}
 	if (darkMode) {
 		switch (type) {
 			case 'input':
@@ -85,6 +97,9 @@ export function getNodeLabelColor(darkMode: boolean): string {
 }
 
 export function getNodeAccentColor(type: NodeType, darkMode: boolean): string {
+	if (type === 'comment') {
+		return '';
+	}
 	if (darkMode) {
 		switch (type) {
 			case 'input':
@@ -117,6 +132,9 @@ export function getSidebarButtonColor(type: NodeType, darkMode: boolean): string
 }
 
 export function getIconBgColor(type: NodeType, darkMode: boolean): string {
+	if (type === 'comment') {
+		return darkMode ? 'bg-amber-800/50' : 'bg-amber-100';
+	}
 	switch (type) {
 		case 'input':
 		case 'process':
@@ -129,6 +147,9 @@ export function getIconBgColor(type: NodeType, darkMode: boolean): string {
 }
 
 export function getIconTextColor(type: NodeType, darkMode: boolean): string {
+	if (type === 'comment') {
+		return darkMode ? 'text-amber-200' : 'text-amber-700';
+	}
 	switch (type) {
 		case 'input':
 		case 'process':
