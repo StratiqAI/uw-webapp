@@ -3,7 +3,7 @@
 
 import { z } from 'zod';
 import { mapStore } from '$lib/stores/MapStore';
-import { jobUpdateStore, type JobUpdate } from '$lib/stores/jobUpdateStore';
+import { jobUpdateStore, type JobUpdate } from '$lib/stores/jobUpdateStore.svelte';
 import { DashboardStorage } from '$lib/dashboard/utils/storage';
 import type { Readable } from 'svelte/store';
 import type {

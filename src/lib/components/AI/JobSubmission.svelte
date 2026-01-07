@@ -3,7 +3,7 @@
 	import { gql } from '$lib/realtime/graphql/requestHandler';
 	import { addSubscription, removeSubscription, ensureConnection } from '$lib/stores/appSyncClientStore';
 	import { S_JOB_UPDATE } from '$lib/realtime/graphql/subscriptions/Job';
-	import { jobUpdateStore, type JobUpdate } from '$lib/stores/jobUpdateStore';
+	import { jobUpdateStore, type JobUpdate } from '$lib/stores/jobUpdateStore.svelte';
 	import type { SubscriptionSpec } from '$lib/realtime/websocket/types';
 
 	// ===== Type and Variables Related to Job Status =====

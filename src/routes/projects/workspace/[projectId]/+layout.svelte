@@ -4,12 +4,11 @@
 
 	// Import project store for synchronization
 	import { 
-		setProject, 
-		project as projectStoreEntity,
+		projectStore,
 		addProjectDocumentLink,
 		updateProjectDocumentLink,
 		removeProjectDocumentLink
-	} from '$lib/stores/appStateStore';
+	} from '$lib/stores/projectStore.svelte';
 	import { mapStore } from '$lib/stores/MapStore';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { setContext } from 'svelte';
@@ -30,7 +29,7 @@
 	import { notificationStore, S_ON_CREATE_NOTIFICATION, type Notification } from '$lib/stores/notifications.svelte';
 
 	// Import project entities store for reactive UI updates
-	import { addProjectText, addProjectTable, addProjectImage } from '$lib/stores/projectEntitiesStore';
+	import { addProjectText, addProjectTable, addProjectImage } from '$lib/stores/projectEntitiesStore.svelte';
 
 	// Import Logging
 	import { logger } from '$lib/logging/debug';
@@ -45,7 +44,7 @@
 
 	// Authentication: Get the authenticated current User from the Load Data
 	let currentUser = $derived(data.currentUser);
-	let project = $derived($projectStoreEntity);
+	let project = $derived(projectStore.entity);
 
 	// Get project data from server (fetched server-side for security)
 	const projectFromServer: Project | null = data.project;
@@ -65,7 +64,7 @@
 		$effect(() => {
 			// Sync project data to store
 			if (projectFromServer && !isNewProject) {
-				setProject(projectFromServer);
+				projectStore.set(projectFromServer);
 				logger('Project synced to store from server:', projectFromServer);
 			}
 
@@ -136,7 +135,7 @@
 				next: (it: Project) => {
 					// Update the global project store so all child pages stay in sync
 					if (browser) {
-						setProject(it);
+						projectStore.set(it);
 						// Load documents if available (documents may be in GraphQL response but not in TypeScript type)
 						// const projectWithDocs = it as any;
 						// if (projectWithDocs.documents?.items) {
