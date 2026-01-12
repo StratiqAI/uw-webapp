@@ -20,6 +20,16 @@
 	// Get projectId from route params (more reliable than project store)
 	const projectId = $derived($page.params.projectId ?? null);
 
+	// Extract doclinks from project
+	const doclinks = $derived.by(() => {
+		if (!project?.doclinks) return [];
+		// Handle both array format and connection format
+		if (Array.isArray(project.doclinks)) {
+			return project.doclinks;
+		}
+		return project.doclinks.items || [];
+	});
+
 	// Dark mode support
 	let darkMode = $derived.by(() => darkModeStore.darkMode);
 
@@ -101,6 +111,49 @@
 				<DocumentUpload idToken={cognitoIdToken} projectId={projectId} metadata={fileMetadata} />
 			</div>
 		</div>
+
+		<!-- Doclinks Display -->
+		{#if projectId && doclinks.length > 0}
+			<div class="mt-8 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg border shadow-sm">
+				<div class="p-6">
+					<div class="flex items-center gap-3 mb-4">
+						<div class="w-1 h-6 {darkMode ? 'bg-indigo-500' : 'bg-indigo-600'} rounded-full"></div>
+						<h3 class="text-lg font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">
+							Document Links
+						</h3>
+						<span class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'}">
+							({doclinks.length})
+						</span>
+					</div>
+					<div class="space-y-2">
+						{#each doclinks as doclink (doclink.id)}
+							<div class="p-3 {darkMode ? 'bg-slate-700/50 border-slate-600' : 'bg-slate-50 border-slate-200'} rounded-lg border">
+								<div class="flex items-center justify-between">
+									<div class="flex-1 min-w-0">
+										<div class="font-medium {darkMode ? 'text-slate-200' : 'text-slate-900'} truncate">
+											{doclink.filename || 'Untitled Document'}
+										</div>
+										{#if doclink.status}
+											<div class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1">
+												Status: {doclink.status}
+											</div>
+										{/if}
+									</div>
+									{#if doclink.documentId}
+										<a 
+											href="/projects/workspace/{projectId}/document-analysis?documentId={doclink.documentId}"
+											class="ml-4 text-sm {darkMode ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-700'} font-medium hover:underline transition-colors"
+										>
+											View
+										</a>
+									{/if}
+								</div>
+							</div>
+						{/each}
+					</div>
+				</div>
+			</div>
+		{/if}
 
 		<!-- Real-time Entity Discovery -->
 		{#if projectId}
