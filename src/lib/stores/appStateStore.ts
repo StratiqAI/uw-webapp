@@ -1,6 +1,6 @@
 import { writable, get, type Writable } from 'svelte/store';
 import type { Project, Document, Doclink } from '@stratiqai/types-simple';
-import type { ProjectDocumentLinkConnection, ProjectDocumentLink } from '$lib/types/Project';
+import type { ProjectDocumentLinkConnection, ProjectDocumentLink } from '$lib/types/cloud/app';
 
 /**
  * Generic application state store for managing entity state

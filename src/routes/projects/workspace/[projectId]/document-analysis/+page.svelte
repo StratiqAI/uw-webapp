@@ -2,8 +2,7 @@
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Import Types and Data Stores
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	import type { Project } from '$lib/types/Project';
-	import type { ProjectDocumentLink } from '$lib/types/Project';
+	import type { Project, Doclink } from '$lib/types/cloud/app';
 	
 	// The project store holds the state for the workspace. 
 	// It's initialized from data loaded on the server side and passed to the client.

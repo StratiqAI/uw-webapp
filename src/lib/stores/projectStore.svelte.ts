@@ -7,7 +7,7 @@
 
 import { AppStateStore } from './appStateStore.svelte';
 import type { Project, Document } from '@stratiqai/types-simple';
-import type { ProjectDocumentLinkConnection, ProjectDocumentLink } from '$lib/types/Project';
+import type { ProjectDocumentLinkConnection, ProjectDocumentLink } from '$lib/types/cloud/app';
 
 /**
  * Project-specific store instance

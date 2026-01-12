@@ -9,7 +9,7 @@
 
 	// Project Data is loaded in the +layout.svelte file and passed to this component as well
 	// as the other pages that are nested within the workspace layout
-	import type { Project } from '$lib/types/Project';
+	import type { Project } from '$lib/types/cloud/app';
 
 	// DocumentandPages is a type that is used to hold the data for the document and pages.
 	import type { Document } from '$lib/types/Document';
