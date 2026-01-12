@@ -22,7 +22,7 @@
 	import { logger } from '$lib/logging/debug';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
 	import { M_UPDATE_PROJECT } from '$lib/realtime/graphql/mutations/Project';
-	import type { Project, ProjectDocument } from '$lib/types/Project';
+	import type { Project, ProjectDocument } from '$lib/types/cloud/app';
 	import { project as projectStore } from '$lib/stores/appStateStore';
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-

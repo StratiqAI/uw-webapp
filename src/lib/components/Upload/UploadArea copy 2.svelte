@@ -25,7 +25,7 @@
 		M_CREATE_PROJECT_DOCUMENT,
 		M_DELETE_PROJECT_DOCUMENT
 	} from '$lib/realtime/graphql/mutations/Project';
-	import type { Project, ProjectDocument } from '$lib/types/Project';
+	import type { Project, ProjectDocument } from '$lib/types/cloud/app';
 	import { project as projectStore } from '$lib/stores/appStateStore';
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-

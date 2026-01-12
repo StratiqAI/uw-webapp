@@ -8,7 +8,7 @@ import type {
 	WorkflowConnection,
 	AIQueryData,
 	ConnectionSide
-} from '$lib/types/Workflow';
+} from '$lib/types/cloud/Workflow';
 
 // Internal component types (from +page.svelte)
 export type InternalElementType = {

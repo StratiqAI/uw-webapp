@@ -40,5 +40,5 @@ export interface DocumentListItem {
 	size?: number; // File size in bytes (only available for uploads)
 	status: 'upload' | 'existing'; // 'upload' for files being uploaded, 'existing' for ProjectDocumentLinks
 	uploadFile?: UploadFile; // Present if status is 'upload'
-	documentLink?: import('$lib/types/Project').ProjectDocumentLink; // Present if status is 'existing'
+	documentLink?: import('$lib/types/cloud/app').ProjectDocumentLink; // Present if status is 'existing'
 }

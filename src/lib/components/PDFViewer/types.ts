@@ -1,4 +1,4 @@
-import type { ProjectDocument } from "$lib/types/Project";
+import type { ProjectDocument } from "$lib/types/cloud/app";
 
 // Type definitions
 export interface PDFViewerProps {

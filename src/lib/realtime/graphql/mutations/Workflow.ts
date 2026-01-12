@@ -2,7 +2,7 @@
  * GraphQL mutations for Workflow operations
  */
 
-import type { Workflow, CreateWorkflowInput, UpdateWorkflowInput } from '$lib/types/Workflow';
+import type { Workflow, CreateWorkflowInput, UpdateWorkflowInput } from '$lib/types/cloud/Workflow';
 import { gql } from '$lib/realtime/graphql/requestHandler';
 
 export const M_CREATE_WORKFLOW = `

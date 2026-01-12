@@ -3,11 +3,11 @@
 	import { ExclamationCircleOutline } from 'flowbite-svelte-icons';
 	import type { DeleteModalProps } from '../../../../../uw-ai-plane/types';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
-	import type { Project } from '$lib/types/Project';
+	import type { Project } from '$lib/types/cloud/app';
 	import { M_DELETE_PROJECT } from '$lib/realtime/graphql/mutations/Project';
 	import { logger } from '$lib/logging/debug';
 	let {
-		open = $bindable(true),
+		open = $bindable(true),	
 		title = 'Are you sure you want to delete this?',
 		yes = "Yes, I'm sure",
 		no = 'No, cancel',

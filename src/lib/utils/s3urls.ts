@@ -1,4 +1,4 @@
-import type { DocumentAndPages } from "$lib/types/Document";
+import type { DocumentAndPages } from "$lib/types/cloud/Document";
 
 export function getPageS3Url(s3Bucket: string, docHash: string, pageNumber: number) {
   return `https://${s3Bucket}.s3.us-west-2.amazonaws.com/${docHash}/pages/${pageNumber}.pdf`;

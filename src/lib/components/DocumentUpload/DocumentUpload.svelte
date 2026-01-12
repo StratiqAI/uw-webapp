@@ -6,7 +6,7 @@
 	import UploadList from './UploadList.svelte';
 	import DocumentProcessingModal from '../DocumentProcessing/DocumentProcessingModal.svelte';
 	import { project } from '$lib/stores/appStateStore';
-	import type { ProjectDocumentLink } from '$lib/types/Project';
+	import type { ProjectDocumentLink } from '$lib/types/cloud/app';
 	import type { DocumentListItem } from './types';
 
 	import { SUPPORTED_FILE_TYPES, MAX_FILE_SIZE } from './constants';
