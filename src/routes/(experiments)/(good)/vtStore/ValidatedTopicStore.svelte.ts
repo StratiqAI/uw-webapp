@@ -822,4 +822,110 @@ export class ValidatedTopicStore {
 	toJSON() {
 		return JSON.parse(JSON.stringify(this.#tree));
 	}
+
+	/**
+	 * Dump store contents to browser console for debugging
+	 * 
+	 * Displays:
+	 * - All registered schemas with their patterns
+	 * - Complete data tree structure
+	 * - All validation errors
+	 * - Schema version
+	 * 
+	 * Usage from browser console:
+	 *   window.validatedTopicStore.dump()
+	 * 
+	 * Or if store is exposed differently:
+	 *   store.dump()
+	 */
+	dump(): void {
+		console.group('📦 ValidatedTopicStore Dump');
+		
+		// Schemas
+		console.group('📋 Registered Schemas');
+		const schemas = this.getRegisteredSchemas();
+		if (schemas.length === 0) {
+			console.log('No schemas registered');
+		} else {
+			schemas.forEach(({ pattern, schema }) => {
+				console.group(`Pattern: ${pattern}`);
+				console.log('Schema:', schema);
+				console.groupEnd();
+			});
+		}
+		console.groupEnd();
+		
+		// Data Tree
+		console.group('🌳 Data Tree');
+		if (Object.keys(this.#tree).length === 0) {
+			console.log('Tree is empty');
+		} else {
+			// Use $state.snapshot() to convert reactive state to plain object
+			const treeSnapshot = $state.snapshot(this.#tree);
+			console.log('Tree structure:', treeSnapshot);
+			console.log('JSON representation:', this.toJSON());
+		}
+		console.groupEnd();
+		
+		// Errors
+		console.group('❌ Validation Errors');
+		if (this.#errors.size === 0) {
+			console.log('No validation errors');
+		} else {
+			// Convert errors Map to plain object for logging
+			const errorsSnapshot: Record<string, any> = {};
+			this.#errors.forEach((errors, topic) => {
+				errorsSnapshot[topic] = errors;
+			});
+			console.log('Errors by topic:', errorsSnapshot);
+			
+			// Also log in grouped format for readability
+			this.#errors.forEach((errors, topic) => {
+				console.group(`Topic: ${topic}`);
+				console.error('Errors:', errors);
+				console.groupEnd();
+			});
+		}
+		console.groupEnd();
+		
+		// Metadata
+		console.group('ℹ️ Metadata');
+		console.log('Schema Version:', this.#schemaVersion);
+		console.log('Total Topics with Data:', this.countTopics());
+		console.log('Total Errors:', this.#errors.size);
+		console.groupEnd();
+		
+		console.groupEnd();
+	}
+
+	/**
+	 * Count total number of topics with data in the store
+	 * Helper method for dump()
+	 * 
+	 * A topic is counted if it has a value (not just a container object)
+	 */
+	private countTopics(): number {
+		let count = 0;
+		const countRecursive = (obj: any): void => {
+			for (const [key, value] of Object.entries(obj)) {
+				if (value && typeof value === 'object' && !Array.isArray(value)) {
+					// Check if this object has any non-object values (actual data)
+					// or if it's empty (which could be a topic placeholder)
+					const hasPrimitiveValues = Object.values(value).some(
+						v => v === null || (typeof v !== 'object' && !Array.isArray(v))
+					);
+					
+					// If it has primitive values or is empty, it's a topic with data
+					if (hasPrimitiveValues || Object.keys(value).length === 0) {
+						count++;
+					}
+					
+					// Recurse into nested objects
+					countRecursive(value);
+				}
+			}
+		};
+		countRecursive(this.#tree);
+		return count;
+	}
 }
