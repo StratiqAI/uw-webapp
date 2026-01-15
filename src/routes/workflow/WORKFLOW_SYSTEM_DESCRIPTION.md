@@ -671,7 +671,7 @@ type WorkflowJSON = {
 
 ### In Progress ⚠️
 
-- **elementTypes Array**: File structure created, but 2400+ line array still needs to be extracted from `+page.svelte` to `services/nodeDefinitions.ts`
+- **elementTypes Array**: File structure created, but 2400+ line array still needs to be extracted from `+page.svelte` to `services/nodes/nodeDefinitions.ts`
 - **Main Component Refactoring**: `+page.svelte` needs to be refactored to use all extracted components and services
 
 ### Pending 🔄

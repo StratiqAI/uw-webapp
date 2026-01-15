@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { WorkflowResult } from '../types';
+	import type { WorkflowResult } from '../../types';
 
 	const {
 		results = [],

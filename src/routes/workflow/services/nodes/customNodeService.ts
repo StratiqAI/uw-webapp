@@ -1,4 +1,4 @@
-import type { ElementType, AIQueryData } from '../types/node';
+import type { ElementType, AIQueryData } from '../../types/node';
 
 const STORAGE_KEY = 'workflow-custom-ai-nodes';
 

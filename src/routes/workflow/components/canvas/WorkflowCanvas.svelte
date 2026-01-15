@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { GridElement, Connection, ConnectionPoint, ConnectionSide, ElementType } from '../types';
-	import { getElementBorderColor, getElementColor } from '../utils/nodeStyling';
+	import type { GridElement, Connection, ConnectionPoint, ConnectionSide, ElementType } from '../../types';
+	import { getElementBorderColor, getElementColor } from '../../utils/nodeStyling';
 	import WorkflowNode from './WorkflowNode.svelte';
 	import WorkflowConnection from './WorkflowConnection.svelte';
 	import WorkflowConnectionPreview from './WorkflowConnectionPreview.svelte';

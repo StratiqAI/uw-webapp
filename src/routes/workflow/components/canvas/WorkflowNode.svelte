@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { GridElement, ConnectionSide } from '../types';
+	import type { GridElement, ConnectionSide } from '../../types';
 	import {
 		getElementColor,
 		getElementBorderColor,
@@ -7,7 +7,7 @@
 		getNodeIconTextColor,
 		getNodeLabelColor,
 		getNodeAccentColor
-	} from '../utils/nodeStyling';
+	} from '../../utils/nodeStyling';
 
 	const {
 		element,

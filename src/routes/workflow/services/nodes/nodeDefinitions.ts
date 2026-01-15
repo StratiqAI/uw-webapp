@@ -1,5 +1,5 @@
-import type { ElementType } from '../types/node';
-import { elementTypes as workflowNodes } from '../nodes';
+import type { ElementType } from '../../types/node';
+import { elementTypes as workflowNodes } from '../../nodes';
 
 /**
  * Default element type definitions for the workflow builder.

@@ -306,7 +306,7 @@ let allElementTypes = $derived([...elementTypes, ...customAINodes]);
   - `utils/idGenerator.ts` - Unique ID generation function
 
 **Remaining Work**:
-- ⚠️ **elementTypes Array**: The massive `elementTypes` array (2400+ lines) needs to be fully extracted from `+page.svelte` to `services/nodeDefinitions.ts`
+- ⚠️ **elementTypes Array**: The massive `elementTypes` array (2400+ lines) needs to be fully extracted from `+page.svelte` to `services/nodes/nodeDefinitions.ts`
 - 🔄 **Main Component Refactoring**: `+page.svelte` needs to be refactored to import and use all extracted components and services, removing duplicate code while maintaining functionality
 
 ### 2. Type Safety Improvements

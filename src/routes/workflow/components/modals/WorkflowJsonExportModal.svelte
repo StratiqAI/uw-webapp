@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Connection, GridElement } from '../types';
+	import type { Connection, GridElement } from '../../types';
 	import WorkflowModal from './WorkflowModal.svelte';
 
 	let {

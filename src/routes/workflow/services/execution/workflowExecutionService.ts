@@ -1,5 +1,5 @@
-import type { GridElement, WorkflowResult } from '../types/workflow';
-import type { Connection } from '../types/connection';
+import type { GridElement, WorkflowResult } from '../../types/workflow';
+import type { Connection } from '../../types/connection';
 
 export async function executeWorkflow(
 	gridElements: GridElement[],

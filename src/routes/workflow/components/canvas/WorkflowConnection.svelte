@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { Connection, GridElement, ConnectionSide } from '../types';
-	import { getConnectionPointPos } from '../services/connectionService';
+	import type { Connection, GridElement, ConnectionSide } from '../../types';
+	import { getConnectionPointPos } from '../../services/connections/connectionService';
 
 	const {
 		connection,

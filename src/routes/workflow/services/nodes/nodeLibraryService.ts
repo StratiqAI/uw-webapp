@@ -1,4 +1,4 @@
-import type { ElementType } from '../types/node';
+import type { ElementType } from '../../types/node';
 import { elementTypes } from './nodeDefinitions';
 
 /**

@@ -1,4 +1,4 @@
-import type { ElementType } from '../types';
+import type { ElementType } from '../../types';
 import {
 	loadCustomAINodes as loadCustomNodes,
 	saveCustomAINodes,

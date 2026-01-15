@@ -1,5 +1,5 @@
-import type { GridElement, WorkflowJSON } from '../types/workflow';
-import type { Connection } from '../types/connection';
+import type { GridElement, WorkflowJSON } from '../../types/workflow';
+import type { Connection } from '../../types/connection';
 
 export function generateWorkflowJSON(
 	gridElements: GridElement[],

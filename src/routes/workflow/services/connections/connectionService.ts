@@ -1,5 +1,5 @@
-import type { GridElement } from '../types/workflow';
-import type { ConnectionSide } from '../types/connection';
+import type { GridElement } from '../../types/workflow';
+import type { ConnectionSide } from '../../types/connection';
 
 export function getConnectionPointPos(
 	element: GridElement,

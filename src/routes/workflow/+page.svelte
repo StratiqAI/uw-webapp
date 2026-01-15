@@ -30,24 +30,24 @@
 <script lang="ts">
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import { generateId } from './utils/idGenerator';
-	import WorkflowSidebar from './components/WorkflowSidebar.svelte';
-	import WorkflowToolbar from './components/WorkflowToolbar.svelte';
-	import WorkflowCanvas from './components/WorkflowCanvas.svelte';
-	import WorkflowResultsPanel from './components/WorkflowResultsPanel.svelte';
-	import WorkflowInputGalleryModal from './components/WorkflowInputGalleryModal.svelte';
-	import WorkflowProcessGalleryModal from './components/WorkflowProcessGalleryModal.svelte';
-	import WorkflowAIQueryEditModal from './components/WorkflowAIQueryEditModal.svelte';
-	import WorkflowNodeOptionsModal from './components/WorkflowNodeOptionsModal.svelte';
-	import WorkflowAIGalleryModal from './components/WorkflowAIGalleryModal.svelte';
-	import WorkflowJsonExportModal from './components/WorkflowJsonExportModal.svelte';
-	import WorkflowCreateCustomAIModal from './components/WorkflowCreateCustomAIModal.svelte';
+	import WorkflowSidebar from './components/layout/WorkflowSidebar.svelte';
+	import WorkflowToolbar from './components/layout/WorkflowToolbar.svelte';
+	import WorkflowCanvas from './components/canvas/WorkflowCanvas.svelte';
+	import WorkflowResultsPanel from './components/layout/WorkflowResultsPanel.svelte';
+	import WorkflowInputGalleryModal from './components/modals/WorkflowInputGalleryModal.svelte';
+	import WorkflowProcessGalleryModal from './components/modals/WorkflowProcessGalleryModal.svelte';
+	import WorkflowAIQueryEditModal from './components/modals/WorkflowAIQueryEditModal.svelte';
+	import WorkflowNodeOptionsModal from './components/modals/WorkflowNodeOptionsModal.svelte';
+	import WorkflowAIGalleryModal from './components/modals/WorkflowAIGalleryModal.svelte';
+	import WorkflowJsonExportModal from './components/modals/WorkflowJsonExportModal.svelte';
+	import WorkflowCreateCustomAIModal from './components/modals/WorkflowCreateCustomAIModal.svelte';
 	import {
 		loadCustomAINodesFromStorage,
 		createCustomAINodeState,
 		deleteCustomAINodeState,
 		resetCustomAINodeDraft
-	} from './services/customAiNodes';
-	import { getElementTypes } from './services/nodeLibraryService';
+	} from './services/nodes/customAiNodes';
+	import { getElementTypes } from './services/nodes/nodeLibraryService';
 	import type { ElementType, GridElement, Connection } from './types';
 
 	// ------------------------------------------------------------------------------------------------

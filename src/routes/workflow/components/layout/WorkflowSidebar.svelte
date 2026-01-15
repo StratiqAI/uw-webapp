@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { ElementType } from '../types';
-	import { getSidebarButtonColor, getIconBgColor, getIconTextColor, getLabelTextColor } from '../utils/nodeStyling';
+	import type { ElementType } from '../../types';
+	import { getSidebarButtonColor, getIconBgColor, getIconTextColor, getLabelTextColor } from '../../utils/nodeStyling';
 
 	let {
 		allElementTypes = [],

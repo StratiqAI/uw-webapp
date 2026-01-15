@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { GridElement, AIQueryData } from '../types';
+	import type { GridElement, AIQueryData } from '../../types';
 
 	import type { PromptTemplate } from "@stratiqai/types-simple"
 	const {

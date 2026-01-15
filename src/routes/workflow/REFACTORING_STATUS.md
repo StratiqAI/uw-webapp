@@ -19,12 +19,12 @@ All type definitions have been extracted to separate files:
 
 Business logic has been extracted to service files:
 
-- `services/workflowExecutionService.ts` - Execution engine logic with topological sort
-- `services/workflowSerializationService.ts` - JSON export/import functionality
-- `services/connectionService.ts` - Connection point position calculations
-- `services/nodeLibraryService.ts` - Node library management (uses elementTypes from nodeDefinitions)
-- `services/nodeDefinitions.ts` - Element type definitions (structure created, full array extraction pending)
-- `services/customNodeService.ts` - Custom AI node localStorage management and creation
+- `services/execution/workflowExecutionService.ts` - Execution engine logic with topological sort
+- `services/serialization/workflowSerializationService.ts` - JSON export/import functionality
+- `services/connections/connectionService.ts` - Connection point position calculations
+- `services/nodes/nodeLibraryService.ts` - Node library management (uses elementTypes from nodeDefinitions)
+- `services/nodes/nodeDefinitions.ts` - Element type definitions (structure created, full array extraction pending)
+- `services/nodes/customNodeService.ts` - Custom AI node localStorage management and creation
 - `services/index.ts` - Barrel export for all services
 
 ### 3. Component Extraction
@@ -91,7 +91,7 @@ Components extracted from `+page.svelte`:
 
 1. **ElementTypes Array**: The massive `elementTypes` array (2400+ lines, lines 75-2475) needs to be moved to:
 
-   - ⚠️ **Partially Complete**: File structure created in `services/nodeDefinitions.ts` with header and first few entries (stub only, ~178 lines)
+- ⚠️ **Partially Complete**: File structure created in `services/nodes/nodeDefinitions.ts` with header and first few entries (stub only, ~178 lines)
    - ⚠️ **Still TODO**: Extract the full 2400+ line array from `+page.svelte` (currently still exists at line 75)
    - ✅ Updated `nodeLibraryService.ts` to use the extracted array structure (imports from nodeDefinitions.ts)
    - ⚠️ **Still TODO**: Add import in `+page.svelte` and remove the inline array definition
@@ -103,7 +103,7 @@ Components extracted from `+page.svelte`:
 3. ~~**Utility Functions**:~~
 
    - ✅ **Completed**: `generateId()` extracted to `utils/idGenerator.ts`
-   - ✅ **Completed**: Custom AI node localStorage functions extracted to `services/customNodeService.ts`
+- ✅ **Completed**: Custom AI node localStorage functions extracted to `services/nodes/customNodeService.ts`
      - `loadCustomAINodes()`, `saveCustomAINodes()`, `createCustomAINode()` functions
 
 4. **Main Component Refactoring**: The `+page.svelte` file needs to:
