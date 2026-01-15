@@ -33,6 +33,7 @@ export function createAIWorkflowNode(config: AIWorkflowNodeConfig): WorkflowNode
 		type: 'ai',
 		label,
 		icon,
+		defaultAIQueryData: { prompt, model, systemPrompt },
 		execute: async (input: any, customData?: AIQueryData) => {
 			if (!customData) {
 				customData = { prompt, model, systemPrompt };
