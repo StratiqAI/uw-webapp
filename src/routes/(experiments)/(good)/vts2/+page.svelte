@@ -21,10 +21,9 @@
 	
 	// GraphQL Store Publisher components
 	import {
-		GraphQLStorePublisher,
 		GraphQLQueryClient,
-		toTopicPath,
-		type ProjectSyncConfig
+		EntitySyncManager,
+		createProjectSyncConfig
 	} from '$lib/realtime/store';
 	
 	// ValidatedTopicStore
@@ -42,9 +41,6 @@
 	// Dark mode
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	
-	// Auth store
-	import { authStore } from '$lib/stores/auth.svelte';
-	
 	// ============================================================================
 	// PROPS
 	// ============================================================================
@@ -57,18 +53,15 @@
 	// ============================================================================
 	
 	// Get idToken from server-side data, fallback to authStore (same pattern as get-started page)
-	const idToken = $derived(data?.idToken ?? authStore.idToken);
+	const idToken = $derived(data?.idToken);
 	$inspect('idToken', idToken);
 	// Initialize store
 	const store = new ValidatedTopicStore();
 	
-	// Initialize query client and publisher (will be set up in onMount)
+	// Initialize query client and subscription client
 	let queryClient: GraphQLQueryClient | null = $state(null);
 	let subscriptionClient: AppSyncWsClient | null = $state(null);
-	let publisher: GraphQLStorePublisher | null = $state(null);
-	
-	// Track active subscriptions for cleanup
-	let activeSubscriptionSpecs: Array<import('$lib/realtime/websocket/types').SubscriptionSpec<any>> = $state([]);
+	let entitySyncManager: EntitySyncManager<Project> | null = $state(null);
 	
 	// UI State
 	let loading = $state(false);
@@ -102,11 +95,11 @@
 	// ============================================================================
 	
 	/**
-	 * Initialize clients and publisher
+	 * Initialize clients and entity sync manager
 	 */
-	async function initializePublisher() {
+	async function initializeManager() {
 		if (!browser || !idToken) {
-			console.warn('Cannot initialize publisher: browser check failed or no idToken');
+			console.warn('Cannot initialize manager: browser check failed or no idToken');
 			return;
 		}
 		
@@ -123,29 +116,35 @@
 			// Wait for subscription client to be ready
 			await subscriptionClient.ready();
 			
-			// Create publisher
-			publisher = new GraphQLStorePublisher({
+			// Create entity sync configuration
+			const config = createProjectSyncConfig(
+				Q_LIST_PROJECTS,
+				Q_GET_PROJECT,
+				S_ON_UPDATE_PROJECT,
+				S_ON_DELETE_PROJECT
+			);
+			
+			// Create entity sync manager
+			entitySyncManager = new EntitySyncManager<Project>({
 				queryClient,
 				subscriptionClient,
-				store
+				store,
+				config
 			});
 			
-			console.log('Publisher initialized successfully');
+			console.log('EntitySyncManager initialized successfully');
 		} catch (err: any) {
-			console.error('Error initializing publisher:', err);
-			error = err.message || 'Failed to initialize publisher';
+			console.error('Error initializing manager:', err);
+			error = err.message || 'Failed to initialize manager';
 		}
 	}
 	
 	/**
-	 * Sync projects list: fetch and publish to store
-	 * 
-	 * Note: GraphQLStorePublisher is designed for single project sync.
-	 * For a list of projects, we manually fetch and publish each one.
+	 * Sync projects list using EntitySyncManager
 	 */
 	async function syncProjectsList() {
-		if (!queryClient || !publisher) {
-			error = 'Publisher not initialized. Please wait for initialization.';
+		if (!entitySyncManager) {
+			error = 'EntitySyncManager not initialized. Please wait for initialization.';
 			return;
 		}
 		
@@ -153,32 +152,13 @@
 		error = null;
 		
 		try {
-			// Fetch projects list
-			const result = await queryClient.query<{ listProjects: { items: Project[]; nextToken?: string | null } }>(
-				Q_LIST_PROJECTS,
-				{ limit: 50, scope: 'OWNED_BY_ME' }
-			);
+			const result = await entitySyncManager.syncList({
+				queryVariables: { limit: 50, scope: 'OWNED_BY_ME' },
+				setupSubscriptions: true,
+				clearExisting: false
+			});
 			
-			if (!result?.listProjects?.items) {
-				error = 'No projects found in response';
-				return;
-			}
-			
-			const projectItems = result.listProjects.items;
-			
-			// Publish each project to the store
-			for (const project of projectItems) {
-				if (project?.id) {
-					const topic = toTopicPath('projects', project.id);
-					store.publish(topic, project);
-				}
-			}
-			
-			console.log(`Synced ${projectItems.length} projects to store`);
-			
-			// Set up subscriptions for real-time updates
-			setupProjectSubscriptions(projectItems);
-			
+			console.log(`Synced ${result.count} projects to store`);
 		} catch (err: any) {
 			console.error('Error syncing projects:', err);
 			error = err.message || 'Failed to sync projects';
@@ -188,71 +168,12 @@
 	}
 	
 	/**
-	 * Set up subscriptions for project updates
-	 */
-	function setupProjectSubscriptions(projectItems: Project[]) {
-		if (!subscriptionClient) return;
-		
-		// CRITICAL: Clean up existing subscriptions before adding new ones
-		// This prevents memory leaks from accumulating subscriptions
-		cleanupSubscriptions();
-		
-		// Set up subscriptions for each project
-		// In a real app, you might want to use a more efficient subscription strategy
-		for (const project of projectItems) {
-			if (!project.id) continue;
-			
-			// Update subscription
-			const updateSpec = {
-				query: S_ON_UPDATE_PROJECT,
-				variables: { id: project.id },
-				path: 'onUpdateProject',
-				next: (updatedProject: Project) => {
-					console.log('Project updated:', updatedProject);
-					const topic = toTopicPath('projects', updatedProject.id);
-					store.publish(topic, updatedProject);
-				},
-				error: (err: any) => console.error('Update subscription error:', err)
-			};
-			subscriptionClient.addSubscription(updateSpec);
-			activeSubscriptionSpecs.push(updateSpec);
-			
-			// Delete subscription
-			const deleteSpec = {
-				query: S_ON_DELETE_PROJECT,
-				variables: { id: project.id },
-				path: 'onDeleteProject',
-				next: (deletedProject: Project) => {
-					console.log('Project deleted:', deletedProject);
-					const topic = toTopicPath('projects', deletedProject.id);
-					store.delete(topic);
-				},
-				error: (err: any) => console.error('Delete subscription error:', err)
-			};
-			subscriptionClient.addSubscription(deleteSpec);
-			activeSubscriptionSpecs.push(deleteSpec);
-		}
-	}
-	
-	/**
-	 * Clean up all active subscriptions
-	 */
-	function cleanupSubscriptions() {
-		if (!subscriptionClient) return;
-		
-		// Remove all tracked subscriptions
-		for (const spec of activeSubscriptionSpecs) {
-			subscriptionClient.removeSubscription(spec);
-		}
-		activeSubscriptionSpecs = [];
-	}
-	
-	/**
 	 * Clear all projects from store
 	 */
 	function clearProjects() {
-		// Clean up subscriptions before clearing
-		cleanupSubscriptions();
+		if (entitySyncManager) {
+			entitySyncManager.cleanup();
+		}
 		store.clearAllAt('projects');
 	}
 	
@@ -269,13 +190,13 @@
 		
 		// Only initialize once when we have a token
 		$effect(() => {
-			if (!idToken || initialized || publisher) return;
+			if (!idToken || initialized || entitySyncManager) return;
 			
 			initialized = true;
 			error = null; // Clear any previous errors
-			initializePublisher().then(() => {
+			initializeManager().then(() => {
 				// Auto-sync projects after initialization
-				if (publisher) {
+				if (entitySyncManager) {
 					syncProjectsList();
 				}
 			});
@@ -283,9 +204,8 @@
 		
 		// Cleanup function
 		return () => {
-			cleanupSubscriptions();
-			if (publisher) {
-				publisher.disconnect();
+			if (entitySyncManager) {
+				entitySyncManager.cleanup();
 			}
 			if (subscriptionClient) {
 				subscriptionClient.disconnect();
@@ -323,7 +243,7 @@
 	<div class="mb-6 flex gap-4">
 		<button
 			onclick={syncProjectsList}
-			disabled={loading || !publisher}
+			disabled={loading || !entitySyncManager}
 			class="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50 {darkMode ? 'bg-blue-600 hover:bg-blue-700' : ''}"
 		>
 			{loading ? 'Syncing...' : 'Sync Projects'}
