@@ -1273,6 +1273,21 @@
 				</span>
 			</div>
 			<div class="flex items-center gap-2">
+				<div class="flex items-center gap-2">
+					<button
+						class="px-3 py-1.5 text-sm font-medium {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'} rounded-md transition-colors"
+						title="Save workflow (coming soon)"
+						onclick={() => {}}
+					>
+						Save
+					</button>
+					<button
+						class="px-3 py-1.5 text-sm font-medium {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'} rounded-md transition-colors"
+						onclick={showWorkflowJSON}
+					>
+						Export
+					</button>
+				</div>
 				<!-- Zoom Controls -->
 				<div class="flex items-center gap-1 {darkMode ? 'bg-slate-700' : 'bg-slate-100'} rounded-md p-1">
 					<button
