@@ -34,6 +34,7 @@
 	import WorkflowToolbar from './components/WorkflowToolbar.svelte';
 	import WorkflowCanvas from './components/WorkflowCanvas.svelte';
 	import WorkflowResultsPanel from './components/WorkflowResultsPanel.svelte';
+	import WorkflowModal from './components/WorkflowModal.svelte';
 	import { loadCustomAINodes as loadCustomNodes, saveCustomAINodes, createCustomAINode as createCustomNode } from './services/customNodeService';
 	import { getElementTypes } from './services/nodeLibraryService';
 	import type { AIQueryData, ElementType, GridElement, Connection, ConnectionPoint } from './types';
@@ -986,59 +987,71 @@
 
 	<!-- Property Data Gallery Modal -->
 	{#if showingInputGallery}
-		<div
-			class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
-			onclick={() => showingInputGallery = false}
-			onkeydown={(e) => e.key === 'Escape' && (showingInputGallery = false)}
-			role="dialog"
-			aria-modal="true"
-			aria-labelledby="input-gallery-modal-title"
-			tabindex="-1"
+		<WorkflowModal
+			{darkMode}
+			labelledBy="input-gallery-modal-title"
+			containerClass="overflow-hidden flex flex-col"
+			onClose={() => (showingInputGallery = false)}
 		>
-			<div
-				class="{darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden m-4 border flex flex-col"
-				onclick={(e) => e.stopPropagation()}
-				onkeydown={(e) => e.stopPropagation()}
-				role="presentation"
-			>
-				<!-- Header -->
-				<div class="p-6 border-b {darkMode ? 'border-slate-700' : 'border-slate-200'} flex items-center justify-between">
-					<div class="flex items-center gap-3">
-						<div class="w-10 h-10 {darkMode ? 'bg-blue-900' : 'bg-blue-100'} rounded-lg flex items-center justify-center">
-							<svg class="w-5 h-5 {darkMode ? 'text-blue-300' : 'text-blue-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-							</svg>
-						</div>
-						<div>
-							<h2 id="input-gallery-modal-title" class="text-xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">
-								Property Data Library
-							</h2>
-							<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-0.5">Browse and add property data input nodes</p>
-						</div>
-					</div>
-					<button
-						onclick={() => showingInputGallery = false}
-						class="p-1.5 {darkMode ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'} rounded transition-colors"
-						aria-label="Close gallery"
-					>
-						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+			<!-- Header -->
+			<div class="p-6 border-b {darkMode ? 'border-slate-700' : 'border-slate-200'} flex items-center justify-between">
+				<div class="flex items-center gap-3">
+					<div class="w-10 h-10 {darkMode ? 'bg-blue-900' : 'bg-blue-100'} rounded-lg flex items-center justify-center">
+						<svg class="w-5 h-5 {darkMode ? 'text-blue-300' : 'text-blue-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
 						</svg>
-					</button>
+					</div>
+					<div>
+						<h2 id="input-gallery-modal-title" class="text-xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">
+							Property Data Library
+						</h2>
+						<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-0.5">Browse and add property data input nodes</p>
+					</div>
 				</div>
+				<button
+					onclick={() => showingInputGallery = false}
+					class="p-1.5 {darkMode ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'} rounded transition-colors"
+					aria-label="Close gallery"
+				>
+					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+					</svg>
+				</button>
+			</div>
 
-				<!-- Gallery Content -->
-				<div class="flex-1 overflow-y-auto p-6">
-					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-						{#each elementTypes.filter((t) => t.type === 'input') as query}
-							<div
-								class="{darkMode ? 'bg-slate-700 border-slate-600 hover:border-blue-500' : 'bg-slate-50 border-slate-200 hover:border-blue-300'} border rounded-lg p-4 cursor-pointer transition-all hover:shadow-lg group"
-								onclick={() => {
+			<!-- Gallery Content -->
+			<div class="flex-1 overflow-y-auto p-6">
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					{#each elementTypes.filter((t) => t.type === 'input') as query}
+						<div
+							class="{darkMode ? 'bg-slate-700 border-slate-600 hover:border-blue-500' : 'bg-slate-50 border-slate-200 hover:border-blue-300'} border rounded-lg p-4 cursor-pointer transition-all hover:shadow-lg group"
+							onclick={() => {
+								if (gridContainer) {
+									const rect = gridContainer.getBoundingClientRect();
+									const centerX = (rect.width / 2 - panX) / zoomLevel - 60;
+									const centerY = (rect.height / 2 - panY) / zoomLevel - 40;
+
+									const newElement: GridElement = {
+										id: generateId(),
+										type: query,
+										x: centerX,
+										y: centerY,
+										width: 120,
+										height: 80
+									};
+									gridElements = [...gridElements, newElement];
+								}
+								showingInputGallery = false;
+							}}
+							role="button"
+							tabindex="0"
+							onkeydown={(e) => {
+								if (e.key === 'Enter' || e.key === ' ') {
 									if (gridContainer) {
 										const rect = gridContainer.getBoundingClientRect();
 										const centerX = (rect.width / 2 - panX) / zoomLevel - 60;
 										const centerY = (rect.height / 2 - panY) / zoomLevel - 40;
-										
+
 										const newElement: GridElement = {
 											id: generateId(),
 											type: query,
@@ -1050,158 +1063,241 @@
 										gridElements = [...gridElements, newElement];
 									}
 									showingInputGallery = false;
-								}}
-								role="button"
-								tabindex="0"
-								onkeydown={(e) => {
-									if (e.key === 'Enter' || e.key === ' ') {
-										if (gridContainer) {
-											const rect = gridContainer.getBoundingClientRect();
-											const centerX = (rect.width / 2 - panX) / zoomLevel - 60;
-											const centerY = (rect.height / 2 - panY) / zoomLevel - 40;
-											
-											const newElement: GridElement = {
-												id: generateId(),
-												type: query,
-												x: centerX,
-												y: centerY,
-												width: 120,
-												height: 80
-											};
-											gridElements = [...gridElements, newElement];
-										}
-										showingInputGallery = false;
-									}
-								}}
-							>
-								<div class="flex items-start gap-3">
-									<div class="w-10 h-10 flex-shrink-0 {darkMode ? 'bg-blue-900' : 'bg-blue-100'} rounded-lg flex items-center justify-center">
-										<span class="text-sm font-semibold {darkMode ? 'text-blue-300' : 'text-blue-600'}">{query.icon}</span>
-									</div>
-									<div class="flex-1 min-w-0">
-										<h4 class="text-sm font-semibold {darkMode ? 'text-white' : 'text-slate-900'} mb-1 group-hover:text-blue-400 transition-colors">
-											{query.label}
-										</h4>
-										<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'} line-clamp-2">
-											{#if query.id === 'input-property-data'}
-												Input property information including address, square footage, and property type
-											{:else if query.id === 'input-financial-metrics'}
-												Input financial metrics including purchase price, annual rent, and operating expenses
-											{:else if query.id === 'input-market-data'}
-												Input market data including cap rates, comparable sales, and market trends
-											{:else if query.id === 'input-event'}
-												Configure an AWS EventBridge event payload with source, detail type, and bus settings
-											{:else}
-												Property data input node
-											{/if}
-										</p>
-									</div>
-									<svg class="w-5 h-5 {darkMode ? 'text-slate-500 group-hover:text-blue-400' : 'text-slate-400 group-hover:text-blue-600'} transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-									</svg>
+								}
+							}}
+						>
+							<div class="flex items-start gap-3">
+								<div class="w-10 h-10 flex-shrink-0 {darkMode ? 'bg-blue-900' : 'bg-blue-100'} rounded-lg flex items-center justify-center">
+									<span class="text-sm font-semibold {darkMode ? 'text-blue-300' : 'text-blue-600'}">{query.icon}</span>
 								</div>
+								<div class="flex-1 min-w-0">
+									<h4 class="text-sm font-semibold {darkMode ? 'text-white' : 'text-slate-900'} mb-1 group-hover:text-blue-400 transition-colors">
+										{query.label}
+									</h4>
+									<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'} line-clamp-2">
+										{#if query.id === 'input-property-data'}
+											Input property information including address, square footage, and property type
+										{:else if query.id === 'input-financial-metrics'}
+											Input financial metrics including purchase price, annual rent, and operating expenses
+										{:else if query.id === 'input-market-data'}
+											Input market data including cap rates, comparable sales, and market trends
+										{:else if query.id === 'input-event'}
+											Configure an AWS EventBridge event payload with source, detail type, and bus settings
+										{:else}
+											Property data input node
+										{/if}
+									</p>
+								</div>
+								<svg class="w-5 h-5 {darkMode ? 'text-slate-500 group-hover:text-blue-400' : 'text-slate-400 group-hover:text-blue-600'} transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+								</svg>
 							</div>
-						{/each}
-					</div>
+						</div>
+					{/each}
 				</div>
 			</div>
-		</div>
+		</WorkflowModal>
 	{/if}
 
+	<!-- Financial Calculations Gallery Modal -->
+	{#if showingProcessGallery}
+		<WorkflowModal
+			{darkMode}
+			labelledBy="process-gallery-modal-title"
+			containerClass="overflow-hidden flex flex-col"
+			onClose={() => (showingProcessGallery = false)}
+		>
+			<!-- Header -->
+			<div class="p-6 border-b {darkMode ? 'border-slate-700' : 'border-slate-200'} flex items-center justify-between">
+				<div class="flex items-center gap-3">
+					<div class="w-10 h-10 {darkMode ? 'bg-purple-900' : 'bg-purple-100'} rounded-lg flex items-center justify-center">
+						<svg class="w-5 h-5 {darkMode ? 'text-purple-300' : 'text-purple-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+						</svg>
+					</div>
+					<div>
+						<h2 id="process-gallery-modal-title" class="text-xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">
+							Financial Calculations Library
+						</h2>
+						<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-0.5">Browse and add financial calculation nodes</p>
+					</div>
+				</div>
+				<button
+					onclick={() => showingProcessGallery = false}
+					class="p-1.5 {darkMode ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'} rounded transition-colors"
+					aria-label="Close gallery"
+				>
+					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+					</svg>
+				</button>
+			</div>
+
+			<!-- Gallery Content -->
+			<div class="flex-1 overflow-y-auto p-6">
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					{#each elementTypes.filter((t) => t.type === 'process') as query}
+						<div
+							class="{darkMode ? 'bg-slate-700 border-slate-600 hover:border-purple-500' : 'bg-slate-50 border-slate-200 hover:border-purple-300'} border rounded-lg p-4 cursor-pointer transition-all hover:shadow-lg group"
+							onclick={() => {
+								if (gridContainer) {
+									const rect = gridContainer.getBoundingClientRect();
+									const centerX = (rect.width / 2 - panX) / zoomLevel - 60;
+									const centerY = (rect.height / 2 - panY) / zoomLevel - 40;
+
+									const newElement: GridElement = {
+										id: generateId(),
+										type: query,
+										x: centerX,
+										y: centerY,
+										width: 120,
+										height: 80
+									};
+									gridElements = [...gridElements, newElement];
+								}
+								showingProcessGallery = false;
+							}}
+							role="button"
+							tabindex="0"
+							onkeydown={(e) => {
+								if (e.key === 'Enter' || e.key === ' ') {
+									if (gridContainer) {
+										const rect = gridContainer.getBoundingClientRect();
+										const centerX = (rect.width / 2 - panX) / zoomLevel - 60;
+										const centerY = (rect.height / 2 - panY) / zoomLevel - 40;
+
+										const newElement: GridElement = {
+											id: generateId(),
+											type: query,
+											x: centerX,
+											y: centerY,
+											width: 120,
+											height: 80
+										};
+										gridElements = [...gridElements, newElement];
+									}
+									showingProcessGallery = false;
+								}
+							}}
+						>
+							<div class="flex items-start gap-3">
+								<div class="w-10 h-10 flex-shrink-0 {darkMode ? 'bg-purple-900' : 'bg-purple-100'} rounded-lg flex items-center justify-center">
+									<span class="text-xs font-semibold {darkMode ? 'text-purple-300' : 'text-purple-600'}">{query.icon}</span>
+								</div>
+								<div class="flex-1 min-w-0">
+									<h4 class="text-sm font-semibold {darkMode ? 'text-white' : 'text-slate-900'} mb-1 group-hover:text-purple-400 transition-colors">
+										{query.label}
+									</h4>
+									<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'} line-clamp-2">
+										{#if query.id === 'process-calculate-noi'}
+											Calculate Net Operating Income from rent and expenses
+										{:else if query.id === 'process-calculate-cap-rate'}
+											Calculate capitalization rate from NOI and purchase price
+										{:else if query.id === 'process-calculate-dscr'}
+											Calculate Debt Service Coverage Ratio
+										{:else if query.id === 'process-calculate-cash-flow'}
+											Calculate annual cash flow from NOI and debt service
+										{:else}
+											Financial calculation node
+										{/if}
+									</p>
+								</div>
+								<svg class="w-5 h-5 {darkMode ? 'text-slate-500 group-hover:text-purple-400' : 'text-slate-400 group-hover:text-purple-600'} transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+								</svg>
+							</div>
+						</div>
+					{/each}
+				</div>
+			</div>
+		</WorkflowModal>
+	{/if}
 
 	<!-- AI Query Edit Modal -->
 	{#if editingAIQuery}
-		<div
-			class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
-			onclick={cancelEditAIQuery}
-			onkeydown={(e) => e.key === 'Escape' && cancelEditAIQuery()}
-			role="dialog"
-			aria-modal="true"
-			aria-labelledby="modal-title"
-			tabindex="-1"
+		<WorkflowModal
+			{darkMode}
+			labelledBy="modal-title"
+			maxWidthClass="max-w-2xl"
+			maxHeightClass="max-h-[90vh]"
+			containerClass="overflow-y-auto"
+			onClose={cancelEditAIQuery}
 		>
-			<div
-				class="{darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4 border"
-				onclick={(e) => e.stopPropagation()}
-				onkeydown={(e) => e.stopPropagation()}
-				role="presentation"
-			>
-				<div class="p-6">
-					<div class="flex items-center gap-3 mb-6 pb-4 {darkMode ? 'border-slate-700' : 'border-slate-200'} border-b">
-						<div class="w-10 h-10 {darkMode ? 'bg-indigo-900' : 'bg-indigo-100'} rounded-lg flex items-center justify-center">
-							<span class="{darkMode ? 'text-indigo-300' : 'text-indigo-600'} font-bold text-sm">AI</span>
-						</div>
-						<div>
-							<h2 id="modal-title" class="text-xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">
-								Configure AI Analysis
-							</h2>
-							<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-0.5">Set up AI processing parameters</p>
-						</div>
+			<div class="p-6">
+				<div class="flex items-center gap-3 mb-6 pb-4 {darkMode ? 'border-slate-700' : 'border-slate-200'} border-b">
+					<div class="w-10 h-10 {darkMode ? 'bg-indigo-900' : 'bg-indigo-100'} rounded-lg flex items-center justify-center">
+						<span class="{darkMode ? 'text-indigo-300' : 'text-indigo-600'} font-bold text-sm">AI</span>
 					</div>
-
-					<div class="space-y-5">
-						<div>
-							<label for="ai-model-select" class="block text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'} mb-2">
-								AI Model
-							</label>
-							<select
-								id="ai-model-select"
-								bind:value={aiQueryModel}
-								class="w-full px-3 py-2.5 {darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-							>
-								<option value="gpt-4o">GPT-4o</option>
-								<option value="gpt-4o-mini">GPT-4o Mini</option>
-								<option value="gpt-4-turbo">GPT-4 Turbo</option>
-								<option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-							</select>
-						</div>
-
-						<div>
-							<label for="ai-system-prompt" class="block text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'} mb-2">
-								Context Instructions <span class="{darkMode ? 'text-slate-500' : 'text-slate-400'} font-normal">(Optional)</span>
-							</label>
-							<textarea
-								id="ai-system-prompt"
-								bind:value={aiQuerySystemPrompt}
-								placeholder="You are an expert commercial real estate analyst..."
-								class="w-full px-3 py-2.5 {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none text-sm"
-								rows="3"
-							></textarea>
-							<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1.5">Provide context about the AI's role and expertise</p>
-						</div>
-
-						<div>
-							<label for="ai-user-prompt" class="block text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'} mb-2">
-								Analysis Prompt
-							</label>
-							<textarea
-								id="ai-user-prompt"
-								bind:value={aiQueryPrompt}
-								placeholder="Analyze the following property data: {'{input}'}"
-								class="w-full px-3 py-2.5 {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none text-sm"
-								rows="5"
-							></textarea>
-							<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1.5">Use {'{input}'} to insert data from connected nodes</p>
-						</div>
-					</div>
-
-					<div class="flex gap-3 mt-8 pt-6 {darkMode ? 'border-slate-700' : 'border-slate-200'} border-t">
-						<button
-							onclick={saveAIQuery}
-							class="flex-1 px-4 py-2.5 {darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-900 hover:bg-slate-800'} text-white rounded-md transition-colors font-semibold text-sm shadow-sm hover:shadow"
-						>
-							Save Configuration
-						</button>
-						<button
-							onclick={cancelEditAIQuery}
-							class="flex-1 px-4 py-2.5 {darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-200 border-slate-600' : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300'} rounded-md transition-colors font-semibold text-sm border"
-						>
-							Cancel
-						</button>
+					<div>
+						<h2 id="modal-title" class="text-xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">
+							Configure AI Analysis
+						</h2>
+						<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-0.5">Set up AI processing parameters</p>
 					</div>
 				</div>
+
+				<div class="space-y-5">
+					<div>
+						<label for="ai-model-select" class="block text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'} mb-2">
+							AI Model
+						</label>
+						<select
+							id="ai-model-select"
+							bind:value={aiQueryModel}
+							class="w-full px-3 py-2.5 {darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+						>
+							<option value="gpt-4o">GPT-4o</option>
+							<option value="gpt-4o-mini">GPT-4o Mini</option>
+							<option value="gpt-4-turbo">GPT-4 Turbo</option>
+							<option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+						</select>
+					</div>
+
+					<div>
+						<label for="ai-system-prompt" class="block text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'} mb-2">
+							Context Instructions <span class="{darkMode ? 'text-slate-500' : 'text-slate-400'} font-normal">(Optional)</span>
+						</label>
+						<textarea
+							id="ai-system-prompt"
+							bind:value={aiQuerySystemPrompt}
+							placeholder="You are an expert commercial real estate analyst..."
+							class="w-full px-3 py-2.5 {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none text-sm"
+							rows="3"
+						></textarea>
+						<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1.5">Provide context about the AI's role and expertise</p>
+					</div>
+
+					<div>
+						<label for="ai-user-prompt" class="block text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'} mb-2">
+							Analysis Prompt
+						</label>
+						<textarea
+							id="ai-user-prompt"
+							bind:value={aiQueryPrompt}
+							placeholder="Analyze the following property data: {'{input}'}"
+							class="w-full px-3 py-2.5 {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none text-sm"
+							rows="5"
+						></textarea>
+						<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1.5">Use {'{input}'} to insert data from connected nodes</p>
+					</div>
+				</div>
+
+				<div class="flex gap-3 mt-8 pt-6 {darkMode ? 'border-slate-700' : 'border-slate-200'} border-t">
+					<button
+						onclick={saveAIQuery}
+						class="flex-1 px-4 py-2.5 {darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-900 hover:bg-slate-800'} text-white rounded-md transition-colors font-semibold text-sm shadow-sm hover:shadow"
+					>
+						Save Configuration
+					</button>
+					<button
+						onclick={cancelEditAIQuery}
+						class="flex-1 px-4 py-2.5 {darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-200 border-slate-600' : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300'} rounded-md transition-colors font-semibold text-sm border"
+					>
+						Cancel
+					</button>
+				</div>
 			</div>
-		</div>
+		</WorkflowModal>
 	{/if}
 
 	<!-- Node Options Modal -->
