@@ -74,6 +74,15 @@ export const MetricWidgetDataSchema = z.object({
 	unit: z.string().nullable().optional()
 });
 
+export const ValidatedMetricWidgetDataSchema = z.object({
+	label: z.string(),
+	value: z.union([z.string(), z.number()]),
+	change: z.number().nullable().optional(),
+	changeType: z.enum(['increase', 'decrease']).nullable().optional(),
+	unit: z.string().nullable().optional(),
+	topic: z.string().nullable().optional() // Topic path in ValidatedTopicStore
+});
+
 export const MapWidgetDataSchema = z.object({
 	title: z.string().nullable().optional(),
 	description: z.string().nullable().optional(),
@@ -94,6 +103,7 @@ export const WidgetDataSchemas = {
 	lineChart: LineChartWidgetDataSchema,
 	barChart: BarChartWidgetDataSchema,
 	metric: MetricWidgetDataSchema,
+	validatedMetric: ValidatedMetricWidgetDataSchema,
 	map: MapWidgetDataSchema
 } as const;
 
@@ -106,6 +116,7 @@ export type ImageWidgetData = z.infer<typeof ImageWidgetDataSchema>;
 export type LineChartWidgetData = z.infer<typeof LineChartWidgetDataSchema>;
 export type BarChartWidgetData = z.infer<typeof BarChartWidgetDataSchema>;
 export type MetricWidgetData = z.infer<typeof MetricWidgetDataSchema>;
+export type ValidatedMetricWidgetData = z.infer<typeof ValidatedMetricWidgetDataSchema>;
 export type MapWidgetData = z.infer<typeof MapWidgetDataSchema>;
 
 // Union type of all widget data
@@ -117,6 +128,7 @@ export type WidgetData =
 	| LineChartWidgetData
 	| BarChartWidgetData
 	| MetricWidgetData
+	| ValidatedMetricWidgetData
 	| MapWidgetData;
 
 // ===== Type-safe Widget Data Mapping =====
@@ -129,6 +141,7 @@ export interface WidgetDataTypeMap {
 	lineChart: LineChartWidgetData;
 	barChart: BarChartWidgetData;
 	metric: MetricWidgetData;
+	validatedMetric: ValidatedMetricWidgetData;
 	map: MapWidgetData;
 }
 

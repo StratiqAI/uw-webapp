@@ -45,7 +45,9 @@
 	// Store components
 	import StoreContents from './ui/store/StoreContents.svelte';
 	import StoredUsers from './ui/store/StoredUsers.svelte';
+	import StoredProducts from './ui/store/StoredProducts.svelte';
 	import PathLookup from './ui/store/PathLookup.svelte';
+	import SchemaDataViewer from './ui/store/SchemaDataViewer.svelte';
 	
 	// AI components
 	import AIInputForm from './ui/ai/AIInputForm.svelte';
@@ -83,6 +85,12 @@
 
 	// Initialize the validated topic store
 	const store = new ValidatedTopicStore();
+	
+	// Expose store to browser console for debugging
+	// Usage: window.validatedTopicStore.dump()
+	if (typeof window !== 'undefined') {
+		(window as any).validatedTopicStore = store;
+	}
 
 	// ============================================================================
 	// SCHEMA INITIALIZATION
@@ -121,11 +129,35 @@
 
 	const taskSchema = taskSchemaBuilder.build();
 
+	// Schema 4: Validated Metric Widget Schema
+	// Creates a schema for validated metric widgets with label, value, and optional change/unit
+	// Note: Using anyOf for value field because Gemini API doesn't support array types like ['string', 'number']
+	const metricSchemaBuilder = new JSONSchemaBuilder(
+		{
+			label: { type: 'string' },
+			value: {
+				anyOf: [
+					{ type: 'string' },
+					{ type: 'number' }
+				]
+			},
+			change: { type: 'number' }, // Optional: percentage change
+			changeType: { type: 'string', enum: ['increase', 'decrease'] }, // Optional: direction of change
+			unit: { type: 'string' } // Optional: unit of measurement (e.g., 'USD', 'kg', '%')
+		},
+		{
+			required: ['label', 'value'] // Only label and value are required
+		}
+	);
+
+	const metricSchema = metricSchemaBuilder.build();
+
 	// Register all schemas with MQTT-style wildcard patterns
 	// The '+' wildcard matches any single-level segment (e.g., app/users/user-1, app/users/user-2)
 	store.registerSchema('app/users/+', userSchema);
 	store.registerSchema('app/products/+', productSchema);
 	store.registerSchema('app/tasks/+', taskSchema);
+	store.registerSchema('app/metrics/+', metricSchema);
 
 	// ============================================================================
 	// COMPONENT STATE
@@ -175,6 +207,18 @@
 	let allUsers = $derived.by(() =>
 		store.getAllAt('app/users', {
 			// Filter to only include objects that have a 'name' property (user-like data)
+			filter: (key, value) => value && typeof value === 'object' && 'name' in value
+		})
+	);
+
+	/**
+	 * Get all products from the store (all topics under app/products/).
+	 * 
+	 * $derived.by() makes this reactive - updates when store.tree changes.
+	 */
+	let allProducts = $derived.by(() =>
+		store.getAllAt('app/products', {
+			// Filter to only include objects that have a 'name' property (product-like data)
 			filter: (key, value) => value && typeof value === 'object' && 'name' in value
 		})
 	);
@@ -242,6 +286,14 @@
 	}
 
 	/**
+	 * Clear all stored products from the store.
+	 */
+	function clearAllProducts(): void {
+		store.clearAllAt('app/products');
+		aiService.resetCounter();
+	}
+
+	/**
 	 * Get provider display name for UI.
 	 */
 	function getProviderDisplayName(provider: 'openai' | 'gemini'): string {
@@ -296,8 +348,14 @@
 			<!-- All Stored Users -->
 			<StoredUsers {allUsers} {clearAllUsers} />
 
+			<!-- All Stored Products -->
+			<StoredProducts {allProducts} {clearAllProducts} />
+
 			<!-- Path Lookup -->
 			<PathLookup {store} />
+
+			<!-- Schema Data Viewer -->
+			<SchemaDataViewer {store} {registeredSchemas} />
 
 			<!-- Schema Builder -->
 			<SchemaBuilder {store} />

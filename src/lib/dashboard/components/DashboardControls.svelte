@@ -147,12 +147,14 @@
 		const defaultSizes: Record<WidgetType, { colSpan: number; rowSpan: number }> = {
 			title: { colSpan: 12, rowSpan: 1 },
 			metric: { colSpan: 2, rowSpan: 1 },
+			validatedMetric: { colSpan: 2, rowSpan: 1 },
 			paragraph: { colSpan: 6, rowSpan: 2 },
 			table: { colSpan: 6, rowSpan: 4 },
 			image: { colSpan: 6, rowSpan: 4 },
 			map: { colSpan: 8, rowSpan: 4 },
 			lineChart: { colSpan: 6, rowSpan: 3 },
-			barChart: { colSpan: 6, rowSpan: 3 }
+			barChart: { colSpan: 6, rowSpan: 3 },
+			schema: { colSpan: 6, rowSpan: 3 }
 		};
 
 		const { colSpan, rowSpan } = defaultSizes[type];
@@ -201,6 +203,17 @@
 					data: {
 						label: 'METRIC',
 						value: '0'
+					}
+				} as Widget;
+
+			case 'validatedMetric':
+				return {
+					...baseWidget,
+					type: 'validatedMetric',
+					data: {
+						label: 'VALIDATED METRIC',
+						value: '0',
+						topic: `app/metrics/${widgetId}` // Default topic path
 					}
 				} as Widget;
 
@@ -324,6 +337,7 @@
 	const widgetTypes: Array<{ type: WidgetType; label: string; icon: string }> = [
 		{ type: 'title', label: 'Title', icon: '📝' },
 		{ type: 'metric', label: 'Metric', icon: '📊' },
+		{ type: 'validatedMetric', label: 'Validated Metric', icon: '✅' },
 		{ type: 'paragraph', label: 'Paragraph', icon: '📄' },
 		{ type: 'table', label: 'Table', icon: '📋' },
 		{ type: 'image', label: 'Image', icon: '🖼️' },

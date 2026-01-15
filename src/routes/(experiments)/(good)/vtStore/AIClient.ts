@@ -158,11 +158,13 @@ class OpenAIProvider extends AIProvider {
 			);
 
 			// Configure OpenAI's structured output format
+			// Sanitize schema for OpenAI (removes unsupported fields, handles strict mode requirements)
+			const sanitizedSchema = this.sanitizeSchemaForOpenAI(request.schema);
 			const schemaConfig = {
 				type: 'json_schema' as const, // OpenAI's structured output format
 				name: request.schemaPattern.replace(/[^a-zA-Z0-9]/g, '_'), // Sanitize pattern for format name
 				strict: true, // Enforce strict schema compliance
-				schema: this.sanitizeSchema(request.schema) as Record<string, unknown>
+				schema: sanitizedSchema as Record<string, unknown>
 			};
 
 			// Call OpenAI's structured output API
@@ -249,6 +251,65 @@ class OpenAIProvider extends AIProvider {
 
 		return null; // No data found in any expected format
 	}
+
+	/**
+	 * Sanitize schema for OpenAI's strict mode
+	 * OpenAI strict mode requires all properties to be in the 'required' array
+	 * For optional fields, we make them nullable and include them in required
+	 */
+	private sanitizeSchemaForOpenAI(schema: Schema): any {
+		const sanitized = this.sanitizeSchema(schema) as any;
+		
+		if (!sanitized.properties) {
+			return sanitized;
+		}
+
+		// Get all property keys
+		const allPropertyKeys = Object.keys(sanitized.properties);
+		
+		// For OpenAI strict mode, all properties must be in required array
+		// If a property is not in required, make it nullable and add to required
+		const required = sanitized.required || [];
+		const updatedProperties: Record<string, any> = {};
+		
+		for (const key of allPropertyKeys) {
+			const property = sanitized.properties[key];
+			const isRequired = required.includes(key);
+			
+			// If property is not required, make it nullable and add to required for strict mode
+			if (!isRequired) {
+				// Make the property nullable by using anyOf with null type
+				if (property.anyOf) {
+					// If already has anyOf, add null to it
+					updatedProperties[key] = {
+						anyOf: [...property.anyOf, { type: 'null' }]
+					};
+				} else if (property.oneOf) {
+					// If has oneOf, add null to it
+					updatedProperties[key] = {
+						oneOf: [...property.oneOf, { type: 'null' }]
+					};
+				} else {
+					// Otherwise, wrap in anyOf with null
+					updatedProperties[key] = {
+						anyOf: [
+							property,
+							{ type: 'null' }
+						]
+					};
+				}
+			} else {
+				// Keep required properties as-is
+				updatedProperties[key] = property;
+			}
+		}
+		
+		return {
+			...sanitized,
+			properties: updatedProperties,
+			required: allPropertyKeys // All properties must be in required for strict mode
+		};
+	}
 }
 
 /**
@@ -315,16 +376,52 @@ class GeminiProvider extends AIProvider {
 
 	/**
 	 * Remove fields that Gemini doesn't support
+	 * Recursively sanitizes properties to preserve anyOf/oneOf structures
 	 */
 	protected sanitizeSchema(schema: Schema): any {
 		// Gemini API doesn't support additionalProperties and $schema fields
 		// Destructure to remove these fields and keep the rest
 		const { additionalProperties, $schema, ...rest } = schema as any;
+		
+		// Recursively sanitize properties to handle anyOf, oneOf, enum, etc.
+		const sanitizedProperties: Record<string, any> = {};
+		if (rest.properties) {
+			for (const [key, value] of Object.entries(rest.properties)) {
+				sanitizedProperties[key] = this.sanitizeProperty(value as any);
+			}
+		}
+		
 		return {
 			type: rest.type || 'object',
-			properties: rest.properties || {},
+			properties: sanitizedProperties,
 			required: rest.required || []
 		};
+	}
+
+	/**
+	 * Recursively sanitize a property definition
+	 * Preserves anyOf, oneOf, enum, and other valid JSON Schema structures
+	 */
+	private sanitizeProperty(property: any): any {
+		if (!property || typeof property !== 'object') {
+			return property;
+		}
+
+		// If property has anyOf or oneOf, preserve it (Gemini supports these)
+		if (property.anyOf || property.oneOf) {
+			const sanitized: any = {};
+			if (property.anyOf) {
+				sanitized.anyOf = property.anyOf.map((item: any) => this.sanitizeProperty(item));
+			}
+			if (property.oneOf) {
+				sanitized.oneOf = property.oneOf.map((item: any) => this.sanitizeProperty(item));
+			}
+			return sanitized;
+		}
+
+		// For regular properties, remove unsupported fields but keep type, enum, etc.
+		const { additionalProperties, $schema, ...rest } = property;
+		return rest;
 	}
 }
 

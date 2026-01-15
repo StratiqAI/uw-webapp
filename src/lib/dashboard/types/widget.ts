@@ -7,6 +7,7 @@ export type WidgetType =
 	| 'lineChart'
 	| 'barChart'
 	| 'metric'
+	| 'validatedMetric'
 	| 'map'
 	| 'schema';
 
@@ -152,6 +153,18 @@ export interface MetricWidget extends BaseWidget {
 	};
 }
 
+export interface ValidatedMetricWidget extends BaseWidget {
+	type: 'validatedMetric';
+	data: {
+		label: string;
+		value: string | number;
+		change?: number;
+		changeType?: 'increase' | 'decrease';
+		unit?: string;
+		topic?: string; // Topic path in ValidatedTopicStore (e.g., 'app/metrics/sales')
+	};
+}
+
 export type Widget =
 	| TableWidget
 	| TitleWidget
@@ -160,6 +173,7 @@ export type Widget =
 	| LineChartWidget
 	| BarChartWidget
 	| MetricWidget
+	| ValidatedMetricWidget
 	| MapWidget
 	| SchemaWidget;
 

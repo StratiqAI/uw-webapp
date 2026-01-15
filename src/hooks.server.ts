@@ -3,7 +3,6 @@ import { type CurrentUser } from '$lib/types/auth';
 import type { Handle } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
-
 import { REGION, COGNITO_USER_POOL_ID } from '$env/static/private';
 
 const JWKS = createRemoteJWKSet(
@@ -52,6 +51,9 @@ function claimsToCurrentUser(payload: JWTPayload) {
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
+	console.log("*******************************************************************************")
+	console.log("event", event);
+	console.log("*******************************************************************************")
 	// Don't protect the /auth/login and /auth/callback routes
 	if (
 		// event.url.pathname.startsWith('/') ||

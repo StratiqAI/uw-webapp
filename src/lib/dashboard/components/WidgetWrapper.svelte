@@ -13,6 +13,7 @@
 	import LineChartWidget from '$lib/dashboard/components/widgets/LineChartWidget.svelte';
 	import BarChartWidget from '$lib/dashboard/components/widgets/BarChartWidget.svelte';
 	import MetricWidget from '$lib/dashboard/components/widgets/MetricWidget.svelte';
+	import ValidatedMetricWidget from '$lib/dashboard/components/widgets/ValidatedMetricWidget.svelte';
 	import MapWidget from '$lib/dashboard/components/widgets/MapWidget.svelte';
 	import SchemaWidget from '$lib/dashboard/components/widgets/SchemaWidget.svelte';
 
@@ -213,6 +214,8 @@
 				<BarChartWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
 			{:else if widget.type === 'metric'}
 				<MetricWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
+			{:else if widget.type === 'validatedMetric'}
+				<ValidatedMetricWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
 			{:else if widget.type === 'map'}
 				<MapWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
 			{:else if widget.type === 'schema'}

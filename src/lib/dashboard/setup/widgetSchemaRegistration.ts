@@ -24,7 +24,9 @@ const WIDGET_NAMES: Record<WidgetType, string> = {
 	lineChart: 'Line Chart Widget',
 	barChart: 'Bar Chart Widget',
 	metric: 'Metric Widget',
-	map: 'Map Widget'
+	validatedMetric: 'Validated Metric Widget',
+	map: 'Map Widget',
+	schema: 'Schema Widget'
 };
 
 /**
@@ -47,7 +49,9 @@ export function registerWidgetSchemas(): void {
 		'lineChart',
 		'barChart',
 		'metric',
-		'map'
+		'validatedMetric',
+		'map',
+		'schema'
 	];
 
 	for (const widgetType of widgetTypes) {

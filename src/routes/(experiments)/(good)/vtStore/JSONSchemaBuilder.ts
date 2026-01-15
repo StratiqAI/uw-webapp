@@ -39,24 +39,26 @@ export interface JSONSchemaBuilderOptions {
  * 
  * This class provides a fluent interface for building JSON schemas with
  * best practices built-in:
- * - Automatically sets all properties as required
+ * - Automatically sets all properties as required (unless specified otherwise)
  * - Sets additionalProperties to false by default
+ * - Supports anyOf/oneOf for union types
  * - Provides methods for provider-specific schema formats
  */
 export class JSONSchemaBuilder {
 	private properties: Record<string, any>;
-	private requiredFields: string[];
+	private requiredFields: string[] | null;
 	private additionalProperties: boolean;
 	private schemaVersion: string;
 
 	constructor(
 		properties: Record<string, any>,
-		options?: JSONSchemaBuilderOptions
+		options?: JSONSchemaBuilderOptions & {
+			required?: string[]; // Optional: specify which fields are required (default: all fields)
+		}
 	) {
 		this.properties = properties;
-		// Automatically create required from all property keys
-		// Best practice: all fields should be required for AI generation
-		this.requiredFields = Object.keys(this.properties);
+		// If required fields specified, use those; otherwise mark all as required
+		this.requiredFields = options?.required ?? null;
 		// Automatically set additionalProperties to false
 		// Best practice: prevent extra fields that aren't in the schema
 		this.additionalProperties = false;
@@ -70,11 +72,14 @@ export class JSONSchemaBuilder {
 	 * @returns Complete JSON Schema object
 	 */
 	build(): Schema {
+		// Determine required fields: use specified list or default to all properties
+		const required = this.requiredFields ?? Object.keys(this.properties);
+		
 		// Build complete JSON Schema object with all standard fields
 		return {
 			type: 'object',
-			properties: this.properties, // Field definitions
-			required: this.requiredFields, // All fields are required by default
+			properties: this.properties, // Field definitions (supports anyOf, oneOf, enum, etc.)
+			required, // Required fields (can be subset of properties)
 			additionalProperties: this.additionalProperties, // false = strict validation
 			$schema: this.schemaVersion // Schema version identifier
 		};
