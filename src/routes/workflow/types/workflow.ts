@@ -10,6 +10,8 @@ export type GridElement = {
 	height: number;
 	output?: any;
 	aiQueryData?: AIQueryData;
+	nodeOptions?: any;
+	commentText?: string;
 };
 
 export type WorkflowResult = {
@@ -29,6 +31,8 @@ export type WorkflowJSON = {
 		height: number;
 		aiQueryData?: AIQueryData;
 		output?: any;
+		nodeOptions?: any;
+		commentText?: string;
 	}>;
 	connections: Array<{
 		id: string;

@@ -15,7 +15,9 @@ export function generateWorkflowJSON(
 			width: el.width,
 			height: el.height,
 			...(el.aiQueryData && { aiQueryData: el.aiQueryData }),
-			...(el.output !== undefined && { output: el.output })
+			...(el.output !== undefined && { output: el.output }),
+			...(el.nodeOptions !== undefined && { nodeOptions: el.nodeOptions }),
+			...(el.commentText && { commentText: el.commentText })
 		})),
 		connections: connections.map((conn) => ({
 			id: conn.id,

@@ -1,0 +1,11 @@
+import { createAIWorkflowNode } from './createAIWorkflowNode';
+
+export const leaseStructureAnalysisNode = createAIWorkflowNode({
+	id: 'ai-lease-structure-analysis',
+	label: 'Lease Structure Analysis',
+	prompt:
+		'Analyze the lease structure and terms for this commercial property. Evaluate lease expiration schedules, rent escalations, renewal probabilities, and lease economics: {input}',
+	systemPrompt:
+		'You are a commercial real estate lease analyst expert in lease structure evaluation, rent roll analysis, lease expiration management, and lease economics.',
+	inputLabel: 'Lease Data'
+});

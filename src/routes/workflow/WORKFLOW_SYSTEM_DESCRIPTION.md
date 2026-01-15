@@ -184,6 +184,7 @@ Data source nodes that provide input to the workflow:
 - **Document Knowledge Base** (`input-property-data`): Property data input
 - **MCP Server** (`input-financial-metrics`): External data source for financial metrics
 - **US Census** (`input-market-data`): Market data input
+- **Event** (`input-event`): AWS EventBridge event configuration input
 
 **Characteristics**:
 - Execute functions typically return default data structures
