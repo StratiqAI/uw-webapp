@@ -3,21 +3,23 @@
 		zoomLevel = 1,
 		darkMode = false,
 		gridElementsCount = 0,
+		onSave,
+		onExport,
 		onZoomIn,
 		onZoomOut,
 		onResetZoom,
 		onClear,
-		onExportJSON,
 		onToggleDarkMode
 	}: {
 		zoomLevel?: number;
 		darkMode?: boolean;
 		gridElementsCount?: number;
+		onSave?: () => void;
+		onExport?: () => void;
 		onZoomIn?: () => void;
 		onZoomOut?: () => void;
 		onResetZoom?: () => void;
 		onClear?: () => void;
-		onExportJSON?: () => void;
 		onToggleDarkMode?: () => void;
 	} = $props();
 </script>
@@ -31,6 +33,27 @@
 		</span>
 	</div>
 	<div class="flex items-center gap-2">
+		{#if onSave || onExport}
+			<div class="flex items-center gap-2">
+				{#if onSave}
+					<button
+						class="px-3 py-1.5 text-sm font-medium {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'} rounded-md transition-colors"
+						onclick={onSave}
+						title="Save workflow (coming soon)"
+					>
+						Save
+					</button>
+				{/if}
+				{#if onExport}
+					<button
+						class="px-3 py-1.5 text-sm font-medium {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'} rounded-md transition-colors"
+						onclick={onExport}
+					>
+						Export
+					</button>
+				{/if}
+			</div>
+		{/if}
 		<!-- Zoom Controls -->
 		<div class="flex items-center gap-1 {darkMode ? 'bg-slate-700' : 'bg-slate-100'} rounded-md p-1">
 			{#if onZoomOut}
@@ -82,18 +105,6 @@
 				onclick={onClear}
 			>
 				Clear
-			</button>
-		{/if}
-		{#if onExportJSON}
-			<button
-				class="p-2 {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'} rounded-md transition-colors"
-				onclick={onExportJSON}
-				aria-label="Export workflow JSON"
-				title="Export workflow as JSON"
-			>
-				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
-				</svg>
 			</button>
 		{/if}
 		{#if onToggleDarkMode}

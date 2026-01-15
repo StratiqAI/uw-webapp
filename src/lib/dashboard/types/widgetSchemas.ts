@@ -93,6 +93,11 @@ export const MapWidgetDataSchema = z.object({
 	apiKey: z.string()
 });
 
+export const SchemaWidgetDataSchema = z.object({
+	schemaId: z.string(),
+	data: z.unknown().optional()
+});
+
 // ===== Schema Registry =====
 
 export const WidgetDataSchemas = {
@@ -104,7 +109,8 @@ export const WidgetDataSchemas = {
 	barChart: BarChartWidgetDataSchema,
 	metric: MetricWidgetDataSchema,
 	validatedMetric: ValidatedMetricWidgetDataSchema,
-	map: MapWidgetDataSchema
+	map: MapWidgetDataSchema,
+	schema: SchemaWidgetDataSchema
 } as const;
 
 // ===== Inferred Types from Schemas =====
@@ -118,6 +124,7 @@ export type BarChartWidgetData = z.infer<typeof BarChartWidgetDataSchema>;
 export type MetricWidgetData = z.infer<typeof MetricWidgetDataSchema>;
 export type ValidatedMetricWidgetData = z.infer<typeof ValidatedMetricWidgetDataSchema>;
 export type MapWidgetData = z.infer<typeof MapWidgetDataSchema>;
+export type SchemaWidgetData = z.infer<typeof SchemaWidgetDataSchema>;
 
 // Union type of all widget data
 export type WidgetData =
@@ -129,7 +136,8 @@ export type WidgetData =
 	| BarChartWidgetData
 	| MetricWidgetData
 	| ValidatedMetricWidgetData
-	| MapWidgetData;
+	| MapWidgetData
+	| SchemaWidgetData;
 
 // ===== Type-safe Widget Data Mapping =====
 
@@ -143,6 +151,7 @@ export interface WidgetDataTypeMap {
 	metric: MetricWidgetData;
 	validatedMetric: ValidatedMetricWidgetData;
 	map: MapWidgetData;
+	schema: SchemaWidgetData;
 }
 
 // ===== Widget Channel Configuration =====

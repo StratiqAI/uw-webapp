@@ -10,7 +10,8 @@
 		onShowInputGallery,
 		onShowProcessGallery,
 		onShowAIGallery,
-		onExecuteWorkflow
+		onExecuteWorkflow,
+		onAddComment
 	}: {
 		allElementTypes?: ElementType[];
 		darkMode?: boolean;
@@ -20,6 +21,7 @@
 		onShowProcessGallery?: () => void;
 		onShowAIGallery?: () => void;
 		onExecuteWorkflow?: () => void;
+		onAddComment?: () => void;
 	} = $props();
 
 	function handleDragStart(elementType: ElementType, event: MouseEvent) {
@@ -198,6 +200,23 @@
 				{/each}
 			</div>
 		</div>
+
+		<!-- Tools -->
+		{#if onAddComment}
+			<div>
+				<h3 class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-wider mb-3">Tools</h3>
+				<button
+					class="w-full p-3.5 {darkMode ? 'bg-amber-900/30 hover:bg-amber-900/40 border-amber-600/50' : 'bg-amber-50 hover:bg-amber-100 border-amber-200'} rounded-lg cursor-pointer transition-all flex items-center gap-3 border shadow-sm hover:shadow-md hover:scale-[1.02] group"
+					onclick={onAddComment}
+					title="Add a comment to the canvas"
+				>
+					<span class="text-lg w-10 h-10 flex items-center justify-center {darkMode ? 'bg-amber-800/50' : 'bg-amber-100'} {darkMode ? 'text-amber-200' : 'text-amber-700'} rounded-lg transition-colors group-hover:scale-105">
+						💬
+					</span>
+					<span class="text-sm font-semibold flex-1 text-left {darkMode ? 'text-slate-200' : 'text-slate-900'}">Add Comment</span>
+				</button>
+			</div>
+		{/if}
 	</div>
 
 	<!-- Execute Button -->

@@ -1,10 +1,11 @@
 <script lang="ts">
 	import type { GridElement, Connection, ConnectionPoint, ConnectionSide } from '../types';
+	import { getElementBorderColor, getElementColor } from '../utils/nodeStyling';
 	import WorkflowNode from './WorkflowNode.svelte';
 	import WorkflowConnection from './WorkflowConnection.svelte';
 	import WorkflowConnectionPreview from './WorkflowConnectionPreview.svelte';
 
-	const {
+	let {
 		gridElements = [],
 		connections = [],
 		zoomLevel = 1,
@@ -15,6 +16,11 @@
 		draggedGridElement = null,
 		currentMousePos = { x: 0, y: 0 },
 		isPanning = false,
+		editingComment = null,
+		commentText = $bindable(''),
+		commentTextareaRef = $bindable(null),
+		gridContainer = $bindable(null),
+		svgContainer = $bindable(null),
 		onPanStart,
 		onGridClick,
 		onWheel,
@@ -22,7 +28,10 @@
 		onNodeDragStart,
 		onNodeDoubleClick,
 		onConnectionPointClick,
-		onConnectionDelete
+		onConnectionDelete,
+		onCommentSave,
+		onCommentCancel,
+		onCommentResizeStart
 	}: {
 		gridElements?: GridElement[];
 		connections?: Connection[];
@@ -34,6 +43,11 @@
 		draggedGridElement?: GridElement | null;
 		currentMousePos?: { x: number; y: number };
 		isPanning?: boolean;
+		editingComment?: GridElement | null;
+		commentText?: string;
+		commentTextareaRef?: HTMLTextAreaElement | null;
+		gridContainer?: HTMLDivElement | null;
+		svgContainer?: SVGSVGElement | null;
 		onPanStart?: (event: MouseEvent) => void;
 		onGridClick?: () => void;
 		onWheel?: (event: WheelEvent) => void;
@@ -42,10 +56,10 @@
 		onNodeDoubleClick?: (element: GridElement, event: MouseEvent) => void;
 		onConnectionPointClick?: (elementId: string, side: ConnectionSide, event: MouseEvent) => void;
 		onConnectionDelete?: (connectionId: string) => void;
+		onCommentSave?: () => void;
+		onCommentCancel?: () => void;
+		onCommentResizeStart?: (element: GridElement, event: MouseEvent) => void;
 	} = $props();
-
-	let gridContainer: HTMLDivElement | null = null;
-	let svgContainer: SVGSVGElement | null = null;
 
 	function handleWheel(event: WheelEvent) {
 		event.preventDefault();
@@ -134,7 +148,7 @@
 						{toElement}
 						{darkMode}
 						isDragging={draggedGridElement ? (draggedGridElement.id === connection.from || draggedGridElement.id === connection.to) : false}
-						{onDelete}={onConnectionDelete}
+						onDelete={onConnectionDelete}
 					/>
 				{/if}
 			{/each}
@@ -156,15 +170,87 @@
 
 		<!-- Grid Elements -->
 		{#each gridElements as element (element.id)}
-			<WorkflowNode
-				{element}
-				{darkMode}
-				isDragged={draggedGridElement?.id === element.id}
-				{onDelete}={onNodeDelete}
-				{onDragStart}={onNodeDragStart}
-				{onDoubleClick}={onNodeDoubleClick}
-				{onConnectionPointClick}={onConnectionPointClick}
-			/>
+			{#if element.type.type === 'comment'}
+				<div
+					class="absolute overflow-visible {getElementColor(
+						element.type.type,
+						darkMode
+					)} rounded-lg {darkMode ? 'shadow-lg shadow-black/30' : 'shadow-md'} cursor-move border-2 {getElementBorderColor(
+						element.type.type,
+						darkMode
+					)} {draggedGridElement?.id === element.id ? '' : 'hover:shadow-lg transition-all'} border-dashed"
+					style="left: {element.x}px; top: {element.y}px; width: {element.width}px; min-height: {element.height}px; {draggedGridElement?.id === element.id ? 'transition: none;' : ''}"
+					onmousedown={(e) => { onNodeDragStart?.(element, e); e.stopPropagation(); }}
+					ondblclick={(e) => onNodeDoubleClick?.(element, e)}
+					role="button"
+					tabindex="0"
+				>
+					<div class="relative w-full h-full p-3 group">
+						<button
+							class="absolute -top-2 -right-2 w-5 h-5 {darkMode ? 'bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white' : 'bg-slate-200 hover:bg-red-500 text-slate-600 hover:text-white'} rounded-full flex items-center justify-center transition-all hover:scale-110 shadow-sm opacity-0 group-hover:opacity-100 z-30"
+							onclick={(e) => onNodeDelete?.(element.id, e)}
+							aria-label="Delete comment"
+							title="Delete comment"
+						>
+							<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+							</svg>
+						</button>
+
+						<div
+							class="resize-handle absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize opacity-0 group-hover:opacity-100 transition-opacity z-30"
+							onmousedown={(e) => onCommentResizeStart?.(element, e)}
+							title="Resize comment"
+							role="button"
+							tabindex="0"
+							aria-label="Resize comment"
+						>
+							<svg class="w-full h-full {darkMode ? 'text-amber-400' : 'text-amber-600'}" fill="currentColor" viewBox="0 0 24 24">
+								<path d="M22 22H20V20H22V22Z" />
+								<path d="M22 18H20V16H22V18Z" />
+								<path d="M18 22H16V20H18V22Z" />
+								<path d="M18 18H16V16H18V18Z" />
+								<path d="M14 22H12V20H14V22Z" />
+								<path d="M22 14H20V12H22V14Z" />
+							</svg>
+						</div>
+
+						{#if editingComment?.id === element.id}
+							<textarea
+								bind:value={commentText}
+								bind:this={commentTextareaRef}
+								class="w-full h-full min-h-[80px] p-2 {darkMode ? 'bg-slate-800 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'} border rounded resize-none focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm"
+								placeholder="Enter your comment..."
+								onkeydown={(e) => {
+									if (e.key === 'Escape') {
+										onCommentCancel?.();
+									} else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+										onCommentSave?.();
+									}
+								}}
+								onclick={(e) => e.stopPropagation()}
+							></textarea>
+							<div class="mt-2 flex items-center justify-end gap-2 text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'}">
+								<span>Ctrl+Enter to save, Esc to cancel</span>
+							</div>
+						{:else}
+							<div class="text-sm {darkMode ? 'text-slate-200' : 'text-slate-700'} whitespace-pre-wrap break-words">
+								{element.commentText || 'Double-click to edit'}
+							</div>
+						{/if}
+					</div>
+				</div>
+			{:else}
+				<WorkflowNode
+					{element}
+					{darkMode}
+					isDragged={draggedGridElement?.id === element.id}
+					onDelete={onNodeDelete}
+					onDragStart={onNodeDragStart}
+					onDoubleClick={onNodeDoubleClick}
+					onConnectionPointClick={onConnectionPointClick}
+				/>
+			{/if}
 		{/each}
 	</div>
 
