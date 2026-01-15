@@ -32,74 +32,86 @@
 	import { generateId } from './utils/idGenerator';
 	import { loadCustomAINodes as loadCustomNodes, saveCustomAINodes, createCustomAINode as createCustomNode } from './services/customNodeService';
 	import { getElementTypes } from './services/nodeLibraryService';
-	// Types
-	type ElementType = {
-		id: string;
-		type: 'input' | 'process' | 'output' | 'ai' | 'comment';
-		label: string;
-		icon: string;
-		execute: (input: any, customData?: any) => any | Promise<any>;
-		defaultAIQueryData?: AIQueryData; // For custom AI nodes
-	};
+	import type { AIQueryData, ElementType, GridElement, Connection, ConnectionPoint } from './types';
 
-	type AIQueryData = {
-		prompt: string;
-		model: string;
-		systemPrompt?: string;
-	};
+	// ------------------------------------------------------------------------------------------------
+	// Workflow builder overview
+	// - Node library and custom AI nodes
+	// - Canvas interaction and execution state
+	// - Editing modals and export tooling
+	// ------------------------------------------------------------------------------------------------
 
-	type GridElement = {
-		id: string;
-		type: ElementType;
-		x: number;
-		y: number;
-		width: number;
-		height: number;
-		output?: any;
-		aiQueryData?: AIQueryData;
-		nodeOptions?: any;
-		commentText?: string; // For comment elements
-	};
-
-	type Connection = {
-		id: string;
-		from: string; // element id
-		to: string; // element id
-		fromSide: 'top' | 'right' | 'bottom' | 'left';
-		toSide: 'top' | 'right' | 'bottom' | 'left';
-	};
-
-	type ConnectionPoint = {
-		x: number;
-		y: number;
-		elementId: string;
-		side: 'top' | 'right' | 'bottom' | 'left';
-	};
-
-	// Available element types - Commercial Real Estate Focused
+	// ------------------------------------------------------------------------------------------------
+	// Node library (default + custom AI)
+	// ------------------------------------------------------------------------------------------------
 	const elementTypes: ElementType[] = getElementTypes();
-
-	// State using Svelte 5 runes
-	let gridElements = $state<GridElement[]>([]);
-	let connections = $state<Connection[]>([]);
-	let draggedElementType = $state<ElementType | null>(null);
-	let nodeFilter = $state('');
-	let draggedGridElement = $state<GridElement | null>(null);
-	let dragOffset = $state({ x: 0, y: 0 });
-	let connectingFrom = $state<ConnectionPoint | null>(null);
-	let currentMousePos = $state({ x: 0, y: 0 });
-	let creatingCustomAI = $state(false);
-	let showingAIGallery = $state(false);
-	let showingInputGallery = $state(false);
-	let showingProcessGallery = $state(false);
 	let customAINodes = $state<ElementType[]>([]);
 	let customAINodeLabel = $state('');
 	let customAINodePrompt = $state('');
 	let customAINodeModel = $state('gpt-4o');
 	let customAINodeSystemPrompt = $state('');
-	let aiGalleryFilter = $state('');
+	let allElementTypes = $derived([...elementTypes, ...customAINodes]);
 
-	// Custom AI node functions - now imported from services/customNodeService.ts
+	// ------------------------------------------------------------------------------------------------
+	// Canvas data + interaction state
+	// ------------------------------------------------------------------------------------------------
+	let gridElements = $state<GridElement[]>([]);
+	let connections = $state<Connection[]>([]);
+	let draggedElementType = $state<ElementType | null>(null);
+	let draggedGridElement = $state<GridElement | null>(null);
+	let dragOffset = $state({ x: 0, y: 0 });
+	let connectingFrom = $state<ConnectionPoint | null>(null);
+	let currentMousePos = $state({ x: 0, y: 0 });
+	let gridContainer = $state<HTMLDivElement | null>(null);
+	let svgContainer = $state<SVGSVGElement | null>(null);
+	let panX = $state(0);
+	let panY = $state(0);
+	let isPanning = $state(false);
+	let panStart = $state({ x: 0, y: 0 });
+	let zoomLevel = $state(1);
+	let resizingElement = $state<GridElement | null>(null);
+	let resizeStart = $state({ x: 0, y: 0, width: 0, height: 0 });
+
+	// ------------------------------------------------------------------------------------------------
+	// UI filters + modal state
+	// ------------------------------------------------------------------------------------------------
+	let nodeFilter = $state('');
+	let creatingCustomAI = $state(false);
+	let showingAIGallery = $state(false);
+	let showingInputGallery = $state(false);
+	let showingProcessGallery = $state(false);
+	let aiGalleryFilter = $state('');
+	let workflowResults = $state<any[]>([]);
+	let editingAIQuery = $state<GridElement | null>(null);
+	let aiQueryPrompt = $state('');
+	let aiQueryModel = $state('gpt-4o');
+	let aiQuerySystemPrompt = $state('');
+	let editingNodeOptions = $state<GridElement | null>(null);
+	let nodeOptionsText = $state('');
+	let nodeOptionsError = $state('');
+	let editingComment = $state<GridElement | null>(null);
+	let commentText = $state('');
+	let commentTextareaRef = $state<HTMLTextAreaElement | null>(null);
+	let showingWorkflowJSON = $state(false);
+	let workflowJSON = $state('');
+	let copiedToClipboard = $state(false);
+
+	// ------------------------------------------------------------------------------------------------
+	// Theme state
+	// ------------------------------------------------------------------------------------------------
+	let darkMode = $derived.by(() => darkModeStore.darkMode);
+	let toggleDarkMode = darkModeStore.toggle;
+
+	// ------------------------------------------------------------------------------------------------
+	// Lifecycle: load custom AI nodes on mount
+	// ------------------------------------------------------------------------------------------------
+	if (typeof window !== 'undefined') {
+		handleLoadCustomAINodes();
+	}
+
+	// ------------------------------------------------------------------------------------------------
+	// Custom AI node management (create/save/delete)
+	// ------------------------------------------------------------------------------------------------
 	function handleLoadCustomAINodes() {
 		customAINodes = loadCustomNodes();
 	}
@@ -108,7 +120,6 @@
 		saveCustomAINodes(customAINodes);
 	}
 
-	// Create a custom AI node
 	function createCustomAINode() {
 		if (!customAINodeLabel.trim() || !customAINodePrompt.trim()) {
 			return;
@@ -126,7 +137,6 @@
 		customAINodes = [...customAINodes, customNode];
 		handleSaveCustomAINodes();
 
-		// Reset form
 		customAINodeLabel = '';
 		customAINodePrompt = '';
 		customAINodeModel = 'gpt-4o';
@@ -134,13 +144,11 @@
 		creatingCustomAI = false;
 	}
 
-	// Delete a custom AI node
 	function deleteCustomAINode(nodeId: string) {
 		customAINodes = customAINodes.filter(n => n.id !== nodeId);
 		handleSaveCustomAINodes();
 	}
 
-	// Cancel creating custom AI node
 	function cancelCreateCustomAI() {
 		customAINodeLabel = '';
 		customAINodePrompt = '';
@@ -149,41 +157,9 @@
 		creatingCustomAI = false;
 	}
 
-	// Combined element types (default + custom)
-	let allElementTypes = $derived([...elementTypes, ...customAINodes]);
-
-	// Load custom nodes on mount
-	if (typeof window !== 'undefined') {
-		handleLoadCustomAINodes();
-	}
-	let gridContainer = $state<HTMLDivElement | null>(null);
-	let svgContainer = $state<SVGSVGElement | null>(null);
-	let workflowResults = $state<any[]>([]);
-	let editingAIQuery = $state<GridElement | null>(null);
-	let aiQueryPrompt = $state('');
-	let aiQueryModel = $state('gpt-4o');
-	let aiQuerySystemPrompt = $state('');
-	let editingNodeOptions = $state<GridElement | null>(null);
-	let nodeOptionsText = $state('');
-	let nodeOptionsError = $state('');
-	let editingComment = $state<GridElement | null>(null);
-	let commentText = $state('');
-	let commentTextareaRef = $state<HTMLTextAreaElement | null>(null);
-	let darkMode = $derived.by(() => darkModeStore.darkMode);
-	let toggleDarkMode = darkModeStore.toggle;
-	let zoomLevel = $state(1);
-	let showingWorkflowJSON = $state(false);
-	let workflowJSON = $state('');
-	let copiedToClipboard = $state(false);
-	let panX = $state(0);
-	let panY = $state(0);
-	let isPanning = $state(false);
-	let panStart = $state({ x: 0, y: 0 });
-	let resizingElement = $state<GridElement | null>(null);
-	let resizeStart = $state({ x: 0, y: 0, width: 0, height: 0 });
-
-	// Generate unique ID - now imported from utils/idGenerator.ts
-
+	// ------------------------------------------------------------------------------------------------
+	// Canvas interactions: drag, resize, pan
+	// ------------------------------------------------------------------------------------------------
 	// Drag from sidebar
 	function startDragFromSidebar(elementType: ElementType, event: MouseEvent) {
 		draggedElementType = elementType;
@@ -312,6 +288,9 @@
 		draggedGridElement = null;
 	}
 
+	// ------------------------------------------------------------------------------------------------
+	// Connection wiring: start/end connections and compute positions
+	// ------------------------------------------------------------------------------------------------
 	// Connection point click
 	function handleConnectionPointClick(
 		elementId: string,
@@ -383,6 +362,9 @@
 		}
 	}
 
+	// ------------------------------------------------------------------------------------------------
+	// Workflow execution: topological run and results capture
+	// ------------------------------------------------------------------------------------------------
 	// Execute workflow
 	async function executeWorkflow() {
 		workflowResults = [];
@@ -458,6 +440,9 @@
 		connectingFrom = null;
 	}
 
+	// ------------------------------------------------------------------------------------------------
+	// Comment nodes: edit, save, cancel
+	// ------------------------------------------------------------------------------------------------
 	// Save comment edit
 	function saveComment() {
 		if (editingComment) {
@@ -713,6 +698,9 @@
 		commentText = newComment.commentText || '';
 	}
 
+	// ------------------------------------------------------------------------------------------------
+	// Node options modal: resolve defaults, edit, save
+	// ------------------------------------------------------------------------------------------------
 	function getDefaultNodeOptions(element: GridElement) {
 		if (element.type.type !== 'input') {
 			return {};
@@ -758,6 +746,9 @@
 		nodeOptionsError = '';
 	}
 
+	// ------------------------------------------------------------------------------------------------
+	// Element configuration: double-click editors (AI, comment, node options)
+	// ------------------------------------------------------------------------------------------------
 	// Handle double-click on element
 	function handleElementDoubleClick(element: GridElement, event: MouseEvent) {
 		event.stopPropagation();
@@ -972,6 +963,9 @@
 	// Toggle dark mode
 	// Dark mode toggle is now handled by the unified store
 
+	// ------------------------------------------------------------------------------------------------
+	// Workflow JSON export (preview, copy, download)
+	// ------------------------------------------------------------------------------------------------
 	// Generate workflow JSON
 	function generateWorkflowJSON() {
 		const workflow = {
@@ -1032,6 +1026,9 @@
 		URL.revokeObjectURL(url);
 	}
 
+	// ------------------------------------------------------------------------------------------------
+	// Zoom controls + mouse wheel zoom
+	// ------------------------------------------------------------------------------------------------
 	// Zoom functions
 	function zoomIn() {
 		zoomLevel = Math.min(zoomLevel + 0.1, 2); // Max zoom 200%
@@ -1074,6 +1071,7 @@
 
 <svelte:window onmousemove={handleMouseMove} onmouseup={handleMouseUp} />
 
+<!-- Layout: sidebar + canvas workspace + modal layers -->
 <div class="flex h-screen w-full overflow-hidden {darkMode ? 'bg-slate-900' : 'bg-slate-50'}">
 	<!-- Left Sidebar -->
 	<div class="w-72 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border-r flex flex-col shadow-sm">
