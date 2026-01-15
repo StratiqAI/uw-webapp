@@ -41,7 +41,12 @@
 	import WorkflowAIGalleryModal from './components/WorkflowAIGalleryModal.svelte';
 	import WorkflowJsonExportModal from './components/WorkflowJsonExportModal.svelte';
 	import WorkflowCreateCustomAIModal from './components/WorkflowCreateCustomAIModal.svelte';
-	import { loadCustomAINodes as loadCustomNodes, saveCustomAINodes, createCustomAINode as createCustomNode } from './services/customNodeService';
+	import {
+		loadCustomAINodesFromStorage,
+		createCustomAINodeState,
+		deleteCustomAINodeState,
+		resetCustomAINodeDraft
+	} from './services/customAiNodes';
 	import { getElementTypes } from './services/nodeLibraryService';
 	import type { ElementType, GridElement, Connection } from './types';
 
@@ -101,54 +106,45 @@
 	// Lifecycle: load custom AI nodes on mount
 	// ------------------------------------------------------------------------------------------------
 	if (typeof window !== 'undefined') {
-		handleLoadCustomAINodes();
+		customAINodes = loadCustomAINodesFromStorage();
 	}
 
 	// ------------------------------------------------------------------------------------------------
 	// Custom AI node management (create/save/delete)
 	// ------------------------------------------------------------------------------------------------
-	function handleLoadCustomAINodes() {
-		customAINodes = loadCustomNodes();
-	}
-
-	function handleSaveCustomAINodes() {
-		saveCustomAINodes(customAINodes);
-	}
-
 	function createCustomAINode() {
-		if (!customAINodeLabel.trim() || !customAINodePrompt.trim()) {
+		const result = createCustomAINodeState({
+			customAINodes,
+			draft: {
+				label: customAINodeLabel,
+				prompt: customAINodePrompt,
+				model: customAINodeModel,
+				systemPrompt: customAINodeSystemPrompt
+			}
+		});
+
+		if (!result.created) {
 			return;
 		}
 
-		const newId = `custom-ai-${Date.now()}`;
-		const customNode = createCustomNode(
-			newId,
-			customAINodeLabel,
-			customAINodePrompt,
-			customAINodeModel,
-			customAINodeSystemPrompt
-		);
-
-		customAINodes = [...customAINodes, customNode];
-		handleSaveCustomAINodes();
-
-		customAINodeLabel = '';
-		customAINodePrompt = '';
-		customAINodeModel = 'gpt-4o';
-		customAINodeSystemPrompt = '';
+		customAINodes = result.customAINodes;
+		customAINodeLabel = result.draft.label;
+		customAINodePrompt = result.draft.prompt;
+		customAINodeModel = result.draft.model;
+		customAINodeSystemPrompt = result.draft.systemPrompt;
 		creatingCustomAI = false;
 	}
 
 	function deleteCustomAINode(nodeId: string) {
-		customAINodes = customAINodes.filter(n => n.id !== nodeId);
-		handleSaveCustomAINodes();
+		customAINodes = deleteCustomAINodeState(customAINodes, nodeId);
 	}
 
 	function cancelCreateCustomAI() {
-		customAINodeLabel = '';
-		customAINodePrompt = '';
-		customAINodeModel = 'gpt-4o';
-		customAINodeSystemPrompt = '';
+		const resetDraft = resetCustomAINodeDraft();
+		customAINodeLabel = resetDraft.label;
+		customAINodePrompt = resetDraft.prompt;
+		customAINodeModel = resetDraft.model;
+		customAINodeSystemPrompt = resetDraft.systemPrompt;
 		creatingCustomAI = false;
 	}
 
