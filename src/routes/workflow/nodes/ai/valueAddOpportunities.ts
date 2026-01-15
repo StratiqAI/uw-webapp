@@ -3,6 +3,7 @@ import { createAIWorkflowNode } from './createAIWorkflowNode';
 export const valueAddOpportunitiesNode = createAIWorkflowNode({
 	id: 'ai-value-add-opportunities',
 	label: 'Value-Add Opportunities',
+	description: 'Identify value-add and repositioning opportunities',
 	prompt:
 		'Identify value-add opportunities for this commercial property. Analyze potential improvements, repositioning strategies, operational enhancements, and value creation initiatives: {input}',
 	systemPrompt:

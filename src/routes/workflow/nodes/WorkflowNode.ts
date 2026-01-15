@@ -4,6 +4,7 @@ type WorkflowNodeConfig = {
 	id: string;
 	type: NodeType;
 	label: string;
+	description?: string;
 	icon: string;
 	execute: ElementType['execute'];
 	defaultAIQueryData?: AIQueryData;
@@ -13,6 +14,7 @@ export class WorkflowNode implements ElementType {
 	id: string;
 	type: NodeType;
 	label: string;
+	description?: string;
 	icon: string;
 	execute: ElementType['execute'];
 	defaultAIQueryData?: AIQueryData;
@@ -21,6 +23,7 @@ export class WorkflowNode implements ElementType {
 		this.id = config.id;
 		this.type = config.type;
 		this.label = config.label;
+		this.description = config.description;
 		this.icon = config.icon;
 		this.execute = config.execute;
 		this.defaultAIQueryData = config.defaultAIQueryData;

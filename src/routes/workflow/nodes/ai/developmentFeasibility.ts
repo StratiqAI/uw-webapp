@@ -3,6 +3,7 @@ import { createAIWorkflowNode } from './createAIWorkflowNode';
 export const developmentFeasibilityNode = createAIWorkflowNode({
 	id: 'ai-development-feasibility',
 	label: 'Development Feasibility',
+	description: 'Analyze development feasibility and project economics',
 	prompt:
 		'Analyze the development feasibility for this commercial real estate project. Evaluate construction costs, development timelines, entitlement processes, and project economics: {input}',
 	systemPrompt:

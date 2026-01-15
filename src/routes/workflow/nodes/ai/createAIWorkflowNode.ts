@@ -4,6 +4,7 @@ import { WorkflowNode } from '../WorkflowNode';
 type AIWorkflowNodeConfig = {
 	id: string;
 	label: string;
+	description?: string;
 	prompt: string;
 	systemPrompt: string;
 	model?: string;
@@ -19,6 +20,7 @@ export function createAIWorkflowNode(config: AIWorkflowNodeConfig): WorkflowNode
 	const {
 		id,
 		label,
+		description,
 		prompt,
 		systemPrompt,
 		model = 'gpt-4o',
@@ -32,6 +34,7 @@ export function createAIWorkflowNode(config: AIWorkflowNodeConfig): WorkflowNode
 		id,
 		type: 'ai',
 		label,
+		description,
 		icon,
 		defaultAIQueryData: { prompt, model, systemPrompt },
 		execute: async (input: any, customData?: AIQueryData) => {

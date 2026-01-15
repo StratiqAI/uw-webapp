@@ -6,7 +6,8 @@
 		allElementTypes = [],
 		darkMode = false,
 		nodeFilter = $bindable(''),
-		onNodeDragStart,
+		draggedElementType = $bindable(null),
+		dragOffset = $bindable({ x: 0, y: 0 }),
 		onShowInputGallery,
 		onShowProcessGallery,
 		onShowAIGallery,
@@ -16,7 +17,8 @@
 		allElementTypes?: ElementType[];
 		darkMode?: boolean;
 		nodeFilter?: string;
-		onNodeDragStart?: (elementType: ElementType, event: MouseEvent) => void;
+		draggedElementType?: ElementType | null;
+		dragOffset?: { x: number; y: number };
 		onShowInputGallery?: () => void;
 		onShowProcessGallery?: () => void;
 		onShowAIGallery?: () => void;
@@ -25,9 +27,12 @@
 	} = $props();
 
 	function handleDragStart(elementType: ElementType, event: MouseEvent) {
-		if (onNodeDragStart) {
-			onNodeDragStart(elementType, event);
-		}
+		draggedElementType = elementType;
+		const rect = (event.target as HTMLElement).getBoundingClientRect();
+		dragOffset = {
+			x: event.clientX - rect.left,
+			y: event.clientY - rect.top
+		};
 	}
 
 	function filterMatches(elementType: ElementType): boolean {

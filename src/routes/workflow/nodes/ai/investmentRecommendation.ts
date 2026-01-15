@@ -3,6 +3,7 @@ import { createAIWorkflowNode } from './createAIWorkflowNode';
 export const investmentRecommendationNode = createAIWorkflowNode({
 	id: 'ai-investment-recommendation',
 	label: 'Investment Recommendation',
+	description: 'Provide investment recommendations with buy/hold/pass rationale',
 	prompt:
 		'Provide an investment recommendation for this commercial real estate opportunity. Include buy/hold/pass recommendation with rationale: {input}',
 	systemPrompt:

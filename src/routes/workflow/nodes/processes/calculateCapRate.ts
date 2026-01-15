@@ -5,6 +5,7 @@ export const calculateCapRateNode = new WorkflowNode({
 	type: 'process',
 	label: 'Calculate Cap Rate',
 	icon: '%',
+	description: 'Calculate capitalization rate from NOI and purchase price.',
 	execute: (input) => {
 		if (typeof input === 'object' && input !== null) {
 			const noi = input.noi || input.netOperatingIncome || 0;

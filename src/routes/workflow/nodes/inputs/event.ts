@@ -5,6 +5,7 @@ export const eventNode = new WorkflowNode({
 	type: 'input',
 	label: 'Event',
 	icon: '📣',
+	description: 'Configure an AWS EventBridge event payload with source, detail type, and bus settings.',
 	execute: (input) =>
 		input || {
 			eventBusName: 'default',

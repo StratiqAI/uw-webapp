@@ -3,6 +3,7 @@ import { createAIWorkflowNode } from './createAIWorkflowNode';
 export const operatingExpenseAnalysisNode = createAIWorkflowNode({
 	id: 'ai-operating-expense-analysis',
 	label: 'Operating Expense Analysis',
+	description: 'Analyze operating expenses and cost optimization',
 	prompt:
 		'Analyze operating expenses for this commercial property. Evaluate expense ratios, expense trends, expense recoveries, and operating expense optimization opportunities: {input}',
 	systemPrompt:

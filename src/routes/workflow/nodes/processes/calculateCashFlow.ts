@@ -5,6 +5,7 @@ export const calculateCashFlowNode = new WorkflowNode({
 	type: 'process',
 	label: 'Calculate Cash Flow',
 	icon: 'CF',
+	description: 'Calculate annual cash flow from NOI and debt service.',
 	execute: (input) => {
 		if (typeof input === 'object' && input !== null) {
 			const noi = input.noi || input.netOperatingIncome || 0;

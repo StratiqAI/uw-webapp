@@ -3,6 +3,7 @@ import { createAIWorkflowNode } from './createAIWorkflowNode';
 export const assetManagementNode = createAIWorkflowNode({
 	id: 'ai-asset-management',
 	label: 'Asset Management',
+	description: 'Develop asset management strategies and value-add opportunities',
 	prompt:
 		'Develop an asset management strategy for this commercial property. Analyze value-add opportunities, operational improvements, tenant retention strategies, and asset optimization initiatives: {input}',
 	systemPrompt:

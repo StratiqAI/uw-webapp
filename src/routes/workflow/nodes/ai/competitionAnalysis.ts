@@ -3,6 +3,7 @@ import { createAIWorkflowNode } from './createAIWorkflowNode';
 export const competitionAnalysisNode = createAIWorkflowNode({
 	id: 'ai-competition-analysis',
 	label: 'Competition Analysis',
+	description: 'Analyze competitive landscape and market positioning',
 	prompt:
 		'Analyze the competitive landscape for this commercial property. Evaluate competing properties, market positioning, competitive advantages, and competitive risks: {input}',
 	systemPrompt:

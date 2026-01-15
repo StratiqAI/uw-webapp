@@ -3,6 +3,7 @@ import { createAIWorkflowNode } from './createAIWorkflowNode';
 export const environmentalAssessmentNode = createAIWorkflowNode({
 	id: 'ai-environmental-assessment',
 	label: 'Environmental Assessment',
+	description: 'Evaluate environmental risks, compliance, and remediation requirements',
 	prompt:
 		'Assess environmental risks and compliance for this commercial property. Evaluate potential contamination, environmental regulations, remediation requirements, and environmental liability: {input}',
 	systemPrompt:

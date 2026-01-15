@@ -3,6 +3,7 @@ import { createAIWorkflowNode } from './createAIWorkflowNode';
 export const incomeApproachValuationNode = createAIWorkflowNode({
 	id: 'ai-income-approach-valuation',
 	label: 'Income Approach Valuation',
+	description: 'Perform income approach valuation and DCF analysis',
 	prompt:
 		'Perform an income approach valuation for this commercial property. Analyze net operating income, capitalization rates, discount rates, and income-based property value: {input}',
 	systemPrompt:

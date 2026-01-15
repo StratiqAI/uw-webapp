@@ -3,6 +3,7 @@ import { createAIWorkflowNode } from './createAIWorkflowNode';
 export const marketTimingNode = createAIWorkflowNode({
 	id: 'ai-market-timing',
 	label: 'Market Timing',
+	description: 'Analyze optimal market timing for transactions',
 	prompt:
 		'Analyze optimal market timing for this commercial real estate transaction. Evaluate market cycles, economic indicators, interest rate trends, and optimal timing for acquisition or disposition: {input}',
 	systemPrompt:

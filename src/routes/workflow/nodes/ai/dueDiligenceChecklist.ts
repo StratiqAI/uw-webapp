@@ -3,6 +3,7 @@ import { createAIWorkflowNode } from './createAIWorkflowNode';
 export const dueDiligenceChecklistNode = createAIWorkflowNode({
 	id: 'ai-due-diligence-checklist',
 	label: 'Due Diligence Checklist',
+	description: 'Generate comprehensive due diligence checklists for acquisitions',
 	prompt:
 		'Generate a comprehensive due diligence checklist for this commercial real estate acquisition. Include financial, legal, physical, environmental, and operational due diligence items: {input}',
 	systemPrompt:

@@ -3,6 +3,7 @@ import { createAIWorkflowNode } from './createAIWorkflowNode';
 export const exchange1031Node = createAIWorkflowNode({
 	id: 'ai-1031-exchange',
 	label: '1031 Exchange',
+	description: 'Analyze 1031 exchange opportunities and tax benefits',
 	prompt:
 		'Analyze 1031 exchange opportunities for this commercial real estate transaction. Evaluate exchange eligibility, timing requirements, replacement property criteria, and tax deferral benefits: {input}',
 	systemPrompt:

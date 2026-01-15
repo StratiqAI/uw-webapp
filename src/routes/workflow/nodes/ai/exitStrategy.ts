@@ -3,6 +3,7 @@ import { createAIWorkflowNode } from './createAIWorkflowNode';
 export const exitStrategyNode = createAIWorkflowNode({
 	id: 'ai-exit-strategy',
 	label: 'Exit Strategy',
+	description: 'Develop exit strategies and optimal hold period analysis',
 	prompt:
 		'Develop an exit strategy for this commercial real estate investment. Analyze optimal hold period, exit timing, potential exit strategies (sale, refinance, 1031 exchange), and exit value projections: {input}',
 	systemPrompt:

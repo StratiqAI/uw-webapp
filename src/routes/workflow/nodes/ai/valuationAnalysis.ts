@@ -3,6 +3,7 @@ import { createAIWorkflowNode } from './createAIWorkflowNode';
 export const valuationAnalysisNode = createAIWorkflowNode({
 	id: 'ai-valuation-analysis',
 	label: 'Valuation Analysis',
+	description: 'Perform comprehensive valuation using multiple approaches',
 	prompt:
 		'Perform a comprehensive valuation analysis for this commercial property using multiple approaches. Evaluate income approach, sales comparison approach, and cost approach to determine fair market value: {input}',
 	systemPrompt:

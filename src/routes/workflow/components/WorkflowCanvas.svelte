@@ -1,37 +1,25 @@
 <script lang="ts">
-	import type { GridElement, Connection, ConnectionPoint, ConnectionSide } from '../types';
+	import type { GridElement, Connection, ConnectionPoint, ConnectionSide, ElementType } from '../types';
 	import { getElementBorderColor, getElementColor } from '../utils/nodeStyling';
 	import WorkflowNode from './WorkflowNode.svelte';
 	import WorkflowConnection from './WorkflowConnection.svelte';
 	import WorkflowConnectionPreview from './WorkflowConnectionPreview.svelte';
 
 	let {
-		gridElements = [],
-		connections = [],
-		zoomLevel = 1,
-		panX = 0,
-		panY = 0,
+		gridElements = $bindable([]),
+		connections = $bindable([]),
+		zoomLevel = $bindable(1),
+		panX = $bindable(0),
+		panY = $bindable(0),
 		darkMode = false,
-		connectingFrom = null,
-		draggedGridElement = null,
-		currentMousePos = { x: 0, y: 0 },
-		isPanning = false,
-		editingComment = null,
-		commentText = $bindable(''),
-		commentTextareaRef = $bindable(null),
+		draggedElementType = $bindable(null),
+		dragOffset = $bindable({ x: 0, y: 0 }),
 		gridContainer = $bindable(null),
 		svgContainer = $bindable(null),
-		onPanStart,
-		onGridClick,
-		onWheel,
 		onNodeDelete,
-		onNodeDragStart,
 		onNodeDoubleClick,
-		onConnectionPointClick,
-		onConnectionDelete,
-		onCommentSave,
-		onCommentCancel,
-		onCommentResizeStart
+		onExecuteWorkflow,
+		generateId
 	}: {
 		gridElements?: GridElement[];
 		connections?: Connection[];
@@ -39,51 +27,255 @@
 		panX?: number;
 		panY?: number;
 		darkMode?: boolean;
-		connectingFrom?: ConnectionPoint | null;
-		draggedGridElement?: GridElement | null;
-		currentMousePos?: { x: number; y: number };
-		isPanning?: boolean;
-		editingComment?: GridElement | null;
-		commentText?: string;
-		commentTextareaRef?: HTMLTextAreaElement | null;
+		draggedElementType?: ElementType | null;
+		dragOffset?: { x: number; y: number };
 		gridContainer?: HTMLDivElement | null;
 		svgContainer?: SVGSVGElement | null;
-		onPanStart?: (event: MouseEvent) => void;
-		onGridClick?: () => void;
-		onWheel?: (event: WheelEvent) => void;
 		onNodeDelete?: (id: string, event: MouseEvent) => void;
-		onNodeDragStart?: (element: GridElement, event: MouseEvent) => void;
 		onNodeDoubleClick?: (element: GridElement, event: MouseEvent) => void;
-		onConnectionPointClick?: (elementId: string, side: ConnectionSide, event: MouseEvent) => void;
-		onConnectionDelete?: (connectionId: string) => void;
-		onCommentSave?: () => void;
-		onCommentCancel?: () => void;
-		onCommentResizeStart?: (element: GridElement, event: MouseEvent) => void;
+		onExecuteWorkflow?: () => void;
+		generateId: () => string;
 	} = $props();
 
-	function handleWheel(event: WheelEvent) {
-		event.preventDefault();
-		if (onWheel) {
-			onWheel(event);
-		}
-	}
+	let connectingFrom = $state<ConnectionPoint | null>(null);
+	let draggedGridElement = $state<GridElement | null>(null);
+	let currentMousePos = $state({ x: 0, y: 0 });
+	let isPanning = $state(false);
+	let panStart = $state({ x: 0, y: 0 });
+	let resizingElement = $state<GridElement | null>(null);
+	let resizeStart = $state({ x: 0, y: 0, width: 0, height: 0 });
+	let editingComment = $state<GridElement | null>(null);
+	let commentText = $state('');
+	let commentTextareaRef = $state<HTMLTextAreaElement | null>(null);
 
-	function handlePanStart(event: MouseEvent) {
-		if (onPanStart) {
-			onPanStart(event);
+	function handleKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape') {
+			connectingFrom = null;
 		}
 	}
 
 	function handleGridClick() {
-		if (onGridClick) {
-			onGridClick();
+		connectingFrom = null;
+	}
+
+	function handleWheel(event: WheelEvent) {
+		event.preventDefault();
+		const delta = event.deltaY > 0 ? -0.1 : 0.1;
+		const newZoom = Math.max(0.5, Math.min(2, zoomLevel + delta));
+
+		if (gridContainer) {
+			const rect = gridContainer.getBoundingClientRect();
+			const mouseX = event.clientX - rect.left;
+			const mouseY = event.clientY - rect.top;
+			const zoomPointX = (mouseX - panX) / zoomLevel;
+			const zoomPointY = (mouseY - panY) / zoomLevel;
+
+			zoomLevel = newZoom;
+			panX = mouseX - zoomPointX * zoomLevel;
+			panY = mouseY - zoomPointY * zoomLevel;
 		}
 	}
 
-	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape' && onGridClick) {
-			onGridClick();
+	function startPanning(event: MouseEvent) {
+		if (draggedElementType || draggedGridElement || connectingFrom || resizingElement) {
+			return;
 		}
+
+		const target = event.target as HTMLElement;
+		if (
+			target.closest('.absolute[style*="left"]') ||
+			target.classList.contains('connection-point') ||
+			target.closest('.connection-point')
+		) {
+			return;
+		}
+
+		isPanning = true;
+		panStart = { x: event.clientX, y: event.clientY };
+		event.preventDefault();
+		event.stopPropagation();
+	}
+
+	function startDragOnGrid(element: GridElement, event: MouseEvent) {
+		if ((event.target as HTMLElement).classList.contains('connection-point')) {
+			return;
+		}
+		if ((event.target as HTMLElement).classList.contains('resize-handle')) {
+			return;
+		}
+		draggedGridElement = element;
+		if (gridContainer) {
+			const rect = gridContainer.getBoundingClientRect();
+			const elementScreenX = element.x * zoomLevel + panX;
+			const elementScreenY = element.y * zoomLevel + panY;
+			dragOffset = {
+				x: (event.clientX - rect.left - elementScreenX) / zoomLevel,
+				y: (event.clientY - rect.top - elementScreenY) / zoomLevel
+			};
+		}
+		event.stopPropagation();
+	}
+
+	function startResize(element: GridElement, event: MouseEvent) {
+		event.stopPropagation();
+		if (element.type.type !== 'comment') return;
+
+		resizingElement = element;
+		if (gridContainer) {
+			resizeStart = {
+				x: event.clientX,
+				y: event.clientY,
+				width: element.width,
+				height: element.height
+			};
+		}
+	}
+
+	function handleMouseMove(event: MouseEvent) {
+		currentMousePos = { x: event.clientX, y: event.clientY };
+
+		if (isPanning && gridContainer) {
+			const deltaX = event.clientX - panStart.x;
+			const deltaY = event.clientY - panStart.y;
+			panX += deltaX;
+			panY += deltaY;
+			panStart = { x: event.clientX, y: event.clientY };
+		} else if (resizingElement && gridContainer) {
+			const deltaX = (event.clientX - resizeStart.x) / zoomLevel;
+			const deltaY = (event.clientY - resizeStart.y) / zoomLevel;
+			const newWidth = Math.max(150, resizeStart.width + deltaX);
+			const newHeight = Math.max(80, resizeStart.height + deltaY);
+			resizingElement.width = newWidth;
+			resizingElement.height = newHeight;
+		} else if (draggedGridElement && gridContainer) {
+			const rect = gridContainer.getBoundingClientRect();
+			draggedGridElement.x = (event.clientX - rect.left - panX) / zoomLevel - dragOffset.x;
+			draggedGridElement.y = (event.clientY - rect.top - panY) / zoomLevel - dragOffset.y;
+		}
+	}
+
+	function handleMouseUp(event: MouseEvent) {
+		isPanning = false;
+		resizingElement = null;
+
+		if (draggedElementType && gridContainer) {
+			const rect = gridContainer.getBoundingClientRect();
+			const x = (event.clientX - rect.left - panX) / zoomLevel - dragOffset.x;
+			const y = (event.clientY - rect.top - panY) / zoomLevel - dragOffset.y;
+
+			const maxX = (rect.width - panX) / zoomLevel - 100;
+			const maxY = (rect.height - panY) / zoomLevel - 80;
+			if (x > -panX / zoomLevel && y > -panY / zoomLevel && x < maxX && y < maxY) {
+				const newElement: GridElement = {
+					id: generateId(),
+					type: draggedElementType,
+					x,
+					y,
+					width: 120,
+					height: 80,
+					...(draggedElementType.type === 'ai' && draggedElementType.defaultAIQueryData
+						? { aiQueryData: draggedElementType.defaultAIQueryData }
+						: {})
+				};
+				gridElements = [...gridElements, newElement];
+			}
+		}
+
+		draggedElementType = null;
+		draggedGridElement = null;
+	}
+
+	function handleConnectionPointClick(
+		elementId: string,
+		side: ConnectionSide,
+		event: MouseEvent
+	) {
+		event.stopPropagation();
+		const element = gridElements.find((el) => el.id === elementId);
+		if (!element) return;
+
+		const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+		const gridRect = gridContainer?.getBoundingClientRect();
+		if (!gridRect) return;
+
+		const point: ConnectionPoint = {
+			x: (rect.left + rect.width / 2 - gridRect.left - panX) / zoomLevel,
+			y: (rect.top + rect.height / 2 - gridRect.top - panY) / zoomLevel,
+			elementId,
+			side
+		};
+
+		if (!connectingFrom) {
+			if (side !== 'right') {
+				return;
+			}
+			connectingFrom = point;
+		} else {
+			if (side !== 'left') {
+				connectingFrom = null;
+				return;
+			}
+			if (connectingFrom.elementId !== elementId && connectingFrom.side === 'right') {
+				const newConnection: Connection = {
+					id: generateId(),
+					from: connectingFrom.elementId,
+					to: elementId,
+					fromSide: connectingFrom.side,
+					toSide: side
+				};
+				connections = [...connections, newConnection];
+				onExecuteWorkflow?.();
+			}
+			connectingFrom = null;
+		}
+	}
+
+	function deleteConnection(connectionId: string) {
+		connections = connections.filter((conn) => conn.id !== connectionId);
+		onExecuteWorkflow?.();
+	}
+
+	function saveComment() {
+		if (editingComment) {
+			editingComment.commentText = commentText;
+			editingComment = null;
+			commentText = '';
+		}
+	}
+
+	function cancelCommentEdit() {
+		editingComment = null;
+		commentText = '';
+	}
+
+	function handleCommentDoubleClick(element: GridElement, event: MouseEvent) {
+		event.stopPropagation();
+		editingComment = element;
+		commentText = element.commentText || '';
+	}
+
+	export function createCommentAt(x: number, y: number) {
+		const commentElementType: ElementType = {
+			id: 'comment',
+			type: 'comment',
+			label: 'Comment',
+			icon: '💬',
+			execute: () => null
+		};
+
+		const newComment: GridElement = {
+			id: generateId(),
+			type: commentElementType,
+			x,
+			y,
+			width: 200,
+			height: 100,
+			commentText: 'Double-click to edit'
+		};
+
+		gridElements = [...gridElements, newComment];
+		editingComment = newComment;
+		commentText = newComment.commentText || '';
 	}
 
 	// Helper to find element by ID
@@ -105,11 +297,13 @@
 	);
 </script>
 
+<svelte:window onmousemove={handleMouseMove} onmouseup={handleMouseUp} />
+
 <div
 	bind:this={gridContainer}
 	class="flex-1 relative {darkMode ? 'bg-slate-900' : 'bg-slate-50'} overflow-hidden {isPanning ? 'cursor-grabbing' : 'cursor-default'}"
 	style="background-image: linear-gradient(to right, {darkMode ? '#1e293b' : '#e2e8f0'} 1px, transparent 1px), linear-gradient(to bottom, {darkMode ? '#1e293b' : '#e2e8f0'} 1px, transparent 1px); background-size: {20 * zoomLevel}px {20 * zoomLevel}px; background-position: {panX}px {panY}px;"
-	onmousedown={handlePanStart}
+	onmousedown={startPanning}
 	onclick={handleGridClick}
 	onkeydown={handleKeydown}
 	onwheel={handleWheel}
@@ -148,7 +342,7 @@
 						{toElement}
 						{darkMode}
 						isDragging={draggedGridElement ? (draggedGridElement.id === connection.from || draggedGridElement.id === connection.to) : false}
-						onDelete={onConnectionDelete}
+						onDelete={deleteConnection}
 					/>
 				{/if}
 			{/each}
@@ -180,8 +374,8 @@
 						darkMode
 					)} {draggedGridElement?.id === element.id ? '' : 'hover:shadow-lg transition-all'} border-dashed"
 					style="left: {element.x}px; top: {element.y}px; width: {element.width}px; min-height: {element.height}px; {draggedGridElement?.id === element.id ? 'transition: none;' : ''}"
-					onmousedown={(e) => { onNodeDragStart?.(element, e); e.stopPropagation(); }}
-					ondblclick={(e) => onNodeDoubleClick?.(element, e)}
+					onmousedown={(e) => { startDragOnGrid(element, e); e.stopPropagation(); }}
+					ondblclick={(e) => handleCommentDoubleClick(element, e)}
 					role="button"
 					tabindex="0"
 				>
@@ -199,7 +393,7 @@
 
 						<div
 							class="resize-handle absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize opacity-0 group-hover:opacity-100 transition-opacity z-30"
-							onmousedown={(e) => onCommentResizeStart?.(element, e)}
+							onmousedown={(e) => startResize(element, e)}
 							title="Resize comment"
 							role="button"
 							tabindex="0"
@@ -223,9 +417,9 @@
 								placeholder="Enter your comment..."
 								onkeydown={(e) => {
 									if (e.key === 'Escape') {
-										onCommentCancel?.();
+										cancelCommentEdit();
 									} else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-										onCommentSave?.();
+										saveComment();
 									}
 								}}
 								onclick={(e) => e.stopPropagation()}
@@ -246,9 +440,9 @@
 					{darkMode}
 					isDragged={draggedGridElement?.id === element.id}
 					onDelete={onNodeDelete}
-					onDragStart={onNodeDragStart}
+					onDragStart={startDragOnGrid}
 					onDoubleClick={onNodeDoubleClick}
-					onConnectionPointClick={onConnectionPointClick}
+					onConnectionPointClick={handleConnectionPointClick}
 				/>
 			{/if}
 		{/each}

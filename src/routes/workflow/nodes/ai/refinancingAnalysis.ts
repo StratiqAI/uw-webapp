@@ -3,6 +3,7 @@ import { createAIWorkflowNode } from './createAIWorkflowNode';
 export const refinancingAnalysisNode = createAIWorkflowNode({
 	id: 'ai-refinancing-analysis',
 	label: 'Refinancing Analysis',
+	description: 'Analyze refinancing opportunities and optimal timing',
 	prompt:
 		'Analyze refinancing opportunities for this commercial property. Evaluate current loan terms, refinancing options, interest rate savings, and optimal refinancing timing: {input}',
 	systemPrompt:

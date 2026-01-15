@@ -3,6 +3,7 @@ import { createAIWorkflowNode } from './createAIWorkflowNode';
 export const comparableSalesAnalysisNode = createAIWorkflowNode({
 	id: 'ai-comparable-sales-analysis',
 	label: 'Comparable Sales Analysis',
+	description: 'Analyze comparable sales for valuation and market value assessment',
 	prompt:
 		'Analyze comparable commercial real estate sales and provide valuation insights. Compare property characteristics, sale prices, cap rates, and price per square foot to assess market value: {input}',
 	systemPrompt:

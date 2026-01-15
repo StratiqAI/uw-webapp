@@ -5,5 +5,6 @@ export const documentKnowledgeBaseNode = new WorkflowNode({
 	type: 'input',
 	label: 'Document Knowledge Base',
 	icon: '🏢',
+	description: 'Input property information including address, square footage, and property type.',
 	execute: (input) => input || { address: '', sqft: 0, yearBuilt: 0, propertyType: 'Office' }
 });

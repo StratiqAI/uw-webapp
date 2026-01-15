@@ -3,6 +3,7 @@ import { createAIWorkflowNode } from './createAIWorkflowNode';
 export const marketForecastingNode = createAIWorkflowNode({
 	id: 'ai-market-forecasting',
 	label: 'Market Forecasting',
+	description: 'Forecast market trends and future conditions',
 	prompt:
 		'Forecast market trends and conditions for this commercial real estate market. Analyze future rent growth, occupancy trends, cap rate movements, and market outlook: {input}',
 	systemPrompt:

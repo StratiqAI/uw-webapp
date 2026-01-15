@@ -5,6 +5,7 @@ export const calculateNoiNode = new WorkflowNode({
 	type: 'process',
 	label: 'Calculate NOI',
 	icon: 'NOI',
+	description: 'Calculate Net Operating Income from rent and expenses.',
 	execute: (input) => {
 		if (typeof input === 'object' && input !== null) {
 			const rent = input.annualRent || input.rent || 0;

@@ -3,6 +3,7 @@ import { createAIWorkflowNode } from './createAIWorkflowNode';
 export const propertyManagementNode = createAIWorkflowNode({
 	id: 'ai-property-management',
 	label: 'Property Management',
+	description: 'Develop property management strategies and best practices',
 	prompt:
 		'Develop property management strategies for this commercial property. Analyze maintenance programs, tenant relations, operational efficiency, and property management best practices: {input}',
 	systemPrompt:
