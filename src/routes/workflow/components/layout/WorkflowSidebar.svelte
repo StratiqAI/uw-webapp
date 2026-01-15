@@ -45,6 +45,12 @@
 	const filteredProcessNodes = $derived(allElementTypes.filter((t) => t.type === 'process' && filterMatches(t)));
 	const filteredAINodes = $derived(allElementTypes.filter((t) => t.type === 'ai' && filterMatches(t)));
 	const filteredOutputNodes = $derived(allElementTypes.filter((t) => t.type === 'output' && filterMatches(t)));
+
+	let showInputNodes = $state(true);
+	let showProcessNodes = $state(true);
+	let showAiNodes = $state(true);
+	let showOutputNodes = $state(true);
+	let showTools = $state(true);
 </script>
 
 <div class="w-72 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border-r flex flex-col shadow-sm">
@@ -83,7 +89,22 @@
 		<!-- Input Nodes -->
 		<div>
 			<div class="flex items-center justify-between mb-3">
-				<h3 class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-wider">Input Nodes</h3>
+				<button
+					class="flex items-center gap-2 text-xs font-semibold {darkMode ? 'text-slate-300' : 'text-slate-600'} uppercase tracking-wider"
+					onclick={() => (showInputNodes = !showInputNodes)}
+					aria-expanded={showInputNodes}
+					aria-controls="sidebar-input-nodes"
+				>
+					<svg
+						class="w-4 h-4 transition-transform {showInputNodes ? 'rotate-90' : ''} {darkMode ? 'text-slate-400' : 'text-slate-500'}"
+						fill="none"
+						stroke="currentColor"
+						viewBox="0 0 24 24"
+					>
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+					</svg>
+					Input Nodes
+				</button>
 				{#if onShowInputGallery}
 					<button
 						onclick={onShowInputGallery}
@@ -97,28 +118,45 @@
 					</button>
 				{/if}
 			</div>
-			<div class="space-y-2.5">
-				{#each filteredInputNodes as elementType}
-					<button
-						class="w-full p-3.5 {getSidebarButtonColor(elementType.type, darkMode)} rounded-lg cursor-move transition-all flex items-center gap-3 border shadow-sm hover:shadow-md hover:scale-[1.02] group"
-						onmousedown={(e) => handleDragStart(elementType, e)}
-					>
-						<span class="text-sm font-semibold w-10 h-10 flex items-center justify-center {getIconBgColor(elementType.type, darkMode)} {getIconTextColor(elementType.type, darkMode)} rounded-lg transition-colors group-hover:scale-105">
-							{elementType.icon}
-						</span>
-						<span class="text-sm font-semibold flex-1 text-left {getLabelTextColor(darkMode)}">{elementType.label}</span>
-						<svg class="w-4 h-4 {darkMode ? 'text-slate-500' : 'text-slate-400'} opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16m-7-7l7 7-7 7"></path>
-						</svg>
-					</button>
-				{/each}
-			</div>
+			{#if showInputNodes}
+				<div id="sidebar-input-nodes" class="space-y-2.5">
+					{#each filteredInputNodes as elementType}
+						<button
+							class="w-full p-3.5 {getSidebarButtonColor(elementType.type, darkMode)} rounded-lg cursor-move transition-all flex items-center gap-3 border shadow-sm hover:shadow-md hover:scale-[1.02] group"
+							onmousedown={(e) => handleDragStart(elementType, e)}
+						>
+							<span class="text-sm font-semibold w-10 h-10 flex items-center justify-center {getIconBgColor(elementType.type, darkMode)} {getIconTextColor(elementType.type, darkMode)} rounded-lg transition-colors group-hover:scale-105">
+								{elementType.icon}
+							</span>
+							<span class="text-sm font-semibold flex-1 text-left {getLabelTextColor(darkMode)}">{elementType.label}</span>
+							<svg class="w-4 h-4 {darkMode ? 'text-slate-500' : 'text-slate-400'} opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16m-7-7l7 7-7 7"></path>
+							</svg>
+						</button>
+					{/each}
+				</div>
+			{/if}
 		</div>
 
 		<!-- Process Nodes -->
 		<div>
 			<div class="flex items-center justify-between mb-3">
-				<h3 class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-wider">Financial Calculations</h3>
+				<button
+					class="flex items-center gap-2 text-xs font-semibold {darkMode ? 'text-slate-300' : 'text-slate-600'} uppercase tracking-wider"
+					onclick={() => (showProcessNodes = !showProcessNodes)}
+					aria-expanded={showProcessNodes}
+					aria-controls="sidebar-process-nodes"
+				>
+					<svg
+						class="w-4 h-4 transition-transform {showProcessNodes ? 'rotate-90' : ''} {darkMode ? 'text-slate-400' : 'text-slate-500'}"
+						fill="none"
+						stroke="currentColor"
+						viewBox="0 0 24 24"
+					>
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+					</svg>
+					Financial Calculations
+				</button>
 				{#if onShowProcessGallery}
 					<button
 						onclick={onShowProcessGallery}
@@ -132,28 +170,45 @@
 					</button>
 				{/if}
 			</div>
-			<div class="space-y-2.5">
-				{#each filteredProcessNodes as elementType}
-					<button
-						class="w-full p-3.5 {getSidebarButtonColor(elementType.type, darkMode)} rounded-lg cursor-move transition-all flex items-center gap-3 border shadow-sm hover:shadow-md hover:scale-[1.02] group"
-						onmousedown={(e) => handleDragStart(elementType, e)}
-					>
-						<span class="text-sm font-semibold w-10 h-10 flex items-center justify-center {getIconBgColor(elementType.type, darkMode)} {getIconTextColor(elementType.type, darkMode)} rounded-lg transition-colors group-hover:scale-105">
-							{elementType.icon}
-						</span>
-						<span class="text-sm font-semibold flex-1 text-left {getLabelTextColor(darkMode)}">{elementType.label}</span>
-						<svg class="w-4 h-4 {darkMode ? 'text-slate-500' : 'text-slate-400'} opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16m-7-7l7 7-7 7"></path>
-						</svg>
-					</button>
-				{/each}
-			</div>
+			{#if showProcessNodes}
+				<div id="sidebar-process-nodes" class="space-y-2.5">
+					{#each filteredProcessNodes as elementType}
+						<button
+							class="w-full p-3.5 {getSidebarButtonColor(elementType.type, darkMode)} rounded-lg cursor-move transition-all flex items-center gap-3 border shadow-sm hover:shadow-md hover:scale-[1.02] group"
+							onmousedown={(e) => handleDragStart(elementType, e)}
+						>
+							<span class="text-sm font-semibold w-10 h-10 flex items-center justify-center {getIconBgColor(elementType.type, darkMode)} {getIconTextColor(elementType.type, darkMode)} rounded-lg transition-colors group-hover:scale-105">
+								{elementType.icon}
+							</span>
+							<span class="text-sm font-semibold flex-1 text-left {getLabelTextColor(darkMode)}">{elementType.label}</span>
+							<svg class="w-4 h-4 {darkMode ? 'text-slate-500' : 'text-slate-400'} opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16m-7-7l7 7-7 7"></path>
+							</svg>
+						</button>
+					{/each}
+				</div>
+			{/if}
 		</div>
 
 		<!-- AI Nodes -->
 		<div>
 			<div class="flex items-center justify-between mb-3">
-				<h3 class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-wider">AI Analysis</h3>
+				<button
+					class="flex items-center gap-2 text-xs font-semibold {darkMode ? 'text-slate-300' : 'text-slate-600'} uppercase tracking-wider"
+					onclick={() => (showAiNodes = !showAiNodes)}
+					aria-expanded={showAiNodes}
+					aria-controls="sidebar-ai-nodes"
+				>
+					<svg
+						class="w-4 h-4 transition-transform {showAiNodes ? 'rotate-90' : ''} {darkMode ? 'text-slate-400' : 'text-slate-500'}"
+						fill="none"
+						stroke="currentColor"
+						viewBox="0 0 24 24"
+					>
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+					</svg>
+					AI Analysis
+				</button>
 				{#if onShowAIGallery}
 					<button
 						onclick={onShowAIGallery}
@@ -167,59 +222,97 @@
 					</button>
 				{/if}
 			</div>
-			<div class="space-y-2.5">
-				{#each filteredAINodes as elementType}
-					<button
-						class="w-full p-3.5 {getSidebarButtonColor(elementType.type, darkMode)} rounded-lg cursor-move transition-all flex items-center gap-3 border shadow-sm hover:shadow-md hover:scale-[1.02] group"
-						onmousedown={(e) => handleDragStart(elementType, e)}
-					>
-						<span class="text-xs font-bold w-10 h-10 flex items-center justify-center {getIconBgColor(elementType.type, darkMode)} {getIconTextColor(elementType.type, darkMode)} rounded-lg transition-colors group-hover:scale-105">
-							{elementType.icon}
-						</span>
-						<span class="text-sm font-semibold flex-1 text-left {getLabelTextColor(darkMode)}">{elementType.label}</span>
-						<svg class="w-4 h-4 {darkMode ? 'text-slate-500' : 'text-slate-400'} opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16m-7-7l7 7-7 7"></path>
-						</svg>
-					</button>
-				{/each}
-			</div>
+			{#if showAiNodes}
+				<div id="sidebar-ai-nodes" class="space-y-2.5">
+					{#each filteredAINodes as elementType}
+						<button
+							class="w-full p-3.5 {getSidebarButtonColor(elementType.type, darkMode)} rounded-lg cursor-move transition-all flex items-center gap-3 border shadow-sm hover:shadow-md hover:scale-[1.02] group"
+							onmousedown={(e) => handleDragStart(elementType, e)}
+						>
+							<span class="text-xs font-bold w-10 h-10 flex items-center justify-center {getIconBgColor(elementType.type, darkMode)} {getIconTextColor(elementType.type, darkMode)} rounded-lg transition-colors group-hover:scale-105">
+								{elementType.icon}
+							</span>
+							<span class="text-sm font-semibold flex-1 text-left {getLabelTextColor(darkMode)}">{elementType.label}</span>
+							<svg class="w-4 h-4 {darkMode ? 'text-slate-500' : 'text-slate-400'} opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16m-7-7l7 7-7 7"></path>
+							</svg>
+						</button>
+					{/each}
+				</div>
+			{/if}
 		</div>
 
 		<!-- Output Nodes -->
 		<div>
-			<h3 class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-wider mb-3">Reports & Outputs</h3>
-			<div class="space-y-2.5">
-				{#each filteredOutputNodes as elementType}
-					<button
-						class="w-full p-3.5 {getSidebarButtonColor(elementType.type, darkMode)} rounded-lg cursor-move transition-all flex items-center gap-3 border shadow-sm hover:shadow-md hover:scale-[1.02] group"
-						onmousedown={(e) => handleDragStart(elementType, e)}
-					>
-						<span class="text-sm font-semibold w-10 h-10 flex items-center justify-center {getIconBgColor(elementType.type, darkMode)} {getIconTextColor(elementType.type, darkMode)} rounded-lg transition-colors group-hover:scale-105">
-							{elementType.icon}
-						</span>
-						<span class="text-sm font-semibold flex-1 text-left {getLabelTextColor(darkMode)}">{elementType.label}</span>
-						<svg class="w-4 h-4 {darkMode ? 'text-slate-500' : 'text-slate-400'} opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16m-7-7l7 7-7 7"></path>
-						</svg>
-					</button>
-				{/each}
-			</div>
+			<button
+				class="flex items-center gap-2 text-xs font-semibold {darkMode ? 'text-slate-300' : 'text-slate-600'} uppercase tracking-wider mb-3"
+				onclick={() => (showOutputNodes = !showOutputNodes)}
+				aria-expanded={showOutputNodes}
+				aria-controls="sidebar-output-nodes"
+			>
+				<svg
+					class="w-4 h-4 transition-transform {showOutputNodes ? 'rotate-90' : ''} {darkMode ? 'text-slate-400' : 'text-slate-500'}"
+					fill="none"
+					stroke="currentColor"
+					viewBox="0 0 24 24"
+				>
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+				</svg>
+				Reports & Outputs
+			</button>
+			{#if showOutputNodes}
+				<div id="sidebar-output-nodes" class="space-y-2.5">
+					{#each filteredOutputNodes as elementType}
+						<button
+							class="w-full p-3.5 {getSidebarButtonColor(elementType.type, darkMode)} rounded-lg cursor-move transition-all flex items-center gap-3 border shadow-sm hover:shadow-md hover:scale-[1.02] group"
+							onmousedown={(e) => handleDragStart(elementType, e)}
+						>
+							<span class="text-sm font-semibold w-10 h-10 flex items-center justify-center {getIconBgColor(elementType.type, darkMode)} {getIconTextColor(elementType.type, darkMode)} rounded-lg transition-colors group-hover:scale-105">
+								{elementType.icon}
+							</span>
+							<span class="text-sm font-semibold flex-1 text-left {getLabelTextColor(darkMode)}">{elementType.label}</span>
+							<svg class="w-4 h-4 {darkMode ? 'text-slate-500' : 'text-slate-400'} opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16m-7-7l7 7-7 7"></path>
+							</svg>
+						</button>
+					{/each}
+				</div>
+			{/if}
 		</div>
 
 		<!-- Tools -->
 		{#if onAddComment}
 			<div>
-				<h3 class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-wider mb-3">Tools</h3>
 				<button
-					class="w-full p-3.5 {darkMode ? 'bg-amber-900/30 hover:bg-amber-900/40 border-amber-600/50' : 'bg-amber-50 hover:bg-amber-100 border-amber-200'} rounded-lg cursor-pointer transition-all flex items-center gap-3 border shadow-sm hover:shadow-md hover:scale-[1.02] group"
-					onclick={onAddComment}
-					title="Add a comment to the canvas"
+					class="flex items-center gap-2 text-xs font-semibold {darkMode ? 'text-slate-300' : 'text-slate-600'} uppercase tracking-wider mb-3"
+					onclick={() => (showTools = !showTools)}
+					aria-expanded={showTools}
+					aria-controls="sidebar-tools"
 				>
-					<span class="text-lg w-10 h-10 flex items-center justify-center {darkMode ? 'bg-amber-800/50' : 'bg-amber-100'} {darkMode ? 'text-amber-200' : 'text-amber-700'} rounded-lg transition-colors group-hover:scale-105">
-						💬
-					</span>
-					<span class="text-sm font-semibold flex-1 text-left {darkMode ? 'text-slate-200' : 'text-slate-900'}">Add Comment</span>
+					<svg
+						class="w-4 h-4 transition-transform {showTools ? 'rotate-90' : ''} {darkMode ? 'text-slate-400' : 'text-slate-500'}"
+						fill="none"
+						stroke="currentColor"
+						viewBox="0 0 24 24"
+					>
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+					</svg>
+					Tools
 				</button>
+				{#if showTools}
+					<div id="sidebar-tools">
+						<button
+							class="w-full p-3.5 {darkMode ? 'bg-amber-900/30 hover:bg-amber-900/40 border-amber-600/50' : 'bg-amber-50 hover:bg-amber-100 border-amber-200'} rounded-lg cursor-pointer transition-all flex items-center gap-3 border shadow-sm hover:shadow-md hover:scale-[1.02] group"
+							onclick={onAddComment}
+							title="Add a comment to the canvas"
+						>
+							<span class="text-lg w-10 h-10 flex items-center justify-center {darkMode ? 'bg-amber-800/50' : 'bg-amber-100'} {darkMode ? 'text-amber-200' : 'text-amber-700'} rounded-lg transition-colors group-hover:scale-105">
+								💬
+							</span>
+							<span class="text-sm font-semibold flex-1 text-left {darkMode ? 'text-slate-200' : 'text-slate-900'}">Add Comment</span>
+						</button>
+					</div>
+				{/if}
 			</div>
 		{/if}
 	</div>
