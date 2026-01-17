@@ -15,16 +15,19 @@ export function createProjectSyncConfig(
 	listQuery: string | any,
 	getQuery: string | any,
 	updateSubscription: string | any,
-	deleteSubscription: string | any
+	deleteSubscription: string | any,
+	createSubscription?: string | any
 ): EntitySyncConfig {
 	return {
 		entityType: 'projects',
 		listQuery,
 		getQuery,
+		createSubscription,
 		updateSubscription,
 		deleteSubscription,
 		listResponsePath: 'listProjects.items',
 		getResponsePath: 'getProject',
+		createSubscriptionPath: 'onCreateProject',
 		updateSubscriptionPath: 'onUpdateProject',
 		deleteSubscriptionPath: 'onDeleteProject',
 		getEntityId: (project: any) => project.id
@@ -38,15 +41,19 @@ export function createEntitySyncConfig<T extends { id: string }>(config: {
 	entityType: string;
 	listQuery: string | any;
 	getQuery: string | any;
+	createSubscription?: string | any;
 	updateSubscription: string | any;
 	deleteSubscription: string | any;
 	listResponsePath?: string;
 	getResponsePath?: string;
+	createSubscriptionPath?: string;
 	updateSubscriptionPath?: string;
 	deleteSubscriptionPath?: string;
+	buildCreateVariables?: () => Record<string, any>;
 	onUpdate?: (entity: T) => void;
 	onDelete?: (entity: T) => void;
-	onSubscriptionError?: (error: any, entityId: string, operation: 'update' | 'delete') => void;
+	onCreate?: (entity: T) => void;
+	onSubscriptionError?: (error: any, entityId: string | null, operation: 'create' | 'update' | 'delete') => void;
 }): EntitySyncConfig<T> {
 	return {
 		...config,

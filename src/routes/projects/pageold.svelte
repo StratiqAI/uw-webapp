@@ -1,209 +1,183 @@
 <script lang="ts">
-	// ----------------------------------------------------------------------------
-	// Imports
-	// ----------------------------------------------------------------------------
-
-	// Logging Section
 	import { logger } from '$lib/logging/debug';
-
-	// Environment Section
-	import { browser } from '$app/environment';
-	import { goto } from '$app/navigation';
-
-	// Realtime Section
-	import { ProjectSyncManager, store } from '$lib/realtime/websocket/projectSync';
-	import { addSubscription, removeSubscription } from '$lib/stores/appSyncClientStore';
-	import { notificationStore, type Notification } from '$lib/stores/notifications.svelte';
-
-	// Types Section
-	import type { PageProps } from './$types';
-	import type { Project } from '@stratiqai/types-simple';
-	import { M_CREATE_PROJECT, M_DELETE_PROJECT, S_ON_CREATE_NOTIFICATION } from '@stratiqai/types-simple';
-	import { print } from 'graphql';
-
-	// Dark Mode Section
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 
-	// Components
-	import DeleteModal from '$lib/components/Dialog/DeleteModal.svelte';
-	import ProjectModal from './ProjectModal.svelte';
-	import MetaTag from './MetaTag.svelte';
-	import NotificationBell from '$lib/components/Notifications/NotificationBell.svelte';
-	import { gql } from '$lib/realtime/graphql/requestHandler';
+	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+	// Props Section
+	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-	// ----------------------------------------------------------------------------
-	// Props + Core Reactive State
-	// ----------------------------------------------------------------------------
-	const { data } = $props();
-	const serverProjects = $derived((data?.items ?? []) as Project[]);
-	const nextToken = $derived(data?.nextToken);
-	const idToken = $derived(data?.idToken);
-	const scope = $derived(data?.scope);
-	const currentUser = $derived(data?.currentUser);
-	const currentScope = $derived(scope || 'OWNED_BY_ME');
+	// Import the SvelteKit Types for the Page Properties
+	import type { PageProps } from './$types';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
+
+	// Get the Props for the Component
+	let componentProps: PageProps = $props();
+
+	// Get the authenticated current User from the Load Data
+	let currentUser = $derived(componentProps.data?.currentUser);
+
+	// Get idToken from server-side load function
+	let idToken = componentProps.data.idToken!;
+	
+	// Get scope from server-side load function (defaults to 'OWNED_BY_ME')
+	// This will be updated when the page reloads with a new scope parameter
+	let currentScope = $derived(componentProps.data?.scope || 'OWNED_BY_ME');
+
+	// Use unified dark mode store
 	let darkMode = $derived.by(() => darkModeStore.darkMode);
-	const toggleDarkMode = darkModeStore.toggle;
+	let toggleDarkMode = darkModeStore.toggle;
 
-	// Manager lifecycle + UI state
-	let projectSyncManager = $state(ProjectSyncManager.createInactive());
+	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+	// Realtime Section
+	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-	// UI State
-	let openProject = $state(false);
-	let openDelete = $state(false);
-	let current_project: any = $state({});
+	// 1. Import types and operations from the new types library
+	import type { Project } from '@stratiqai/types-simple';
+	import { M_CREATE_PROJECT, M_DELETE_PROJECT } from '@stratiqai/types-simple';
+	import { print } from 'graphql';
+	
+	// Import shared notification store and subscription
+	import { notificationStore, S_ON_CREATE_NOTIFICATION, type Notification } from '$lib/stores/notifications.svelte';
+
+	// 3. Import shared AppSync client store
+	import { addSubscription, removeSubscription, ensureConnection } from '$lib/stores/appSyncClientStore';
+
+	// 4. Import list operations for Project
+	import { createListOps } from '$lib/realtime/websocket/ListOperations';
+
+	// 5. Import Project subscriptions
+	import { S_ON_CREATE_PROJECT, S_ON_UPDATE_PROJECT, S_ON_DELETE_PROJECT } from '@stratiqai/types-simple';
+
+	// 6. Create reactive state for Project list
+	let projects = $state<Project[]>(componentProps.data?.items || []);
+
+	// 7. Create list operations for Project
+	export const projectListOps = createListOps<Project>({
+		keyFor: (it) => it.id
+	});
+
+	// Search state
+	let searchFilter = $state('');
 	let showEmailInfo = $state(false);
-	let errorMsg = $state<string | null>(null);
 
-	// ----------------------------------------------------------------------------
-	// Store-backed UI Data
-	// ----------------------------------------------------------------------------
-	function isValidProject(value: unknown): value is Project {
-		return typeof value === 'object' && value !== null && 'id' in value && 'name' in value;
-	}
+	// Personalized pipeline email
+	let pipelineEmail = $derived.by(() => {
+		if (currentUser?.email) {
+			const localPart = currentUser.email.split('@')[0];
+			return `${localPart}-pipeline@stratiqai.com`;
+		}
+		return 'your-email-pipeline@stratiqai.com';
+	});
 
-	function matchesSearch(project: Project, searchLower: string): boolean {
-		return !!(
-			project.name?.toLowerCase().includes(searchLower) ||
-			project.description?.toLowerCase().includes(searchLower)
-		);
-	}
-
-	// Get projects from store (reactive to store changes)
-	const storeProjects = $derived.by(() =>
-		store.getAllAtArray<Project>('projects', {
-			filter: (_key, value) => isValidProject(value)
+	// Filtered projects
+	let filteredProjects = $derived(
+		projects.filter((project) => {
+			if (!searchFilter) return true;
+			const searchLower = searchFilter.toLowerCase();
+			return (
+				project.name?.toLowerCase().includes(searchLower) ||
+				project.description?.toLowerCase().includes(searchLower)
+			);
 		})
 	);
 
-	// Track hydration: once store has data, never fall back to server defaults
-	let storeHydrated = $state(false);
-	$effect(() => {
-		if (!storeHydrated && storeProjects.length > 0) {
-			storeHydrated = true;
+	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+	// Effects Section
+	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+	// Set up GraphQL realtime subscriptions when component is mounted
+	$effect.root(() => {
+		// Only run on the client (not during SSR)
+		if (typeof window === 'undefined') return;
+
+		// Check if idToken is available before setting up WebSocket
+		if (!idToken) {
+			console.error('No idToken available for WebSocket authentication');
+			return;
 		}
-	});
 
-	// Use store projects once hydrated, otherwise use server projects
-	const allProjects = $derived(storeHydrated ? storeProjects : serverProjects);
+		logger('Setting up WebSocket subscriptions with idToken:', idToken ? 'present' : 'missing');
 
-	// Search and filter
-	let searchFilter = $state('');
-	const projects = $derived.by(() => {
-		if (!searchFilter) return allProjects;
-		const searchLower = searchFilter.toLowerCase();
-		return allProjects.filter((project) => matchesSearch(project, searchLower));
-	});
-
-	// ----------------------------------------------------------------------------
-	// Utilities
-	// ----------------------------------------------------------------------------
-	const pipelineEmail = $derived(
-		currentUser?.email
-			? `${currentUser.email.split('@')[0]}-pipeline@stratiqai.com`
-			: 'your-email-pipeline@stratiqai.com'
-	);
-
-	const metaTags = {
-		path: '/projects',
-		description: 'My StratiqAI Projects',
-		title: 'My StratiqAI Projects',
-		subtitle: 'My StratiqAI Projects'
-	};
-
-	async function createNewProjectHandler(e: Event) {
-		e.preventDefault();
-		errorMsg = null;
-
-		try {
-			const res = await gql<{ createProject: Project }>(
-				print(M_CREATE_PROJECT),
-				{ input: { name: 'New Project', sharingMode: 'PRIVATE' } },
-				idToken
-			);
-
-			if (!res.createProject?.id) {
-				errorMsg = 'Error creating project: No project returned';
-				return;
+		// Ensure connection to shared AppSync client
+		ensureConnection(idToken).then(() => {
+			const ownerId = currentUser?.sub;
+			
+			// 1. Subscribe to CREATE events for new projects owned by the current user
+			if (ownerId) {
+				const createSub = {
+					query: S_ON_CREATE_PROJECT,
+					variables: { ownerId },
+					path: 'onCreateProject',
+					next: (project: Project) => {
+						console.log('Project created:', project);
+						// Only add if it matches the current scope
+						if (currentScope === 'OWNED_BY_ME' && project.ownerId === ownerId) {
+							projectListOps.upsertMutable(projects, project);
+						} else if (currentScope === 'ALL_TENANT') {
+							// For ALL_TENANT scope, also add projects from the same tenant
+							const tenantId = currentUser?.tenant || projects[0]?.tenantId;
+							if (project.tenantId === tenantId) {
+								projectListOps.upsertMutable(projects, project);
+							}
+						}
+					},
+					error: (err: any) => console.error('Project CREATE subscription error:', err)
+				};
+				addSubscription(idToken, createSub);
 			}
-
-			await goto(`/projects/workspace/${res.createProject.id}/get-started`);
-		} catch (err) {
-			console.error('Error creating new project:', err);
-			errorMsg = 'Error creating new project';
-		}
-	}
-
-	// ----------------------------------------------------------------------------
-	// Manager Lifecycle
-	// ----------------------------------------------------------------------------
-	// Initialize manager and sync projects
-	$effect(() => {
-		let aborted = false;
-
-		async function initializeAndSync() {
-			if (!browser || !idToken) return;
-
-			try {
-				const hasInitialItems = serverProjects.length > 0;
-				await projectSyncManager.initialize({
-					idToken,
-					initialItems: hasInitialItems ? serverProjects : [],
-					setupSubscriptions: true,
-					clearExisting: false
-				});
-
-				if (aborted || !projectSyncManager.isReady) return;
-
-				// Only sync from API if we didn't have initial items
-				if (!hasInitialItems) {
-					await projectSyncManager.syncList({
-						queryVariables: { limit: 50, scope: currentScope },
-						setupSubscriptions: true,
-						clearExisting: false
-					});
+			
+			// 2. For ALL_TENANT scope, also subscribe to tenant-wide project creation
+			if (currentScope === 'ALL_TENANT') {
+				const tenantId = currentUser?.tenant || projects[0]?.tenantId;
+				if (tenantId) {
+					const tenantCreateSub = {
+						query: S_ON_CREATE_PROJECT,
+						variables: { tenantId },
+						path: 'onCreateProject',
+						next: (project: Project) => {
+							console.log('Project created in tenant:', project);
+							// Only add if it's from the same tenant
+							if (project.tenantId === tenantId) {
+								projectListOps.upsertMutable(projects, project);
+							}
+						},
+						error: (err: any) => console.error('Project CREATE (tenant) subscription error:', err)
+					};
+					addSubscription(idToken, tenantCreateSub);
 				}
-			} catch (err) {
-				if (aborted) return;
-				console.error('Error initializing project sync:', err);
 			}
-		}
 
-		initializeAndSync();
+			// 3. Subscribe to UPDATE and DELETE events for each existing project
+			const updateSubscriptions = projects.map((project) => ({
+				query: S_ON_UPDATE_PROJECT,
+				variables: { id: project.id },
+				path: 'onUpdateProject',
+				next: (updatedProject: Project) => {
+					console.log('Project updated:', updatedProject);
+					projectListOps.upsertMutable(projects, updatedProject);
+				},
+				error: (err: any) => console.error('Project UPDATE subscription error for', project.id, err)
+			}));
 
-		return () => {
-			aborted = true;
-			projectSyncManager.cleanup();
-		};
-	});
+			const deleteSubscriptions = projects.map((project) => ({
+				query: S_ON_DELETE_PROJECT,
+				variables: { id: project.id },
+				path: 'onDeleteProject',
+				next: (deletedProject: Project) => {
+					console.log('Project deleted:', deletedProject);
+					projectListOps.removeMutable(projects, deletedProject);
+				},
+				error: (err: any) => console.error('Project DELETE subscription error for', project.id, err)
+			}));
 
-	// Re-sync when scope changes (after initial load)
-	$effect(() => {
-		if (!browser || !projectSyncManager.isReady || !idToken) return;
+			// Add all subscriptions
+			[...updateSubscriptions, ...deleteSubscriptions].forEach((sub) => {
+				addSubscription(idToken, sub);
+			});
 
-		projectSyncManager.syncList({
-			queryVariables: { limit: 50, scope: currentScope },
-			setupSubscriptions: true,
-			clearExisting: true
-		}).catch((err) => {
-			console.error('Error syncing projects for scope:', err);
-		});
-	});
-
-	// Set up notification subscriptions for all projects
-	$effect(() => {
-		if (!browser || !idToken || !projects.length) return;
-
-		const subscriptions: Array<{
-			query: string;
-			variables: { parentId: string };
-			path: string;
-			next: (notification: Notification) => void;
-			error: (err: unknown) => void;
-		}> = [];
-
-		// Subscribe to notifications for each project
-		projects.forEach((project) => {
-			const spec = {
+			// 4. Subscribe to notifications for each project
+			const notificationSubscriptions = projects.map((project) => ({
 				query: print(S_ON_CREATE_NOTIFICATION),
 				variables: { parentId: project.id },
 				path: 'onCreateNotification',
@@ -211,26 +185,76 @@
 					console.log('Notification received for project:', project.id, notification);
 					notificationStore.addNotification(notification);
 				},
-				error: (err: unknown) => {
-					console.error('Notification subscription error for project', project.id, err);
-				}
-			};
-			subscriptions.push(spec);
-			addSubscription(idToken, spec).catch((err) => {
-				console.error('Failed to add notification subscription for project', project.id, err);
+				error: (err: any) => console.error('Notification subscription error for project', project.id, err)
+			}));
+
+			notificationSubscriptions.forEach((sub) => {
+				addSubscription(idToken, sub);
 			});
+		}).catch((error) => {
+			console.error('Failed to set up AppSync subscriptions:', error);
 		});
 
-		// Cleanup: remove all subscriptions when projects change or component unmounts
+		// Return disposer to clean up subscriptions on component unmount/HMR
 		return () => {
-			subscriptions.forEach((spec) => {
-				removeSubscription(spec);
-			});
+			// Note: The shared client manages subscriptions, but we should clean up
+			// when the component unmounts. However, since we're using a shared client,
+			// we might want to keep subscriptions active. For now, we'll let the
+			// shared client handle cleanup on app-level events (like logout).
+			console.log('Projects page unmounting - subscriptions remain active in shared client');
 		};
 	});
+
+	// Reactive error message, initially null
+	let errorMsg = $state<string | null>(null);
+
+	// Local Components
+	import DeleteModal from '$lib/components/Dialog/DeleteModal.svelte';
+	import ProjectModal from './ProjectModal.svelte';
+	import MetaTag from './MetaTag.svelte';
+	import { gql } from '$lib/realtime/graphql/requestHandler';
+	import NotificationBell from '$lib/components/Notifications/NotificationBell.svelte';
+
+	// State
+	let openProject: boolean = $state(false); // modal control
+	let openDelete: boolean = $state(false); // modal control
+	let current_project: any = $state({});
+
+	// Meta Tags
+	const path: string = '/projects';
+	const description: string = 'My StratiqAI Projects';
+	const title: string = 'My StratiqAI Projects';
+	const subtitle: string = 'My StratiqAI Projects';
+
+	async function createNewProjectHandler(e: Event) {
+		e.preventDefault();
+
+		// Prepare input for create project mutation - only name is required
+		const input = {
+			name: 'New Project',
+			sharingMode: "PRIVATE"
+		};
+
+		try {
+			const res = await gql<{ createProject: Project }>(print(M_CREATE_PROJECT), { input }, idToken);
+			
+			// Check if project was created
+			if (!res.createProject) {
+				console.error('Project creation returned null project');
+				alert('Error creating project: No project returned');
+				return;
+			}
+			
+			const projectId = res.createProject.id;
+			await goto(`/projects/workspace/${projectId}/get-started`);
+		} catch (err) {
+			console.error('Error creating new project:', err);
+			alert('Error creating new project');
+		}
+	}
 </script>
 
-<MetaTag {...metaTags} />
+<MetaTag {path} {description} {title} {subtitle} />
 
 <div
 	class="flex h-screen w-full overflow-hidden {darkMode
@@ -272,8 +296,8 @@
 				</h1>
 				<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
 				<span class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'}">
-					{projects.length}
-					{projects.length === 1 ? 'project' : 'projects'}
+					{filteredProjects.length}
+					{filteredProjects.length === 1 ? 'project' : 'projects'}
 				</span>
 			</div>
 			<div class="flex items-center gap-2">
@@ -360,11 +384,7 @@
 				</div>
 				<div class="flex items-center gap-2">
 					<!-- Scope Toggle -->
-					<div
-						class="flex items-center gap-2 rounded-lg border {darkMode
-							? 'border-slate-700 bg-slate-800'
-							: 'border-slate-200 bg-white'} p-1"
-					>
+					<div class="flex items-center gap-2 rounded-lg border {darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'} p-1">
 						<button
 							onclick={() => {
 								goto(`/projects?scope=OWNED_BY_ME`, { noScroll: true });
@@ -381,11 +401,17 @@
 							My Projects
 						</button>
 						<button
-							disabled
-							class="px-3 py-1.5 text-xs font-medium rounded transition-colors cursor-not-allowed opacity-50 {darkMode
-								? 'text-slate-500'
-								: 'text-slate-400'}"
-							title="Team Projects (disabled)"
+							onclick={() => {
+								goto(`/projects?scope=ALL_TENANT`, { noScroll: true });
+							}}
+							class="px-3 py-1.5 text-xs font-medium rounded transition-colors {currentScope === 'ALL_TENANT'
+								? darkMode
+									? 'bg-indigo-600 text-white'
+									: 'bg-indigo-100 text-indigo-700'
+								: darkMode
+									? 'text-slate-400 hover:text-slate-200'
+									: 'text-slate-600 hover:text-slate-900'}"
+							title="Show tenant projects"
 						>
 							Team Projects
 						</button>
@@ -470,6 +496,7 @@
 												onclick={(e) => {
 													e.stopPropagation();
 													navigator.clipboard.writeText(pipelineEmail);
+													// Could add a toast notification here
 												}}
 												class="p-1 {darkMode
 													? 'text-slate-400 hover:bg-slate-600 hover:text-slate-200'
@@ -514,9 +541,9 @@
 		<!-- Projects List -->
 		<div class="flex-1 overflow-y-auto {darkMode ? 'bg-slate-900' : 'bg-slate-50'}">
 			<div class="px-6 py-6">
-				{#if projects.length > 0}
+				{#if filteredProjects.length > 0}
 					<div class="space-y-3">
-						{#each projects as project (project.id)}
+						{#each filteredProjects as project}
 							<div
 								class="{darkMode
 									? 'border-slate-700 bg-slate-800 hover:border-indigo-500'
@@ -675,9 +702,4 @@
 
 <!-- Modals -->
 <ProjectModal bind:open={openProject} data={current_project} {idToken} />
-<DeleteModal
-	bind:open={openDelete}
-	data={current_project}
-	{idToken}
-	mutation={print(M_DELETE_PROJECT)}
-/>
+<DeleteModal bind:open={openDelete} data={current_project} {idToken} mutation={print(M_DELETE_PROJECT)} />

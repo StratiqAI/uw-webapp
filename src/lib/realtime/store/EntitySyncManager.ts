@@ -41,7 +41,7 @@
 import type { DocumentNode } from 'graphql';
 import type { SubscriptionSpec } from '../websocket/types';
 import type { IGraphQLQueryClient } from './GraphQLQueryClient';
-import type { AppSyncWsClient } from '../websocket/AppSyncWsClient';
+import type { AppSyncWsClient } from '../websocket/wsClient';
 import type { EntitySyncConfig, EntitySyncOptions, EntitySyncResult } from './EntitySyncConfig';
 import { toTopicPath } from './TopicMapper';
 
@@ -77,6 +77,7 @@ export class EntitySyncManager<T extends { id: string } = any> {
 	private store: IValidatedTopicStore;
 	private config: EntitySyncConfig<T>;
 	private activeSubscriptions: Map<string, SubscriptionSpec<any>> = new Map();
+	private static readonly CREATE_SUBSCRIPTION_KEY = 'create';
 	
 	constructor(options: EntitySyncManagerOptions<T>) {
 		this.queryClient = options.queryClient;
@@ -122,6 +123,7 @@ export class EntitySyncManager<T extends { id: string } = any> {
 		
 		// Set up subscriptions if requested
 		if (setupSubscriptions) {
+			this.setupCreateSubscription();
 			this.setupSubscriptionsForEntities(entities);
 		}
 		
@@ -159,6 +161,7 @@ export class EntitySyncManager<T extends { id: string } = any> {
 		
 		// Set up subscriptions if requested
 		if (setupSubscriptions) {
+			this.setupCreateSubscription();
 			this.setupSubscriptionsForEntities([entity]);
 		}
 		
@@ -251,6 +254,42 @@ export class EntitySyncManager<T extends { id: string } = any> {
 			this.subscriptionClient.addSubscription(deleteSpec);
 			this.activeSubscriptions.set(`delete-${id}`, deleteSpec);
 		}
+	}
+
+	/**
+	 * Set up a create subscription (if configured) to receive new entities.
+	 */
+	setupCreateSubscription(): void {
+		if (!this.config.createSubscription) return;
+		if (this.activeSubscriptions.has(EntitySyncManager.CREATE_SUBSCRIPTION_KEY)) return;
+
+		const variables = this.config.buildCreateVariables ? this.config.buildCreateVariables() : {};
+
+		const createSpec: SubscriptionSpec<T> = {
+			query: this.config.createSubscription,
+			variables,
+			path: this.config.createSubscriptionPath,
+			next: (createdEntity: T) => {
+				const id = this.config.getEntityId(createdEntity);
+				if (id) {
+					const topic = toTopicPath(this.config.entityType, id);
+					this.store.publish(topic, createdEntity);
+					// Ensure new entities get update/delete subscriptions
+					this.setupSubscriptionsForEntities([createdEntity]);
+				}
+				if (this.config.onCreate) {
+					this.config.onCreate(createdEntity);
+				}
+			},
+			error: (err: any) => {
+				if (this.config.onSubscriptionError) {
+					this.config.onSubscriptionError(err, null, 'create');
+				}
+			}
+		};
+
+		this.subscriptionClient.addSubscription(createSpec);
+		this.activeSubscriptions.set(EntitySyncManager.CREATE_SUBSCRIPTION_KEY, createSpec);
 	}
 	
 	/**

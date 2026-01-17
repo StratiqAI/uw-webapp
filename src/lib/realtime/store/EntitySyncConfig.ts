@@ -25,6 +25,9 @@ export interface EntitySyncConfig<T = any> {
 	/** GraphQL query for fetching a single entity by ID */
 	getQuery: string | DocumentNode;
 	
+	/** GraphQL subscription query for entity creates */
+	createSubscription?: string | DocumentNode;
+	
 	/** GraphQL subscription query for entity updates */
 	updateSubscription: string | DocumentNode;
 	
@@ -36,6 +39,9 @@ export interface EntitySyncConfig<T = any> {
 	
 	/** Path to extract data from get query response (e.g., 'getProject') */
 	getResponsePath?: string;
+	
+	/** Path to extract data from create subscription payload (e.g., 'onCreateProject') */
+	createSubscriptionPath?: string;
 	
 	/** Path to extract data from update subscription payload (e.g., 'onUpdateProject') */
 	updateSubscriptionPath?: string;
@@ -52,11 +58,17 @@ export interface EntitySyncConfig<T = any> {
 	/** Optional function to build query variables for get query */
 	buildGetVariables?: (id: string) => Record<string, any>;
 	
+	/** Optional function to build subscription variables for create */
+	buildCreateVariables?: () => Record<string, any>;
+	
 	/** Optional function to build subscription variables for update */
 	buildUpdateVariables?: (id: string) => Record<string, any>;
 	
 	/** Optional function to build subscription variables for delete */
 	buildDeleteVariables?: (id: string) => Record<string, any>;
+	
+	/** Optional callback when entity is created via subscription */
+	onCreate?: (entity: T) => void;
 	
 	/** Optional callback when entity is updated via subscription */
 	onUpdate?: (entity: T) => void;
@@ -65,7 +77,7 @@ export interface EntitySyncConfig<T = any> {
 	onDelete?: (entity: T) => void;
 	
 	/** Optional error handler for subscriptions */
-	onSubscriptionError?: (error: any, entityId: string, operation: 'update' | 'delete') => void;
+	onSubscriptionError?: (error: any, entityId: string | null, operation: 'create' | 'update' | 'delete') => void;
 }
 
 /**

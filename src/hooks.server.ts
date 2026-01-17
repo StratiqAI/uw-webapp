@@ -51,9 +51,9 @@ function claimsToCurrentUser(payload: JWTPayload) {
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
-	console.log("*******************************************************************************")
-	console.log("event", event);
-	console.log("*******************************************************************************")
+	// console.log("*******************************************************************************")
+	// console.log("event", event);
+	// console.log("*******************************************************************************")
 	// Don't protect the /auth/login and /auth/callback routes
 	if (
 		// event.url.pathname.startsWith('/') ||

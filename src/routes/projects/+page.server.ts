@@ -1,41 +1,36 @@
-//**********************************************************************************
-// Projects Page Server Load
-// This file loads the projects data from the server and returns it to the client.
-// **********************************************************************************
+// Server-side loader for the Projects page.
+// Fetches a paged list of projects from AppSync and returns it to the client.
 
-// SvelteKit Imports
+// SvelteKit
 import { error } from '@sveltejs/kit';
 
-// Import the type for the server load function
+// Server load type
 import type { PageServerLoad } from './$types';
 
-// ---------------------------------------------------------------------------------
-// Import the GraphQL helper for making HTTP requests to AppSync
+// AppSync GraphQL request helper
 import { gql } from '$lib/realtime/graphql/requestHandler';
 
-// Import GraphQL operations from the new types library
+// GraphQL operation
 import { Q_LIST_PROJECTS } from '@stratiqai/types-simple';
 import { print } from 'graphql';
 
-// Import the Project type definition
+// Types
 import type { Project } from '@stratiqai/types-simple';
 
-// Define the server-side load function for this page
-export const load: PageServerLoad = async ({ params, cookies, url }) => {
+// Server-side load
+export const load: PageServerLoad = async ({ cookies, url }) => {
 	try {
 		const idToken = cookies.get('id_token');
 		if (!idToken) {
-			error(401, 'Not Authorized');
+			throw error(401, 'Not Authorized');
 		}
 
-		// Call the GraphQL endpoint with the Q_LIST query and a limit of 50 items
-		// The response is expected to have a listProjects object with an items array
-		// Default scope is 'OWNED_BY_ME' to show user's own projects
-		// Validate scope against ListScope enum values
+		// Parse and validate query params (scope + pagination).
+		// Default scope is 'OWNED_BY_ME' to show the caller's projects.
 		const validScopes = ['OWNED_BY_ME', 'SHARED_WITH_ME', 'ALL_TENANT'] as const;
 		const requestedScope = url.searchParams.get('scope');
-		const scope = (requestedScope && validScopes.includes(requestedScope as any)) 
-			? requestedScope 
+		const scope = validScopes.includes(requestedScope as (typeof validScopes)[number])
+			? requestedScope
 			: 'OWNED_BY_ME';
 		const nextToken = url.searchParams.get('nextToken') || undefined;
 		const response = await gql<{ listProjects: { items: Project[]; nextToken?: string | null } }>(
@@ -43,31 +38,23 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
 			{ limit: 50, nextToken, scope }, 
 			idToken
 		);
-		// Log the full response for debugging purposes
-		// console.log('GraphQL response:', JSON.stringify(response, null, 2));
-		
-		// Check if response is null or undefined
-		if (!response) {
-			console.error('GraphQL response is null or undefined');
-			return { items: [], nextToken: null, idToken: idToken, error: 'No response from GraphQL' };
+		// Ensure the response shape is what the UI expects.
+		if (!response?.listProjects) {
+			throw error(502, 'Invalid response from GraphQL');
 		}
 		
-		// Check if listProjects is null or undefined
-		if (!response.listProjects) {
-			console.error('listProjects is null or undefined in response');
-			return { items: [], nextToken: null, idToken: idToken, error: 'listProjects is null in response' };
-		}
-		
-		// Return the items array to the page as props, with fallback for null/undefined
+		// Return data to the page (with safe fallbacks for optional fields).
 		return { 
 			items: response.listProjects.items || [], 
 			nextToken: response.listProjects.nextToken || null,
-			idToken: idToken,
-			scope: scope
+			idToken,
+			scope
 		};
-	} catch (error: any) {
-		// If an error occurs, log it and return an empty items array with the error message
-		console.error('Error loading data:', error);
-		return { items: [], error: error.message };
+	} catch (err: any) {
+		console.error('Error loading data:', err);
+		if (err?.status) {
+			throw err;
+		}
+		throw error(500, err?.message || 'Failed to load projects');
 	}
 };

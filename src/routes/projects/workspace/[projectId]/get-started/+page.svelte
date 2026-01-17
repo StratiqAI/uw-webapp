@@ -2,7 +2,7 @@
 <script lang="ts">
 	import DocumentUpload from '$lib/components/DocumentUpload/DocumentUpload.svelte';
 	import ProjectEntitiesDisplay from '$lib/components/ProjectEntities/ProjectEntitiesDisplay.svelte';
-	import { project as projectStore } from '$lib/stores/appStateStore.js';
+	import { projectStore } from '$lib/stores/projectStore.svelte';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import { page } from '$app/stores';
@@ -14,20 +14,18 @@
 	// Use server-side currentUser first (available during SSR), then fallback to authStore
 	const currentUser = $derived(data.currentUser ?? authStore.currentUser);
 
-	// Use reactive project store instead of static data
-	let project = $derived($projectStore);
+	// Use project store synced by the workspace layout's realtime subscriptions
+	let project = $derived(projectStore.entity);
 	let isNewProject = $derived(data.isNewProject);
 	// Get projectId from route params (more reliable than project store)
 	const projectId = $derived($page.params.projectId ?? null);
 
-	// Extract doclinks from project
+	// Extract doclinks from the project store (supports connection or array formats)
 	const doclinks = $derived.by(() => {
-		if (!project?.doclinks) return [];
-		// Handle both array format and connection format
-		if (Array.isArray(project.doclinks)) {
-			return project.doclinks;
-		}
-		return project.doclinks.items || [];
+		const links = (project as any)?.projectDocumentLinks ?? (project as any)?.doclinks;
+		if (!links) return [];
+		if (Array.isArray(links)) return links;
+		return links.items || [];
 	});
 
 	// Dark mode support
