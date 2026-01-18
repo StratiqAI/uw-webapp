@@ -4,4 +4,4 @@
  */
 
 export { ProjectSyncManager, store, type ProjectManagerOptions } from './syncManagers/ProjectSyncManager';
-export { PromptTemplateSyncManager, type PromptTemplateManagerOptions } from './syncManagers/PromptTemplateSyncManager';
+// export { PromptTemplateSyncManager, type PromptTemplateManagerOptions } from './syncManagers/PromptTemplateSyncManager';

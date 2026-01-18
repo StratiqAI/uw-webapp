@@ -1,19 +1,27 @@
 <script lang="ts">
+	import type { Project } from '@stratiqai/types-simple';
+	import ProjectSwitcher from '$lib/dashboard/components/ProjectSwitcher.svelte';
+
 	const {
 		zoomLevel = 1,
 		darkMode = false,
 		gridElementsCount = 0,
+		projects = [],
+		selectedProjectId = null,
 		onSave,
 		onExport,
 		onZoomIn,
 		onZoomOut,
 		onResetZoom,
 		onClear,
-		onToggleDarkMode
+		onToggleDarkMode,
+		onProjectChange
 	}: {
 		zoomLevel?: number;
 		darkMode?: boolean;
 		gridElementsCount?: number;
+		projects?: Project[];
+		selectedProjectId?: string | null;
 		onSave?: () => void;
 		onExport?: () => void;
 		onZoomIn?: () => void;
@@ -21,13 +29,21 @@
 		onResetZoom?: () => void;
 		onClear?: () => void;
 		onToggleDarkMode?: () => void;
+		onProjectChange?: (projectId: string | null) => void;
 	} = $props();
 </script>
 
 <div class="h-14 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border-b flex items-center justify-between px-6 shadow-sm">
 	<div class="flex items-center gap-4">
-		<h2 class="text-base font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">Workflow Canvas</h2>
-		<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
+		{#if projects.length > 0 && onProjectChange}
+			<ProjectSwitcher
+				{projects}
+				{selectedProjectId}
+				{darkMode}
+				onProjectChange={onProjectChange}
+			/>
+			<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
+		{/if}
 		<span class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'}">
 			{gridElementsCount} {gridElementsCount === 1 ? 'node' : 'nodes'}
 		</span>

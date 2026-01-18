@@ -49,6 +49,14 @@
 	} from './services/nodes/customAiNodes';
 	import { getElementTypes } from './services/nodes/nodeLibraryService';
 	import type { ElementType, GridElement, Connection } from './types';
+	import type { PageData } from './$types';
+	import type { Project } from '@stratiqai/types-simple';
+
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
 
 	// ------------------------------------------------------------------------------------------------
 	// Workflow builder overview
@@ -101,6 +109,17 @@
 	// ------------------------------------------------------------------------------------------------
 	let darkMode = $derived.by(() => darkModeStore.darkMode);
 	let toggleDarkMode = darkModeStore.toggle;
+
+	// ------------------------------------------------------------------------------------------------
+	// Project state
+	// ------------------------------------------------------------------------------------------------
+	let projects = $state<Project[]>(data.projects || []);
+	let selectedProjectId = $state<string | null>(null);
+
+	function handleProjectChange(projectId: string | null) {
+		selectedProjectId = projectId;
+		// TODO: Filter workflow nodes or reload workflow based on selected project
+	}
 
 	// ------------------------------------------------------------------------------------------------
 	// Lifecycle: load custom AI nodes on mount
@@ -284,6 +303,8 @@
 			{zoomLevel}
 			{darkMode}
 			gridElementsCount={gridElements.length}
+			{projects}
+			{selectedProjectId}
 			onSave={() => {}}
 			onExport={() => (showingWorkflowJSON = true)}
 			onZoomIn={zoomIn}
@@ -295,6 +316,7 @@
 				workflowResults = [];
 			}}
 			onToggleDarkMode={toggleDarkMode}
+			onProjectChange={handleProjectChange}
 		/>
 
 		<WorkflowCanvas

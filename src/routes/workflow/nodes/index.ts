@@ -2,6 +2,9 @@ import { documentKnowledgeBaseNode } from './inputs/documentKnowledgeBase';
 import { mcpServerNode } from './inputs/mcpServer';
 import { usCensusNode } from './inputs/usCensus';
 import { eventNode } from './inputs/event';
+import { onDocumentUploadNode } from './inputs/onDocumentUpload';
+import { onImageNode } from './inputs/onImage';
+import { onTextNode } from './inputs/onText';
 import { calculateNoiNode } from './processes/calculateNoi';
 import { calculateCapRateNode } from './processes/calculateCapRate';
 import { calculateDscrNode } from './processes/calculateDscr';
@@ -57,6 +60,9 @@ export const elementTypes = [
 	mcpServerNode,
 	usCensusNode,
 	eventNode,
+	onDocumentUploadNode,
+	onImageNode,
+	onTextNode,
 	// Process Nodes
 	calculateNoiNode,
 	calculateCapRateNode,
