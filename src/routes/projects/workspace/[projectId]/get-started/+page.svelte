@@ -1,11 +1,13 @@
 <!-- +page.svelte -->
 <script lang="ts">
+	import { browser } from '$app/environment';
+	import { page } from '$app/stores';
 	import DocumentUpload from '$lib/components/DocumentUpload/DocumentUpload.svelte';
 	import ProjectEntitiesDisplay from '$lib/components/ProjectEntities/ProjectEntitiesDisplay.svelte';
-	import { projectStore } from '$lib/stores/projectStore.svelte';
+	import { ProjectSyncManager, store } from '$lib/realtime/websocket/projectSync';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
-	import { page } from '$app/stores';
+	import type { Project, Doclink } from '@stratiqai/types-simple';
 
 	let { data } = $props();
 
@@ -13,23 +15,73 @@
 	const cognitoIdToken = $derived(data.idToken ?? authStore.idToken);
 	// Use server-side currentUser first (available during SSR), then fallback to authStore
 	const currentUser = $derived(data.currentUser ?? authStore.currentUser);
-
-	// Use project store synced by the workspace layout's realtime subscriptions
-	let project = $derived(projectStore.entity);
-	let isNewProject = $derived(data.isNewProject);
-	// Get projectId from route params (more reliable than project store)
+	const isNewProject = $derived(data.isNewProject);
+	// Get projectId from route params
 	const projectId = $derived($page.params.projectId ?? null);
+	const projectFromServer = $derived(data.project ?? null);
 
-	// Extract doclinks from the project store (supports connection or array formats)
+	// Manager lifecycle
+	let projectSyncManager = $state(ProjectSyncManager.createInactive());
+
+	// Get project from store (reactive to store changes)
+	// Use store.at() to directly access the project instead of getAllAtArray
+	// which creates new arrays and can cause infinite loops
+	const project = $derived.by(() => {
+		if (!projectId) return null;
+		return store.at<Project>(`projects/${projectId}`) ?? null;
+	});
+
+	// Extract doclinks from the project (supports connection or array formats)
 	const doclinks = $derived.by(() => {
-		const links = (project as any)?.projectDocumentLinks ?? (project as any)?.doclinks;
+		if (!project) return [];
+		const links = (project as any)?.doclinks;
 		if (!links) return [];
-		if (Array.isArray(links)) return links;
-		return links.items || [];
+		if (Array.isArray(links)) return links as Doclink[];
+		return (links.items || []) as Doclink[];
 	});
 
 	// Dark mode support
-	let darkMode = $derived.by(() => darkModeStore.darkMode);
+	const darkMode = $derived.by(() => darkModeStore.darkMode);
+
+	// Sync single project when projectId is available
+	$effect(() => {
+		if (!browser || !projectId || !cognitoIdToken || isNewProject) return;
+
+		let aborted = false;
+
+		async function syncProject() {
+			try {
+				// Initialize manager if not ready
+				if (!projectSyncManager.isReady) {
+					const initialItems = projectFromServer ? [projectFromServer] : [];
+					await projectSyncManager.initialize({
+						idToken: cognitoIdToken,
+						initialItems,
+						setupSubscriptions: true,
+						clearExisting: false
+					});
+				}
+
+				if (aborted || !projectSyncManager.isReady) return;
+
+				// Sync the single project (this will include doclinks from the query)
+				if (!projectFromServer) {
+					await projectSyncManager.syncOne(projectId, {
+						setupSubscriptions: true
+					});
+				}
+			} catch (err) {
+				if (aborted) return;
+				// Error handled silently
+			}
+		}
+
+		syncProject();
+
+		return () => {
+			aborted = true;
+		};
+	});
 
 	// Construct file metadata for S3 uploads
 	// This must be available before uploads can start
@@ -38,52 +90,15 @@
 		const hasOwnerId = !!currentUser?.sub;
 		const hasProjectId = !!projectId;
 		
-		console.log('[get-started] [METADATA_DERIVED] Computing metadata:', {
-			hasCurrentUser: !!currentUser,
-			hasSub: hasOwnerId,
-			currentUserSub: currentUser?.sub,
-			currentUser: currentUser,
-			hasProjectId: hasProjectId,
-			projectId: projectId,
-			hasProject: !!project,
-			projectTenantId: project?.tenantId,
-			authStoreSub: authStore.currentUser?.sub,
-			authStoreTenant: authStore.currentUser?.tenant,
-			timestamp: new Date().toISOString()
-		});
-		
 		if (!hasOwnerId || !hasProjectId) {
-			console.warn('[get-started] [METADATA_DERIVED] Cannot create fileMetadata - missing required fields:', {
-				hasCurrentUser: !!currentUser,
-				hasSub: hasOwnerId,
-				currentUserSub: currentUser?.sub,
-				currentUser: currentUser,
-				hasProjectId: hasProjectId,
-				projectId: projectId,
-				authStoreSub: authStore.currentUser?.sub,
-				authStoreCurrentUser: authStore.currentUser,
-				stackTrace: new Error().stack
-			});
 			return null;
 		}
 		
-		const metadata = {
+		return {
 			tenantId: project?.tenantId || currentUser.tenant || authStore.currentUser?.tenant || 'default',
 			ownerId: currentUser.sub,
 			parentId: projectId
 		};
-		
-		console.log('[get-started] [METADATA_DERIVED] File metadata created successfully:', {
-			metadata: metadata,
-			source: {
-				tenantIdFrom: project?.tenantId ? 'project' : currentUser.tenant ? 'currentUser' : authStore.currentUser?.tenant ? 'authStore' : 'default',
-				ownerIdFrom: 'currentUser',
-				parentIdFrom: 'projectId'
-			},
-			timestamp: new Date().toISOString()
-		});
-		
-		return metadata;
 	});
 </script>
 

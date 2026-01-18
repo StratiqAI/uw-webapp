@@ -5,8 +5,8 @@
 	import UploadDropZone from './UploadDropZone.svelte';
 	import UploadList from './UploadList.svelte';
 	import DocumentProcessingModal from '../DocumentProcessing/DocumentProcessingModal.svelte';
-	import { project } from '$lib/stores/appStateStore';
-	import type { ProjectDocumentLink } from '$lib/types/cloud/app';
+	import { store } from '$lib/realtime/websocket/projectSync';
+	import type { Project, Doclink } from '@stratiqai/types-simple';
 	import type { DocumentListItem } from './types';
 
 	import { SUPPORTED_FILE_TYPES, MAX_FILE_SIZE } from './constants';
@@ -21,71 +21,65 @@
 	const uploader = createUploader(idToken, projectId, metadata ?? null);
 	
 	// Update uploader metadata when it changes reactively
-	// Always update, even if metadata is null, so the uploader knows the current state
+	// Only update if the values actually changed to prevent infinite loops
+	let lastMetadata = $state<typeof metadata>(null);
 	$effect(() => {
-		console.log('[DocumentUpload] [EFFECT] Metadata effect triggered:', {
-			hasMetadata: !!metadata,
-			metadata: metadata,
-			hasIdToken: !!idToken,
-			hasProjectId: !!projectId,
-			projectId: projectId,
-			hasUpdateMetadata: !!uploader.updateMetadata,
-			timestamp: new Date().toISOString()
-		});
+		if (!uploader.updateMetadata) return;
 		
-		if (uploader.updateMetadata) {
-			const previousMetadata = uploader.files.length > 0 ? 'check uploader state' : 'no files yet';
-			uploader.updateMetadata(metadata ?? null);
-			
-			if (metadata) {
-				console.log('[DocumentUpload] [EFFECT] Metadata updated (non-null):', {
-					metadata: metadata,
-					previousState: previousMetadata,
-					uploaderFilesCount: uploader.files.length
-				});
-			} else {
-				console.warn('[DocumentUpload] [EFFECT] Metadata is null - uploads will fail until metadata is available:', {
-					hasIdToken: !!idToken,
-					hasProjectId: !!projectId,
-					projectId: projectId,
-					uploaderFilesCount: uploader.files.length,
-					activeUploads: uploader.activeUploads
-				});
-			}
-		} else {
-			console.error('[DocumentUpload] [EFFECT] uploader.updateMetadata is not available!');
+		// Compare values, not references
+		const current = metadata ?? null;
+		const last = lastMetadata;
+		
+		if (
+			current?.tenantId !== last?.tenantId ||
+			current?.ownerId !== last?.ownerId ||
+			current?.parentId !== last?.parentId
+		) {
+			uploader.updateMetadata(current);
+			lastMetadata = current;
 		}
 	});
 	
 	// Update uploader token when it changes reactively
+	let lastToken = $state<typeof idToken>(null);
 	$effect(() => {
-		if (uploader.updateToken) {
+		if (!uploader.updateToken) return;
+		
+		if (idToken !== lastToken) {
 			uploader.updateToken(idToken);
+			lastToken = idToken;
 		}
 	});
-	
+
 	// Make files reactive so the list updates when files are added
 	const uploadFiles = $derived(uploader.files);
 
-	// Get projectDocumentLinks from the project store reactively
-	const projectDocumentLinks = $derived.by(() => {
-		const currentProject = $project;
-		// Check for doclinks (GraphQL field name) or projectDocumentLinks
-		const links = (currentProject as any)?.doclinks || (currentProject as any)?.projectDocumentLinks;
-		if (!links) return [] as ProjectDocumentLink[];
+	// Get doclinks from the store for the current project
+	// Use store.at() to directly access the project instead of getAllAtArray
+	// which creates new arrays and can cause infinite loops
+	const doclinks = $derived.by(() => {
+		if (!projectId) return [] as Doclink[];
+		
+		// Directly access the project at the specific path
+		const currentProject = store.at<Project>(`projects/${projectId}`);
+		if (!currentProject) return [] as Doclink[];
+		
+		// Extract doclinks from project (supports connection or array formats)
+		const links = (currentProject as any)?.doclinks;
+		if (!links) return [] as Doclink[];
 		
 		if (Array.isArray(links)) {
-			return links;
+			return links as Doclink[];
 		}
-		return (links as { items: ProjectDocumentLink[] }).items || [];
+		return (links.items || []) as Doclink[];
 	});
 
-	// Combine upload files and existing ProjectDocumentLinks into a unified list
+	// Combine upload files and existing doclinks into a unified list
 	const documentList = $derived.by(() => {
 		const items: DocumentListItem[] = [];
 		
-		// Add existing ProjectDocumentLinks
-		for (const link of projectDocumentLinks) {
+		// Add existing doclinks
+		for (const link of doclinks) {
 			items.push({
 				id: link.id,
 				filename: link.filename,
@@ -114,51 +108,20 @@
 	});
 
 	function handleFilesAdded(event: { validFiles: File[] }) {
-		console.log('[DocumentUpload] [HANDLE_FILES_ADDED] Files added:', {
-			validFilesCount: event.validFiles.length,
-			fileNames: event.validFiles.map(f => f.name),
-			hasMetadata: !!metadata,
-			metadata: metadata,
-			hasIdToken: !!idToken,
-			hasProjectId: !!projectId,
-			projectId: projectId,
-			timestamp: new Date().toISOString()
-		});
-		
 		// Prevent adding files that are already in the list (check both uploads and existing links)
 		const existingFileNames = new Set([
 			...uploadFiles.map((f) => f.file.name),
-			...projectDocumentLinks.map((link: ProjectDocumentLink) => link.filename)
+			...doclinks.map((link: Doclink) => link.filename)
 		]);
 		const newFiles = event.validFiles.filter(
 			(file) => !existingFileNames.has(file.name)
 		);
 		
-		console.log('[DocumentUpload] [HANDLE_FILES_ADDED] Filtered new files:', {
-			newFilesCount: newFiles.length,
-			newFileNames: newFiles.map(f => f.name),
-			existingCount: existingFileNames.size,
-			hasMetadata: !!metadata,
-			metadata: metadata
-		});
-		
-		if (newFiles.length > 0 && !metadata) {
-			console.error('[DocumentUpload] [HANDLE_FILES_ADDED] WARNING: Adding files but metadata is null!', {
-				newFiles: newFiles.map(f => f.name),
-				metadata: metadata,
-				hasIdToken: !!idToken,
-				hasProjectId: !!projectId,
-				projectId: projectId
-			});
-		}
-		
 		uploader.add(newFiles);
 	}
 
 	function handleError(event: { errors: string[] }) {
-		// Here you would typically show a toast notification or an alert
-		// For now, we'll just log them.
-		console.error('Validation errors:', event.errors);
+		// Error handling - could be extended to show toast notifications
 	}
 
 	// Modal state
@@ -220,7 +183,7 @@
 		if (e.item.status === 'upload' && e.item.uploadFile) {
 			uploader.remove(e.item.uploadFile.id);
 		}
-		// Note: Removing existing ProjectDocumentLinks would require a mutation
+		// Note: Removing existing doclinks would require a mutation
 		// For now, we'll only allow removing upload files
 	}}
 	onRetry={(e) => {

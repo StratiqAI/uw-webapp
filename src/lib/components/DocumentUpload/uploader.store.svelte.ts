@@ -36,15 +36,6 @@ export function createUploader(
 	let project = $state(projectId);
 	let fileMetadata = $state(metadata);
 	
-	// Debug: Log initial state
-	console.log(`${LOG_PREFIX} [INIT] Uploader created:`, {
-		hasToken: !!token,
-		hasProject: !!project,
-		hasMetadata: !!fileMetadata,
-		metadata: fileMetadata,
-		projectId: project
-	});
-	
 	// Track active subscriptions per document (keyed by sha256/documentId)
 	const activeSubscriptions = new Map<string, SubscriptionSpec<any>[]>();
 
@@ -234,27 +225,20 @@ export function createUploader(
 			return activeUploads;
 		},
 		updateMetadata: (newMetadata: FileMetadata) => {
-			const oldMetadata = fileMetadata;
-			fileMetadata = newMetadata;
-			console.log(`${LOG_PREFIX} [UPDATE_METADATA] Metadata updated:`, {
-				oldMetadata: oldMetadata,
-				newMetadata: newMetadata,
-				wasNull: !oldMetadata,
-				isNull: !newMetadata,
-				hasToken: !!token,
-				hasProject: !!project,
-				stackTrace: new Error().stack
-			});
+			// Only update if values actually changed to prevent unnecessary updates
+			if (
+				fileMetadata?.tenantId !== newMetadata?.tenantId ||
+				fileMetadata?.ownerId !== newMetadata?.ownerId ||
+				fileMetadata?.parentId !== newMetadata?.parentId
+			) {
+				fileMetadata = newMetadata;
+			}
 		},
 		updateToken: (newToken: string | null) => {
-			const oldToken = token;
-			token = newToken;
-			console.log(`${LOG_PREFIX} [UPDATE_TOKEN] Token updated:`, {
-				hadToken: !!oldToken,
-				hasToken: !!newToken,
-				hasMetadata: !!fileMetadata,
-				metadata: fileMetadata
-			});
+			// Only update if token actually changed
+			if (token !== newToken) {
+				token = newToken;
+			}
 		},
 		add: (filesToAdd: File[]) => {
 			// Warn if metadata is not available when files are added

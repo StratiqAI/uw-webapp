@@ -1,22 +1,29 @@
 <!-- src/routes/(app)/+layout.svelte -->
 <script lang="ts">
+	// ----------------------------------------------------------------------------
+	// Imports
+	// ----------------------------------------------------------------------------
 	import { browser } from '$app/environment';
 	import type { LayoutProps } from './$types';
 	import { ProjectSyncManager, store } from '$lib/realtime/websocket/projectSync';
-	import type { Project, Doclink } from '@stratiqai/types-simple';
-	import { logger } from '$lib/logging/debug';
-	// Import shared notification store and subscription
+	import { addSubscription, removeSubscription } from '$lib/stores/appSyncClientStore';
 	import { notificationStore, S_ON_CREATE_NOTIFICATION, type Notification } from '$lib/stores/notifications.svelte';
+	import { darkModeStore } from '$lib/stores/darkMode.svelte';
+	import { ui } from '$lib/stores/ui.svelte';
+	import type { Project } from '@stratiqai/types-simple';
+	import { print } from 'graphql';
+	import { logger } from '$lib/logging/debug';
+	import RightChatDrawer from '$lib/components/RightChatDrawer.svelte';
+	import WorkspaceHeaderBar from '$lib/components/workspace/WorkspaceHeaderBar.svelte';
+
 	// ----------------------------------------------------------------------------
 	// Props + Core Reactive State
 	// ----------------------------------------------------------------------------
 	let { children, data }: LayoutProps = $props();
 
-	// Auth + UI theme
-	let currentUser = $derived(data.currentUser);
+	const currentUser = $derived(data.currentUser);
 	const idToken = $derived(data?.idToken);
-	const isDarkMode = $derived(darkModeStore.darkMode);
-	let isNewProject = $derived(data.isNewProject);
+	const isNewProject = $derived(data.isNewProject);
 	const projectFromServer = $derived(data.project ?? null);
 	const projectId = $derived(projectFromServer?.id ?? null);
 
@@ -26,67 +33,93 @@
 	// ----------------------------------------------------------------------------
 	// Store-backed UI Data
 	// ----------------------------------------------------------------------------
-	// Type guard to ensure store data matches the Project shape
 	function isValidProject(value: unknown): value is Project {
 		return typeof value === 'object' && value !== null && 'id' in value && 'name' in value;
 	}
 
-	// Reactive list of projects (auto-updates when the store changes)
-	let projects = $derived.by(() =>
-		store.getAllAt<Project>('projects', { filter: (_key, value) => isValidProject(value) })
+	// Get projects from store (reactive to store changes)
+	const storeProjects = $derived.by(() =>
+		store.getAllAtArray<Project>('projects', {
+			filter: (_key, value) => isValidProject(value)
+		})
 	);
 
 	// Current project based on route id
-	let project = $derived.by(() => {
+	const project = $derived.by(() => {
 		if (!projectId) return null;
-		const match = projects.find((entry: { id: string; data: Project }) => entry.data?.id === projectId);
-		return match?.data ?? null;
+		return storeProjects.find((p) => p.id === projectId) ?? null;
 	});
 
 	// ----------------------------------------------------------------------------
 	// Manager Lifecycle
 	// ----------------------------------------------------------------------------
+	// Initialize manager and sync projects
 	$effect(() => {
-		console.log("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-
 		let aborted = false;
 
-		// Create manager + initial sync for this token
-		const initializeAndSync = async () => {
+		async function initializeAndSync() {
+			if (!browser || !idToken) return;
+
 			try {
-				if (!browser) return;
-				await projectSyncManager.initialize({ idToken });
-				if (aborted || !projectSyncManager.isReady) return;
-				await projectSyncManager.syncList({
-					queryVariables: { limit: 50, scope: 'OWNED_BY_ME' },
+				// Initialize with server project if available
+				const initialItems = projectFromServer ? [projectFromServer] : [];
+				await projectSyncManager.initialize({
+					idToken,
+					initialItems,
 					setupSubscriptions: true,
 					clearExisting: false
 				});
-			} catch (err: unknown) {
+
+				if (aborted || !projectSyncManager.isReady) return;
+
+				// Only sync from API if we didn't have initial project
+				if (!projectFromServer) {
+					await projectSyncManager.syncList({
+						queryVariables: { limit: 50, scope: 'OWNED_BY_ME' },
+						setupSubscriptions: true,
+						clearExisting: false
+					});
+				}
+			} catch (err) {
 				if (aborted) return;
-				console.error('Error syncing projects:', err);
+				console.error('Error initializing project sync:', err);
 			}
-		};
+		}
 
 		initializeAndSync();
 
-		// Cleanup on token change/unmount
 		return () => {
 			aborted = true;
 			projectSyncManager.cleanup();
 		};
 	});
-	
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	// Application Svelte Components Section
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-	// Import Application Svelte Components
-	import { ui } from '$lib/stores/ui.svelte';
-	import RightChatDrawer from '$lib/components/RightChatDrawer.svelte';
-	import WorkspaceHeaderBar from '$lib/components/workspace/WorkspaceHeaderBar.svelte';
-	import { darkModeStore } from '$lib/stores/darkMode.svelte';
-	import NotificationBell from '$lib/components/Notifications/NotificationBell.svelte';
+	// Set up notification subscription for this project
+	$effect(() => {
+		if (!browser || !idToken || !projectId) return;
+
+		const spec = {
+			query: print(S_ON_CREATE_NOTIFICATION),
+			variables: { parentId: projectId },
+			path: 'onCreateNotification',
+			next: (notification: Notification) => {
+				console.log('Notification received for project:', projectId, notification);
+				notificationStore.addNotification(notification);
+			},
+			error: (err: unknown) => {
+				console.error('Notification subscription error for project', projectId, err);
+			}
+		};
+
+		addSubscription(idToken, spec).catch((err) => {
+			console.error('Failed to add notification subscription for project', projectId, err);
+		});
+
+		// Cleanup: remove subscription when project changes or component unmounts
+		return () => {
+			removeSubscription(spec);
+		};
+	});
 </script>
 
 <!-- Full viewport split: main app + right chat drawer -->
