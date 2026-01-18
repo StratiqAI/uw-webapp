@@ -1,4 +1,5 @@
 import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from '$env/static/public';
+import { browser } from '$app/environment';
 import type { Project } from '@stratiqai/types-simple';
 import {
 	Q_GET_PROJECT,
@@ -22,6 +23,14 @@ import { toTopicPath } from '$lib/realtime/store/TopicMapper';
 
 // Re-export the specific store used by this manager
 export const store = validatedTopicStore;
+
+// Expose dumpStore function to browser console for debugging
+if (browser && typeof window !== 'undefined') {
+	(window as any).dumpStore = () => {
+		console.log('ValidatedTopicStore contents:', store.toJSON());
+		return store.toJSON();
+	};
+}
 
 /**
  * Configuration for synchronizing Project entities.
