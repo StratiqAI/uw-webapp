@@ -1,6 +1,6 @@
-import { documentKnowledgeBaseNode } from './inputs/documentKnowledgeBase';
-import { mcpServerNode } from './inputs/mcpServer';
-import { usCensusNode } from './inputs/usCensus';
+import { documentKnowledgeBaseNode } from './tools/documentKnowledgeBase';
+import { mcpServerNode } from './tools/mcpServer';
+import { usCensusNode } from './tools/usCensus';
 import { eventNode } from './inputs/event';
 import { onDocumentUploadNode } from './inputs/onDocumentUpload';
 import { onImageNode } from './inputs/onImage';
@@ -55,10 +55,11 @@ import { financialSummaryNode } from './outputs/financialSummary';
 import { analysisReportNode } from './outputs/analysisReport';
 
 export const elementTypes = [
-	// Input Nodes
+	// Tool Nodes
 	documentKnowledgeBaseNode,
 	mcpServerNode,
 	usCensusNode,
+	// Input Nodes
 	eventNode,
 	onDocumentUploadNode,
 	onImageNode,

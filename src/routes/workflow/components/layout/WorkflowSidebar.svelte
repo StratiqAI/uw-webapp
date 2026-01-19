@@ -45,6 +45,7 @@
 	const filteredProcessNodes = $derived(allElementTypes.filter((t) => t.type === 'process' && filterMatches(t)));
 	const filteredAINodes = $derived(allElementTypes.filter((t) => t.type === 'ai' && filterMatches(t)));
 	const filteredOutputNodes = $derived(allElementTypes.filter((t) => t.type === 'output' && filterMatches(t)));
+	const filteredToolNodes = $derived(allElementTypes.filter((t) => t.type === 'tools' && filterMatches(t)));
 
 	let showInputNodes = $state(true);
 	let showProcessNodes = $state(true);
@@ -191,7 +192,7 @@
 					>
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
 					</svg>
-					Financial Calculations
+					Functions
 				</button>
 				{#if onShowProcessGallery}
 					<button
@@ -334,7 +335,7 @@
 		</div>
 
 		<!-- Tools -->
-		{#if onAddComment}
+		{#if filteredToolNodes.length > 0 || onAddComment}
 			<div>
 				<button
 					class="flex items-center gap-2 text-xs font-semibold {darkMode ? 'text-slate-300' : 'text-slate-600'} uppercase tracking-wider mb-3"
@@ -353,17 +354,33 @@
 					Tools
 				</button>
 				{#if showTools}
-					<div id="sidebar-tools">
-						<button
-							class="w-full p-3.5 {darkMode ? 'bg-amber-900/30 hover:bg-amber-900/40 border-amber-600/50' : 'bg-amber-50 hover:bg-amber-100 border-amber-200'} rounded-lg cursor-pointer transition-all flex items-center gap-3 border shadow-sm hover:shadow-md hover:scale-[1.02] group"
-							onclick={onAddComment}
-							title="Add a comment to the canvas"
-						>
-							<span class="text-lg w-10 h-10 flex items-center justify-center {darkMode ? 'bg-amber-800/50' : 'bg-amber-100'} {darkMode ? 'text-amber-200' : 'text-amber-700'} rounded-lg transition-colors group-hover:scale-105">
-								💬
-							</span>
-							<span class="text-sm font-semibold flex-1 text-left {darkMode ? 'text-slate-200' : 'text-slate-900'}">Add Comment</span>
-						</button>
+					<div id="sidebar-tools" class="space-y-2.5">
+						{#each filteredToolNodes as elementType}
+							<button
+								class="w-full p-3.5 {darkMode ? 'bg-purple-900/30 hover:bg-purple-900/40 border-purple-600/50' : 'bg-purple-50 hover:bg-purple-100 border-purple-200'} rounded-lg cursor-move transition-all flex items-center gap-3 border shadow-sm hover:shadow-md hover:scale-[1.02] group"
+								onmousedown={(e) => handleDragStart(elementType, e)}
+							>
+								<span class="text-sm font-semibold w-10 h-10 flex items-center justify-center {darkMode ? 'bg-purple-800/50' : 'bg-purple-100'} {darkMode ? 'text-purple-200' : 'text-purple-700'} rounded-lg transition-colors group-hover:scale-105">
+									{elementType.icon}
+								</span>
+								<span class="text-sm font-semibold flex-1 text-left {darkMode ? 'text-slate-200' : 'text-slate-900'}">{elementType.label}</span>
+								<svg class="w-4 h-4 {darkMode ? 'text-slate-500' : 'text-slate-400'} opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16m-7-7l7 7-7 7"></path>
+								</svg>
+							</button>
+						{/each}
+						{#if onAddComment}
+							<button
+								class="w-full p-3.5 {darkMode ? 'bg-amber-900/30 hover:bg-amber-900/40 border-amber-600/50' : 'bg-amber-50 hover:bg-amber-100 border-amber-200'} rounded-lg cursor-pointer transition-all flex items-center gap-3 border shadow-sm hover:shadow-md hover:scale-[1.02] group"
+								onclick={onAddComment}
+								title="Add a comment to the canvas"
+							>
+								<span class="text-lg w-10 h-10 flex items-center justify-center {darkMode ? 'bg-amber-800/50' : 'bg-amber-100'} {darkMode ? 'text-amber-200' : 'text-amber-700'} rounded-lg transition-colors group-hover:scale-105">
+									💬
+								</span>
+								<span class="text-sm font-semibold flex-1 text-left {darkMode ? 'text-slate-200' : 'text-slate-900'}">Add Comment</span>
+							</button>
+						{/if}
 					</div>
 				{/if}
 			</div>
