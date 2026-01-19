@@ -1,7 +1,7 @@
 import { WorkflowNode } from '../WorkflowNode';
 
 export const onDocumentUploadNode = new WorkflowNode({
-	id: 'input-on-document-upload',
+	id: 'on-document-upload',
 	type: 'input',
 	label: 'On Document Upload',
 	icon: '📄',

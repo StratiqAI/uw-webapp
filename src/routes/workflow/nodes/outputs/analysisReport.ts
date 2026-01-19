@@ -1,7 +1,7 @@
 import { WorkflowNode } from '../WorkflowNode';
 
 export const analysisReportNode = new WorkflowNode({
-	id: 'output-analysis-report',
+	id: 'analysis-report',
 	type: 'output',
 	label: 'Analysis Report',
 	icon: '📈',

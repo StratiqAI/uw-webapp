@@ -1,7 +1,7 @@
 import { WorkflowNode } from '../WorkflowNode';
 
 export const calculateDscrNode = new WorkflowNode({
-	id: 'process-calculate-dscr',
+	id: 'calculate-dscr',
 	type: 'process',
 	label: 'Calculate DSCR',
 	icon: 'DSCR',

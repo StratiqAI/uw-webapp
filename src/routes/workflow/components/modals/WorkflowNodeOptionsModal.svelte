@@ -5,11 +5,13 @@
 	let {
 		darkMode = false,
 		editingNodeOptions = $bindable(null),
+		selectedProjectId = null,
 		onSave,
 		onClose
 	}: {
 		darkMode?: boolean;
 		editingNodeOptions?: GridElement | null;
+		selectedProjectId?: string | null;
 		onSave?: () => void;
 		onClose?: () => void;
 	} = $props();
@@ -27,7 +29,17 @@
 			if (fallbackOptions && typeof (fallbackOptions as Promise<any>).then === 'function') {
 				return {};
 			}
-			return fallbackOptions ?? {};
+			let options = fallbackOptions ?? {};
+			
+			// For Document Knowledge Base node, ensure it has projectId
+			if (element.type.id === 'property-data') {
+				options = {
+					...options,
+					projectId: selectedProjectId || ''
+				};
+			}
+			
+			return options;
 		} catch (error) {
 			console.warn('Failed to resolve default node options', error);
 			return {};

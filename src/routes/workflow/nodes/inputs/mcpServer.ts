@@ -1,7 +1,7 @@
 import { WorkflowNode } from '../WorkflowNode';
 
 export const mcpServerNode = new WorkflowNode({
-	id: 'input-financial-metrics',
+	id: 'financial-metrics',
 	type: 'input',
 	label: 'MCP Server',
 	icon: 'M',

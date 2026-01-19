@@ -1,7 +1,7 @@
 import { createAIWorkflowNode } from './createAIWorkflowNode';
 
 export const propertyAnalysisNode = createAIWorkflowNode({
-	id: 'ai-property-analysis',
+	id: 'property-analysis',
 	label: 'Property Analysis',
 	description: 'Analyze commercial real estate properties with comprehensive assessments',
 	prompt:

@@ -24,6 +24,7 @@ export type WorkflowJSON = {
 	elements: Array<{
 		id: string;
 		type: string;
+		category: string;
 		typeLabel: string;
 		x: number;
 		y: number;

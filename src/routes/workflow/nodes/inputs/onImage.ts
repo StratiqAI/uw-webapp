@@ -1,7 +1,7 @@
 import { WorkflowNode } from '../WorkflowNode';
 
 export const onImageNode = new WorkflowNode({
-	id: 'input-on-image',
+	id: 'on-image',
 	type: 'input',
 	label: 'On Image',
 	icon: '🖼️',

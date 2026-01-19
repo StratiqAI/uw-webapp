@@ -1,7 +1,7 @@
 import { WorkflowNode } from '../WorkflowNode';
 
 export const calculateCashFlowNode = new WorkflowNode({
-	id: 'process-calculate-cash-flow',
+	id: 'calculate-cash-flow',
 	type: 'process',
 	label: 'Calculate Cash Flow',
 	icon: 'CF',

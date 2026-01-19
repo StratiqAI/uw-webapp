@@ -18,19 +18,26 @@
 
 	function generateWorkflowJSON() {
 		const workflow = {
-			elements: gridElements.map((el) => ({
-				id: el.id,
-				type: el.type.id,
-				typeLabel: el.type.label,
-				x: el.x,
-				y: el.y,
-				width: el.width,
-				height: el.height,
-				...(el.aiQueryData && { aiQueryData: el.aiQueryData }),
-				...(el.output !== undefined && { output: el.output }),
-				...(el.nodeOptions !== undefined && { nodeOptions: el.nodeOptions }),
-				...(el.commentText && { commentText: el.commentText })
-			})),
+			elements: gridElements.map((el) => {
+				// Extract category from el.type.type
+				const category = el.type.type;
+				// Strip category prefix from el.type.id (e.g., "input-property-data" -> "property-data")
+				const typeIdWithoutPrefix = el.type.id.replace(/^(input|output|process|ai)-/, '');
+				return {
+					id: el.id,
+					type: typeIdWithoutPrefix,
+					category,
+					typeLabel: el.type.label,
+					x: el.x,
+					y: el.y,
+					width: el.width,
+					height: el.height,
+					...(el.aiQueryData && { aiQueryData: el.aiQueryData }),
+					...(el.output !== undefined && { output: el.output }),
+					...(el.nodeOptions !== undefined && { nodeOptions: el.nodeOptions }),
+					...(el.commentText && { commentText: el.commentText })
+				};
+			}),
 			connections: connections.map((conn) => ({
 				id: conn.id,
 				from: conn.from,

@@ -61,7 +61,24 @@
 <div class="absolute overflow-visible" style="left: {element.x}px; top: {element.y}px;">
 	<!-- Node Container -->
 	<div
-		class="{getElementColor(element.type.type, darkMode)} rounded-xl {darkMode ? 'shadow-2xl shadow-black/50' : 'shadow-lg'} cursor-move border-2 {getElementBorderColor(element.type.type, darkMode)} {isDragged ? '' : 'hover:shadow-2xl hover:scale-[1.02] transition-all'} {getNodeAccentColor(element.type.type, darkMode) ? getNodeAccentColor(element.type.type, darkMode) + ' ring-1' : ''}"
+		class="{element.type.type === 'input' 
+			? darkMode ? 'bg-gradient-to-r from-indigo-500/10 via-slate-700/80 to-slate-800/80' : 'bg-gradient-to-r from-indigo-50 via-white to-slate-50/50'
+			: element.type.type === 'output'
+			? darkMode ? 'bg-gradient-to-l from-emerald-500/10 via-slate-700/80 to-slate-800/80' : 'bg-gradient-to-l from-emerald-50 via-white to-slate-50/50'
+			: getElementColor(element.type.type, darkMode)} 
+		{element.type.type === 'input' ? 'rounded-r-2xl rounded-l-full' 
+			: element.type.type === 'output' ? 'rounded-l-2xl rounded-r-full'
+			: 'rounded-xl'} 
+		{darkMode ? 'shadow-2xl shadow-black/50' : 'shadow-lg'} 
+		cursor-move 
+		{element.type.type === 'input' 
+			? 'border-2 ' + (darkMode ? 'border-slate-600/60 border-l-indigo-400/60' : 'border-slate-200 border-l-indigo-400/70')
+			: element.type.type === 'output'
+			? 'border-2 ' + (darkMode ? 'border-slate-600/60 border-r-emerald-400/60' : 'border-slate-200 border-r-emerald-400/70')
+			: 'border-2 ' + getElementBorderColor(element.type.type, darkMode)
+		} 
+		{isDragged ? '' : 'hover:shadow-2xl hover:scale-[1.02] transition-all'} 
+		{getNodeAccentColor(element.type.type, darkMode) ? getNodeAccentColor(element.type.type, darkMode) + ' ring-1' : ''}"
 		style="width: {element.width}px; height: {element.height}px; {isDragged ? 'transition: none;' : ''}"
 		onmousedown={handleDragStart}
 		ondblclick={handleDoubleClickEvent}
@@ -69,6 +86,22 @@
 		tabindex="0"
 	>
 		<div class="relative w-full h-full flex flex-col items-center justify-center group overflow-visible">
+			{#if element.type.type === 'input'}
+				<!-- Entry indicator arrow on the left -->
+				<div class="absolute left-0 top-1/2 -translate-y-1/2 w-6 h-6 {darkMode ? 'bg-indigo-500/30' : 'bg-indigo-500/20'} rounded-full flex items-center justify-center z-10">
+					<svg class="w-3 h-3 {darkMode ? 'text-indigo-300' : 'text-indigo-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+					</svg>
+				</div>
+			{/if}
+			{#if element.type.type === 'output'}
+				<!-- Exit indicator arrow on the right -->
+				<div class="absolute right-0 top-1/2 -translate-y-1/2 w-6 h-6 {darkMode ? 'bg-emerald-500/30' : 'bg-emerald-500/20'} rounded-full flex items-center justify-center z-10">
+					<svg class="w-3 h-3 {darkMode ? 'text-emerald-300' : 'text-emerald-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 17l-5-5m0 0l5-5m-5 5h12"></path>
+					</svg>
+				</div>
+			{/if}
 			<!-- Hover Options Icons (appear above node on hover) -->
 			<div class="absolute -top-12 left-1/2 -translate-x-1/2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-30 pointer-events-auto">
 			<!-- Play Button -->
@@ -120,45 +153,42 @@
 			</div>
 
 			<!-- Icon Container (centered in node) -->
-			<div class="w-12 h-12 flex items-center justify-center {getNodeIconBgColor(element.type.type, darkMode)} rounded-lg shadow-sm">
+			<div class="w-12 h-12 flex items-center justify-center {getNodeIconBgColor(element.type.type, darkMode)} {(element.type.type === 'input' || element.type.type === 'output') ? 'rounded-full' : 'rounded-lg'} shadow-sm">
 				<span class="text-lg {getNodeIconTextColor(element.type.type, darkMode)} font-semibold">
 					{element.type.icon}
 				</span>
 			</div>
 
-			<!-- Output Display (inside node, below icon) -->
-			{#if element.output !== undefined}
-				<div class="text-[10px] mt-2 truncate max-w-full px-2 py-1 font-mono {darkMode ? 'bg-slate-700 text-slate-200' : 'bg-slate-100 text-slate-600'} rounded border {darkMode ? 'border-slate-600' : 'border-slate-200'}">
-					{String(element.output).slice(0, 20)}
-				</div>
-			{/if}
-
 			<!-- Connection Points (only left input and right output) -->
 			{#if onConnectionPointClick}
-				<!-- Input Connection Point (left side - flat indicator) -->
-				<button
-					class="connection-point absolute top-1/2 left-0 -translate-y-1/2 -translate-x-1/2 flex items-center justify-center cursor-crosshair z-20 group/conn"
-					onclick={(e) => handleConnectionClick('left', e)}
-					aria-label="Input connection point"
-				>
-					<!-- Flat rectangular indicator -->
-					<div class="w-3 h-8 {darkMode ? 'bg-slate-500' : 'bg-slate-400'} group-hover/conn:bg-indigo-500 transition-colors rounded-sm"></div>
-				</button>
-				<!-- Output Connection Point (right side - circular, centered on edge) -->
-				<button
-					class="connection-point absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 flex items-center justify-center cursor-crosshair z-20 group/conn"
-					onclick={(e) => handleConnectionClick('right', e)}
-					aria-label="Output connection point"
-				>
-					<!-- Circle centered on edge -->
-					<div class="w-4 h-4 {darkMode ? 'bg-slate-600 border-slate-500' : 'bg-white border-slate-300'} border-2 rounded-full group-hover/conn:bg-indigo-500 group-hover/conn:border-indigo-600 transition-all group-hover/conn:scale-125 group-hover/conn:shadow-md"></div>
-				</button>
+				<!-- Input Connection Point (left side - flat indicator) - Hidden for input nodes -->
+				{#if element.type.type !== 'input'}
+					<button
+						class="connection-point absolute top-1/2 left-0 -translate-y-1/2 -translate-x-1/2 flex items-center justify-center cursor-crosshair z-20 group/conn"
+						onclick={(e) => handleConnectionClick('left', e)}
+						aria-label="Input connection point"
+					>
+						<!-- Flat rectangular indicator -->
+						<div class="w-3 h-8 {darkMode ? 'bg-slate-500' : 'bg-slate-400'} group-hover/conn:bg-indigo-500 transition-colors rounded-sm"></div>
+					</button>
+				{/if}
+				<!-- Output Connection Point (right side - circular, centered on edge) - Hidden for output nodes -->
+				{#if element.type.type !== 'output'}
+					<button
+						class="connection-point absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 flex items-center justify-center cursor-crosshair z-20 group/conn"
+						onclick={(e) => handleConnectionClick('right', e)}
+						aria-label="Output connection point"
+					>
+						<!-- Circle centered on edge -->
+						<div class="w-4 h-4 {darkMode ? 'bg-slate-600 border-slate-500' : 'bg-white border-slate-300'} border-2 rounded-full group-hover/conn:bg-indigo-500 group-hover/conn:border-indigo-600 transition-all group-hover/conn:scale-125 group-hover/conn:shadow-md"></div>
+					</button>
+				{/if}
 			{/if}
 		</div>
 	</div>
 
 	<!-- Description/Label (below the node) -->
-	<div class="text-center whitespace-nowrap pointer-events-none mt-3" style="width: {element.width}px;">
+	<div class="text-center whitespace-nowrap pointer-events-none mt-3" style="width: {element.width}px; {element.type.type === 'input' ? 'margin-left: 6px;' : element.type.type === 'output' ? 'margin-left: -6px;' : ''}">
 		<div class="text-sm font-semibold {getNodeLabelColor(darkMode)} leading-tight">
 			{element.type.label}
 		</div>

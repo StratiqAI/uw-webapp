@@ -1,7 +1,7 @@
 import { WorkflowNode } from '../WorkflowNode';
 
 export const calculateCapRateNode = new WorkflowNode({
-	id: 'process-calculate-cap-rate',
+	id: 'calculate-cap-rate',
 	type: 'process',
 	label: 'Calculate Cap Rate',
 	icon: '%',

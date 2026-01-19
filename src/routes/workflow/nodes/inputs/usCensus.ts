@@ -1,7 +1,7 @@
 import { WorkflowNode } from '../WorkflowNode';
 
 export const usCensusNode = new WorkflowNode({
-	id: 'input-market-data',
+	id: 'market-data',
 	type: 'input',
 	label: 'US Census',
 	icon: '📊',

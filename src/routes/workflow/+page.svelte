@@ -48,9 +48,79 @@
 		resetCustomAINodeDraft
 	} from './services/nodes/customAiNodes';
 	import { getElementTypes } from './services/nodes/nodeLibraryService';
+	import { generateWorkflowJSON } from './services/serialization/workflowSerializationService';
+	import { gql } from '$lib/realtime/graphql/requestHandler';
+	import WorkflowSwitcher from '$lib/dashboard/components/WorkflowSwitcher.svelte';
+	import { Q_GET_PROJECT } from '@stratiqai/types-simple';
 	import type { ElementType, GridElement, Connection } from './types';
 	import type { PageData } from './$types';
 	import type { Project } from '@stratiqai/types-simple';
+	import type { WorkflowJSON } from './types/workflow';
+	
+	// M_UPDATE_WORKFLOW mutation - matches the structure from @stratiqai/types-simple
+	// Uses CompositeKeyInput since Workflow is a child entity (has parentId)
+	const M_UPDATE_WORKFLOW = `
+		mutation UpdateWorkflow($key: CompositeKeyInput!, $input: UpdateWorkflowInput!) {
+			updateWorkflow(key: $key, input: $input) {
+				id
+				entityType
+				tenantId
+				ownerId
+				createdAt
+				updatedAt
+				deletedAt
+				sharingMode
+				name
+				definitionJSON
+			}
+		}
+	`;
+	
+	// M_DELETE_WORKFLOW mutation - uses CompositeKeyInput since Workflow is a child entity
+	const M_DELETE_WORKFLOW = `
+		mutation DeleteWorkflow($key: CompositeKeyInput!) {
+			deleteWorkflow(key: $key) {
+				id
+				entityType
+				tenantId
+				ownerId
+				createdAt
+				updatedAt
+				deletedAt
+				sharingMode
+				name
+				definitionJSON
+			}
+		}
+	`;
+	
+	// Workflow type - defined locally since it may not be exported from types-simple
+	type Workflow = {
+		id: string;
+		name: string;
+		definitionJSON: any;
+		[key: string]: any;
+	};
+	
+	// M_CREATE_WORKFLOW mutation - matches the structure from @stratiqai/types-simple
+	// This is the same mutation defined in types-simple/src/graphql/mutations/Workflow.ts
+	// Using inline definition since TypeScript exports may not be available, but structure matches exactly
+	const M_CREATE_WORKFLOW = `
+		mutation CreateWorkflow($input: CreateWorkflowInput!) {
+			createWorkflow(input: $input) {
+				id
+				entityType
+				tenantId
+				ownerId
+				createdAt
+				updatedAt
+				deletedAt
+				sharingMode
+				name
+				definitionJSON
+			}
+		}
+	`;
 
 	interface Props {
 		data: PageData;
@@ -116,9 +186,392 @@
 	let projects = $state<Project[]>(data.projects || []);
 	let selectedProjectId = $state<string | null>(null);
 
+	// ------------------------------------------------------------------------------------------------
+	// Workflow state
+	// ------------------------------------------------------------------------------------------------
+	let workflows = $state<Workflow[]>([]);
+	let selectedWorkflowId = $state<string | null>(null);
+	let loadingWorkflows = $state(false);
+
+	// Load workflows when project changes
+	async function loadWorkflowsForProject(projectId: string | null) {
+		if (!projectId || !data.idToken) {
+			workflows = [];
+			selectedWorkflowId = null;
+			return;
+		}
+
+		loadingWorkflows = true;
+		try {
+			// Query the project to get its workflows using the exact query structure
+			const response = await gql<{ getProject: { workflows?: { items: Workflow[]; nextToken?: string | null } } | null }>(
+				Q_GET_PROJECT,
+				{ id: projectId },
+				data.idToken
+			);
+			
+			const workflowItems = response?.getProject?.workflows?.items || [];
+			console.log('Loaded workflows for project:', projectId, workflowItems);
+			workflows = workflowItems;
+		} catch (error) {
+			console.error('Failed to load workflows:', error);
+			workflows = [];
+		} finally {
+			loadingWorkflows = false;
+		}
+	}
+
 	function handleProjectChange(projectId: string | null) {
 		selectedProjectId = projectId;
-		// TODO: Filter workflow nodes or reload workflow based on selected project
+		selectedWorkflowId = null; // Clear selected workflow when project changes
+		loadWorkflowsForProject(projectId);
+	}
+
+	// Load workflows when project is selected (including on initial load)
+	$effect(() => {
+		if (selectedProjectId && data.idToken) {
+			loadWorkflowsForProject(selectedProjectId);
+		}
+	});
+
+	// ------------------------------------------------------------------------------------------------
+	// Load workflow into canvas
+	// ------------------------------------------------------------------------------------------------
+	function findElementTypeByTypeAndCategory(typeId: string, category: string): ElementType | null {
+		// Try to find element type by matching id (with or without prefix)
+		// Use allElementTypes to include custom AI nodes
+		// First try exact match
+		let found = allElementTypes.find((et) => et.id === typeId);
+		if (found) return found;
+
+		// Try with category prefix
+		found = allElementTypes.find((et) => et.id === `${category}-${typeId}`);
+		if (found) return found;
+
+		// Try without prefix if it has one
+		const withoutPrefix = typeId.replace(/^(input|output|process|ai)-/, '');
+		found = allElementTypes.find((et) => {
+			const etWithoutPrefix = et.id.replace(/^(input|output|process|ai)-/, '');
+			return etWithoutPrefix === withoutPrefix && et.type === category;
+		});
+		if (found) return found;
+
+		return null;
+	}
+
+	function loadWorkflowIntoCanvas(workflow: Workflow) {
+		if (!workflow.definitionJSON) {
+			console.error('Workflow has no definitionJSON');
+			return;
+		}
+
+		try {
+			const workflowData: WorkflowJSON = typeof workflow.definitionJSON === 'string' 
+				? JSON.parse(workflow.definitionJSON)
+				: workflow.definitionJSON;
+
+			// Clear current canvas
+			gridElements = [];
+			connections = [];
+
+			// Deserialize elements
+			const newElements: GridElement[] = [];
+			for (const elData of workflowData.elements || []) {
+				// Handle comments specially since they're not in the element types library
+				let elementType: ElementType | null = null;
+				if (elData.category === 'comment') {
+					// Create comment element type inline (same as createCommentAt)
+					elementType = {
+						id: 'comment',
+						type: 'comment',
+						label: 'Comment',
+						icon: '💬',
+						execute: () => null
+					};
+				} else {
+					elementType = findElementTypeByTypeAndCategory(elData.type, elData.category);
+				}
+
+				if (!elementType) {
+					console.warn(`Could not find element type for: ${elData.type} (category: ${elData.category})`);
+					continue;
+				}
+
+				const gridElement: GridElement = {
+					id: elData.id,
+					type: elementType,
+					x: elData.x,
+					y: elData.y,
+					width: elData.width,
+					height: elData.height,
+					...(elData.aiQueryData && { aiQueryData: elData.aiQueryData }),
+					...(elData.output !== undefined && { output: elData.output }),
+					...(elData.nodeOptions !== undefined && { nodeOptions: elData.nodeOptions }),
+					...(elData.commentText && { commentText: elData.commentText })
+				};
+				newElements.push(gridElement);
+			}
+
+			// Deserialize connections
+			const newConnections: Connection[] = (workflowData.connections || []).map((connData) => ({
+				id: connData.id,
+				from: connData.from,
+				to: connData.to,
+				fromSide: connData.fromSide,
+				toSide: connData.toSide
+			}));
+
+			gridElements = newElements;
+			connections = newConnections;
+		} catch (error) {
+			console.error('Failed to load workflow into canvas:', error);
+			alert(`Error loading workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
+		}
+	}
+
+	function handleWorkflowChange(workflowId: string | null) {
+		selectedWorkflowId = workflowId;
+		if (workflowId) {
+			const workflow = workflows.find((w) => w.id === workflowId);
+			if (workflow) {
+				loadWorkflowIntoCanvas(workflow);
+			}
+		} else {
+			// Clear canvas when "New Workflow" is selected
+			gridElements = [];
+			connections = [];
+			workflowResults = [];
+		}
+	}
+
+	// ------------------------------------------------------------------------------------------------
+	// Delete workflow
+	// ------------------------------------------------------------------------------------------------
+	async function handleDeleteWorkflow(workflowId: string) {
+		if (!data.idToken) {
+			console.error('No authentication token available');
+			alert('Error: Not authenticated. Please refresh the page.');
+			return;
+		}
+
+		if (!selectedProjectId) {
+			console.error('No project selected');
+			alert('Error: Please select a project before deleting the workflow.');
+			return;
+		}
+
+		const workflow = workflows.find((w) => w.id === workflowId);
+		if (!workflow) {
+			console.error('Workflow not found:', workflowId);
+			return;
+		}
+
+		try {
+			// CompositeKeyInput requires both id and parentId for child entities
+			const key = {
+				id: workflowId,
+				parentId: selectedProjectId
+			};
+
+			const response = await gql<{ deleteWorkflow: { id: string } | null }>(
+				M_DELETE_WORKFLOW,
+				{ key },
+				data.idToken
+			);
+
+			if (!response.deleteWorkflow) {
+				console.error('Workflow deletion returned null');
+				alert('Error deleting workflow: No workflow returned');
+				return;
+			}
+
+			// Remove the workflow from local state
+			workflows = workflows.filter((w) => w.id !== workflowId);
+
+			// If the deleted workflow was selected, clear the selection and canvas
+			if (selectedWorkflowId === workflowId) {
+				selectedWorkflowId = null;
+				gridElements = [];
+				connections = [];
+				workflowResults = [];
+			}
+
+			console.log('Workflow deleted successfully:', response.deleteWorkflow);
+		} catch (error) {
+			console.error('Failed to delete workflow:', error);
+			alert(`Error deleting workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			throw error;
+		}
+	}
+
+	// ------------------------------------------------------------------------------------------------
+	// Rename workflow
+	// ------------------------------------------------------------------------------------------------
+	async function handleRenameWorkflow(workflowId: string, newName: string) {
+		if (!data.idToken) {
+			console.error('No authentication token available');
+			alert('Error: Not authenticated. Please refresh the page.');
+			return;
+		}
+
+		if (!selectedProjectId) {
+			console.error('No project selected');
+			alert('Error: Please select a project before renaming the workflow.');
+			return;
+		}
+
+		const workflow = workflows.find((w) => w.id === workflowId);
+		if (!workflow) {
+			console.error('Workflow not found:', workflowId);
+			return;
+		}
+
+		try {
+			// UpdateWorkflowInput - both fields are optional, so we can update just the name
+			// For a rename, we only need to send the name field
+			const input: { name: string; definitionJSON?: string } = {
+				name: newName
+			};
+			
+			// Optionally include definitionJSON to preserve it during the update
+			// Convert to string if it's an object (AWSJSON expects a string)
+			if (workflow.definitionJSON) {
+				input.definitionJSON = typeof workflow.definitionJSON === 'string' 
+					? workflow.definitionJSON 
+					: JSON.stringify(workflow.definitionJSON);
+			}
+
+			// CompositeKeyInput requires both id and parentId for child entities
+			const key = {
+				id: workflowId,
+				parentId: selectedProjectId
+			};
+
+			const response = await gql<{ updateWorkflow: { id: string; name: string } | null }>(
+				M_UPDATE_WORKFLOW,
+				{ key, input },
+				data.idToken
+			);
+
+			if (!response.updateWorkflow) {
+				console.error('Workflow update returned null');
+				alert('Error renaming workflow: No workflow returned');
+				return;
+			}
+
+			// Update the workflow in the local state
+			const workflowIndex = workflows.findIndex((w) => w.id === workflowId);
+			if (workflowIndex !== -1) {
+				workflows[workflowIndex] = {
+					...workflows[workflowIndex],
+					name: newName
+				};
+				// Trigger reactivity by reassigning
+				workflows = [...workflows];
+			}
+
+			console.log('Workflow renamed successfully:', response.updateWorkflow);
+		} catch (error) {
+			console.error('Failed to rename workflow:', error);
+			alert(`Error renaming workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			throw error; // Re-throw so the component can handle it
+		}
+	}
+
+	// ------------------------------------------------------------------------------------------------
+	// Save workflow to backend
+	// ------------------------------------------------------------------------------------------------
+	async function saveWorkflow() {
+		if (!data.idToken) {
+			console.error('No authentication token available');
+			alert('Error: Not authenticated. Please refresh the page.');
+			return;
+		}
+
+		if (!selectedProjectId) {
+			alert('Error: Please select a project before saving the workflow.');
+			return;
+		}
+
+		try {
+			// Generate workflow JSON
+			const workflowJSON = generateWorkflowJSON(gridElements, connections);
+
+			// Check if we're updating an existing workflow or creating a new one
+			if (selectedWorkflowId) {
+				// Update existing workflow
+				const workflow = workflows.find((w) => w.id === selectedWorkflowId);
+				if (!workflow) {
+					alert('Error: Selected workflow not found.');
+					return;
+				}
+
+				const input: { name: string; definitionJSON: string } = {
+					name: workflow.name, // Keep existing name, or you could update it
+					definitionJSON: workflowJSON
+				};
+
+				// CompositeKeyInput requires both id and parentId for child entities
+				const key = {
+					id: selectedWorkflowId,
+					parentId: selectedProjectId
+				};
+
+				const response = await gql<{ updateWorkflow: { id: string; name: string; definitionJSON: any } | null }>(
+					M_UPDATE_WORKFLOW,
+					{ key, input },
+					data.idToken
+				);
+
+				if (!response.updateWorkflow) {
+					console.error('Workflow update returned null');
+					alert('Error updating workflow: No workflow returned');
+					return;
+				}
+
+				// Update the workflow in local state
+				const workflowIndex = workflows.findIndex((w) => w.id === selectedWorkflowId);
+				if (workflowIndex !== -1) {
+					workflows[workflowIndex] = {
+						...workflows[workflowIndex],
+						...response.updateWorkflow
+					};
+					workflows = [...workflows]; // Trigger reactivity
+				}
+
+				console.log('Workflow updated successfully:', response.updateWorkflow);
+				alert('Workflow updated successfully!');
+			} else {
+				// Create new workflow
+				const input = {
+					name: 'New Workflow',
+					definitionJSON: workflowJSON,
+					parentId: selectedProjectId
+				};
+
+				const response = await gql<{ createWorkflow: { id: string; name: string; definitionJSON: any } | null }>(
+					M_CREATE_WORKFLOW,
+					{ input },
+					data.idToken
+				);
+
+				if (!response.createWorkflow) {
+					console.error('Workflow creation returned null');
+					alert('Error saving workflow: No workflow returned');
+					return;
+				}
+
+				// Add the new workflow to the list and select it
+				workflows = [...workflows, response.createWorkflow];
+				selectedWorkflowId = response.createWorkflow.id;
+
+				console.log('Workflow created successfully:', response.createWorkflow);
+				alert('Workflow created successfully!');
+			}
+		} catch (error) {
+			console.error('Failed to save workflow:', error);
+			alert(`Error saving workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
+		}
 	}
 
 	// ------------------------------------------------------------------------------------------------
@@ -305,7 +758,9 @@
 			gridElementsCount={gridElements.length}
 			{projects}
 			{selectedProjectId}
-			onSave={() => {}}
+			{workflows}
+			{selectedWorkflowId}
+			onSave={saveWorkflow}
 			onExport={() => (showingWorkflowJSON = true)}
 			onZoomIn={zoomIn}
 			onZoomOut={zoomOut}
@@ -317,6 +772,9 @@
 			}}
 			onToggleDarkMode={toggleDarkMode}
 			onProjectChange={handleProjectChange}
+			onWorkflowChange={handleWorkflowChange}
+			onRenameWorkflow={handleRenameWorkflow}
+			onDeleteWorkflow={handleDeleteWorkflow}
 		/>
 
 		<WorkflowCanvas
@@ -388,6 +846,7 @@
 		<WorkflowNodeOptionsModal
 			{darkMode}
 			bind:editingNodeOptions={editingNodeOptions}
+			{selectedProjectId}
 			onSave={executeWorkflow}
 		/>
 	{/if}

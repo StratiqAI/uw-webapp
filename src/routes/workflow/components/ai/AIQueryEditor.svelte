@@ -86,6 +86,8 @@
 							<option value="gpt-4o-mini">GPT-4o Mini</option>
 							<option value="gpt-4-turbo">GPT-4 Turbo</option>
 							<option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+							<option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
+							<option value="gemini-3-pro-preview">Gemini 3 Pro Preview</option>
 						</select>
 					</div>
 

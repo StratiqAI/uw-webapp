@@ -1,7 +1,7 @@
 import { WorkflowNode } from '../WorkflowNode';
 
 export const financialSummaryNode = new WorkflowNode({
-	id: 'output-financial-summary',
+	id: 'financial-summary',
 	type: 'output',
 	label: 'Financial Summary',
 	icon: '💰',

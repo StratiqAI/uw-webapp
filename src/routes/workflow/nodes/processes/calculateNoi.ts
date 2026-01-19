@@ -1,7 +1,7 @@
 import { WorkflowNode } from '../WorkflowNode';
 
 export const calculateNoiNode = new WorkflowNode({
-	id: 'process-calculate-noi',
+	id: 'calculate-noi',
 	type: 'process',
 	label: 'Calculate NOI',
 	icon: 'NOI',

@@ -1,6 +1,15 @@
 <script lang="ts">
 	import type { Project } from '@stratiqai/types-simple';
 	import ProjectSwitcher from '$lib/dashboard/components/ProjectSwitcher.svelte';
+	import WorkflowSwitcher from '$lib/dashboard/components/WorkflowSwitcher.svelte';
+	
+	// Workflow type - defined locally since it may not be exported from types-simple
+	type Workflow = {
+		id: string;
+		name: string;
+		definitionJSON: any;
+		[key: string]: any;
+	};
 
 	const {
 		zoomLevel = 1,
@@ -8,6 +17,8 @@
 		gridElementsCount = 0,
 		projects = [],
 		selectedProjectId = null,
+		workflows = [],
+		selectedWorkflowId = null,
 		onSave,
 		onExport,
 		onZoomIn,
@@ -15,13 +26,18 @@
 		onResetZoom,
 		onClear,
 		onToggleDarkMode,
-		onProjectChange
+		onProjectChange,
+		onWorkflowChange,
+		onRenameWorkflow,
+		onDeleteWorkflow
 	}: {
 		zoomLevel?: number;
 		darkMode?: boolean;
 		gridElementsCount?: number;
 		projects?: Project[];
 		selectedProjectId?: string | null;
+		workflows?: Workflow[];
+		selectedWorkflowId?: string | null;
 		onSave?: () => void;
 		onExport?: () => void;
 		onZoomIn?: () => void;
@@ -30,6 +46,9 @@
 		onClear?: () => void;
 		onToggleDarkMode?: () => void;
 		onProjectChange?: (projectId: string | null) => void;
+		onWorkflowChange?: (workflowId: string | null) => void;
+		onRenameWorkflow?: (workflowId: string, newName: string) => Promise<void>;
+		onDeleteWorkflow?: (workflowId: string) => Promise<void>;
 	} = $props();
 </script>
 
@@ -41,6 +60,17 @@
 				{selectedProjectId}
 				{darkMode}
 				onProjectChange={onProjectChange}
+			/>
+			<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
+		{/if}
+		{#if selectedProjectId && workflows.length >= 0 && onWorkflowChange}
+			<WorkflowSwitcher
+				{workflows}
+				{selectedWorkflowId}
+				{darkMode}
+				onWorkflowChange={onWorkflowChange}
+				onRename={onRenameWorkflow}
+				onDelete={onDeleteWorkflow}
 			/>
 			<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
 		{/if}

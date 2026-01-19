@@ -1,7 +1,7 @@
 import { WorkflowNode } from '../WorkflowNode';
 
 export const onTextNode = new WorkflowNode({
-	id: 'input-on-text',
+	id: 'on-text',
 	type: 'input',
 	label: 'On Text',
 	icon: '📝',
