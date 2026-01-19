@@ -30,7 +30,13 @@
 
 	// Advanced fields - Response Format
 	let responseFormatType = $state<'text' | 'json_object' | 'json_schema'>('text');
-	let jsonSchemaText = $state('');
+	let jsonSchemaText = $state(''); // Keep for backward compatibility/fallback
+	
+	// Schema Builder State
+	let schemaProperties = $state<Record<string, any>>({});
+	let schemaRequired = $state<string[]>([]);
+	let fieldOrder = $state<string[]>([]);
+	let useSchemaBuilder = $state(false); // Toggle between builder and textarea
 
 	// Advanced fields - Options
 	let stream = $state(false);
@@ -78,13 +84,35 @@
 			if (data?.responseFormat) {
 				responseFormatType = data.responseFormat.type;
 				if (data.responseFormat.type === 'json_schema' && 'schema' in data.responseFormat) {
-					jsonSchemaText = JSON.stringify(data.responseFormat.schema, null, 2);
+					const schema = data.responseFormat.schema as any;
+					jsonSchemaText = JSON.stringify(schema, null, 2);
+					// Initialize schema builder from existing schema
+					if (schema.properties) {
+						schemaProperties = { ...schema.properties };
+						schemaRequired = schema.required ? [...schema.required] : [];
+						fieldOrder = Object.keys(schema.properties);
+						useSchemaBuilder = true;
+					}
 				}
 			} else if (defaults?.responseFormat) {
 				responseFormatType = defaults.responseFormat.type;
 				if (defaults.responseFormat.type === 'json_schema' && 'schema' in defaults.responseFormat) {
-					jsonSchemaText = JSON.stringify(defaults.responseFormat.schema, null, 2);
+					const schema = defaults.responseFormat.schema as any;
+					jsonSchemaText = JSON.stringify(schema, null, 2);
+					// Initialize schema builder from existing schema
+					if (schema.properties) {
+						schemaProperties = { ...schema.properties };
+						schemaRequired = schema.required ? [...schema.required] : [];
+						fieldOrder = Object.keys(schema.properties);
+						useSchemaBuilder = true;
+					}
 				}
+			} else {
+				// Reset schema builder state
+				schemaProperties = {};
+				schemaRequired = [];
+				fieldOrder = [];
+				useSchemaBuilder = false;
 			}
 
 			// Advanced fields - Options
@@ -106,6 +134,7 @@
 
 			// Only set showAdvanced on initial load (when it's a new query)
 			// Once the user opens/closes it, respect their choice
+			// Note: Response Format is no longer in Advanced section
 			if (isNewQuery) {
 				showAdvanced = Boolean(
 					temperature !== undefined ||
@@ -114,7 +143,6 @@
 						frequencyPenalty !== undefined ||
 						presencePenalty !== undefined ||
 						stopSequences ||
-						responseFormatType !== 'text' ||
 						stream ||
 						user ||
 						seed !== undefined ||
@@ -135,6 +163,10 @@
 			stopSequences = '';
 			responseFormatType = 'text';
 			jsonSchemaText = '';
+			schemaProperties = {};
+			schemaRequired = [];
+			fieldOrder = [];
+			useSchemaBuilder = false;
 			stream = false;
 			user = '';
 			seed = undefined;
@@ -169,12 +201,17 @@
 		if (responseFormatType !== 'text') {
 			if (responseFormatType === 'json_object') {
 				aiQueryData.responseFormat = { type: 'json_object' };
-			} else if (responseFormatType === 'json_schema' && jsonSchemaText.trim()) {
-				try {
-					const schema = JSON.parse(jsonSchemaText);
-					aiQueryData.responseFormat = { type: 'json_schema', schema };
-				} catch (e) {
-					console.error('Invalid JSON schema:', e);
+			} else if (responseFormatType === 'json_schema') {
+				// Use schema builder if it has properties, otherwise fall back to textarea
+				if (useSchemaBuilder && Object.keys(schemaProperties).length > 0) {
+					aiQueryData.responseFormat = { type: 'json_schema', schema: schemaPreview };
+				} else if (jsonSchemaText.trim()) {
+					try {
+						const schema = JSON.parse(jsonSchemaText);
+						aiQueryData.responseFormat = { type: 'json_schema', schema };
+					} catch (e) {
+						console.error('Invalid JSON schema:', e);
+					}
 				}
 			}
 		}
@@ -206,6 +243,133 @@
 	function cancelEditAIQuery() {
 		editingAIQuery = null;
 		onClose?.();
+	}
+
+	// Schema Builder Functions
+	let orderedFieldEntries = $derived.by(() => {
+		const entries: Array<[string, any]> = [];
+		for (const fieldName of fieldOrder) {
+			if (schemaProperties[fieldName]) {
+				entries.push([fieldName, schemaProperties[fieldName]]);
+			}
+		}
+		for (const [fieldName, fieldSchema] of Object.entries(schemaProperties)) {
+			if (!fieldOrder.includes(fieldName)) {
+				entries.push([fieldName, fieldSchema]);
+			}
+		}
+		return entries;
+	});
+
+	let schemaPreview = $derived.by(() => {
+		return {
+			type: 'object',
+			properties: schemaProperties,
+			required: schemaRequired,
+			additionalProperties: false,
+			$schema: 'http://json-schema.org/draft-07/schema#'
+		};
+	});
+
+	function addSchemaField(isReasoning: boolean = false) {
+		const fieldName = isReasoning
+			? 'reasoning'
+			: `field_${Object.keys(schemaProperties).length + 1}`;
+		
+		if (isReasoning && schemaProperties[fieldName]) {
+			return;
+		}
+
+		const baseField: any = { type: 'string' };
+		if (isReasoning) {
+			baseField.description =
+				'A step-by-step internal monologue explaining the logic and reasoning behind the values chosen for all other fields. This helps ensure accuracy and prevents skipping steps.';
+		}
+
+		if (isReasoning) {
+			const newProps: Record<string, any> = { [fieldName]: baseField };
+			for (const [key, value] of Object.entries(schemaProperties)) {
+				newProps[key] = value;
+			}
+			schemaProperties = newProps;
+			fieldOrder = [fieldName, ...fieldOrder];
+		} else {
+			schemaProperties[fieldName] = baseField;
+			fieldOrder = [...fieldOrder, fieldName];
+		}
+
+		if (!schemaRequired.includes(fieldName)) {
+			schemaRequired.push(fieldName);
+		}
+		schemaProperties = { ...schemaProperties };
+		schemaRequired = [...schemaRequired];
+	}
+
+	function removeSchemaField(fieldName: string) {
+		delete schemaProperties[fieldName];
+		fieldOrder = fieldOrder.filter((name) => name !== fieldName);
+		schemaRequired = schemaRequired.filter((r) => r !== fieldName);
+		schemaProperties = { ...schemaProperties };
+		schemaRequired = [...schemaRequired];
+	}
+
+	function updateSchemaField(fieldName: string, updates: Partial<any>) {
+		if (schemaProperties[fieldName]) {
+			schemaProperties[fieldName] = { ...schemaProperties[fieldName], ...updates };
+			schemaProperties = { ...schemaProperties };
+		}
+	}
+
+	function updateSchemaFieldType(fieldName: string, type: string) {
+		if (schemaProperties[fieldName]) {
+			const current = schemaProperties[fieldName];
+			const updated: any = { type, ...current };
+			if (type !== 'string') {
+				delete updated.enum;
+				delete updated.pattern;
+			}
+			if (type !== 'number' && type !== 'integer') {
+				delete updated.minimum;
+				delete updated.maximum;
+			}
+			updateSchemaField(fieldName, updated);
+		}
+	}
+
+	function toggleSchemaFieldRequired(fieldName: string) {
+		if (schemaRequired.includes(fieldName)) {
+			schemaRequired = schemaRequired.filter((r) => r !== fieldName);
+		} else {
+			schemaRequired = [...schemaRequired, fieldName];
+		}
+	}
+
+	function updateFieldName(oldName: string, newName: string) {
+		if (!newName || newName === oldName) return;
+		if (schemaProperties[newName]) {
+			alert('A field with this name already exists');
+			return;
+		}
+
+		const wasRequired = schemaRequired.includes(oldName);
+		const fieldData = schemaProperties[oldName];
+		const oldIndex = fieldOrder.indexOf(oldName);
+		
+		delete schemaProperties[oldName];
+		fieldOrder = fieldOrder.filter((name) => name !== oldName);
+		schemaRequired = schemaRequired.filter((r) => r !== oldName);
+		
+		schemaProperties[newName] = fieldData;
+		fieldOrder = [
+			...fieldOrder.slice(0, oldIndex),
+			newName,
+			...fieldOrder.slice(oldIndex)
+		];
+		
+		if (wasRequired) {
+			schemaRequired = [...schemaRequired, newName];
+		}
+		schemaProperties = { ...schemaProperties };
 	}
 </script>
 
@@ -275,6 +439,270 @@
 					rows="5"
 				></textarea>
 				<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1.5">Use {'{input}'} to insert data from connected nodes</p>
+			</div>
+
+			<!-- Response Format -->
+			<div>
+				<h3 class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-wide mb-3">
+					Response Format
+				</h3>
+				<div>
+					<label
+						for="response-format"
+						class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-1.5"
+					>
+						Format Type
+					</label>
+					<select
+						id="response-format"
+						bind:value={responseFormatType}
+						class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+					>
+						<option value="text">Text (Default)</option>
+						<option value="json_object">JSON Object</option>
+						<option value="json_schema">JSON Schema</option>
+					</select>
+				</div>
+				{#if responseFormatType === 'json_schema'}
+					<div class="mt-3 space-y-3">
+						<!-- Toggle between builder and textarea -->
+						<div class="flex items-center gap-3">
+							<label class="flex items-center gap-2 cursor-pointer">
+								<input
+									type="checkbox"
+									bind:checked={useSchemaBuilder}
+									class="cursor-pointer"
+								/>
+								<span class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-700'}">
+									Use Visual Schema Builder
+								</span>
+							</label>
+						</div>
+
+						{#if useSchemaBuilder}
+							<!-- Visual Schema Builder -->
+							<div class="rounded-md border {darkMode ? 'border-teal-600 bg-teal-900/30' : 'border-teal-300 bg-teal-50'} p-4">
+								<div class="mb-4">
+									<div class="mb-2 flex items-center justify-between">
+										<div class="block text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'}">Schema Properties:</div>
+										<div class="flex gap-2">
+											<button
+												type="button"
+												onclick={() => addSchemaField(true)}
+												class="rounded bg-amber-600 px-3 py-1 text-xs text-white hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-800"
+												title="Add reasoning field (best practice for AI)"
+											>
+												+ Reasoning
+											</button>
+											<button
+												type="button"
+												onclick={() => addSchemaField(false)}
+												class="rounded bg-teal-600 px-3 py-1 text-xs text-white hover:bg-teal-700 dark:bg-teal-700 dark:hover:bg-teal-800"
+											>
+												+ Add Field
+											</button>
+										</div>
+									</div>
+									<div class="space-y-3">
+										{#each orderedFieldEntries as [fieldName, fieldSchema] (fieldName)}
+											<div class="rounded border {darkMode ? 'border-gray-600 bg-slate-800' : 'border-gray-300 bg-white'} p-3">
+												<div class="mb-2 flex items-center gap-2">
+													{#key fieldName}
+														<input
+															type="text"
+															value={fieldName}
+															onblur={(e) => {
+																const newName = e.currentTarget.value.trim();
+																if (newName && newName !== fieldName) {
+																	updateFieldName(fieldName, newName);
+																} else if (!newName || newName === '') {
+																	e.currentTarget.value = fieldName;
+																}
+															}}
+															onkeydown={(e) => {
+																if (e.key === 'Enter') {
+																	e.currentTarget.blur();
+																}
+															}}
+															class="flex-1 rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-sm font-medium"
+															placeholder="Field name"
+														/>
+													{/key}
+													<select
+														value={fieldSchema.type || 'string'}
+														onchange={(e) => updateSchemaFieldType(fieldName, e.currentTarget.value)}
+														class="rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-sm"
+													>
+														<option value="string">string</option>
+														<option value="number">number</option>
+														<option value="integer">integer</option>
+														<option value="boolean">boolean</option>
+														<option value="array">array</option>
+														<option value="object">object</option>
+													</select>
+													<label class="flex cursor-pointer items-center gap-1 text-sm {darkMode ? 'text-slate-200' : 'text-slate-700'}">
+														<input
+															type="checkbox"
+															checked={schemaRequired.includes(fieldName)}
+															onchange={() => toggleSchemaFieldRequired(fieldName)}
+															class="cursor-pointer"
+														/>
+														Required
+													</label>
+													<button
+														type="button"
+														onclick={() => removeSchemaField(fieldName)}
+														class="rounded bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700"
+													>
+														Remove
+													</button>
+												</div>
+
+												<!-- Description -->
+												<div class="mb-2">
+													<div class="mb-1 block text-xs font-medium {darkMode ? 'text-slate-300' : 'text-gray-700'}">
+														Description <span class="text-red-500 dark:text-red-400">*</span>
+													</div>
+													<textarea
+														value={fieldSchema.description || ''}
+														oninput={(e) =>
+															updateSchemaField(fieldName, { description: e.currentTarget.value })}
+														placeholder="Clear instruction explaining what this field represents and any constraints..."
+														class="w-full rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-xs"
+														rows="2"
+													></textarea>
+													<p class="mt-1 text-xs {darkMode ? 'text-gray-400' : 'text-gray-500'}">
+														Write as if giving direct instructions to the AI model
+													</p>
+												</div>
+
+												<!-- Enum (for string types) -->
+												{#if fieldSchema.type === 'string'}
+													<div class="mb-2">
+														<div class="mb-1 block text-xs font-medium {darkMode ? 'text-slate-300' : 'text-gray-700'}">
+															Enum Values (comma-separated)
+														</div>
+														<input
+															type="text"
+															value={fieldSchema.enum ? fieldSchema.enum.join(', ') : ''}
+															oninput={(e) => {
+																const value = e.currentTarget.value.trim();
+																if (value) {
+																	const enumValues = value.split(',').map((v) => v.trim()).filter(Boolean);
+																	updateSchemaField(fieldName, { enum: enumValues });
+																} else {
+																	const updated = { ...fieldSchema };
+																	delete updated.enum;
+																	updateSchemaField(fieldName, updated);
+																}
+															}}
+															placeholder="e.g., low, medium, high, urgent"
+															class="w-full rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-xs"
+														/>
+														<p class="mt-1 text-xs {darkMode ? 'text-gray-400' : 'text-gray-500'}">
+															Force the model to pick from a fixed list (prevents synonyms)
+														</p>
+													</div>
+
+													<!-- Pattern -->
+													<div class="mb-2">
+														<div class="mb-1 block text-xs font-medium {darkMode ? 'text-slate-300' : 'text-gray-700'}">Pattern (Regex)</div>
+														<input
+															type="text"
+															value={fieldSchema.pattern || ''}
+															oninput={(e) => {
+																const value = e.currentTarget.value.trim();
+																if (value) {
+																	updateSchemaField(fieldName, { pattern: value });
+																} else {
+																	const updated = { ...fieldSchema };
+																	delete updated.pattern;
+																	updateSchemaField(fieldName, updated);
+																}
+															}}
+															placeholder="e.g., ^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
+															class="w-full rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-xs font-mono"
+														/>
+														<p class="mt-1 text-xs {darkMode ? 'text-gray-400' : 'text-gray-500'}">
+															Regex pattern for format validation (e.g., dates, hex codes, phone numbers)
+														</p>
+													</div>
+												{/if}
+
+												<!-- Minimum/Maximum (for number/integer) -->
+												{#if fieldSchema.type === 'number' || fieldSchema.type === 'integer'}
+													<div class="mb-2 grid grid-cols-2 gap-2">
+														<div>
+															<div class="mb-1 block text-xs font-medium {darkMode ? 'text-slate-300' : 'text-gray-700'}">Minimum</div>
+															<input
+																type="number"
+																value={fieldSchema.minimum ?? ''}
+																oninput={(e) => {
+																	const value = e.currentTarget.value;
+																	updateSchemaField(
+																		fieldName,
+																		value ? { minimum: Number(value) } : { minimum: undefined }
+																	);
+																}}
+																class="w-full rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-xs"
+															/>
+														</div>
+														<div>
+															<div class="mb-1 block text-xs font-medium {darkMode ? 'text-slate-300' : 'text-gray-700'}">Maximum</div>
+															<input
+																type="number"
+																value={fieldSchema.maximum ?? ''}
+																oninput={(e) => {
+																	const value = e.currentTarget.value;
+																	updateSchemaField(
+																		fieldName,
+																		value ? { maximum: Number(value) } : { maximum: undefined }
+																	);
+																}}
+																class="w-full rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-xs"
+															/>
+														</div>
+													</div>
+												{/if}
+											</div>
+										{/each}
+										{#if Object.keys(schemaProperties).length === 0}
+											<p class="text-sm {darkMode ? 'text-gray-400' : 'text-gray-500'}">
+												No properties yet. Click "+ Reasoning" (best practice) or "+ Add Field" to get started.
+											</p>
+										{/if}
+									</div>
+								</div>
+
+								<!-- Schema Preview -->
+								<div class="rounded-md border {darkMode ? 'border-teal-700 bg-teal-900/30' : 'border-teal-200 bg-teal-100'} p-3">
+									<strong class="mb-2 block text-sm {darkMode ? 'text-teal-200' : 'text-slate-900'}">Schema Preview:</strong>
+									<pre class="max-h-48 overflow-auto text-xs {darkMode ? 'text-slate-200' : 'text-slate-700'}">{JSON.stringify(schemaPreview, null, 2)}</pre>
+								</div>
+							</div>
+						{:else}
+							<!-- Fallback to textarea -->
+							<div>
+								<label
+									for="json-schema"
+									class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-1.5"
+								>
+									JSON Schema
+								</label>
+								<textarea
+									id="json-schema"
+									bind:value={jsonSchemaText}
+									placeholder="JSON schema object"
+									class="w-full px-3 py-2 font-mono text-xs {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
+									rows="6"
+								></textarea>
+								<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1.5">
+									Enter a valid JSON schema object, or enable the Visual Schema Builder above
+								</p>
+							</div>
+						{/if}
+					</div>
+				{/if}
 			</div>
 		</div>
 
@@ -408,50 +836,6 @@
 								class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
 							/>
 						</div>
-					</div>
-
-					<!-- Response Format -->
-					<div>
-						<h3 class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-wide mb-3">
-							Response Format
-						</h3>
-						<div>
-							<label
-								for="response-format"
-								class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-1.5"
-							>
-								Format Type
-							</label>
-							<select
-								id="response-format"
-								bind:value={responseFormatType}
-								class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-							>
-								<option value="text">Text (Default)</option>
-								<option value="json_object">JSON Object</option>
-								<option value="json_schema">JSON Schema</option>
-							</select>
-						</div>
-						{#if responseFormatType === 'json_schema'}
-							<div class="mt-3">
-								<label
-									for="json-schema"
-									class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-1.5"
-								>
-									JSON Schema
-								</label>
-								<textarea
-									id="json-schema"
-									bind:value={jsonSchemaText}
-									placeholder="JSON schema object"
-									class="w-full px-3 py-2 font-mono text-xs {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
-									rows="6"
-								></textarea>
-								<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1.5">
-									Enter a valid JSON schema object
-								</p>
-							</div>
-						{/if}
 					</div>
 
 					<!-- Advanced Options -->
