@@ -52,10 +52,6 @@
 			onConnectionPointClick(element.id, side, e);
 		}
 	}
-
-	function handleButtonClick(e: MouseEvent) {
-		e.stopPropagation();
-	}
 </script>
 
 <div class="absolute overflow-visible" style="left: {element.x}px; top: {element.y}px;">
@@ -104,28 +100,6 @@
 			{/if}
 			<!-- Hover Options Icons (appear above node on hover) -->
 			<div class="absolute -top-12 left-1/2 -translate-x-1/2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-30 pointer-events-auto">
-			<!-- Play Button -->
-			<button
-				class="w-5 h-5 {darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-slate-200 hover:bg-slate-300 text-slate-600'} rounded flex items-center justify-center transition-all hover:scale-110 shadow-sm"
-				aria-label="Run node"
-				title="Run node"
-				onclick={handleButtonClick}
-			>
-				<svg class="w-3 h-3 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-					<path d="M8 5v14l11-7z" />
-				</svg>
-			</button>
-			<!-- Power Button -->
-			<button
-				class="w-5 h-5 {darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-slate-200 hover:bg-slate-300 text-slate-600'} rounded flex items-center justify-center transition-all hover:scale-110 shadow-sm"
-				aria-label="Toggle node"
-				title="Toggle node"
-				onclick={handleButtonClick}
-			>
-				<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-				</svg>
-			</button>
 				<!-- Delete Button -->
 				{#if onDelete}
 					<button
@@ -139,17 +113,6 @@
 						</svg>
 					</button>
 				{/if}
-			<!-- More Options Button -->
-			<button
-				class="w-5 h-5 {darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-slate-200 hover:bg-slate-300 text-slate-600'} rounded flex items-center justify-center transition-all hover:scale-110 shadow-sm"
-				aria-label="More options"
-				title="More options"
-				onclick={handleButtonClick}
-			>
-				<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-					<path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
-				</svg>
-			</button>
 			</div>
 
 			<!-- Icon Container (centered in node) -->

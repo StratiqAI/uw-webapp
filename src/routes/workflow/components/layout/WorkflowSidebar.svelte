@@ -122,7 +122,7 @@
 			{#if showInputNodes}
 				<div id="sidebar-input-nodes" class="space-y-3">
 					{#each filteredInputNodes as elementType}
-						{@const isDisabled = elementType.id !== 'property-data' && elementType.id !== 'on-document-upload' && elementType.id !== 'event'}
+						{@const isDisabled = elementType.id !== 'property-data' && elementType.id !== 'on-document-upload' && elementType.id !== 'event' && elementType.id !== 'on-image' && elementType.id !== 'on-text' && elementType.id !== 'on-table'}
 						<button
 							disabled={isDisabled}
 							class="w-full relative pl-6 pr-4 py-2.5 {isDisabled 

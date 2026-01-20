@@ -6,14 +6,13 @@ export const onDocumentUploadNode = new WorkflowNode({
 	label: 'On Document Upload',
 	icon: '📄',
 	description: 'Triggered when a document is uploaded. Receives document metadata and content.',
+	defaultInput: {
+		source: 'com.stratiqai.doclink',
+		detailType: 'Created'
+	},
 	execute: (input) =>
 		input || {
-			documentId: '',
-			fileName: '',
-			fileType: '',
-			fileSize: 0,
-			uploadedAt: '',
-			projectId: '',
-			metadata: {}
+			source: 'com.stratiqai.doclink',
+			detailType: 'Created'
 		}
 });

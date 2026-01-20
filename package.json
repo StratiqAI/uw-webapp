@@ -63,7 +63,7 @@
 		"@aws-sdk/util-dynamodb": "^3.806.0",
 		"@google/generative-ai": "^0.24.1",
 		"@stratiqai/types": "^2.0.39",
-		"@stratiqai/types-simple": "^1.0.21",
+		"@stratiqai/types-simple": "^1.0.23",
 		"@turf/turf": "^7.2.0",
 		"ajv": "^8.17.1",
 		"ajv-formats": "^3.0.1",

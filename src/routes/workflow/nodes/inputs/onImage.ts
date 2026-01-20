@@ -8,13 +8,7 @@ export const onImageNode = new WorkflowNode({
 	description: 'Triggered when an image is processed. Receives image data and metadata.',
 	execute: (input) =>
 		input || {
-			imageId: '',
-			url: '',
-			width: 0,
-			height: 0,
-			format: '',
-			documentId: '',
-			pageNumber: 0,
-			metadata: {}
+			source: 'com.stratiqai.image',
+			detailType: 'Created'
 		}
 });

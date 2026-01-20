@@ -5,6 +5,7 @@ import { eventNode } from './inputs/event';
 import { onDocumentUploadNode } from './inputs/onDocumentUpload';
 import { onImageNode } from './inputs/onImage';
 import { onTextNode } from './inputs/onText';
+import { onTableNode } from './inputs/onTable';
 import { calculateNoiNode } from './processes/calculateNoi';
 import { calculateCapRateNode } from './processes/calculateCapRate';
 import { calculateDscrNode } from './processes/calculateDscr';
@@ -64,6 +65,7 @@ export const elementTypes = [
 	onDocumentUploadNode,
 	onImageNode,
 	onTextNode,
+	onTableNode,
 	// Process Nodes
 	calculateNoiNode,
 	calculateCapRateNode,

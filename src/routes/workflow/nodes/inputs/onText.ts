@@ -8,12 +8,7 @@ export const onTextNode = new WorkflowNode({
 	description: 'Triggered when text is extracted or processed. Receives text content and metadata.',
 	execute: (input) =>
 		input || {
-			textId: '',
-			content: '',
-			documentId: '',
-			pageNumber: 0,
-			language: '',
-			confidence: 0,
-			metadata: {}
+			source: 'com.stratiqai.text',
+			detailType: 'Created'
 		}
 });
