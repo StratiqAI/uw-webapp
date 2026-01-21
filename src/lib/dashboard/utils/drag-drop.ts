@@ -36,20 +36,19 @@ export function createDragHandlers(widget: Widget, handlers: DragDropHandlers) {
 }
 
 export function createDropHandlers(handlers: {
-	onDragOver: (x: number, y: number) => void;
-	onDrop: (x: number, y: number) => void;
+	onDragOver: (e: DragEvent) => void;
+	onDrop: (e: DragEvent) => void;
 	onDragLeave: () => void;
 }) {
 	return {
 		handleDragOver: (e: DragEvent) => {
 			e.preventDefault();
-			e.dataTransfer!.dropEffect = 'move';
-			handlers.onDragOver(e.clientX, e.clientY);
+			handlers.onDragOver(e);
 		},
 
 		handleDrop: (e: DragEvent) => {
 			e.preventDefault();
-			handlers.onDrop(e.clientX, e.clientY);
+			handlers.onDrop(e);
 		},
 
 		handleDragLeave: () => {

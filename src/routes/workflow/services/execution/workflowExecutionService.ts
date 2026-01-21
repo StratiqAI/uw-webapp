@@ -1,53 +1,65 @@
 import type { GridElement, WorkflowResult } from '../../types/workflow';
 import type { Connection } from '../../types/connection';
 
+/**
+ * Run workflow locally (in-browser). Uses output-type nodes as roots when present;
+ * otherwise sink nodes (no outgoing connections) so Input→AI runs without an Output node.
+ * Does not call the backend; for real runs use triggers or startWorkflowExecution.
+ */
 export async function executeWorkflow(
 	gridElements: GridElement[],
 	connections: Connection[]
 ): Promise<WorkflowResult[]> {
-	// Build execution order (topological sort)
 	const processed = new Set<string>();
 	const results = new Map<string, any>();
 
 	async function executeElement(elementId: string): Promise<any> {
-		if (processed.has(elementId)) {
-			return results.get(elementId);
-		}
+		if (processed.has(elementId)) return results.get(elementId);
 
 		const element = gridElements.find((el) => el.id === elementId);
 		if (!element) return null;
 
-		// Get inputs from connected elements
 		const inputConnections = connections.filter((conn) => conn.to === elementId);
-		let input = null;
+		let input: any = null;
 
 		if (inputConnections.length > 0) {
 			const inputs = await Promise.all(
 				inputConnections.map((conn) => executeElement(conn.from))
 			);
 			input = inputs.length === 1 ? inputs[0] : inputs;
+		} else if (element.type.type === 'input') {
+			input = (element as any).nodeOptions ?? {
+				_source: 'local-run',
+				doclinkId: 'local-placeholder',
+				documentId: 'local-placeholder',
+				filename: 'test-document.pdf'
+			};
 		}
 
-		// Execute element (handle both sync and async)
-		const outputPromise = element.type.execute(input, element.aiQueryData);
+		const exec = (element.type as any).execute;
+		const outputPromise = exec ? exec(input, (element as any).aiQueryData) : null;
 		const output = await Promise.resolve(outputPromise);
-		element.output = output;
+		(element as any).output = output;
 		results.set(elementId, output);
 		processed.add(elementId);
-
 		return output;
 	}
 
-	// Execute all output elements (they will trigger upstream execution)
-	const outputElements = gridElements.filter((el) => el.type.type === 'output');
-	await Promise.all(outputElements.map((el) => executeElement(el.id)));
+	const outputTypeElements = gridElements.filter((el) => el.type.type === 'output');
+	const sinkElements = gridElements.filter((el) => !connections.some((c) => c.from === el.id));
+	const roots = outputTypeElements.length > 0 ? outputTypeElements : sinkElements;
 
-	// Collect results
+	if (roots.length === 0) {
+		await Promise.all(gridElements.map((el) => executeElement(el.id)));
+	} else {
+		await Promise.all(roots.map((el) => executeElement(el.id)));
+	}
+
 	return Array.from(results.entries()).map(([id, value]) => {
 		const element = gridElements.find((el) => el.id === id);
 		return {
 			elementId: id,
-			label: element?.type.label || '',
+			label: element?.type.label || (element?.type as any)?.id || '',
 			value
 		};
 	});

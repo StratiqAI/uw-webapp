@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
+	import { topicDragStore, TOPIC_DROP_MIME } from '$lib/dashboard/stores/topicDragStore';
 	import GridContainer from '$lib/dashboard/components/GridContainer.svelte';
 	import WidgetWrapper from '$lib/dashboard/components/WidgetWrapper.svelte';
 	import GhostIndicator from '$lib/dashboard/components/GhostIndicator.svelte';
 	import { getGridPositionFromCoordinates } from '$lib/dashboard/utils/grid';
 	import { createDropHandlers } from '$lib/dashboard/utils/drag-drop';
-	import type { Widget } from '$lib/dashboard/types/widget';
+	import { DEFAULT_WIDGET_SIZES, getDefaultDataForWidget } from '$lib/dashboard/setup/defaultDashboardValues';
+	import type { Widget, WidgetType } from '$lib/dashboard/types/widget';
 
 	interface Props {
 		darkMode?: boolean;
@@ -14,49 +16,103 @@
 	let { darkMode = false }: Props = $props();
 
 	let containerEl = $state<HTMLElement>();
+	let topicDropGhost = $state<{ position: { gridColumn: number; gridRow: number }; widgetType: WidgetType; topic: string } | null>(null);
+
+	function getPositionFromEvent(e: DragEvent): { gridColumn: number; gridRow: number } | null {
+		if (!containerEl) return null;
+		const rect = containerEl.getBoundingClientRect();
+		return getGridPositionFromCoordinates(
+			e.clientX,
+			e.clientY,
+			rect,
+			dashboard.config.gridColumns,
+			dashboard.config.gridRows,
+			dashboard.config.gap,
+			dashboard.config.minCellHeight
+		);
+	}
 
 	const dropHandlers = createDropHandlers({
-		onDragOver: (x: number, y: number) => {
-			if (!containerEl || !dashboard.dragState.isDragging) return;
+		onDragOver: (e: DragEvent) => {
+			if (!containerEl || !e.dataTransfer) return;
 
-			const rect = containerEl.getBoundingClientRect();
-			const position = getGridPositionFromCoordinates(
-				x,
-				y,
-				rect,
-				dashboard.config.gridColumns,
-				dashboard.config.gridRows,
-				dashboard.config.gap,
-				dashboard.config.minCellHeight
-			);
-			console.log('position', position);
+			const isTopicDrag = e.dataTransfer.types.includes(TOPIC_DROP_MIME);
+
+			if (isTopicDrag) {
+				e.dataTransfer.dropEffect = 'copy';
+				const t = topicDragStore.current;
+				const position = getPositionFromEvent(e);
+				if (t && position) {
+					topicDropGhost = { position, widgetType: t.widgetType, topic: t.topic };
+				} else {
+					topicDropGhost = null;
+				}
+				dashboard.setDragState({ ghostPosition: null });
+				return;
+			}
+
+			e.dataTransfer.dropEffect = 'move';
+			topicDropGhost = null;
+			if (!dashboard.dragState.isDragging) return;
+
+			const position = getPositionFromEvent(e);
+			if (!position) return;
 			if (dashboard.activeWidget) {
 				const canPlace = dashboard.canPlaceWidget(
-					{
-						...dashboard.activeWidget,
-						...position
-					},
+					{ ...dashboard.activeWidget, ...position },
 					dashboard.activeWidget.id
 				);
-
-				if (canPlace) {
-					dashboard.setDragState({ ghostPosition: position });
-				} else {
-					dashboard.setDragState({ ghostPosition: null });
-				}
+				dashboard.setDragState({ ghostPosition: canPlace ? position : null });
 			}
 		},
 
-		onDrop: (x: number, y: number) => {
+		onDrop: (e: DragEvent) => {
+			const raw = e.dataTransfer?.getData(TOPIC_DROP_MIME);
+			if (raw) {
+				try {
+					const { topic, widgetType } = JSON.parse(raw) as { topic: string; widgetType: WidgetType };
+					const position = getPositionFromEvent(e);
+					if (!position) {
+						topicDropGhost = null;
+						topicDragStore.set(null);
+						return;
+					}
+					const size = DEFAULT_WIDGET_SIZES[widgetType] ?? { colSpan: 4, rowSpan: 2 };
+					const newId = `widget-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+					const data = getDefaultDataForWidget({ type: widgetType, id: newId } as Widget);
+					const widget: Widget = {
+						id: newId,
+						type: widgetType,
+						topicOverride: topic,
+						gridColumn: position.gridColumn,
+						gridRow: position.gridRow,
+						colSpan: size.colSpan,
+						rowSpan: size.rowSpan,
+						minWidth: 1,
+						minHeight: 1,
+						data
+					} as Widget;
+					dashboard.addWidget(widget);
+				} catch (err) {
+					console.error('Topic drop failed:', err);
+				}
+				topicDropGhost = null;
+				topicDragStore.set(null);
+				return;
+			}
+
 			const position = dashboard.dragState.ghostPosition;
 			if (position && dashboard.dragState.activeWidgetId) {
 				dashboard.moveWidget(dashboard.dragState.activeWidgetId, position);
 			}
 			dashboard.resetInteractionStates();
+			topicDropGhost = null;
 		},
 
 		onDragLeave: () => {
+			topicDropGhost = null;
 			dashboard.setDragState({ ghostPosition: null });
+			topicDragStore.set(null);
 		}
 	});
 
@@ -91,6 +147,11 @@
 				colSpan: dashboard.activeWidget?.colSpan || 1,
 				rowSpan: dashboard.activeWidget?.rowSpan || 1
 			}}
+		/>
+	{:else if topicDropGhost}
+		<GhostIndicator
+			position={topicDropGhost.position}
+			size={DEFAULT_WIDGET_SIZES[topicDropGhost.widgetType]}
 		/>
 	{/if}
 </GridContainer>

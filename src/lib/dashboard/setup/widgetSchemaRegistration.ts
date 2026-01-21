@@ -32,7 +32,7 @@ const WIDGET_NAMES: Record<WidgetType, string> = {
 /**
  * All widget types that should be registered
  */
-const WIDGET_TYPES: WidgetType[] = [
+export const WIDGET_TYPES: WidgetType[] = [
 	'paragraph',
 	'table',
 	'title',

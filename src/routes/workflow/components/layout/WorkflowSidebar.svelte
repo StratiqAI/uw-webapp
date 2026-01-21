@@ -387,12 +387,13 @@
 		{/if}
 	</div>
 
-	<!-- Execute Button -->
+	<!-- Execute Button (local preview only; backend runs need Test run or triggers) -->
 	{#if onExecuteWorkflow}
 		<div class="p-5 border-t {darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-slate-50'}">
 			<button
 				class="w-full px-4 py-3 {darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-900 hover:bg-slate-800'} text-white rounded-md transition-colors font-semibold text-sm shadow-sm hover:shadow-md flex items-center justify-center gap-2"
 				onclick={onExecuteWorkflow}
+				title="Run locally (preview). Uses placeholder data; does not call AI or save to Executions. For real runs, use a trigger (e.g. document upload) or Test run when available."
 			>
 				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>

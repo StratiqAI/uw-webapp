@@ -146,7 +146,7 @@
 	/>
 	<script
 		type="text/javascript"
-		src="https://rawgit.com/mapbox/mapbox-gl-leaflet/master/leaflet-mapbox-gl.js"
+		src="https://cdn.jsdelivr.net/npm/mapbox-gl-leaflet@0.0.16/leaflet-mapbox-gl.js"
 	></script>
 </svelte:head>
 

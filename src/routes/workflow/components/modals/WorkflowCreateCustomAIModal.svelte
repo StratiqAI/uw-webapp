@@ -4,7 +4,7 @@
 	let {
 		darkMode = false,
 		customAINodeLabel = $bindable(''),
-		customAINodeModel = $bindable('gpt-4o'),
+		customAINodeModel = $bindable('gemini-3-flash-preview'),
 		customAINodeSystemPrompt = $bindable(''),
 		customAINodePrompt = $bindable(''),
 		onCreate,
@@ -66,10 +66,6 @@
 					bind:value={customAINodeModel}
 					class="w-full px-3 py-2.5 {darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
 				>
-					<option value="gpt-4o">GPT-4o</option>
-					<option value="gpt-4o-mini">GPT-4o Mini</option>
-					<option value="gpt-4-turbo">GPT-4 Turbo</option>
-					<option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
 					<option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
 					<option value="gemini-3-pro-preview">Gemini 3 Pro Preview</option>
 				</select>

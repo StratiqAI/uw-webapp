@@ -2,6 +2,7 @@
 	import type { PageData } from './$types';
 	import Dashboard from '$lib/dashboard/components/Dashboard.svelte';
 	import DashboardControls from '$lib/dashboard/components/DashboardControls.svelte';
+	import ValidatedTopicStoreSidebar from '$lib/dashboard/components/ValidatedTopicStoreSidebar.svelte';
 	import ProjectSwitcher from '$lib/dashboard/components/ProjectSwitcher.svelte';
 	import MapStoreDebugPanel from '$lib/dashboard/components/widgets/MapStoreDebugWidget.svelte';
 	import ParagraphDisplayParent from '$lib/dashboard/examples/ParagraphDisplayParent.svelte';
@@ -48,9 +49,20 @@
 		// If no saved dashboard for this project, load defaults
 		if (!hasLoadedDashboard) {
 			console.info('No saved dashboard found for project, loading defaults');
+			try {
+				publishWidgetData(dashboardWidgets);
+			} catch (e) {
+				console.error('Error publishing widget data on project change:', e);
+			}
 			dashboardWidgets.forEach((widget) => {
 				dashboard.addWidget(widget);
 			});
+		} else {
+			try {
+				publishWidgetData(dashboard.widgets, { onlyIfMissing: true });
+			} catch (e) {
+				console.error('Error publishing widget data on project change:', e);
+			}
 		}
 	}
 
@@ -104,6 +116,12 @@
 			// If no saved dashboard, load defaults
 			if (!hasLoadedDashboard) {
 				console.info('No saved dashboard found, loading defaults');
+				// Publish to ValidatedTopicStore first so when widgets mount they already have data
+				try {
+					publishWidgetData(dashboardWidgets);
+				} catch (error) {
+					console.error('Error publishing widget data:', error);
+				}
 				dashboardWidgets.forEach((widget) => {
 					try {
 						dashboard.addWidget(widget);
@@ -111,48 +129,25 @@
 						console.error(`Failed to add widget ${widget.id}:`, error);
 					}
 				});
-				// Publish initial data for all widgets after a small delay to ensure widgets are mounted
-				setTimeout(() => {
-					try {
-						publishWidgetData(dashboardWidgets);
-					} catch (error) {
-						console.error('Error publishing widget data:', error);
-					}
-				}, 100);
 			} else {
 				// If saved dashboard exists, ensure all config widgets are present
-				// This handles the case where new widgets are added to config but not in saved dashboard
-				const addedWidgets: typeof dashboardWidgets = [];
 				dashboardWidgets.forEach((configWidget) => {
 					try {
 						const exists = dashboard.widgets.some(w => w.id === configWidget.id);
 						if (!exists) {
 							console.info(`Adding missing widget from config: ${configWidget.id}`);
 							dashboard.addWidget(configWidget);
-							addedWidgets.push(configWidget);
 						}
 					} catch (error) {
 						console.error(`Failed to add missing widget ${configWidget.id}:`, error);
 					}
 				});
-				// Publish data for newly added widgets
-				if (addedWidgets.length > 0) {
-					setTimeout(() => {
-						try {
-							publishWidgetData(addedWidgets);
-						} catch (error) {
-							console.error('Error publishing data for added widgets:', error);
-						}
-					}, 100);
+				// Publish defaults only for widgets that have no data (preserves restored values; fills new/migrated widgets)
+				try {
+					publishWidgetData(dashboard.widgets, { onlyIfMissing: true });
+				} catch (error) {
+					console.error('Error publishing widget data:', error);
 				}
-				// Also publish data for existing widgets (in case they don't have data yet)
-				setTimeout(() => {
-					try {
-						publishWidgetData(dashboard.widgets.filter(w => dashboardWidgets.some(cw => cw.id === w.id)));
-					} catch (error) {
-						console.error('Error publishing data for existing widgets:', error);
-					}
-				}, 100);
 			}
 
 			// Ensure grid has enough capacity for all widgets (after loading)
@@ -302,4 +297,5 @@
 			</div>
 		</div>
 	</div>
+	<ValidatedTopicStoreSidebar {darkMode} />
 </div>

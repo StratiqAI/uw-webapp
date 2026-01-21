@@ -21,7 +21,7 @@
 	let templateDescription = $state('');
 
 	// Basic AI query fields
-	let aiQueryModel = $state('gpt-4o');
+	let aiQueryModel = $state('gemini-3-flash-preview');
 	let aiQuerySystemPrompt = $state('');
 	let aiQueryPrompt = $state('');
 
@@ -62,7 +62,7 @@
 			const data = parseTemplateToAIQueryData(template.template);
 
 			aiQueryPrompt = data.prompt || '';
-			aiQueryModel = data.model || 'gpt-4o';
+			aiQueryModel = data.model || 'gemini-3-flash-preview';
 			aiQuerySystemPrompt = data.systemPrompt || '';
 
 			temperature = data.temperature;
@@ -118,7 +118,7 @@
 			templateName = '';
 			templateDescription = '';
 			aiQueryPrompt = 'Analyze the following data and provide insights: {input}';
-			aiQueryModel = 'gpt-4o';
+			aiQueryModel = 'gemini-3-flash-preview';
 			aiQuerySystemPrompt = 'You are a helpful AI assistant.';
 			temperature = undefined;
 			maxTokens = undefined;
@@ -410,10 +410,6 @@
 							bind:value={aiQueryModel}
 							class="w-full px-3 py-2.5 {darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
 						>
-							<option value="gpt-4o">GPT-4o</option>
-							<option value="gpt-4o-mini">GPT-4o Mini</option>
-							<option value="gpt-4-turbo">GPT-4 Turbo</option>
-							<option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
 							<option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
 							<option value="gemini-3-pro-preview">Gemini 3 Pro Preview</option>
 						</select>

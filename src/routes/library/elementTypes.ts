@@ -26,7 +26,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Analyze this commercial real estate property and provide a comprehensive assessment including property condition, location analysis, and investment potential: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are an expert commercial real estate analyst with deep knowledge of property valuation, market analysis, and investment strategies.'
 				};
 			}
@@ -43,7 +43,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Analyze the commercial real estate market data and provide insights on market trends, comparable properties, and market conditions: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are an expert commercial real estate market analyst specializing in market trends, comparable sales analysis, and economic indicators.'
 				};
 			}
@@ -60,7 +60,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Assess the investment risks for this commercial real estate opportunity. Consider financial, market, property, and regulatory risks: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate risk analyst expert in identifying and evaluating investment risks including market volatility, property condition, tenant risk, and regulatory compliance.'
 				};
 			}
@@ -77,7 +77,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Provide an investment recommendation for this commercial real estate opportunity. Include buy/hold/pass recommendation with rationale: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a senior commercial real estate investment advisor with expertise in underwriting deals, analyzing returns, and making investment recommendations for institutional and private investors.'
 				};
 			}
@@ -94,7 +94,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Analyze the tenant profile and lease structure for this commercial property. Evaluate tenant credit quality, lease terms, rent roll stability, and tenant concentration risks: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are an expert commercial real estate analyst specializing in tenant credit analysis, lease structure evaluation, and rent roll risk assessment.'
 				};
 			}
@@ -111,7 +111,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Analyze the capital expenditure requirements for this commercial property. Assess deferred maintenance, required improvements, roof/HVAC systems, and estimate future CapEx needs: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate property condition expert specializing in building systems analysis, deferred maintenance assessment, and capital expenditure planning.'
 				};
 			}
@@ -128,7 +128,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Analyze comparable commercial real estate sales and provide valuation insights. Compare property characteristics, sale prices, cap rates, and price per square foot to assess market value: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate valuation expert specializing in comparable sales analysis, market value assessment, and property valuation methodologies.'
 				};
 			}
@@ -145,7 +145,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Create a comprehensive financial model for this commercial real estate investment. Analyze cash flows, returns (IRR, equity multiple), debt service coverage, and provide sensitivity analysis: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate financial modeling expert specializing in investment analysis, cash flow projections, return calculations, and financial underwriting.'
 				};
 			}
@@ -162,7 +162,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Analyze the location characteristics of this commercial property. Evaluate demographics, traffic patterns, accessibility, nearby amenities, competition, and location-based risks and opportunities: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate location analyst expert in site selection, demographic analysis, traffic studies, and location-based market evaluation.'
 				};
 			}
@@ -179,7 +179,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Analyze the lease structure and terms for this commercial property. Evaluate lease expiration schedules, rent escalations, renewal probabilities, and lease economics: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate lease analyst expert in lease structure evaluation, rent roll analysis, lease expiration management, and lease economics.'
 				};
 			}
@@ -196,7 +196,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Analyze zoning regulations and compliance for this commercial property. Assess permitted uses, development rights, setbacks, parking requirements, and potential zoning risks or opportunities: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate zoning expert specializing in land use regulations, zoning compliance, development rights analysis, and regulatory risk assessment.'
 				};
 			}
@@ -213,7 +213,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Assess environmental risks and compliance for this commercial property. Evaluate potential contamination, environmental regulations, remediation requirements, and environmental liability: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate environmental consultant expert in Phase I/II assessments, environmental risk evaluation, regulatory compliance, and remediation cost estimation.'
 				};
 			}
@@ -230,7 +230,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Analyze the debt structure and financing terms for this commercial property investment. Evaluate loan terms, interest rates, amortization schedules, prepayment penalties, and refinancing risks: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate finance expert specializing in debt structuring, loan analysis, financing strategies, and debt service optimization.'
 				};
 			}
@@ -247,7 +247,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Analyze the tax implications for this commercial real estate investment. Evaluate property taxes, income tax considerations, depreciation benefits, 1031 exchange opportunities, and tax-efficient structuring: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate tax advisor expert in property tax assessment, real estate tax planning, depreciation strategies, and tax-efficient investment structures.'
 				};
 			}
@@ -264,7 +264,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Analyze the competitive landscape for this commercial property. Evaluate competing properties, market positioning, competitive advantages, and competitive risks: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate market analyst expert in competitive analysis, market positioning, and competitive strategy evaluation.'
 				};
 			}
@@ -281,7 +281,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Develop an exit strategy for this commercial real estate investment. Analyze optimal hold period, exit timing, potential exit strategies (sale, refinance, 1031 exchange), and exit value projections: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate investment strategist expert in exit planning, hold period optimization, and exit strategy execution.'
 				};
 			}
@@ -298,7 +298,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Generate a comprehensive due diligence checklist for this commercial real estate acquisition. Include financial, legal, physical, environmental, and operational due diligence items: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate due diligence expert specializing in acquisition due diligence, risk identification, and comprehensive property evaluation.'
 				};
 			}
@@ -315,7 +315,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Analyze the rent roll for this commercial property. Evaluate current rents vs market rents, lease expiration schedule, tenant mix, rent growth potential, and rent roll stability: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate rent roll analyst expert in lease analysis, rent optimization, and rent roll risk assessment.'
 				};
 			}
@@ -332,7 +332,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Develop an asset management strategy for this commercial property. Analyze value-add opportunities, operational improvements, tenant retention strategies, and asset optimization initiatives: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate asset manager expert in property operations, value creation, tenant relations, and asset optimization strategies.'
 				};
 			}
@@ -349,7 +349,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Analyze this commercial real estate portfolio. Evaluate portfolio diversification, geographic concentration, property type mix, performance metrics, and portfolio optimization opportunities: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate portfolio manager expert in portfolio analysis, diversification strategies, and portfolio optimization.'
 				};
 			}
@@ -366,7 +366,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Perform a comprehensive valuation analysis for this commercial property using multiple approaches. Evaluate income approach, sales comparison approach, and cost approach to determine fair market value: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate appraiser expert in property valuation methodologies, market value assessment, and appraisal standards.'
 				};
 			}
@@ -383,7 +383,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Provide lease negotiation strategies and recommendations for this commercial property. Analyze market lease rates, tenant improvement allowances, rent escalations, and lease term structures: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate lease negotiator expert in lease structuring, market rate analysis, and lease negotiation strategies.'
 				};
 			}
@@ -400,7 +400,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Develop property management strategies for this commercial property. Analyze maintenance programs, tenant relations, operational efficiency, and property management best practices: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate property manager expert in property operations, maintenance management, tenant relations, and operational optimization.'
 				};
 			}
@@ -417,7 +417,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Analyze the development feasibility for this commercial real estate project. Evaluate construction costs, development timelines, entitlement processes, and project economics: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate development consultant expert in feasibility analysis, construction cost estimation, and development project evaluation.'
 				};
 			}
@@ -434,7 +434,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Analyze refinancing opportunities for this commercial property. Evaluate current loan terms, refinancing options, interest rate savings, and optimal refinancing timing: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate finance expert specializing in refinancing strategies, loan restructuring, and debt optimization.'
 				};
 			}
@@ -451,7 +451,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Analyze 1031 exchange opportunities for this commercial real estate transaction. Evaluate exchange eligibility, timing requirements, replacement property criteria, and tax deferral benefits: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate tax advisor expert in 1031 exchanges, like-kind exchange rules, and tax-deferred exchange strategies.'
 				};
 			}
@@ -468,7 +468,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Analyze optimal market timing for this commercial real estate transaction. Evaluate market cycles, economic indicators, interest rate trends, and optimal timing for acquisition or disposition: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate market strategist expert in market cycle analysis, economic indicators, and transaction timing optimization.'
 				};
 			}
@@ -485,7 +485,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Develop tenant retention strategies for this commercial property. Analyze tenant satisfaction factors, renewal incentives, lease renewal probabilities, and retention best practices: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate tenant relations expert specializing in tenant retention, lease renewals, and tenant satisfaction strategies.'
 				};
 			}
@@ -502,7 +502,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Identify value-add opportunities for this commercial property. Analyze potential improvements, repositioning strategies, operational enhancements, and value creation initiatives: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate value-add strategist expert in property repositioning, value creation, and investment value enhancement.'
 				};
 			}
@@ -519,7 +519,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Assess legal compliance requirements for this commercial property. Evaluate lease compliance, ADA requirements, building codes, environmental regulations, and legal risk factors: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate legal compliance expert specializing in property law, regulatory compliance, and legal risk assessment.'
 				};
 			}
@@ -536,7 +536,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Analyze operating expenses for this commercial property. Evaluate expense ratios, expense trends, expense recoveries, and operating expense optimization opportunities: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate operations analyst expert in operating expense analysis, expense management, and cost optimization.'
 				};
 			}
@@ -553,7 +553,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Analyze capitalization rates for this commercial property investment. Evaluate market cap rates, going-in cap rates, exit cap rates, and cap rate compression/expansion risks: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate investment analyst expert in cap rate analysis, yield analysis, and capitalization rate trends.'
 				};
 			}
@@ -570,7 +570,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Analyze demographic trends and characteristics for this commercial property location. Evaluate population growth, income levels, employment trends, and demographic risk factors: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate demographic analyst expert in population analysis, demographic trends, and location-based demographic evaluation.'
 				};
 			}
@@ -587,7 +587,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Estimate construction costs for this commercial real estate development or renovation project. Analyze material costs, labor costs, contractor pricing, and construction cost trends: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial construction cost estimator expert in construction cost analysis, material pricing, and construction cost estimation methodologies.'
 				};
 			}
@@ -604,7 +604,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Assess the physical condition of this commercial property. Evaluate building systems, structural integrity, maintenance needs, and property condition risks: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial property inspector expert in building condition assessment, property inspections, and physical condition evaluation.'
 				};
 			}
@@ -621,7 +621,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Perform an income approach valuation for this commercial property. Analyze net operating income, capitalization rates, discount rates, and income-based property value: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate appraiser expert in income approach valuation, DCF analysis, and income-based property appraisal.'
 				};
 			}
@@ -638,7 +638,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Create a comprehensive lease abstract for this commercial property lease. Extract and summarize key lease terms, rent structure, expiration dates, renewal options, and critical lease provisions: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate lease analyst expert in lease abstraction, lease term extraction, and lease document analysis.'
 				};
 			}
@@ -655,7 +655,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Develop a property repositioning strategy for this commercial property. Analyze repositioning opportunities, target market repositioning, renovation requirements, and repositioning economics: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate repositioning strategist expert in property transformation, market repositioning, and value creation through repositioning.'
 				};
 			}
@@ -672,7 +672,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Perform comprehensive acquisition underwriting for this commercial property investment. Analyze purchase price, projected returns, risks, and investment viability: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate underwriter expert in acquisition analysis, investment underwriting, and deal evaluation.'
 				};
 			}
@@ -689,7 +689,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Forecast market trends and conditions for this commercial real estate market. Analyze future rent growth, occupancy trends, cap rate movements, and market outlook: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate market forecaster expert in market trend analysis, economic forecasting, and real estate market predictions.'
 				};
 			}
@@ -706,7 +706,7 @@ export const elementTypes: ElementType[] = [
 			if (!customData) {
 				customData = {
 					prompt: 'Analyze tenant improvement requirements and costs for this commercial property. Evaluate TI allowances, build-out costs, tenant improvement economics, and TI negotiation strategies: {input}',
-					model: 'gpt-4o',
+					model: 'gemini-3-flash-preview',
 					systemPrompt: 'You are a commercial real estate tenant improvement expert specializing in TI cost analysis, build-out planning, and tenant improvement negotiations.'
 				};
 			}

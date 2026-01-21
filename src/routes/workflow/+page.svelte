@@ -33,7 +33,8 @@
 	import WorkflowSidebar from './components/layout/WorkflowSidebar.svelte';
 	import WorkflowToolbar from './components/layout/WorkflowToolbar.svelte';
 	import WorkflowCanvas from './components/canvas/WorkflowCanvas.svelte';
-	import WorkflowResultsPanel from './components/layout/WorkflowResultsPanel.svelte';
+	import WorkflowBottomPanel from './components/layout/WorkflowBottomPanel.svelte';
+	import WorkflowExecutionDetailModal from './components/modals/WorkflowExecutionDetailModal.svelte';
 	import WorkflowInputGalleryModal from './components/modals/WorkflowInputGalleryModal.svelte';
 	import WorkflowProcessGalleryModal from './components/modals/WorkflowProcessGalleryModal.svelte';
 	import WorkflowAIQueryEditModal from './components/modals/WorkflowAIQueryEditModal.svelte';
@@ -52,6 +53,11 @@
 	import { gql } from '$lib/realtime/graphql/requestHandler';
 	import WorkflowSwitcher from '$lib/dashboard/components/WorkflowSwitcher.svelte';
 	import { Q_GET_PROJECT } from '@stratiqai/types-simple';
+	import { S_ON_WORKFLOW_EXECUTION_STATUS_CHANGE } from '$lib/graphql/workflowExecutionSubscriptions';
+	import { fetchWorkflowExecutions } from './services/backend/workflowExecutionService';
+	import type { WorkflowExecutionListItem } from './services/backend/workflowExecutionService';
+	import { getAppSyncWsClient, initAppSyncWsClient } from '$lib/realtime/websocket/wsClient';
+	import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from '$env/static/public';
 	import type { ElementType, GridElement, Connection } from './types';
 	import type { PageData } from './$types';
 	import type { Project } from '@stratiqai/types-simple';
@@ -142,7 +148,7 @@
 	let customAINodes = $state<ElementType[]>([]);
 	let customAINodeLabel = $state('');
 	let customAINodePrompt = $state('');
-	let customAINodeModel = $state('gpt-4o');
+	let customAINodeModel = $state('gemini-3-flash-preview');
 	let customAINodeSystemPrompt = $state('');
 	let allElementTypes = $derived([...elementTypes, ...customAINodes]);
 
@@ -193,6 +199,14 @@
 	let selectedWorkflowId = $state<string | null>(null);
 	let loadingWorkflows = $state(false);
 
+	// ------------------------------------------------------------------------------------------------
+	// Workflow executions (backend runs from events)
+	// ------------------------------------------------------------------------------------------------
+	let executions = $state<WorkflowExecutionListItem[]>([]);
+	let executionsLoading = $state(false);
+	let selectedExecutionId = $state<string | null>(null);
+	const executionsSubscriptionSpecRef = { current: null as { query: any; variables: any; next: (p: any) => void } | null };
+
 	// Load workflows when project changes
 	async function loadWorkflowsForProject(projectId: string | null) {
 		if (!projectId || !data.idToken) {
@@ -232,6 +246,70 @@
 		if (selectedProjectId && data.idToken) {
 			loadWorkflowsForProject(selectedProjectId);
 		}
+	});
+
+	// Load workflow executions and subscribe to status changes when a workflow is selected
+	$effect(() => {
+		const wfId = selectedWorkflowId;
+		const token = data.idToken;
+		if (!wfId || !token) {
+			executions = [];
+			const client = getAppSyncWsClient();
+			const spec = executionsSubscriptionSpecRef.current;
+			if (client && spec) {
+				client.removeSubscription(spec);
+				executionsSubscriptionSpecRef.current = null;
+			}
+			return;
+		}
+		let cancelled = false;
+		(async () => {
+			executionsLoading = true;
+			try {
+				const { items } = await fetchWorkflowExecutions(wfId, token);
+				if (cancelled) return;
+				executions = items;
+			} catch (e) {
+				if (!cancelled) executions = [];
+			} finally {
+				if (!cancelled) executionsLoading = false;
+			}
+			if (cancelled) return;
+			const client = getAppSyncWsClient() ?? initAppSyncWsClient({
+				graphqlHttpUrl: PUBLIC_GRAPHQL_HTTP_ENDPOINT,
+				auth: { mode: 'cognito', idToken: token }
+			});
+			const spec = {
+				query: S_ON_WORKFLOW_EXECUTION_STATUS_CHANGE,
+				variables: { workflowId: wfId },
+				next: (payload: any) => {
+					if (cancelled) return;
+					const d = payload?.onWorkflowExecutionStatusChange;
+					if (!d) return;
+					executions = (() => {
+						const list = executions;
+						const idx = list.findIndex((e) => e.id === d.id);
+						if (idx >= 0) {
+							const n = [...list];
+							n[idx] = { ...list[idx], ...d };
+							return n;
+						}
+						return [d, ...list];
+					})();
+				}
+			};
+			executionsSubscriptionSpecRef.current = spec;
+			client.addSubscription(spec);
+		})();
+		return () => {
+			cancelled = true;
+			const client = getAppSyncWsClient();
+			const spec = executionsSubscriptionSpecRef.current;
+			if (client && spec) {
+				client.removeSubscription(spec);
+				executionsSubscriptionSpecRef.current = null;
+			}
+		};
 	});
 
 	// ------------------------------------------------------------------------------------------------
@@ -625,13 +703,14 @@
 	// ------------------------------------------------------------------------------------------------
 
 	// ------------------------------------------------------------------------------------------------
-	// Workflow execution: topological run and results capture
+	// Workflow execution: topological run and results capture (in-browser / local preview only)
+	// - Starts from output nodes when present; otherwise from sink nodes (no outgoing connections)
+	//   so workflows like Input -> AI without an Output node still run.
+	// - Does NOT call the backend; for real runs (Pinecone/Gemini, etc.) use "Test run" when available.
 	// ------------------------------------------------------------------------------------------------
-	// Execute workflow
 	async function executeWorkflow() {
 		workflowResults = [];
 
-		// Build execution order (topological sort)
 		const processed = new Set<string>();
 		const results = new Map<string, any>();
 
@@ -643,22 +722,24 @@
 			const element = gridElements.find((el) => el.id === elementId);
 			if (!element) return null;
 
-			// Get inputs from connected elements
 			const inputConnections = connections.filter((conn) => conn.to === elementId);
-			let input = null;
+			let input: any = null;
 
 			if (inputConnections.length > 0) {
 				const inputs = await Promise.all(
 					inputConnections.map((conn) => executeElement(conn.from))
 				);
 				input = inputs.length === 1 ? inputs[0] : inputs;
+			} else if (element.type.type === 'input') {
+				// Input nodes: use nodeOptions when set, or synthetic placeholder for local run
+				input = element.nodeOptions ?? {
+					_source: 'local-run',
+					doclinkId: 'local-placeholder',
+					documentId: 'local-placeholder',
+					filename: 'test-document.pdf'
+				};
 			}
 
-		if (inputConnections.length === 0 && element.type.type === 'input' && element.nodeOptions !== undefined) {
-			input = element.nodeOptions;
-		}
-
-			// Execute element (handle both sync and async)
 			const outputPromise = element.type.execute(input, element.aiQueryData);
 			const output = await Promise.resolve(outputPromise);
 			element.output = output;
@@ -668,16 +749,24 @@
 			return output;
 		}
 
-		// Execute all output elements (they will trigger upstream execution)
-		const outputElements = gridElements.filter((el) => el.type.type === 'output');
-		await Promise.all(outputElements.map((el) => executeElement(el.id)));
+		// Start from output-type nodes if any; otherwise from sink nodes (no outgoing) so
+		// workflows like Input -> AI run without requiring an Output node.
+		const outputTypeElements = gridElements.filter((el) => el.type.type === 'output');
+		const sinkElements = gridElements.filter((el) => !connections.some((c) => c.from === el.id));
+		const roots = outputTypeElements.length > 0 ? outputTypeElements : sinkElements;
 
-		// Collect results
+		if (roots.length === 0) {
+			// No sink and no output: try running from every node (e.g. single disconnected node)
+			await Promise.all(gridElements.map((el) => executeElement(el.id)));
+		} else {
+			await Promise.all(roots.map((el) => executeElement(el.id)));
+		}
+
 		workflowResults = Array.from(results.entries()).map(([id, value]) => {
 			const element = gridElements.find((el) => el.id === id);
 			return {
 				elementId: id,
-				label: element?.type.label || '',
+				label: element?.type.label || element?.type.id || '',
 				value
 			};
 		});
@@ -795,10 +884,14 @@
 			{generateId}
 		/>
 
-		<WorkflowResultsPanel
+		<WorkflowBottomPanel
 			results={workflowResults}
+			onClearResults={() => (workflowResults = [])}
+			{executions}
+			executionsLoading={executionsLoading}
+			{selectedWorkflowId}
+			onSelectExecution={(exec) => (selectedExecutionId = exec.id)}
 			{darkMode}
-			onClear={() => (workflowResults = [])}
 		/>
 	</div>
 
@@ -893,6 +986,16 @@
 			bind:customAINodePrompt={customAINodePrompt}
 			onCreate={createCustomAINode}
 			onClose={cancelCreateCustomAI}
+		/>
+	{/if}
+
+	<!-- Workflow Execution Detail Modal -->
+	{#if selectedExecutionId && data.idToken}
+		<WorkflowExecutionDetailModal
+			executionId={selectedExecutionId}
+			idToken={data.idToken}
+			{darkMode}
+			onClose={() => (selectedExecutionId = null)}
 		/>
 	{/if}
 </div>
