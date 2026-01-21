@@ -3,70 +3,162 @@
 	// Import Types and Data Stores
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	import type { Project, Doclink } from '$lib/types/cloud/app';
+	import { browser } from '$app/environment';
 	
-	// The project store holds the state for the workspace. 
-	// It's initialized from data loaded on the server side and passed to the client.
-	import { project as projectStore } from '$lib/stores/appStateStore';
+	// ProjectDocument type for PDFViewer (id and filename)
+	interface ProjectDocument {
+		id: string;
+		filename: string;
+	}
 	
-	// Import project entities store for displaying discovered text, tables, and images
-	import { getProjectTextsStore, getProjectTablesStore, getProjectImagesStore } from '$lib/stores/projectEntitiesStore';
+	// Use ValidatedTopicStore instead of appStateStore
+	import { store } from '$lib/realtime/websocket/projectSync';
+	
+	// Import DocumentEntitiesSyncManager for fetching texts, tables, and images
+	import { DocumentEntitiesSyncManager } from '$lib/realtime/websocket/syncManagers/DocumentEntitiesSyncManager';
+	
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
-	
-	// Access mapStore from parent layout context
-	import { getContext } from 'svelte';
 	
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Import Application Defined Components
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	import ProjectEntitiesDisplay from '$lib/components/ProjectEntities/ProjectEntitiesDisplay.svelte';
+	import PDFViewer from '$lib/components/PDFViewer/PDFViewer.svelte';
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Initialize the state variables for this component
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	
+	// Get page data including idToken
+	let { data } = $props();
+	const idToken = $derived(data?.idToken);
+	
 	// Get projectId from route params
 	import { page } from '$app/stores';
 	const projectId = $derived($page.params.projectId ?? null);
-	
-	// Get mapStore from parent layout context
-	const mapStore = getContext('mapStore') as any;
 
 	// Dark mode support
 	const darkMode = $derived(darkModeStore.darkMode);
+	
+	// Document entities sync manager instance
+	let documentEntitiesManager = $state<DocumentEntitiesSyncManager | null>(null);
+	let isLoadingEntities = $state(false);
+	let entitiesError = $state<string | null>(null);
+	
+	// Track which document IDs we've already fetched to prevent re-fetching
+	let lastFetchedDocIds = $state<string>('');
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Component Variables that are Derived from the Stores
 	// Do not modify these variables directly
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-	// Projects belong to users and hold the documents
-	let project = $derived($projectStore);
+	// Get current project from ValidatedTopicStore
+	const project = $derived.by(() => {
+		if (!projectId) return null;
+		return store.at<Project>(`projects/${projectId}`) ?? null;
+	});
 
-	// Get projectDocumentLinks from project (these link to documents)
-	const projectDocumentLinks = $derived.by(() => {
-		const currentProject = $projectStore;
-		// Access projectDocumentLinks with type assertion (Project type extends StratiqProject)
-		const projectWithLinks = currentProject as any as Project;
-		if (!projectWithLinks?.projectDocumentLinks) return [] as ProjectDocumentLink[];
-		const links = projectWithLinks.projectDocumentLinks;
+	// Get doclinks from project (these link to documents)
+	const doclinks = $derived.by(() => {
+		const currentProject = project;
+		if (!currentProject?.doclinks) return [] as Doclink[];
+		const links = currentProject.doclinks;
 		if (Array.isArray(links)) {
 			return links;
 		}
-		return (links as { items: ProjectDocumentLink[] }).items || [];
+		return (links as { items: Doclink[] })?.items || [];
 	});
 
-	// Get reactive stores for project entities (using $derived.by to react to projectId changes)
-	const texts = $derived.by(() => {
-		const pid = $page.params.projectId ?? null;
-		return pid ? getProjectTextsStore(pid) : null;
+	// Convert doclinks to ProjectDocument format for PDFViewer
+	// The id should be the documentId (SHA256 hash) which is used in the S3 URL path
+	const documents = $derived.by(() => {
+		return doclinks
+			.filter((link) => link.documentId && link.filename)
+			.map((link) => ({
+				id: link.documentId!, // This is the SHA256 hash used in S3 path: {hash}/document.pdf
+				filename: link.filename
+			})) as ProjectDocument[];
 	});
-	const tables = $derived.by(() => {
-		const pid = $page.params.projectId ?? null;
-		return pid ? getProjectTablesStore(pid) : null;
+
+	// Selected document state for PDFViewer
+	let selectedDocId = $state<string>('');
+	let currentPage = $state(1);
+
+	// Always select the first document by default when documents are available
+	$effect(() => {
+		if (documents.length > 0) {
+			const firstDocId = documents[0].id;
+			// Always select the first document if none is selected, or if the current selection is invalid
+			if (!selectedDocId || !documents.some((doc) => doc.id === selectedDocId)) {
+				selectedDocId = firstDocId;
+				currentPage = 1; // Reset to first page when changing documents
+			}
+		} else if (selectedDocId) {
+			// Clear selection if documents list becomes empty
+			selectedDocId = '';
+		}
 	});
-	const images = $derived.by(() => {
-		const pid = $page.params.projectId ?? null;
-		return pid ? getProjectImagesStore(pid) : null;
+
+	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+	// Fetch document entities using DocumentEntitiesSyncManager
+	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+	
+	// Create a stable key from document IDs to detect actual changes
+	const documentIdsKey = $derived(documents.map(doc => doc.id).sort().join(','));
+	
+	/**
+	 * Initialize and fetch document entities when documents are available
+	 */
+	async function fetchDocumentEntities(documentIds: string[], token: string, pid: string): Promise<void> {
+		if (!browser) return;
+
+		isLoadingEntities = true;
+		entitiesError = null;
+
+		try {
+			// Cleanup existing manager if any
+			if (documentEntitiesManager) {
+				documentEntitiesManager.cleanup();
+			}
+
+			// Create and initialize the manager
+			documentEntitiesManager = await DocumentEntitiesSyncManager.create({
+				idToken: token,
+				projectId: pid,
+				documentIds
+			});
+		} catch (err) {
+			console.error('Failed to fetch document entities:', err);
+			entitiesError = err instanceof Error ? err.message : 'Failed to load document entities';
+		} finally {
+			isLoadingEntities = false;
+		}
+	}
+
+	// Fetch entities when document IDs change (using stable key comparison)
+	$effect(() => {
+		const docIdsKey = documentIdsKey;
+		const token = idToken;
+		const pid = projectId;
+		
+		// Only fetch if we have valid data and the document IDs have actually changed
+		if (browser && token && pid && docIdsKey && docIdsKey !== lastFetchedDocIds) {
+			lastFetchedDocIds = docIdsKey;
+			const documentIds = docIdsKey.split(',').filter(id => id);
+			if (documentIds.length > 0) {
+				fetchDocumentEntities(documentIds, token, pid);
+			}
+		}
+	});
+
+	// Cleanup on component destroy
+	$effect(() => {
+		return () => {
+			if (documentEntitiesManager) {
+				documentEntitiesManager.cleanup();
+			}
+		};
 	});
 </script>
 
@@ -85,84 +177,113 @@
 			</p>
 		</div>
 
-		<!-- Documents List -->
-		{#if projectDocumentLinks.length > 0}
+		<!-- PDF Viewer -->
+		{#if documents.length > 0 && selectedDocId}
 			<div class="mb-8 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg border shadow-sm">
 				<div class="p-6">
 					<h3 class="text-lg font-semibold {darkMode ? 'text-white' : 'text-slate-900'} mb-4">
-						Documents ({projectDocumentLinks.length})
+						Documents ({documents.length})
 					</h3>
-					<div class="space-y-2">
-						{#each projectDocumentLinks as link (link.id)}
-							<div class="p-4 {darkMode ? 'bg-slate-700/50 border-slate-600' : 'bg-slate-50 border-slate-200'} rounded-lg border">
-								<div class="flex items-center justify-between">
-									<div class="flex items-center gap-3">
-										<div class="w-10 h-10 {darkMode ? 'bg-indigo-900' : 'bg-indigo-100'} rounded-lg flex items-center justify-center">
-											<svg
-												class="h-5 w-5 {darkMode ? 'text-indigo-300' : 'text-indigo-600'}"
-												fill="none"
-												stroke="currentColor"
-												viewBox="0 0 24 24"
-											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-												></path>
-											</svg>
-										</div>
-										<div>
-											<div class="font-medium {darkMode ? 'text-white' : 'text-slate-900'}">
-												{link.filename}
-											</div>
-											<div class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'}">
-												Document ID: {link.documentId}
-											</div>
-										</div>
-									</div>
-									<div class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'}">
-										Status: {link.status}
-									</div>
-								</div>
-							</div>
-						{/each}
-					</div>
+					<PDFViewer
+						documents={documents}
+						bind:currentDocHash={selectedDocId}
+						bind:currentPage={currentPage}
+						showButtons={['navigation', 'zoom', 'rotate', 'download']}
+					/>
 				</div>
 			</div>
 		{/if}
 
-		<!-- Real-time Entity Discovery -->
+		<!-- Document Entities Display -->
 		{#if projectId}
 			<div class="{darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg border shadow-sm">
 				<div class="p-6">
-					<ProjectEntitiesDisplay {projectId} />
+					{#if isLoadingEntities}
+						<div class="flex items-center justify-center py-8">
+							<div class="flex items-center gap-3">
+								<svg class="animate-spin h-5 w-5 {darkMode ? 'text-indigo-400' : 'text-indigo-600'}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+								</svg>
+								<span class="{darkMode ? 'text-slate-300' : 'text-slate-600'}">Loading document entities...</span>
+							</div>
+						</div>
+					{:else if entitiesError}
+						<div class="p-4 {darkMode ? 'bg-red-900/20 border-red-500/30' : 'bg-red-50 border-red-200'} rounded-lg border">
+							<div class="flex items-center gap-2 text-red-600 dark:text-red-400">
+								<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+								</svg>
+								<span class="font-medium">Error loading entities</span>
+							</div>
+							<p class="mt-1 text-sm {darkMode ? 'text-red-300' : 'text-red-600'}">{entitiesError}</p>
+							<button
+								onclick={() => {
+									lastFetchedDocIds = ''; // Reset to allow re-fetch
+									const docIds = documents.map(doc => doc.id);
+									if (idToken && projectId && docIds.length > 0) {
+										fetchDocumentEntities(docIds, idToken, projectId);
+									}
+								}}
+								class="mt-3 px-3 py-1.5 text-sm font-medium {darkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-100 hover:bg-red-200 text-red-700'} rounded-md transition-colors"
+							>
+								Retry
+							</button>
+						</div>
+					{:else}
+						<ProjectEntitiesDisplay {projectId} {documents} />
+					{/if}
 				</div>
 			</div>
 		{/if}
 
 		<!-- Empty State -->
-		{#if projectDocumentLinks.length === 0}
-			<div class="text-center py-12 {darkMode ? 'text-slate-400' : 'text-slate-500'}">
-				<div class="mb-4">
-					<svg
-						class="mx-auto h-16 w-16 {darkMode ? 'text-slate-600' : 'text-slate-300'}"
-						fill="none"
-						stroke="currentColor"
-						viewBox="0 0 24 24"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-						></path>
-					</svg>
+		{#if documents.length === 0 || !selectedDocId}
+			<div class="{darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg border shadow-sm">
+				<div class="text-center py-12 px-6">
+					<div class="mb-4">
+						<svg
+							class="mx-auto h-16 w-16 {darkMode ? 'text-slate-400' : 'text-slate-300'}"
+							fill="none"
+							stroke="currentColor"
+							viewBox="0 0 24 24"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+							></path>
+						</svg>
+					</div>
+					<h3 class="text-lg font-semibold {darkMode ? 'text-white' : 'text-slate-900'} mb-2">
+						No documents uploaded yet
+					</h3>
+					<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-600'} mb-4">
+						Upload your first document to get started with document analysis.
+					</p>
+					{#if projectId}
+						<a
+							href="/projects/workspace/{projectId}/get-started"
+							class="inline-flex items-center gap-2 px-4 py-2 {darkMode ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'} rounded-lg font-medium transition-colors"
+						>
+							<svg
+								class="w-5 h-5"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+								></path>
+							</svg>
+							Go to Get Started
+						</a>
+					{/if}
 				</div>
-				<p class="text-base font-medium mb-2">No documents uploaded yet</p>
-				<p class="text-sm">
-					Go to <a href="/projects/workspace/{projectId}/get-started" class="{darkMode ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-700'} underline">Get Started</a> to upload your first document.
-				</p>
 			</div>
 		{/if}
 	</div>

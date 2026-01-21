@@ -116,7 +116,12 @@
 		const workspaceIndex = parts.indexOf('workspace');
 		if (workspaceIndex !== -1 && workspaceIndex + 2 < parts.length) {
 			// Return path up to projectId: /projects/workspace/[projectId]
-			return parts.slice(0, workspaceIndex + 3).join('/');
+			// workspaceIndex = 2, projectId is at index 3, so slice(0, 4) includes indices 0-3
+			return parts.slice(0, workspaceIndex + 2).join('/');
+		}
+		// If we're at the workspace root (no projectId yet), return up to workspace
+		if (workspaceIndex !== -1) {
+			return parts.slice(0, workspaceIndex + 1).join('/');
 		}
 		return '';
 	});
@@ -125,8 +130,6 @@
 	const pageTitle = $derived.by(() => {
 		if (currentPath.includes('get-started')) return 'Get Started';
 		if (currentPath.includes('document-analysis')) return 'Document Analysis';
-		if (currentPath.includes('market-analysis')) return 'Market Analysis';
-		if (currentPath.includes('property-analysis')) return 'Financial Analysis';
 		if (currentPath.includes('investment-analysis')) return 'Investment Analysis';
 		return 'Workspace';
 	});
@@ -134,13 +137,7 @@
 	// Tab navigation items
 	const tabs = [
 		{ href: 'get-started', label: 'Get Started' },
-		{ href: 'document-analysis', label: 'Document Analysis' },
-		{ href: 'market-analysis', label: 'Market Analysis' },
-		{ href: 'property-analysis', label: 'Financial Analysis' },
-		{ href: 'investment-analysis', label: 'Location/Site' },
-		{ href: 'investment-analysis', label: 'Political/Legal' },
-		{ href: 'investment-analysis', label: 'Insight/Sensitivity' },
-		{ href: 'investment-analysis', label: 'Reports' }
+		{ href: 'document-analysis', label: 'Document Analysis' }
 	];
 
 	// Check if a tab is active

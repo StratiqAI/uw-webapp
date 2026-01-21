@@ -3,7 +3,6 @@
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
 	import DocumentUpload from '$lib/components/DocumentUpload/DocumentUpload.svelte';
-	import ProjectEntitiesDisplay from '$lib/components/ProjectEntities/ProjectEntitiesDisplay.svelte';
 	import { ProjectSyncManager, store } from '$lib/realtime/websocket/projectSync';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
@@ -126,7 +125,7 @@
 		</div>
 
 		<!-- Doclinks Display -->
-		{#if projectId && doclinks.length > 0}
+		<!-- {#if projectId && doclinks.length > 0}
 			<div class="mt-8 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg border shadow-sm">
 				<div class="p-6">
 					<div class="flex items-center gap-3 mb-4">
@@ -166,16 +165,7 @@
 					</div>
 				</div>
 			</div>
-		{/if}
-
-		<!-- Real-time Entity Discovery -->
-		{#if projectId}
-			<div class="mt-8 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg border shadow-sm">
-				<div class="p-6">
-					<ProjectEntitiesDisplay {projectId} />
-				</div>
-			</div>
-		{/if}
+		{/if} -->
 
 		<!-- Help Link -->
 		<div class="mt-6 text-center">
