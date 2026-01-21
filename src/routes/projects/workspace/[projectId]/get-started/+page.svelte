@@ -3,7 +3,9 @@
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
 	import DocumentUpload from '$lib/components/DocumentUpload/DocumentUpload.svelte';
+	import ProjectEntitiesDisplay from '$lib/components/ProjectEntities/ProjectEntitiesDisplay.svelte';
 	import { ProjectSyncManager, store } from '$lib/realtime/websocket/projectSync';
+	import { DocumentEntitiesSyncManager } from '$lib/realtime/websocket/syncManagers/DocumentEntitiesSyncManager';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import type { Project, Doclink } from '@stratiqai/types-simple';
@@ -21,6 +23,14 @@
 
 	// Manager lifecycle
 	let projectSyncManager = $state(ProjectSyncManager.createInactive());
+	
+	// Document entities sync manager instance
+	let documentEntitiesManager = $state<DocumentEntitiesSyncManager | null>(null);
+	let isLoadingEntities = $state(false);
+	let entitiesError = $state<string | null>(null);
+	
+	// Track which document IDs we've already fetched to prevent re-fetching
+	let lastFetchedDocIds = $state<string>('');
 
 	// Get project from store (reactive to store changes)
 	// Use store.at() to directly access the project instead of getAllAtArray
@@ -37,6 +47,17 @@
 		if (!links) return [];
 		if (Array.isArray(links)) return links as Doclink[];
 		return (links.items || []) as Doclink[];
+	});
+
+	// Convert doclinks to ProjectDocument format for ProjectEntitiesDisplay
+	// The id should be the documentId (SHA256 hash) which is used in the S3 URL path
+	const documents = $derived.by(() => {
+		return doclinks
+			.filter((link) => link.documentId && link.filename)
+			.map((link) => ({
+				id: link.documentId!, // This is the SHA256 hash used in S3 path: {hash}/document.pdf
+				filename: link.filename
+			}));
 	});
 
 	// Dark mode support
@@ -99,6 +120,67 @@
 			parentId: projectId
 		};
 	});
+
+	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+	// Fetch document entities using DocumentEntitiesSyncManager
+	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+	
+	// Create a stable key from document IDs to detect actual changes
+	const documentIdsKey = $derived(documents.map(doc => doc.id).sort().join(','));
+	
+	/**
+	 * Initialize and fetch document entities when documents are available
+	 */
+	async function fetchDocumentEntities(documentIds: string[], token: string, pid: string): Promise<void> {
+		if (!browser) return;
+
+		isLoadingEntities = true;
+		entitiesError = null;
+
+		try {
+			// Cleanup existing manager if any
+			if (documentEntitiesManager) {
+				documentEntitiesManager.cleanup();
+			}
+
+			// Create and initialize the manager
+			documentEntitiesManager = await DocumentEntitiesSyncManager.create({
+				idToken: token,
+				projectId: pid,
+				documentIds
+			});
+		} catch (err) {
+			console.error('Failed to fetch document entities:', err);
+			entitiesError = err instanceof Error ? err.message : 'Failed to load document entities';
+		} finally {
+			isLoadingEntities = false;
+		}
+	}
+
+	// Fetch entities when document IDs change (using stable key comparison)
+	$effect(() => {
+		const docIdsKey = documentIdsKey;
+		const token = cognitoIdToken;
+		const pid = projectId;
+		
+		// Only fetch if we have valid data and the document IDs have actually changed
+		if (browser && token && pid && docIdsKey && docIdsKey !== lastFetchedDocIds) {
+			lastFetchedDocIds = docIdsKey;
+			const documentIds = docIdsKey.split(',').filter(id => id);
+			if (documentIds.length > 0) {
+				fetchDocumentEntities(documentIds, token, pid);
+			}
+		}
+	});
+
+	// Cleanup on component destroy
+	$effect(() => {
+		return () => {
+			if (documentEntitiesManager) {
+				documentEntitiesManager.cleanup();
+			}
+		};
+	});
 </script>
 
 <!-- Main Content Area -->
@@ -123,6 +205,49 @@
 				<DocumentUpload idToken={cognitoIdToken} projectId={projectId} metadata={fileMetadata} />
 			</div>
 		</div>
+
+		<!-- Real-time Discovery Section -->
+		{#if projectId && documents.length > 0}
+			<div class="mt-8 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg border shadow-sm">
+				<div class="p-6">
+					{#if isLoadingEntities}
+						<div class="flex items-center justify-center py-8">
+							<div class="flex items-center gap-3">
+								<svg class="animate-spin h-5 w-5 {darkMode ? 'text-indigo-400' : 'text-indigo-600'}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+								</svg>
+								<span class="{darkMode ? 'text-slate-300' : 'text-slate-600'}">Loading document entities...</span>
+							</div>
+						</div>
+					{:else if entitiesError}
+						<div class="p-4 {darkMode ? 'bg-red-900/20 border-red-500/30' : 'bg-red-50 border-red-200'} rounded-lg border">
+							<div class="flex items-center gap-2 text-red-600 dark:text-red-400">
+								<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+								</svg>
+								<span class="font-medium">Error loading entities</span>
+							</div>
+							<p class="mt-1 text-sm {darkMode ? 'text-red-300' : 'text-red-600'}">{entitiesError}</p>
+							<button
+								onclick={() => {
+									lastFetchedDocIds = ''; // Reset to allow re-fetch
+									const docIds = documents.map(doc => doc.id);
+									if (cognitoIdToken && projectId && docIds.length > 0) {
+										fetchDocumentEntities(docIds, cognitoIdToken, projectId);
+									}
+								}}
+								class="mt-3 px-3 py-1.5 text-sm font-medium {darkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-100 hover:bg-red-200 text-red-700'} rounded-md transition-colors"
+							>
+								Retry
+							</button>
+						</div>
+					{:else}
+						<ProjectEntitiesDisplay {projectId} {documents} />
+					{/if}
+				</div>
+			</div>
+		{/if}
 
 		<!-- Doclinks Display -->
 		<!-- {#if projectId && doclinks.length > 0}

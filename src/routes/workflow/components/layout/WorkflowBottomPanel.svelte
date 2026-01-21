@@ -13,6 +13,7 @@
 		executionsLoading = false,
 		selectedWorkflowId = null,
 		onSelectExecution,
+		onRefreshExecutions,
 		darkMode = false
 	}: {
 		results?: WorkflowResult[];
@@ -21,6 +22,7 @@
 		executionsLoading?: boolean;
 		selectedWorkflowId?: string | null;
 		onSelectExecution?: (exec: WorkflowExecutionListItem) => void;
+		onRefreshExecutions?: () => void;
 		darkMode?: boolean;
 	} = $props();
 
@@ -111,6 +113,7 @@
 				{selectedWorkflowId}
 				{darkMode}
 				onSelectExecution={onSelectExecution}
+				onRefresh={onRefreshExecutions}
 			/>
 		{/if}
 	</div>

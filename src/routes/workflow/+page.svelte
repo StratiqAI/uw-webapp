@@ -207,6 +207,30 @@
 	let selectedExecutionId = $state<string | null>(null);
 	const executionsSubscriptionSpecRef = { current: null as { query: any; variables: any; next: (p: any) => void } | null };
 
+	// Function to load workflow executions for the selected workflow
+	async function loadWorkflowExecutions() {
+		const wfId = selectedWorkflowId;
+		const projectId = selectedProjectId;
+		const token = data.idToken;
+		if (!wfId || !projectId || !token) {
+			executions = [];
+			return;
+		}
+
+		executionsLoading = true;
+		try {
+			console.log('[loadWorkflowExecutions] Loading executions:', { wfId, projectId });
+			const { items } = await fetchWorkflowExecutions(wfId, projectId, token);
+			console.log('[loadWorkflowExecutions] Loaded executions:', { count: items.length, items });
+			executions = items;
+		} catch (e) {
+			console.error('Failed to load workflow executions:', e);
+			executions = [];
+		} finally {
+			executionsLoading = false;
+		}
+	}
+
 	// Load workflows when project changes
 	async function loadWorkflowsForProject(projectId: string | null) {
 		if (!projectId || !data.idToken) {
@@ -251,8 +275,9 @@
 	// Load workflow executions and subscribe to status changes when a workflow is selected
 	$effect(() => {
 		const wfId = selectedWorkflowId;
+		const projectId = selectedProjectId;
 		const token = data.idToken;
-		if (!wfId || !token) {
+		if (!wfId || !projectId || !token) {
 			executions = [];
 			const client = getAppSyncWsClient();
 			const spec = executionsSubscriptionSpecRef.current;
@@ -264,17 +289,11 @@
 		}
 		let cancelled = false;
 		(async () => {
-			executionsLoading = true;
-			try {
-				const { items } = await fetchWorkflowExecutions(wfId, token);
-				if (cancelled) return;
-				executions = items;
-			} catch (e) {
-				if (!cancelled) executions = [];
-			} finally {
-				if (!cancelled) executionsLoading = false;
-			}
+			// Load executions
+			await loadWorkflowExecutions();
 			if (cancelled) return;
+
+			// Set up subscription for real-time updates
 			const client = getAppSyncWsClient() ?? initAppSyncWsClient({
 				graphqlHttpUrl: PUBLIC_GRAPHQL_HTTP_ENDPOINT,
 				auth: { mode: 'cognito', idToken: token }
@@ -891,6 +910,7 @@
 			executionsLoading={executionsLoading}
 			{selectedWorkflowId}
 			onSelectExecution={(exec) => (selectedExecutionId = exec.id)}
+			onRefreshExecutions={loadWorkflowExecutions}
 			{darkMode}
 		/>
 	</div>
@@ -994,6 +1014,7 @@
 		<WorkflowExecutionDetailModal
 			executionId={selectedExecutionId}
 			idToken={data.idToken}
+			projectId={selectedProjectId ?? undefined}
 			{darkMode}
 			onClose={() => (selectedExecutionId = null)}
 		/>

@@ -42,7 +42,6 @@
 </script>
 
 
-
 <div class="grid grid-cols-3 gap-6">
 	<!-- Column 1 -->
 	<div class="col-span-1">

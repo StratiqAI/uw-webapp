@@ -11,28 +11,52 @@ html, body {
   font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-@theme {
-  --color-primary-50: #fff5f2;
-  --color-primary-100: #fff1ee;
-  --color-primary-200: #ffe4de;
-  --color-primary-300: #ffd5cc;
-  --color-primary-400: #ffbcad;
-  --color-primary-500: #fe795d;
-  --color-primary-600: #ef562f;
-  --color-primary-700: #eb4f27;
-  --color-primary-800: #cc4522;
-  --color-primary-900: #a5371b;
+/* Global color enhancements - reduce brightness in light mode, add warmth to dark mode */
+:root {
+  --surface-light: var(--color-primary-50);
+  --surface-dark: #0f172a; /* Warmer dark base instead of pure slate */
+}
 
-  --color-secondary-50: #f0f9ff;
-  --color-secondary-100: #e0f2fe;
-  --color-secondary-200: #bae6fd;
-  --color-secondary-300: #7dd3fc;
-  --color-secondary-400: #38bdf8;
-  --color-secondary-500: #0ea5e9;
-  --color-secondary-600: #0284c7;
-  --color-secondary-700: #0369a1;
-  --color-secondary-800: #075985;
-  --color-secondary-900: #0c4a6e;
+.dark {
+  color-scheme: dark;
+}
+
+@theme {
+  /* Primary (Blue) - distinctive, professional, trustworthy */
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #93c5fd;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-primary-800: #1e40af;
+  --color-primary-900: #1e3a8a;
+
+  /* Secondary (Violet) - complementary, used for CTAs and variety */
+  --color-secondary-50: #f5f3ff;
+  --color-secondary-100: #ede9fe;
+  --color-secondary-200: #ddd6fe;
+  --color-secondary-300: #c4b5fd;
+  --color-secondary-400: #a78bfa;
+  --color-secondary-500: #8b5cf6;
+  --color-secondary-600: #7c3aed;
+  --color-secondary-700: #6d28d9;
+  --color-secondary-800: #5b21b6;
+  --color-secondary-900: #4c1d95;
+
+  /* Indigo override - maps to primary so all indigo-* classes use brand color */
+  --color-indigo-50: #eff6ff;
+  --color-indigo-100: #dbeafe;
+  --color-indigo-200: #bfdbfe;
+  --color-indigo-300: #93c5fd;
+  --color-indigo-400: #60a5fa;
+  --color-indigo-500: #3b82f6;
+  --color-indigo-600: #2563eb;
+  --color-indigo-700: #1d4ed8;
+  --color-indigo-800: #1e40af;
+  --color-indigo-900: #1e3a8a;
 }
 
 @source "../node_modules/flowbite-svelte/dist";
@@ -55,24 +79,24 @@ html, body {
 }
 
 
-/* Custom scrollbar styles */
+/* Custom scrollbar styles - theme-aware */
 .widget-content::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 .widget-content::-webkit-scrollbar-track {
-  background: #f3f4f6;
+  background: var(--color-primary-100);
   border-radius: 3px;
 }
 
 .widget-content::-webkit-scrollbar-thumb {
-  background: #9ca3af;
+  background: var(--color-primary-400);
   border-radius: 3px;
 }
 
 .widget-content::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+  background: var(--color-primary-500);
 }
 
 /* Prevent text selection while dragging */
@@ -91,4 +115,129 @@ html, body {
   .resize-handles {
     display: none;
   }
+}
+
+/* Enhanced background pattern to reduce starkness */
+.app-background-pattern {
+  position: relative;
+}
+
+.app-background-pattern::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  opacity: 0.08;
+  background-image: 
+    linear-gradient(to right, rgba(59, 130, 246, 0.15) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(59, 130, 246, 0.15) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+}
+
+.dark .app-background-pattern::before {
+  opacity: 0.12;
+  background-image: 
+    linear-gradient(to right, rgba(147, 197, 253, 0.2) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(147, 197, 253, 0.2) 1px, transparent 1px);
+}
+
+/* Add subtle texture overlay */
+.app-background-pattern::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  opacity: 0.02;
+  background-image: 
+    radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 40% 20%, rgba(59, 130, 246, 0.06) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.dark .app-background-pattern::after {
+  opacity: 0.04;
+  background-image: 
+    radial-gradient(circle at 20% 50%, rgba(147, 197, 253, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(196, 181, 253, 0.12) 0%, transparent 50%),
+    radial-gradient(circle at 40% 20%, rgba(147, 197, 253, 0.1) 0%, transparent 50%);
+}
+
+/* Alternative dot pattern */
+.app-background-dots {
+  position: relative;
+}
+
+.app-background-dots::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  opacity: 0.04;
+  background-image: radial-gradient(circle, rgba(0, 0, 0, 0.2) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+}
+
+.dark .app-background-dots::before {
+  opacity: 0.06;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.15) 1px, transparent 1px);
+}
+
+/* Enhanced card styling for depth and visual interest */
+.card-enhanced {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(59, 130, 246, 0.1);
+  box-shadow: 
+    0 1px 3px 0 rgba(0, 0, 0, 0.05),
+    0 4px 6px -1px rgba(0, 0, 0, 0.03),
+    0 2px 4px -1px rgba(59, 130, 246, 0.05);
+  transition: all 0.2s ease-in-out;
+}
+
+.card-enhanced:hover {
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.08),
+    0 10px 15px -3px rgba(0, 0, 0, 0.05),
+    0 4px 8px -2px rgba(59, 130, 246, 0.1);
+  transform: translateY(-1px);
+}
+
+.dark .card-enhanced {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(147, 197, 253, 0.15);
+  box-shadow: 
+    0 1px 3px 0 rgba(0, 0, 0, 0.3),
+    0 4px 6px -1px rgba(0, 0, 0, 0.2),
+    0 2px 4px -1px rgba(147, 197, 253, 0.1);
+}
+
+.dark .card-enhanced:hover {
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.4),
+    0 10px 15px -3px rgba(0, 0, 0, 0.3),
+    0 4px 8px -2px rgba(147, 197, 253, 0.15);
+}
+
+/* Subtle glassmorphism effect for surfaces */
+.glass-surface {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.dark .glass-surface {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }

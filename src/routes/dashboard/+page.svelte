@@ -201,11 +201,11 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div class="flex h-screen w-full overflow-hidden {darkMode ? 'bg-slate-900' : 'bg-slate-50'}">
+<div class="flex h-screen w-full overflow-hidden {darkMode ? 'bg-gradient-to-br from-slate-900 via-primary-950/20 to-slate-900' : 'bg-primary-100/30'}">
 	<!-- Main Content Area -->
-	<div class="flex-1 flex flex-col overflow-hidden {darkMode ? 'bg-slate-900' : 'bg-white'}">
+	<div class="flex-1 flex flex-col overflow-hidden {darkMode ? 'bg-slate-900/80' : 'bg-primary-50/40'}">
 		<!-- Header -->
-		<div class="h-14 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border-b flex items-center justify-between px-6 shadow-sm">
+		<div class="h-14 {darkMode ? 'bg-gradient-to-r from-slate-800 via-primary-900/30 to-slate-800 border-primary-800/40' : 'bg-gradient-to-r from-primary-50/80 via-white to-primary-50/60 border-primary-200/60'} border-b flex items-center justify-between px-6 shadow-sm">
 			<div class="flex items-center gap-4">
 				<h1 class="text-2xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'} tracking-tight">Dashboards</h1>
 				<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
@@ -283,7 +283,7 @@
 	</div> -->
 
 		<!-- Dashboard Canvas -->
-		<div class="flex-1 relative {darkMode ? 'bg-slate-900' : 'bg-slate-50'} overflow-auto">
+		<div class="flex-1 relative {darkMode ? 'bg-gradient-to-b from-slate-900/90 via-slate-900/80 to-primary-950/20' : 'bg-primary-50/30'} overflow-auto">
 			<div class="p-6">
 				{#if isLoading}
 					<div class="flex h-64 items-center justify-center">

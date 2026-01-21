@@ -9,9 +9,10 @@
 	import { fetchWorkflowExecutionDetail } from '../../services/backend/workflowExecutionService';
 	import type { WorkflowExecution, WorkflowNodeExecution } from '@stratiqai/types-simple';
 
-	const { executionId, idToken, darkMode = false, onClose }: {
+	const { executionId, idToken, projectId, darkMode = false, onClose }: {
 		executionId: string;
 		idToken: string;
+		projectId?: string;
 		darkMode?: boolean;
 		onClose: () => void;
 	} = $props();
@@ -52,13 +53,28 @@
 	}
 
 	onMount(async () => {
-		if (!executionId || !idToken) return;
+		if (!executionId || !idToken) {
+			console.error('[WorkflowExecutionDetailModal] Missing executionId or idToken', { executionId, hasToken: !!idToken });
+			return;
+		}
 
 		loading = true;
 		error = null;
+		console.log('[WorkflowExecutionDetailModal] Fetching execution:', { executionId, projectId });
 		try {
-			execution = await fetchWorkflowExecutionDetail(executionId, idToken);
+			const result = await fetchWorkflowExecutionDetail(executionId, idToken, projectId);
+			console.log('[WorkflowExecutionDetailModal] Fetched execution:', result);
+			if (result) {
+				console.log('[WorkflowExecutionDetailModal] Node executions count:', result.nodeExecutions?.items?.length ?? 0);
+				console.log('[WorkflowExecutionDetailModal] Node executions:', result.nodeExecutions?.items);
+			}
+			execution = result;
+			if (!result) {
+				error = 'Execution not found';
+				console.warn('[WorkflowExecutionDetailModal] Execution returned null');
+			}
 		} catch (e) {
+			console.error('[WorkflowExecutionDetailModal] Error fetching execution:', e);
 			error = e instanceof Error ? e.message : 'Failed to load execution';
 		} finally {
 			loading = false;
@@ -107,7 +123,38 @@
 	const totalNodes = $derived(Number((execution as Record<string, unknown>)?.totalNodes) || 0);
 	const completedNodes = $derived(Number((execution as Record<string, unknown>)?.completedNodes) || 0);
 	const pct = $derived(totalNodes > 0 ? Math.round((completedNodes / totalNodes) * 100) : 0);
-	const nodeItems = $derived(execution?.nodeExecutions?.items ?? []);
+	
+	// Parse nodeExecutions and ensure outputData is parsed if it's a string
+	const nodeItems = $derived.by(() => {
+		const items = execution?.nodeExecutions?.items ?? [];
+		return items.map((node) => {
+			// Parse outputData if it's a string (AWSJSON comes as string from GraphQL)
+			let parsedOutputData = node.outputData;
+			if (typeof node.outputData === 'string') {
+				try {
+					parsedOutputData = JSON.parse(node.outputData);
+				} catch (e) {
+					console.warn('[WorkflowExecutionDetailModal] Failed to parse node outputData:', e);
+				}
+			}
+			
+			// Parse inputData if it's a string
+			let parsedInputData = node.inputData;
+			if (typeof node.inputData === 'string') {
+				try {
+					parsedInputData = JSON.parse(node.inputData);
+				} catch (e) {
+					// Ignore parse errors for inputData
+				}
+			}
+			
+			return {
+				...node,
+				outputData: parsedOutputData,
+				inputData: parsedInputData
+			};
+		});
+	});
 </script>
 
 <div
@@ -207,21 +254,36 @@
 					<h3 class="text-sm font-semibold {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
 						Nodes ({nodeItems.length})
 					</h3>
-					<div class="space-y-2">
-						{#each nodeItems as node (node.id)}
+					{#if nodeItems.length === 0}
+						<p class="text-sm {darkMode ? 'text-slate-500' : 'text-slate-500'} py-2">
+							No node executions yet.
+						</p>
+					{:else}
+						<div class="space-y-2">
+							{#each nodeItems as node (node.id)}
 							<div
 								class="rounded-lg border {darkMode
 									? 'bg-slate-800 border-slate-700'
 									: 'bg-slate-50 border-slate-200'}"
 							>
 								<div class="flex items-center justify-between gap-2 py-2 px-3">
-									<div class="min-w-0">
+									<div class="min-w-0 flex-1">
 										<div class="text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-800'}">
 											{node.nodeName || node.nodeId || 'Node'}
 										</div>
 										<div class="text-xs {darkMode ? 'text-slate-500' : 'text-slate-500'}">
 											{node.nodeType || (node as Record<string, unknown>).nodeCategory || '—'}
 										</div>
+										{#if node.startedAt || node.completedAt}
+											<div class="text-[10px] {darkMode ? 'text-slate-600' : 'text-slate-500'} mt-0.5">
+												{#if node.startedAt}
+													Started {formatDate(node.startedAt)}
+												{/if}
+												{#if node.completedAt}
+													{#if node.startedAt} · {/if}Completed {formatDate(node.completedAt)}
+												{/if}
+											</div>
+										{/if}
 									</div>
 									<span
 										class="text-[10px] font-medium px-1.5 py-0.5 rounded flex-shrink-0 {statusColor(node.status)}"
@@ -234,33 +296,46 @@
 										{node.errorMessage}
 									</div>
 								{/if}
-								{#if node.outputData != null && typeof node.outputData === 'object'}
+								{#if node.outputData != null}
+									{@const output = typeof node.outputData === 'string' ? (() => { try { return JSON.parse(node.outputData); } catch { return node.outputData; } })() : node.outputData}
 									<div class="px-3 pb-3 pt-0">
 										<div class="text-xs font-medium {darkMode ? 'text-slate-400' : 'text-slate-600'} mb-1">Result</div>
-										{#if typeof (node.outputData as Record<string, unknown>).text === 'string'}
-											<div class="text-sm {darkMode ? 'text-slate-200' : 'text-slate-800'} whitespace-pre-wrap">{(node.outputData as Record<string, unknown>).text}</div>
-											{#if (node.outputData as Record<string, unknown>).query != null || (node.outputData as Record<string, unknown>).matchCount != null}
-												<div class="text-xs mt-1.5 {darkMode ? 'text-slate-500' : 'text-slate-500'}">
-													{#if (node.outputData as Record<string, unknown>).query}
-														<span>Query: {(node.outputData as Record<string, unknown>).query as string}</span>
-													{/if}
-													{#if (node.outputData as Record<string, unknown>).matchCount != null}
-														<span> · {(node.outputData as Record<string, unknown>).matchCount} chunks</span>
-													{/if}
-												</div>
+										{#if typeof output === 'object' && output !== null && output !== undefined}
+												{#if typeof (output as Record<string, unknown>).text === 'string'}
+													<div class="text-sm {darkMode ? 'text-slate-200' : 'text-slate-800'} whitespace-pre-wrap">{(output as Record<string, unknown>).text}</div>
+													<div class="text-xs mt-1.5 {darkMode ? 'text-slate-500' : 'text-slate-500'} flex flex-wrap gap-x-3 gap-y-1">
+														{#if (output as Record<string, unknown>).query}
+															<span>Query: {(output as Record<string, unknown>).query as string}</span>
+														{/if}
+														{#if (output as Record<string, unknown>).matchCount != null}
+															<span>{(output as Record<string, unknown>).matchCount} chunks</span>
+														{/if}
+														{#if (output as Record<string, unknown>).type}
+															<span>Type: {(output as Record<string, unknown>).type as string}</span>
+														{/if}
+														{#if (output as Record<string, unknown>).usage && typeof (output as Record<string, unknown>).usage === 'object'}
+															{@const usage = (output as Record<string, unknown>).usage as Record<string, unknown>}
+															{#if usage.totalTokenCount != null}
+																<span>Tokens: {String(usage.totalTokenCount)}</span>
+															{/if}
+														{/if}
+													</div>
+											{:else}
+												<pre
+													class="text-xs p-2 rounded overflow-x-auto max-h-32 {darkMode
+														? 'bg-slate-900 text-slate-300'
+														: 'bg-white text-slate-700'} border {darkMode ? 'border-slate-700' : 'border-slate-200'}"
+												>{JSON.stringify(output, null, 2)}</pre>
 											{/if}
 										{:else}
-											<pre
-												class="text-xs p-2 rounded overflow-x-auto max-h-32 {darkMode
-													? 'bg-slate-900 text-slate-300'
-													: 'bg-white text-slate-700'} border {darkMode ? 'border-slate-700' : 'border-slate-200'}"
-											>{JSON.stringify(node.outputData, null, 2)}</pre>
+											<div class="text-sm {darkMode ? 'text-slate-200' : 'text-slate-800'} whitespace-pre-wrap">{String(output)}</div>
 										{/if}
 									</div>
 								{/if}
 							</div>
 						{/each}
-					</div>
+						</div>
+					{/if}
 				</div>
 
 				{#if execution.outputData != null && execution.status === 'COMPLETED'}

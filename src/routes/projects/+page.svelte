@@ -238,12 +238,12 @@
 		: 'bg-slate-50'} transition-colors"
 >
 	<!-- Main Content Area -->
-	<div class="flex flex-1 flex-col overflow-hidden {darkMode ? 'bg-slate-900' : 'bg-white'}">
+	<div class="flex flex-1 flex-col overflow-hidden {darkMode ? 'bg-slate-900/80' : 'bg-primary-50/40'}">
 		<!-- Header -->
 		<div
-			class="h-14 {darkMode
-				? 'border-slate-700 bg-slate-800'
-				: 'border-slate-200 bg-white'} flex items-center justify-between border-b px-6 shadow-sm"
+			class="glass-surface h-14 {darkMode
+				? 'border-primary-800/30 bg-gradient-to-r from-slate-800 via-primary-900/20 to-slate-800'
+				: 'border-primary-200/60 bg-gradient-to-r from-primary-50/80 via-white to-primary-50/60'} flex items-center justify-between border-b px-6 shadow-sm"
 		>
 			<div class="flex items-center gap-4">
 				<div
@@ -322,9 +322,9 @@
 						type="text"
 						bind:value={searchFilter}
 						placeholder="Search projects..."
-						class="w-full px-4 py-2 pl-10 {darkMode
-							? 'border-slate-600 bg-slate-700 text-white placeholder-slate-400'
-							: 'border-slate-300 bg-white text-slate-900 placeholder-slate-500'} rounded-lg border transition-colors focus:border-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500"
+						class="glass-surface w-full px-4 py-2 pl-10 {darkMode
+							? 'border-slate-600/50 text-white placeholder-slate-400'
+							: 'border-primary-200/60 text-slate-900 placeholder-slate-500'} rounded-lg border transition-all focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-400/30 shadow-sm"
 					/>
 					<svg
 						class="absolute left-3 top-2.5 h-5 w-5 {darkMode ? 'text-slate-400' : 'text-slate-500'}"
@@ -512,15 +512,15 @@
 		</div>
 
 		<!-- Projects List -->
-		<div class="flex-1 overflow-y-auto {darkMode ? 'bg-slate-900' : 'bg-slate-50'}">
+		<div class="flex-1 overflow-y-auto {darkMode ? 'bg-slate-900/80' : 'bg-primary-50/40'}">
 			<div class="px-6 py-6">
 				{#if projects.length > 0}
 					<div class="space-y-3">
 						{#each projects as project (project.id)}
 							<div
-								class="{darkMode
-									? 'border-slate-700 bg-slate-800 hover:border-indigo-500'
-									: 'border-slate-200 bg-white hover:border-indigo-300'} group rounded-lg border p-4 transition-all hover:shadow-lg"
+								class="card-enhanced {darkMode
+									? 'border-slate-700/50'
+									: 'border-primary-200/60'} group rounded-xl border p-5"
 							>
 								<div class="flex items-center justify-between">
 									<a

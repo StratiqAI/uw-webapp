@@ -16,11 +16,30 @@
 						isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 					}
 					
+					// Apply dark class immediately
 					if (isDark) {
 						document.documentElement.classList.add('dark');
 					} else {
 						document.documentElement.classList.remove('dark');
 					}
+					
+					// Set inline styles immediately to prevent flash - match theme colors
+					const style = document.createElement('style');
+					style.id = 'dark-mode-prevent-flash';
+					style.textContent = isDark 
+						? 'html, body { background-color: #0f172a !important; color: #f1f5f9 !important; }'
+						: 'html, body { background-color: #dbeafe !important; color: #0f172a !important; }';
+					document.head.appendChild(style);
+					
+					// Remove the inline style once page loads so CSS can take over
+					window.addEventListener('load', function() {
+						setTimeout(function() {
+							const flashPrevent = document.getElementById('dark-mode-prevent-flash');
+							if (flashPrevent) {
+								flashPrevent.remove();
+							}
+						}, 100);
+					});
 				} catch (e) {
 					// Silently fail if localStorage is not available
 				}
@@ -52,7 +71,7 @@
 			src="https://cdn.jsdelivr.net/npm/mapbox-gl-leaflet@0.0.16/leaflet-mapbox-gl.js"
 		></script>
 	</head>
-	<body data-sveltekit-preload-data="hover" class="bg-black">
+	<body data-sveltekit-preload-data="hover">
 		<div style="display: contents">%sveltekit.body%</div>
 	</body>
 </html>

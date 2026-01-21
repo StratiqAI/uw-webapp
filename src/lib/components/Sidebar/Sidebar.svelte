@@ -79,9 +79,9 @@
 	];
 </script>
 
-<div class="group relative flex h-full w-full flex-col {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border-r shadow-sm overflow-visible">
+<div class="group relative flex h-full w-full flex-col {darkMode ? 'bg-gradient-to-b from-slate-800 via-slate-800 to-primary-950/30 border-primary-800/40' : 'bg-gradient-to-b from-primary-50/80 via-white to-primary-50/60 border-primary-200/60'} border-r shadow-sm overflow-visible">
 	<!-- Logo and Header -->
-	<div class="relative {isSidebarOpen ? 'p-5' : 'p-3'} border-b {darkMode ? 'border-slate-700 bg-gradient-to-r from-slate-800 to-slate-800' : 'border-slate-200 bg-gradient-to-r from-slate-50 to-white'}">
+	<div class="relative {isSidebarOpen ? 'p-5' : 'p-3'} border-b {darkMode ? 'border-primary-700/40 border-b-primary-500/50 bg-gradient-to-r from-slate-800 via-primary-900/20 to-slate-800' : 'border-primary-300/60 bg-gradient-to-r from-primary-100/80 via-primary-50/60 to-white'}">
 		<div class="flex items-center {isSidebarOpen ? 'justify-between' : 'justify-center'}">
 			<div class="flex items-center gap-3">
 				<button
@@ -170,11 +170,11 @@
 					${
 						active === item.activeKey
 							? darkMode 
-								? 'bg-slate-700 text-white shadow-sm' 
-								: 'bg-slate-100 text-slate-900 shadow-sm'
+								? 'bg-primary-900/50 text-primary-100 shadow-sm' 
+								: 'bg-primary-100 text-primary-800 shadow-sm'
 							: darkMode
-								? 'text-slate-300 hover:bg-slate-700 hover:text-white'
-								: 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+								? 'text-slate-300 hover:bg-primary-900/40 hover:text-primary-200'
+								: 'text-slate-700 hover:bg-primary-100/60 hover:text-primary-900'
 					}
 				`}
 				onclick={() => (active = item.activeKey)}
@@ -182,8 +182,8 @@
 				<svg 
 					class={`flex-shrink-0 transition-colors ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6'} ${
 						active === item.activeKey
-							? darkMode ? 'text-white' : 'text-slate-900'
-							: darkMode ? 'text-slate-400 group-hover:text-white' : 'text-slate-500 group-hover:text-slate-900'
+							? darkMode ? 'text-primary-100' : 'text-primary-800'
+							: darkMode ? 'text-slate-400 group-hover:text-primary-200' : 'text-slate-500 group-hover:text-primary-700'
 					}`}
 					aria-hidden="true" 
 					xmlns="http://www.w3.org/2000/svg" 
@@ -210,7 +210,7 @@
 	</nav>
 
 	<!-- Footer -->
-	<div class="{isSidebarOpen ? 'p-4' : 'p-3'} border-t {darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50/50'} relative z-50 overflow-visible">
+	<div class="{isSidebarOpen ? 'p-4' : 'p-3'} border-t {darkMode ? 'border-primary-800/40 bg-gradient-to-r from-slate-800/80 via-primary-950/20 to-slate-800/80' : 'border-primary-200/60 bg-gradient-to-r from-primary-50/70 via-white/50 to-primary-50/70'} relative z-50 overflow-visible">
 		<div class="flex items-center {isSidebarOpen ? 'justify-start gap-3' : 'justify-center'} relative">
 			<UserDropdown {currentUser} {darkMode} {isSidebarOpen} onToggleDarkMode={toggleDarkMode} />
 		</div>
