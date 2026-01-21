@@ -7,7 +7,7 @@ import type {
 } from '$lib/dashboard/types/widget';
 import { isValidPosition, findAvailablePosition } from '$lib/dashboard/utils/grid';
 import { DashboardStorage } from '$lib/dashboard/utils/storage';
-import { mapStore } from '$lib/stores/MapStore';
+import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 
 // Constants for better maintainability
 const DEFAULT_CONFIG: DashboardConfig = {
@@ -393,7 +393,7 @@ class DashboardStore {
 		this.#config = structuredClone(DEFAULT_CONFIG);
 		this.#hasUnsavedChanges = false;
 		
-		mapStore.clearData();
+		validatedTopicStore.clearAllAt('widgets');
 		this.clearSavedDashboard();
 		
 		console.log('✅ Reset complete');
@@ -404,7 +404,7 @@ class DashboardStore {
 		const success = DashboardStorage.clearDashboard(this.#projectId);
 		
 		if (success) {
-			mapStore.clearData();
+			validatedTopicStore.clearAllAt('widgets');
 			this.#hasUnsavedChanges = false;
 			console.log('✅ Dashboard cleared');
 		}

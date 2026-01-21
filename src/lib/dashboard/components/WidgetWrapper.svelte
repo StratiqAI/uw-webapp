@@ -2,8 +2,8 @@
 	import type { Widget, WidgetAction } from '$lib/dashboard/types/widget';
 	import { createDragHandlers } from '$lib/dashboard/utils/drag-drop';
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
-	import { mapStore } from '$lib/stores/MapStore';
-	import { getWidgetTopic, getWidgetSchemaId } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
+	import { getWidgetTopic, getWidgetSchemaId, getWidgetTopicsByType } from '$lib/dashboard/setup/widgetSchemaRegistration';
 	import ResizeHandles from './ResizeHandles.svelte';
 	import WidgetDropdown from './WidgetDropdown.svelte';
 	import TitleWidget from '$lib/dashboard/components/widgets/TitleWidget.svelte';
@@ -13,7 +13,6 @@
 	import LineChartWidget from '$lib/dashboard/components/widgets/LineChartWidget.svelte';
 	import BarChartWidget from '$lib/dashboard/components/widgets/BarChartWidget.svelte';
 	import MetricWidget from '$lib/dashboard/components/widgets/MetricWidget.svelte';
-	import ValidatedMetricWidget from '$lib/dashboard/components/widgets/ValidatedMetricWidget.svelte';
 	import MapWidget from '$lib/dashboard/components/widgets/MapWidget.svelte';
 	import SchemaWidget from '$lib/dashboard/components/widgets/SchemaWidget.svelte';
 
@@ -31,7 +30,6 @@
 	let widgetFlipFn: (() => void) | null = null;
 	let selectedTopic = $state<string>('');
 	let previewData = $state<unknown>(null);
-	let previewUnsubscribe: (() => void) | null = null;
 
 	const currentTopic = $derived(widget.topicOverride || getWidgetTopic(widget.type, widget.id));
 	const schemaId = $derived.by(() => {
@@ -41,38 +39,27 @@
 			return widget.type === 'schema' ? (widget.data as any).schemaId : null;
 		}
 	});
+	
+	// Get available topics from ValidatedTopicStore for this widget type
 	const availableTopics = $derived.by(() => {
-		return schemaId ? mapStore.getTopicsBySchema(schemaId) : [];
+		// Access store.tree to create reactive dependency
+		const _ = validatedTopicStore.tree;
+		
+		// Get all topics for this widget type
+		const widgetTypeTopics = getWidgetTopicsByType(widget.type as any);
+		return widgetTypeTopics.map(item => `widgets/${widget.type}/${item.id}`);
 	});
 
-	// Subscribe to preview data when topic is selected
+	// Get preview data from ValidatedTopicStore reactively
 	$effect(() => {
-		if (previewUnsubscribe) {
-			previewUnsubscribe();
-			previewUnsubscribe = null;
-		}
-
 		if (!selectedTopic || !showEditDialog) {
 			previewData = null;
 			return;
 		}
 
-		try {
-			const stream = mapStore.getStream(selectedTopic, 'widget-config-preview');
-			previewData = stream.get();
-			previewUnsubscribe = stream.subscribe((value) => {
-				previewData = value;
-			});
-		} catch {
-			previewData = null;
-		}
-
-		return () => {
-			if (previewUnsubscribe) {
-				previewUnsubscribe();
-				previewUnsubscribe = null;
-			}
-		};
+		// Access store.tree to create reactive dependency
+		const _ = validatedTopicStore.tree;
+		previewData = validatedTopicStore.at(selectedTopic);
 	});
 
 	const dragHandlers = createDragHandlers(widget, {
@@ -200,6 +187,7 @@
 				<ParagraphWidget 
 					data={widget.data} 
 					widgetId={widget.id}
+					topicOverride={widget.topicOverride}
 					{darkMode}
 					onAIGenerationReady={handleAIGenerationReady}
 					onFlipControlReady={handleFlipControlReady}
@@ -214,8 +202,6 @@
 				<BarChartWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
 			{:else if widget.type === 'metric'}
 				<MetricWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
-			{:else if widget.type === 'validatedMetric'}
-				<ValidatedMetricWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
 			{:else if widget.type === 'map'}
 				<MapWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
 			{:else if widget.type === 'schema'}
@@ -342,8 +328,11 @@
 							bind:value={selectedTopic}
 							class="w-full rounded-lg border {darkMode ? 'border-slate-600 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-900'} px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all font-mono text-sm"
 						>
+							<option value={currentTopic}>{currentTopic} (current)</option>
 							{#each availableTopics as topic}
-								<option value={topic}>{topic}</option>
+								{#if topic !== currentTopic}
+									<option value={topic}>{topic}</option>
+								{/if}
 							{/each}
 						</select>
 						

@@ -1,11 +1,8 @@
 <script lang="ts">
 	import type { SchemaWidget } from '$lib/dashboard/types/widget';
-	import { mapStore } from '$lib/stores/MapStore';
-	import { useTopic } from '$lib/hooks/mapStoreRunes.svelte';
+	import { useReactiveValidatedTopic } from '$lib/hooks/validatedTopicStoreRunes.svelte';
 	import { schemaRegistry } from '$lib/stores/SchemaRegistry';
 	import AutoDataView from '$lib/components/auto/AutoDataView.svelte';
-	import { onMount } from 'svelte';
-	import { browser } from '$app/environment';
 
 	interface Props {
 		data: SchemaWidget['data'];
@@ -20,28 +17,22 @@
 	const schemaId = $derived(data.schemaId);
 	
 	// Use topic override if provided, otherwise use default topic naming convention
-	const topic = $derived(topicOverride || `widget:schema:${widgetId}:${schemaId}`);
+	const topic = $derived(topicOverride || `widgets/schema/${widgetId}-${schemaId}`);
 
-	// Subscribe to data updates using useTopic hook
+	// Subscribe to data updates using ValidatedTopicStore hook (reactive to topic changes)
 	// Note: We use `unknown` here since the schema is dynamic
-	const dataStream = useTopic<unknown>(topic, `schema-widget-consumer-${widgetId}`);
+	const dataStream = useReactiveValidatedTopic<unknown>(() => topic);
 	let widgetData = $derived<unknown>(dataStream.current || data.data || {});
 
 	// Get schema definition from registry (full definition with metadata)
 	let schemaDefinition = $derived(schemaRegistry.getDefinition(schemaId));
 
-	// Enforce schema on mount
-	onMount(() => {
-		if (browser && schemaId) {
-			mapStore.enforceTopicSchema(topic, schemaId);
-			console.log(`📋 SchemaWidget:${widgetId} - Schema enforced: ${schemaId} on topic: ${topic}`);
-		}
+	$effect(() => {
+		console.log(`📋 SchemaWidget:${widgetId} - Initialized with ValidatedTopicStore`);
+		console.log(`   Schema ID: ${schemaId}`);
+		console.log(`   Topic: ${topic}`);
+		console.log(`   Initial data:`, data.data);
 	});
-
-	console.log(`📋 SchemaWidget:${widgetId} - Initialized`);
-	console.log(`   Schema ID: ${schemaId}`);
-	console.log(`   Topic: ${topic}`);
-	console.log(`   Initial data:`, data.data);
 </script>
 
 <div class="schema-widget h-full flex flex-col {darkMode ? 'bg-slate-800' : 'bg-slate-50'}">
@@ -76,4 +67,3 @@
 		</div>
 	{/if}
 </div>
-

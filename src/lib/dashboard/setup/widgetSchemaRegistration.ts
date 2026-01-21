@@ -1,17 +1,18 @@
 /**
  * Widget Schema Registration
  * 
- * Registers all widget Zod schemas with the SchemaRegistry.
- * This enables schema validation for all widget data flowing through MapStore.
+ * Registers all widget Zod schemas with both:
+ * - SchemaRegistry (for JSON Schema conversion and component mapping)
+ * - ValidatedTopicStore (for runtime validation of widget data)
  * 
  * Call this function at app startup, before any widgets are initialized.
  */
 
 import { schemaRegistry } from '$lib/stores/SchemaRegistry';
-import {
-	WidgetDataSchemas,
-	type WidgetType
-} from '$lib/dashboard/types/widgetSchemas';
+import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
+import { zodToJsonSchema } from 'zod-to-json-schema';
+import { WidgetDataSchemas } from '$lib/dashboard/types/widgetSchemas';
+import type { WidgetType } from '$lib/dashboard/types/widget';
 
 /**
  * Map widget types to human-readable names
@@ -24,55 +25,116 @@ const WIDGET_NAMES: Record<WidgetType, string> = {
 	lineChart: 'Line Chart Widget',
 	barChart: 'Bar Chart Widget',
 	metric: 'Metric Widget',
-	validatedMetric: 'Validated Metric Widget',
 	map: 'Map Widget',
 	schema: 'Schema Widget'
 };
 
 /**
+ * All widget types that should be registered
+ */
+const WIDGET_TYPES: WidgetType[] = [
+	'paragraph',
+	'table',
+	'title',
+	'image',
+	'lineChart',
+	'barChart',
+	'metric',
+	'map',
+	'schema'
+];
+
+// Track if schemas have been registered
+let schemasRegistered = false;
+
+/**
  * Register all widget schemas with SchemaRegistry
  * 
- * This function registers all 8 widget types using their Zod schemas.
+ * This function registers all widget types using their Zod schemas.
  * The SchemaRegistry will automatically:
  * - Convert Zod schemas to JSON Schema (for storage/AI compatibility)
  * - Compile to Zod validators (for runtime validation)
  * - Store both formats for efficient access
  */
 export function registerWidgetSchemas(): void {
+	if (schemasRegistered) {
+		console.log('🔧 [Widget Schema Registration] Schemas already registered, skipping...');
+		return;
+	}
+
 	console.log('🔧 [Widget Schema Registration] Starting widget schema registration...');
 
-	const widgetTypes: WidgetType[] = [
-		'paragraph',
-		'table',
-		'title',
-		'image',
-		'lineChart',
-		'barChart',
-		'metric',
-		'validatedMetric',
-		'map',
-		'schema'
-	];
-
-	for (const widgetType of widgetTypes) {
+	for (const widgetType of WIDGET_TYPES) {
 		const schemaId = `widget:${widgetType}-v1`;
 		const schema = WidgetDataSchemas[widgetType];
 		const name = WIDGET_NAMES[widgetType];
 
 		try {
+			// Register with SchemaRegistry (for component mapping)
 			schemaRegistry.registerZodSchema(schemaId, schema, {
 				name,
 				description: `Data schema for ${name.toLowerCase()}`
 			});
 
-			console.log(`   ✅ Registered: ${schemaId} (${name})`);
+			console.log(`   ✅ SchemaRegistry: ${schemaId} (${name})`);
 		} catch (error) {
-			console.error(`   ❌ Failed to register ${schemaId}:`, error);
+			console.error(`   ❌ Failed to register ${schemaId} with SchemaRegistry:`, error);
 			throw error;
 		}
 	}
 
-	console.log('✅ [Widget Schema Registration] All widget schemas registered successfully');
+	console.log('✅ [Widget Schema Registration] All widget schemas registered with SchemaRegistry');
+	schemasRegistered = true;
+}
+
+/**
+ * Register all widget schemas with ValidatedTopicStore
+ * 
+ * This function registers JSON Schemas with ValidatedTopicStore using
+ * wildcard patterns so that all widget data is validated at the boundary.
+ * 
+ * Topic patterns:
+ * - widgets/{widgetType}/+ - Matches all widgets of a specific type
+ * 
+ * Example: widgets/metric/+ validates all metric widget data
+ */
+export function registerWidgetSchemasWithTopicStore(): void {
+	console.log('🔧 [Widget Schema Registration] Registering schemas with ValidatedTopicStore...');
+
+	for (const widgetType of WIDGET_TYPES) {
+		const zodSchema = WidgetDataSchemas[widgetType];
+		const topicPattern = `widgets/${widgetType}/+`;
+
+		try {
+			// Convert Zod schema to JSON Schema
+			const jsonSchema = zodToJsonSchema(zodSchema, {
+				name: `${widgetType}WidgetData`,
+				$refStrategy: 'none' // Inline all references
+			});
+
+			// Register with ValidatedTopicStore using wildcard pattern
+			validatedTopicStore.registerSchema(topicPattern, jsonSchema);
+
+			console.log(`   ✅ ValidatedTopicStore: ${topicPattern}`);
+		} catch (error) {
+			console.error(`   ❌ Failed to register ${topicPattern} with ValidatedTopicStore:`, error);
+			throw error;
+		}
+	}
+
+	console.log('✅ [Widget Schema Registration] All widget schemas registered with ValidatedTopicStore');
+}
+
+/**
+ * Initialize all widget schemas
+ * 
+ * Call this once at app startup to register schemas with both:
+ * - SchemaRegistry (for component mapping and JSON Schema access)
+ * - ValidatedTopicStore (for runtime validation)
+ */
+export function initializeWidgetSchemas(): void {
+	registerWidgetSchemas();
+	registerWidgetSchemasWithTopicStore();
 }
 
 /**
@@ -86,17 +148,27 @@ export function getWidgetSchemaId(widgetType: WidgetType): string {
 }
 
 /**
- * Get topic name for a widget instance
+ * Get topic path for a widget instance in ValidatedTopicStore
  * 
  * @param widgetType - The widget type
  * @param widgetId - The widget instance ID
  * @param topicOverride - Optional topic override (if provided, returns this instead)
- * @returns The topic name (e.g., 'widget:title:abc123')
+ * @returns The topic path (e.g., 'widgets/metric/widget-1')
  */
 export function getWidgetTopic(widgetType: WidgetType, widgetId: string, topicOverride?: string): string {
 	if (topicOverride) {
 		return topicOverride;
 	}
-	return `widget:${widgetType}:${widgetId}`;
+	return `widgets/${widgetType}/${widgetId}`;
 }
 
+/**
+ * Get all topics for a widget type from ValidatedTopicStore
+ * 
+ * @param widgetType - The widget type
+ * @returns Array of topic paths that have data for this widget type
+ */
+export function getWidgetTopicsByType(widgetType: WidgetType): Array<{ id: string; data: unknown }> {
+	const basePath = `widgets/${widgetType}`;
+	return validatedTopicStore.getAllAt(basePath);
+}

@@ -1,10 +1,7 @@
 <script lang="ts">
 	import type { TableWidget } from '$lib/dashboard/types/widget';
-	import { mapStore } from '$lib/stores/MapStore';
-	import { useTopic } from '$lib/hooks/mapStoreRunes.svelte';
-	import { getWidgetTopic, getWidgetSchemaId } from '$lib/dashboard/setup/widgetSchemaRegistration';
-	import { onMount } from 'svelte';
-	import { browser } from '$app/environment';
+	import { useReactiveValidatedTopic } from '$lib/hooks/validatedTopicStoreRunes.svelte';
+	import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
 
 	interface Props {
 		data: TableWidget['data'];
@@ -18,22 +15,15 @@
 	// Use topic override if provided, otherwise use default topic naming convention
 	const topic = $derived(getWidgetTopic('table', widgetId, topicOverride));
 	
-	// Subscribe to data updates using useTopic hook
-	const dataStream = useTopic<TableWidget['data']>(topic, `table-widget-consumer-${widgetId}`);
+	// Subscribe to data updates using ValidatedTopicStore hook (reactive to topic changes)
+	const dataStream = useReactiveValidatedTopic<TableWidget['data']>(() => topic);
 	let widgetData = $derived<TableWidget['data']>(dataStream.current || data);
 
-	// Enforce schema on mount
-	onMount(() => {
-		if (browser) {
-			const schemaId = getWidgetSchemaId('table');
-			mapStore.enforceTopicSchema(topic, schemaId);
-			console.log(`📋 TableWidget:${widgetId} - Schema enforced: ${schemaId} on topic: ${topic}`);
-		}
+	$effect(() => {
+		console.log(`📋 TableWidget:${widgetId} - Initialized with ValidatedTopicStore`);
+		console.log(`   Topic: ${topic}`);
+		console.log(`   Initial data:`, data);
 	});
-
-	console.log(`📋 TableWidget:${widgetId} - Initialized`);
-	console.log(`   Topic: ${topic}`);
-	console.log(`   Initial data:`, data);
 
 	let sortColumn = $state<string | null>(null);
 	let sortDirection = $state<'asc' | 'desc'>('asc');

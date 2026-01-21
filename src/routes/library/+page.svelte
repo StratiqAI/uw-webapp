@@ -1,178 +1,403 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { elementTypes, type ElementType, type AIQueryData } from './elementTypes';
-
-	// State
+	import { onMount, onDestroy } from 'svelte';
+	import type { PromptTemplate, Project } from '@stratiqai/types-simple';
+	import { PromptTemplateSyncManager } from '$lib/realtime/websocket/syncManagers/PromptTemplateSyncManager';
+	import { ProjectSyncManager } from '$lib/realtime/websocket/syncManagers/ProjectSyncManager';
+	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
+	import { GraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
+	import { toTopicPath } from '$lib/realtime/store/TopicMapper';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
+
+	// Components
+	import ProjectSelector from './components/ProjectSelector.svelte';
+	import PromptTemplateEditModal from './components/PromptTemplateEditModal.svelte';
+
+	// Services
+	import {
+		fetchProjectWithPromptTemplates,
+		createPromptTemplate,
+		updatePromptTemplate,
+		deletePromptTemplate,
+		parseTemplateToAIQueryData,
+		type AIQueryData
+	} from './libraryService';
+
+	// Page data from server
+	let { data } = $props<{ data: { idToken: string; projects: Project[] } }>();
+
+	// Dark mode
 	let darkMode = $derived.by(() => darkModeStore.darkMode);
 	let toggleDarkMode = darkModeStore.toggle;
-	let customAINodes = $state<ElementType[]>([]);
-	let aiGalleryFilter = $state('');
-	let creatingCustomAI = $state(false);
-	let customAINodeLabel = $state('');
-	let customAINodePrompt = $state('');
-	let customAINodeModel = $state('gpt-4o');
-	let customAINodeSystemPrompt = $state('');
 
-	// Load custom AI nodes from localStorage on mount
-	function loadCustomAINodes() {
-		try {
-			const stored = localStorage.getItem('workflow-custom-ai-nodes');
-			if (stored) {
-				const parsed = JSON.parse(stored);
-				// Reconstruct execute function for each custom node
-				customAINodes = parsed.map((node: any) => ({
-					...node,
-					execute: async (input: any, customData?: AIQueryData) => {
-						const data = customData || node.defaultAIQueryData;
-						if (!data) return 'AI Query not configured';
-						return 'AI Query configured';
-					}
-				}));
-			}
-		} catch (e) {
-			console.error('Failed to load custom AI nodes:', e);
+	// Sync managers
+	let promptTemplateSyncManager: PromptTemplateSyncManager | null = null;
+	let projectSyncManager: ProjectSyncManager | null = null;
+	let queryClient: GraphQLQueryClient | null = null;
+
+	// UI State
+	let selectedProjectId = $state<string | null>(null);
+	let editingTemplate = $state<PromptTemplate | null>(null);
+	let isCreating = $state(false);
+	let searchFilter = $state('');
+	let isLoading = $state(false);
+	let error = $state<string | null>(null);
+
+	// Get projects from store or page data
+	let projects = $derived.by(() => {
+		const storeProjects = validatedTopicStore.getAllAtArray<Project>('projects');
+		return storeProjects.length > 0 ? storeProjects : data.projects;
+	});
+
+	// Get all templates from store
+	let allTemplates = $derived.by(() => {
+		return validatedTopicStore.getAllAtArray<PromptTemplate>('promptTemplates');
+	});
+
+	// Filter templates by selected project and search
+	let filteredTemplates = $derived.by(() => {
+		let templates = allTemplates;
+
+		// Filter by project if selected
+		if (selectedProjectId) {
+			templates = templates.filter((t) => t.parentId === selectedProjectId);
 		}
-	}
 
-	// Save custom AI nodes to localStorage (without execute functions)
-	function saveCustomAINodes() {
-		try {
-			const serializable = customAINodes.map(({ execute, ...rest }) => rest);
-			localStorage.setItem('workflow-custom-ai-nodes', JSON.stringify(serializable));
-		} catch (e) {
-			console.error('Failed to save custom AI nodes:', e);
+		// Filter by search
+		if (searchFilter) {
+			const search = searchFilter.toLowerCase();
+			templates = templates.filter(
+				(t) =>
+					t.name.toLowerCase().includes(search) ||
+					(t.description && t.description.toLowerCase().includes(search))
+			);
 		}
-	}
 
-	// Create a custom AI node
-	function createCustomAINode() {
-		if (!customAINodeLabel.trim() || !customAINodePrompt.trim()) {
+		return templates;
+	});
+
+	// Initialize sync managers and fetch data
+	async function initialize() {
+		if (!data.idToken) {
+			error = 'Not authenticated';
 			return;
 		}
 
-		const newId = `custom-ai-${Date.now()}`;
-		const newNode: ElementType = {
-			id: newId,
-			type: 'ai',
-			label: customAINodeLabel.trim(),
-			icon: 'AI',
-			execute: async (input: any, customData?: AIQueryData) => {
-				const data = customData || newNode.defaultAIQueryData;
-				if (!data) return 'AI Query not configured';
-				return 'AI Query configured';
-			},
-			defaultAIQueryData: {
-				prompt: customAINodePrompt.trim(),
-				model: customAINodeModel,
-				systemPrompt: customAINodeSystemPrompt.trim() || undefined
+		isLoading = true;
+		error = null;
+
+		try {
+			queryClient = new GraphQLQueryClient(data.idToken);
+
+			// Initialize project sync manager
+			projectSyncManager = ProjectSyncManager.createInactive();
+			await projectSyncManager.initialize({
+				idToken: data.idToken,
+				initialItems: data.projects,
+				setupSubscriptions: true
+			});
+
+			// Initialize prompt template sync manager
+			promptTemplateSyncManager = PromptTemplateSyncManager.createInactive();
+			await promptTemplateSyncManager.initialize({
+				idToken: data.idToken,
+				setupSubscriptions: true
+			});
+
+			// If we have projects, select the first one and load its templates
+			if (data.projects.length > 0) {
+				selectedProjectId = data.projects[0].id;
+				await loadTemplatesForProject(selectedProjectId);
 			}
+		} catch (err) {
+			console.error('Failed to initialize:', err);
+			error = err instanceof Error ? err.message : 'Failed to initialize';
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	// Load templates for a specific project by fetching the project with its templates
+	async function loadTemplatesForProject(projectId: string) {
+		if (!queryClient) return;
+
+		isLoading = true;
+		try {
+			// Fetch project with its nested prompt templates
+			const { project, promptTemplates } = await fetchProjectWithPromptTemplates(
+				queryClient,
+				projectId
+			);
+
+			// Publish project to store
+			validatedTopicStore.publish(toTopicPath('projects', project.id), project);
+
+			// Publish each template to store
+			for (const template of promptTemplates) {
+				validatedTopicStore.publish(toTopicPath('promptTemplates', template.id), template);
+			}
+		} catch (err) {
+			console.error('Failed to load templates:', err);
+			error = err instanceof Error ? err.message : 'Failed to load templates';
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	// Handle project selection
+	async function handleProjectSelect(projectId: string | null) {
+		selectedProjectId = projectId;
+		if (projectId) {
+			await loadTemplatesForProject(projectId);
+		}
+	}
+
+	// Handle create new template
+	function handleCreateNew() {
+		if (!selectedProjectId) {
+			alert('Please select a project first');
+			return;
+		}
+		isCreating = true;
+		editingTemplate = null;
+	}
+
+	// Handle edit template
+	function handleEditTemplate(template: PromptTemplate) {
+		editingTemplate = template;
+		isCreating = false;
+	}
+
+	// Handle save template (create or update)
+	async function handleSaveTemplate(saveData: {
+		name: string;
+		description: string;
+		aiQueryData: AIQueryData;
+	}) {
+		if (!queryClient) return;
+
+		isLoading = true;
+		try {
+			if (isCreating && selectedProjectId) {
+				// Create new template
+				const newTemplate = await createPromptTemplate(
+					queryClient,
+					selectedProjectId,
+					saveData.name,
+					saveData.aiQueryData,
+					saveData.description || undefined
+				);
+
+				// Publish to store
+				validatedTopicStore.publish(toTopicPath('promptTemplates', newTemplate.id), newTemplate);
+			} else if (editingTemplate) {
+				// Update existing template
+				const updatedTemplate = await updatePromptTemplate(
+					queryClient,
+					editingTemplate.id,
+					editingTemplate.parentId,
+					{
+						name: saveData.name,
+						aiQueryData: saveData.aiQueryData,
+						description: saveData.description || undefined
+					}
+				);
+
+				// Update in store
+				validatedTopicStore.publish(
+					toTopicPath('promptTemplates', updatedTemplate.id),
+					updatedTemplate
+				);
+			}
+
+			// Close modal
+			editingTemplate = null;
+			isCreating = false;
+		} catch (err) {
+			console.error('Failed to save template:', err);
+			alert(err instanceof Error ? err.message : 'Failed to save template');
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	// Handle cancel edit
+	function handleCancelEdit() {
+		editingTemplate = null;
+		isCreating = false;
+	}
+
+	// Handle delete template
+	async function handleDeleteTemplate(template: PromptTemplate) {
+		if (!queryClient) return;
+
+		if (!confirm(`Are you sure you want to delete "${template.name}"?`)) {
+			return;
+		}
+
+		isLoading = true;
+		try {
+			await deletePromptTemplate(queryClient, template.id, template.parentId);
+
+			// Remove from store
+			validatedTopicStore.delete(toTopicPath('promptTemplates', template.id));
+		} catch (err) {
+			console.error('Failed to delete template:', err);
+			alert(err instanceof Error ? err.message : 'Failed to delete template');
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	// Get display info for a template
+	function getTemplateDisplayInfo(template: PromptTemplate) {
+		const aiData = parseTemplateToAIQueryData(template.template);
+		return {
+			prompt: aiData.prompt,
+			model: aiData.model,
+			hasSchema: aiData.responseFormat?.type === 'json_schema'
 		};
-
-		customAINodes = [...customAINodes, newNode];
-		saveCustomAINodes();
-
-		// Reset form
-		customAINodeLabel = '';
-		customAINodePrompt = '';
-		customAINodeModel = 'gpt-4o';
-		customAINodeSystemPrompt = '';
-		creatingCustomAI = false;
-	}
-
-	// Delete a custom AI node
-	function deleteCustomAINode(nodeId: string) {
-		customAINodes = customAINodes.filter((node) => node.id !== nodeId);
-		saveCustomAINodes();
-	}
-
-	// Cancel creating custom AI node
-	function cancelCreateCustomAI() {
-		customAINodeLabel = '';
-		customAINodePrompt = '';
-		customAINodeModel = 'gpt-4o';
-		customAINodeSystemPrompt = '';
-		creatingCustomAI = false;
-	}
-
-	// Dark mode toggle is now handled by the unified store
-
-	// Get query description
-	function getQueryDescription(queryId: string): string {
-		const element = elementTypes.find((e) => e.id === queryId);
-		return element?.description || 'Custom AI analysis query';
 	}
 
 	onMount(() => {
-		loadCustomAINodes();
-		// Dark mode is initialized by the store
+		initialize();
+	});
+
+	onDestroy(() => {
+		promptTemplateSyncManager?.cleanup();
+		projectSyncManager?.cleanup();
 	});
 </script>
 
 <div class="min-h-screen {darkMode ? 'bg-slate-900' : 'bg-slate-50'} transition-colors">
 	<!-- Header -->
-	<div class="{darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border-b sticky top-0 z-10">
+	<div
+		class="{darkMode
+			? 'bg-slate-800 border-slate-700'
+			: 'bg-white border-slate-200'} border-b sticky top-0 z-10"
+	>
 		<div class="max-w-7xl mx-auto px-6 py-4">
 			<div class="flex items-center justify-between">
 				<div class="flex items-center gap-3">
-					<div class="w-10 h-10 {darkMode ? 'bg-indigo-900' : 'bg-indigo-100'} rounded-lg flex items-center justify-center">
-						<svg class="w-5 h-5 {darkMode ? 'text-indigo-300' : 'text-indigo-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+					<div
+						class="w-10 h-10 {darkMode
+							? 'bg-indigo-900'
+							: 'bg-indigo-100'} rounded-lg flex items-center justify-center"
+					>
+						<svg
+							class="w-5 h-5 {darkMode ? 'text-indigo-300' : 'text-indigo-600'}"
+							fill="none"
+							stroke="currentColor"
+							viewBox="0 0 24 24"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+							></path>
 						</svg>
 					</div>
 					<div>
 						<h1 class="text-2xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">
 							The Automated Professional Library
 						</h1>
-						<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-0.5">Packages of AI Agents, Workflows and Dashboards that are right for the job</p>
+						<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-0.5">
+							AI Query Templates for your projects
+						</p>
 					</div>
 				</div>
 				<div class="flex items-center gap-3">
+					<ProjectSelector
+						{projects}
+						{selectedProjectId}
+						{darkMode}
+						onSelect={handleProjectSelect}
+					/>
 					<button
-						onclick={() => creatingCustomAI = true}
-						class="px-4 py-2 text-sm font-medium {darkMode ? 'text-indigo-400 hover:text-indigo-300 hover:bg-indigo-900/20' : 'text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50'} rounded-lg transition-colors flex items-center gap-2"
+						onclick={handleCreateNew}
+						disabled={!selectedProjectId || isLoading}
+						class="px-4 py-2 text-sm font-medium {darkMode
+							? 'text-indigo-400 hover:text-indigo-300 hover:bg-indigo-900/20'
+							: 'text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50'} rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
 					>
 						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M12 4v16m8-8H4"
+							></path>
 						</svg>
 						Create New
 					</button>
 					<button
 						onclick={toggleDarkMode}
-						class="p-2 {darkMode ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'} rounded-lg transition-colors"
+						class="p-2 {darkMode
+							? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+							: 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'} rounded-lg transition-colors"
 						aria-label="Toggle dark mode"
 					>
 						{#if darkMode}
 							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+								></path>
 							</svg>
 						{:else}
 							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+								></path>
 							</svg>
 						{/if}
 					</button>
 				</div>
 			</div>
-			<!-- Filter Input -->
+
+			<!-- Search Input -->
 			<div class="relative mt-4">
 				<input
 					type="text"
-					bind:value={aiGalleryFilter}
+					bind:value={searchFilter}
 					placeholder="Search queries..."
-					class="w-full px-4 py-2 pl-10 {darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
+					class="w-full px-4 py-2 pl-10 {darkMode
+						? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400'
+						: 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
 				/>
-				<svg class="absolute left-3 top-2.5 w-5 h-5 {darkMode ? 'text-slate-400' : 'text-slate-500'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+				<svg
+					class="absolute left-3 top-2.5 w-5 h-5 {darkMode ? 'text-slate-400' : 'text-slate-500'}"
+					fill="none"
+					stroke="currentColor"
+					viewBox="0 0 24 24"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+					></path>
 				</svg>
-				{#if aiGalleryFilter}
+				{#if searchFilter}
 					<button
-						onclick={() => aiGalleryFilter = ''}
-						class="absolute right-3 top-2.5 p-1 {darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'} rounded transition-colors"
+						onclick={() => (searchFilter = '')}
+						class="absolute right-3 top-2.5 p-1 {darkMode
+							? 'text-slate-400 hover:text-slate-200'
+							: 'text-slate-500 hover:text-slate-700'} rounded transition-colors"
 						aria-label="Clear filter"
 					>
 						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M6 18L18 6M6 6l12 12"
+							></path>
 						</svg>
 					</button>
 				{/if}
@@ -182,225 +407,187 @@
 
 	<!-- Main Content -->
 	<div class="max-w-7xl mx-auto px-6 py-8">
-		<!-- Default AI Queries -->
-		{#if elementTypes.filter((t) => t.type === 'ai' && (!aiGalleryFilter || t.label.toLowerCase().includes(aiGalleryFilter.toLowerCase()) || t.id.toLowerCase().includes(aiGalleryFilter.toLowerCase()))).length > 0}
-			<div class="mb-8">
-				<h2 class="text-sm font-semibold {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-4 flex items-center gap-2">
-					<span class="w-1 h-4 {darkMode ? 'bg-indigo-500' : 'bg-indigo-600'} rounded"></span>
-					Default Queries ({elementTypes.filter((t) => t.type === 'ai' && (!aiGalleryFilter || t.label.toLowerCase().includes(aiGalleryFilter.toLowerCase()) || t.id.toLowerCase().includes(aiGalleryFilter.toLowerCase()))).length})
-				</h2>
-				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-					{#each elementTypes.filter((t) => t.type === 'ai' && (!aiGalleryFilter || t.label.toLowerCase().includes(aiGalleryFilter.toLowerCase()) || t.id.toLowerCase().includes(aiGalleryFilter.toLowerCase()))) as query}
-						<div
-							class="{darkMode ? 'bg-slate-800 border-slate-700 hover:border-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-300'} border rounded-lg p-4 transition-all hover:shadow-lg group"
-						>
-							<div class="flex items-start gap-3">
-								<div class="w-10 h-10 flex-shrink-0 {darkMode ? 'bg-indigo-900' : 'bg-indigo-100'} rounded-lg flex items-center justify-center">
-									<span class="text-xs font-bold {darkMode ? 'text-indigo-300' : 'text-indigo-600'}">AI</span>
-								</div>
-								<div class="flex-1 min-w-0">
-									<h3 class="text-sm font-semibold {darkMode ? 'text-white' : 'text-slate-900'} mb-1 group-hover:text-indigo-400 transition-colors">
-										{query.label}
-									</h3>
-									<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'} line-clamp-2">
-										{getQueryDescription(query.id)}
-									</p>
-								</div>
-							</div>
-						</div>
-					{/each}
-				</div>
+		<!-- Error Message -->
+		{#if error}
+			<div
+				class="mb-6 p-4 rounded-lg {darkMode
+					? 'bg-red-900/20 border-red-800 text-red-300'
+					: 'bg-red-50 border-red-200 text-red-700'} border"
+			>
+				<p class="text-sm">{error}</p>
 			</div>
 		{/if}
 
-		<!-- Custom AI Queries -->
-		{#if customAINodes.filter((q) => !aiGalleryFilter || q.label.toLowerCase().includes(aiGalleryFilter.toLowerCase()) || q.id.toLowerCase().includes(aiGalleryFilter.toLowerCase())).length > 0}
+		<!-- Loading State -->
+		{#if isLoading && filteredTemplates.length === 0}
+			<div class="text-center py-12">
+				<div
+					class="w-12 h-12 mx-auto mb-4 border-4 {darkMode
+						? 'border-slate-600 border-t-indigo-500'
+						: 'border-slate-200 border-t-indigo-600'} rounded-full animate-spin"
+				></div>
+				<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'}">Loading templates...</p>
+			</div>
+		{:else if !selectedProjectId}
+			<!-- No Project Selected -->
+			<div class="text-center py-12">
+				<svg
+					class="w-16 h-16 mx-auto {darkMode ? 'text-slate-600' : 'text-slate-300'} mb-4"
+					fill="none"
+					stroke="currentColor"
+					viewBox="0 0 24 24"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="1.5"
+						d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+					></path>
+				</svg>
+				<p class="text-base font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
+					Select a Project
+				</p>
+				<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'}">
+					Choose a project from the dropdown to view and manage its query templates
+				</p>
+			</div>
+		{:else if filteredTemplates.length === 0}
+			<!-- No Templates -->
+			<div class="text-center py-12">
+				<svg
+					class="w-16 h-16 mx-auto {darkMode ? 'text-slate-600' : 'text-slate-300'} mb-4"
+					fill="none"
+					stroke="currentColor"
+					viewBox="0 0 24 24"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="1.5"
+						d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+					></path>
+				</svg>
+				<p class="text-base font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
+					{searchFilter ? 'No queries found' : 'No query templates yet'}
+				</p>
+				<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mb-4">
+					{searchFilter
+						? 'Try adjusting your search terms'
+						: 'Create your first AI query template to get started'}
+				</p>
+				{#if !searchFilter}
+					<button
+						onclick={handleCreateNew}
+						class="px-4 py-2 text-sm font-medium {darkMode
+							? 'bg-indigo-600 hover:bg-indigo-700'
+							: 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-lg transition-colors"
+					>
+						Create Your First Query
+					</button>
+				{/if}
+			</div>
+		{:else}
+			<!-- Template Grid -->
 			<div>
-				<h2 class="text-sm font-semibold {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-4 flex items-center gap-2">
+				<h2
+					class="text-sm font-semibold {darkMode
+						? 'text-slate-300'
+						: 'text-slate-700'} mb-4 flex items-center gap-2"
+				>
 					<span class="w-1 h-4 {darkMode ? 'bg-emerald-500' : 'bg-emerald-600'} rounded"></span>
-					Your Custom Queries ({customAINodes.filter((q) => !aiGalleryFilter || q.label.toLowerCase().includes(aiGalleryFilter.toLowerCase()) || q.id.toLowerCase().includes(aiGalleryFilter.toLowerCase())).length})
+					Query Templates ({filteredTemplates.length})
 				</h2>
 				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-					{#each customAINodes.filter((q) => !aiGalleryFilter || q.label.toLowerCase().includes(aiGalleryFilter.toLowerCase()) || q.id.toLowerCase().includes(aiGalleryFilter.toLowerCase())) as query}
+					{#each filteredTemplates as template (template.id)}
+						{@const displayInfo = getTemplateDisplayInfo(template)}
 						<div
-							class="{darkMode ? 'bg-slate-800 border-slate-700 hover:border-emerald-500' : 'bg-white border-slate-200 hover:border-emerald-300'} border rounded-lg p-4 transition-all hover:shadow-lg group relative"
+							class="{darkMode
+								? 'bg-slate-800 border-slate-700 hover:border-emerald-500'
+								: 'bg-white border-slate-200 hover:border-emerald-300'} border rounded-lg p-4 transition-all hover:shadow-lg group relative cursor-pointer"
+							onclick={() => handleEditTemplate(template)}
+							onkeydown={(e) => e.key === 'Enter' && handleEditTemplate(template)}
+							role="button"
+							tabindex="0"
 						>
+							<!-- Delete Button -->
 							<button
-								onclick={() => deleteCustomAINode(query.id)}
-								class="absolute top-2 right-2 p-1 {darkMode ? 'text-slate-500 hover:text-red-400 hover:bg-red-900/20' : 'text-slate-400 hover:text-red-600 hover:bg-red-50'} rounded transition-colors opacity-0 group-hover:opacity-100"
-								title="Delete custom query"
-								aria-label="Delete custom query"
+								onclick={(e) => {
+									e.stopPropagation();
+									handleDeleteTemplate(template);
+								}}
+								class="absolute top-2 right-2 p-1 {darkMode
+									? 'text-slate-500 hover:text-red-400 hover:bg-red-900/20'
+									: 'text-slate-400 hover:text-red-600 hover:bg-red-50'} rounded transition-colors opacity-0 group-hover:opacity-100"
+								title="Delete query"
+								aria-label="Delete query"
 							>
 								<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+									></path>
 								</svg>
 							</button>
+
 							<div class="flex items-start gap-3 pr-6">
-								<div class="w-10 h-10 flex-shrink-0 {darkMode ? 'bg-emerald-900' : 'bg-emerald-100'} rounded-lg flex items-center justify-center">
-									<span class="text-xs font-bold {darkMode ? 'text-emerald-300' : 'text-emerald-600'}">AI</span>
+								<div
+									class="w-10 h-10 flex-shrink-0 {darkMode
+										? 'bg-emerald-900'
+										: 'bg-emerald-100'} rounded-lg flex items-center justify-center"
+								>
+									<span class="text-xs font-bold {darkMode ? 'text-emerald-300' : 'text-emerald-600'}"
+										>AI</span
+									>
 								</div>
 								<div class="flex-1 min-w-0">
-									<h3 class="text-sm font-semibold {darkMode ? 'text-white' : 'text-slate-900'} mb-1 group-hover:text-emerald-400 transition-colors">
-										{query.label}
+									<h3
+										class="text-sm font-semibold {darkMode
+											? 'text-white'
+											: 'text-slate-900'} mb-1 group-hover:text-emerald-400 transition-colors"
+									>
+										{template.name}
 									</h3>
-									{#if query.defaultAIQueryData}
-										<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'} line-clamp-2">
-											{query.defaultAIQueryData.prompt.slice(0, 80)}...
-										</p>
-										<div class="mt-2 flex items-center gap-2">
-											<span class="text-[10px] px-1.5 py-0.5 {darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600'} rounded font-medium">
-												{query.defaultAIQueryData.model}
+									<p
+										class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'} line-clamp-2 mb-2"
+									>
+										{template.description || displayInfo.prompt.slice(0, 100)}
+										{displayInfo.prompt.length > 100 ? '...' : ''}
+									</p>
+									<div class="flex items-center gap-2 flex-wrap">
+										<span
+											class="text-[10px] px-1.5 py-0.5 {darkMode
+												? 'bg-slate-700 text-slate-300'
+												: 'bg-slate-200 text-slate-600'} rounded font-medium"
+										>
+											{displayInfo.model}
+										</span>
+										{#if displayInfo.hasSchema}
+											<span
+												class="text-[10px] px-1.5 py-0.5 {darkMode
+													? 'bg-teal-900/50 text-teal-300'
+													: 'bg-teal-100 text-teal-700'} rounded font-medium"
+											>
+												Structured Output
 											</span>
-										</div>
-									{/if}
+										{/if}
+									</div>
 								</div>
 							</div>
 						</div>
 					{/each}
 				</div>
-			</div>
-		{:else if !aiGalleryFilter}
-			<div class="text-center py-12">
-				<svg class="w-16 h-16 mx-auto {darkMode ? 'text-slate-600' : 'text-slate-300'} mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
-				</svg>
-				<p class="text-base font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">No custom agents yet</p>
-				<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mb-4">Create your first custom agent to get started</p>
-				<button
-					onclick={() => creatingCustomAI = true}
-					class="px-4 py-2 text-sm font-medium {darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-lg transition-colors"
-				>
-					Create Your First Agent
-				</button>
-			</div>
-		{/if}
-
-		<!-- No Results Message -->
-		{#if aiGalleryFilter && elementTypes.filter((t) => t.type === 'ai' && (t.label.toLowerCase().includes(aiGalleryFilter.toLowerCase()) || t.id.toLowerCase().includes(aiGalleryFilter.toLowerCase()))).length === 0 && customAINodes.filter((q) => q.label.toLowerCase().includes(aiGalleryFilter.toLowerCase()) || q.id.toLowerCase().includes(aiGalleryFilter.toLowerCase())).length === 0}
-			<div class="text-center py-12">
-				<svg class="w-16 h-16 mx-auto {darkMode ? 'text-slate-600' : 'text-slate-300'} mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-				</svg>
-				<p class="text-base font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">No queries found</p>
-				<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'}">Try adjusting your search terms</p>
 			</div>
 		{/if}
 	</div>
 </div>
 
-<!-- Create Custom AI Node Modal -->
-{#if creatingCustomAI}
-	<div
-		class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
-		onclick={cancelCreateCustomAI}
-		onkeydown={(e) => e.key === 'Escape' && cancelCreateCustomAI()}
-		role="dialog"
-		aria-modal="true"
-		aria-labelledby="create-modal-title"
-		tabindex="-1"
-	>
-		<div
-			class="{darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4 border"
-			onclick={(e) => e.stopPropagation()}
-			onkeydown={(e) => e.stopPropagation()}
-			role="presentation"
-		>
-			<div class="p-6">
-				<div class="flex items-center gap-3 mb-6 pb-4 {darkMode ? 'border-slate-700' : 'border-slate-200'} border-b">
-					<div class="w-10 h-10 {darkMode ? 'bg-indigo-900' : 'bg-indigo-100'} rounded-lg flex items-center justify-center">
-						<svg class="w-5 h-5 {darkMode ? 'text-indigo-300' : 'text-indigo-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-						</svg>
-					</div>
-					<div>
-						<h2 id="create-modal-title" class="text-xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">
-							Create Custom AI Query
-						</h2>
-						<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-0.5">Add a new AI analysis query to your library</p>
-					</div>
-				</div>
-
-				<form
-					onsubmit={(e) => {
-						e.preventDefault();
-						createCustomAINode();
-					}}
-					class="space-y-4"
-				>
-					<div>
-						<label for="custom-label" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
-							Query Label
-						</label>
-						<input
-							id="custom-label"
-							type="text"
-							bind:value={customAINodeLabel}
-							placeholder="e.g., Market Analysis for Retail Properties"
-							class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
-							required
-						/>
-					</div>
-
-					<div>
-						<label for="custom-prompt" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
-							Prompt
-						</label>
-						<textarea
-							id="custom-prompt"
-							bind:value={customAINodePrompt}
-							placeholder="Enter the prompt for your AI query. Use {input} as a placeholder for input data."
-							rows="4"
-							class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
-							required
-						></textarea>
-					</div>
-
-					<div>
-						<label for="custom-model" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
-							Model
-						</label>
-						<select
-							id="custom-model"
-							bind:value={customAINodeModel}
-							class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
-						>
-							<option value="gpt-4o">GPT-4o</option>
-							<option value="gpt-4-turbo">GPT-4 Turbo</option>
-							<option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-						</select>
-					</div>
-
-					<div>
-						<label for="custom-system-prompt" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
-							System Prompt (Optional)
-						</label>
-						<textarea
-							id="custom-system-prompt"
-							bind:value={customAINodeSystemPrompt}
-							placeholder="Enter a system prompt to define the AI's role and expertise..."
-							rows="3"
-							class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
-						></textarea>
-					</div>
-
-					<div class="flex items-center justify-end gap-3 pt-4 border-t {darkMode ? 'border-slate-700' : 'border-slate-200'}">
-						<button
-							type="button"
-							onclick={cancelCreateCustomAI}
-							class="px-4 py-2 text-sm font-medium {darkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-700 hover:bg-slate-100'} rounded-lg transition-colors"
-						>
-							Cancel
-						</button>
-						<button
-							type="submit"
-							class="px-4 py-2 text-sm font-medium {darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-lg transition-colors"
-						>
-							Create Query
-						</button>
-					</div>
-				</form>
-			</div>
-		</div>
-	</div>
-{/if}
-
+<!-- Edit/Create Modal -->
+<PromptTemplateEditModal
+	{darkMode}
+	template={editingTemplate}
+	{isCreating}
+	onSave={handleSaveTemplate}
+	onCancel={handleCancelEdit}
+/>

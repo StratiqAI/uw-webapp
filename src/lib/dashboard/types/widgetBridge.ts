@@ -1,11 +1,10 @@
 // Widget Bridge System
-// Type-safe bridge between AI JobSubmission -> mapObjectStore -> Widget components
+// Type-safe bridge between AI JobSubmission -> ValidatedTopicStore -> Widget components
 
 import { z } from 'zod';
-import { mapStore } from '$lib/stores/MapStore';
+import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 import { jobUpdateStore, type JobUpdate } from '$lib/stores/jobUpdateStore.svelte';
 import { DashboardStorage } from '$lib/dashboard/utils/storage';
-import type { Readable } from 'svelte/store';
 import type {
 	WidgetChannelConfig,
 	WidgetDataTypeMap,
@@ -15,49 +14,68 @@ import type {
 } from './widgetSchemas';
 import type { WidgetType } from './widget';
 
+// ===== Topic Path Utilities =====
+
+/**
+ * Generate a topic path for a widget
+ * Pattern: widgets/{widgetType}/{channelId}
+ */
+export function getWidgetTopicPath(widgetType: string, channelId: string): string {
+	return `widgets/${widgetType}/${channelId}`;
+}
+
 // ===== Validated Publisher Implementation =====
 
 class ValidatedPublisherImpl<T> implements ValidatedPublisher<T> {
+	private topic: string;
+	
 	constructor(
 		private schema: z.ZodSchema<T>,
-		private publisher: { publish: (value: T) => void; clear: () => void },
-		private channelId: string
+		private channelId: string,
+		private widgetType: string
 	) {
-		console.log(`[ValidatedPublisher] Constructor called for channel: ${this.channelId}`);
+		this.topic = getWidgetTopicPath(widgetType, channelId);
+		console.log(`[ValidatedPublisher] Constructor called for topic: ${this.topic}`);
 	}
 
 	publish(data: T): void {
-		console.log(`[ValidatedPublisher:${this.channelId}] publish() called with data:`, data);
+		console.log(`[ValidatedPublisher:${this.topic}] publish() called with data:`, data);
 		const result = this.schema.safeParse(data);
 		if (!result.success) {
-			console.error(`[ValidatedPublisher:${this.channelId}] Validation failed:`, result.error);
+			console.error(`[ValidatedPublisher:${this.topic}] Validation failed:`, result.error);
 			throw result.error;
 		}
-		console.log(`[ValidatedPublisher:${this.channelId}] ✅ Validation passed, publishing to mapStore`);
-		this.publisher.publish(result.data);
+		console.log(`[ValidatedPublisher:${this.topic}] ✅ Validation passed, publishing to ValidatedTopicStore`);
+		
+		// Publish to ValidatedTopicStore (which also validates against registered schemas)
+		const published = validatedTopicStore.publish(this.topic, result.data);
+		if (!published) {
+			console.error(`[ValidatedPublisher:${this.topic}] ❌ ValidatedTopicStore rejected the data`);
+			return;
+		}
 		
 		// Trigger auto-save of widget data to localStorage
-		console.log(`[ValidatedPublisher:${this.channelId}] 💾 Triggering auto-save to localStorage...`);
+		console.log(`[ValidatedPublisher:${this.topic}] 💾 Triggering auto-save to localStorage...`);
 		DashboardStorage.autoSaveWidgetData();
 	}
 
 	safeParse(data: unknown): { success: true; data: T } | { success: false; error: z.ZodError } {
-		console.log(`[ValidatedPublisher:${this.channelId}] safeParse() called`);
+		console.log(`[ValidatedPublisher:${this.topic}] safeParse() called`);
 		const result = this.schema.safeParse(data);
 		if (result.success) {
-			console.log(`[ValidatedPublisher:${this.channelId}] ✅ safeParse validation passed`);
+			console.log(`[ValidatedPublisher:${this.topic}] ✅ safeParse validation passed`);
 			return { success: true, data: result.data };
 		}
-		console.log(`[ValidatedPublisher:${this.channelId}] ❌ safeParse validation failed`);
+		console.log(`[ValidatedPublisher:${this.topic}] ❌ safeParse validation failed`);
 		return { success: false, error: result.error };
 	}
 
 	clear(): void {
-		console.log(`[ValidatedPublisher:${this.channelId}] clear() called`);
-		this.publisher.clear();
+		console.log(`[ValidatedPublisher:${this.topic}] clear() called`);
+		validatedTopicStore.delete(this.topic);
 		
 		// Trigger auto-save after clearing
-		console.log(`[ValidatedPublisher:${this.channelId}] 💾 Triggering auto-save after clear...`);
+		console.log(`[ValidatedPublisher:${this.topic}] 💾 Triggering auto-save after clear...`);
 		DashboardStorage.autoSaveWidgetData();
 	}
 }
@@ -65,51 +83,72 @@ class ValidatedPublisherImpl<T> implements ValidatedPublisher<T> {
 // ===== Validated Consumer Implementation =====
 
 class ValidatedConsumerImpl<T> implements ValidatedConsumer<T> {
+	private topic: string;
+	private unsubscribers: Set<() => void> = new Set();
+	
 	constructor(
 		private schema: z.ZodSchema<T>,
-		private consumer: { subscribe: Readable<T | undefined>['subscribe']; get: () => T | undefined },
-		private channelId: string
+		private channelId: string,
+		private widgetType: string
 	) {
-		console.log(`[ValidatedConsumer] Constructor called for channel: ${this.channelId}`);
+		this.topic = getWidgetTopicPath(widgetType, channelId);
+		console.log(`[ValidatedConsumer] Constructor called for topic: ${this.topic}`);
 	}
 
 	subscribe(callback: (data: T | undefined) => void): () => void {
-		console.log(`[ValidatedConsumer:${this.channelId}] subscribe() called, setting up subscription`);
-		return this.consumer.subscribe((data) => {
-			console.log(`[ValidatedConsumer:${this.channelId}] 📥 Data received from mapStore:`, data);
-			if (data === undefined) {
-				console.log(`[ValidatedConsumer:${this.channelId}] Data is undefined, passing through`);
+		console.log(`[ValidatedConsumer:${this.topic}] subscribe() called, setting up subscription`);
+		
+		// Use ValidatedTopicStore's subscribe method for programmatic subscriptions
+		const unsubscribe = validatedTopicStore.subscribe(this.topic, (value: unknown) => {
+			console.log(`[ValidatedConsumer:${this.topic}] 📥 Data received from ValidatedTopicStore:`, value);
+			
+			if (value === undefined) {
+				console.log(`[ValidatedConsumer:${this.topic}] Data is undefined, passing through`);
 				callback(undefined);
 				return;
 			}
 
-			const result = this.schema.safeParse(data);
+			const result = this.schema.safeParse(value);
 			if (!result.success) {
-				console.error(`[ValidatedConsumer:${this.channelId}] ❌ Invalid data received:`, result.error);
+				console.error(`[ValidatedConsumer:${this.topic}] ❌ Invalid data received:`, result.error);
 				callback(undefined);
 				return;
 			}
 
-			console.log(`[ValidatedConsumer:${this.channelId}] ✅ Validation passed, calling callback with validated data`);
+			console.log(`[ValidatedConsumer:${this.topic}] ✅ Validation passed, calling callback with validated data`);
 			callback(result.data);
 		});
+		
+		this.unsubscribers.add(unsubscribe);
+		
+		// Also call callback with current value immediately
+		const currentValue = this.get();
+		if (currentValue !== undefined) {
+			callback(currentValue);
+		}
+		
+		return () => {
+			unsubscribe();
+			this.unsubscribers.delete(unsubscribe);
+		};
 	}
 
 	get(): T | undefined {
-		console.log(`[ValidatedConsumer:${this.channelId}] get() called`);
-		const data = this.consumer.get();
+		console.log(`[ValidatedConsumer:${this.topic}] get() called`);
+		const data = validatedTopicStore.at<T>(this.topic);
+		
 		if (data === undefined) {
-			console.log(`[ValidatedConsumer:${this.channelId}] No data in store`);
+			console.log(`[ValidatedConsumer:${this.topic}] No data in store`);
 			return undefined;
 		}
 
 		const result = this.schema.safeParse(data);
 		if (!result.success) {
-			console.error(`[ValidatedConsumer:${this.channelId}] Invalid data in store:`, result.error);
+			console.error(`[ValidatedConsumer:${this.topic}] Invalid data in store:`, result.error);
 			return undefined;
 		}
 
-		console.log(`[ValidatedConsumer:${this.channelId}] ✅ Returning validated data from store`);
+		console.log(`[ValidatedConsumer:${this.topic}] ✅ Returning validated data from store`);
 		return result.data;
 	}
 }
@@ -118,51 +157,37 @@ class ValidatedConsumerImpl<T> implements ValidatedConsumer<T> {
 
 /**
  * Create a validated publisher for a widget channel
+ * Now uses ValidatedTopicStore instead of MapStore
  */
 export function createWidgetPublisher<T extends WidgetType>(
 	config: WidgetChannelConfig<T>,
 	publisherId: string
 ): ValidatedPublisher<WidgetDataTypeMap[T]> {
 	console.log(`\n🔧 [createWidgetPublisher] Called for channel: ${config.channelId}, publisher: ${publisherId}`);
-	const mapStorePublisher = mapStore.getPublisher(config.channelId, publisherId);
-	
-	// Adapter to match expected interface (publish + clear)
-	const publisher = {
-		publish: (value: WidgetDataTypeMap[T]) => mapStorePublisher.publish(value),
-		clear: () => mapStorePublisher.clear()
-	};
-	
-	console.log(`   ↳ Registered publisher in mapStore`);
+	console.log(`   ↳ Using ValidatedTopicStore at topic: widgets/${config.widgetType}/${config.channelId}`);
 
 	return new ValidatedPublisherImpl(
 		config.schema,
-		publisher,
-		`${config.channelId}:${publisherId}`
+		config.channelId,
+		config.widgetType
 	);
 }
 
 /**
  * Create a validated consumer for a widget channel
+ * Now uses ValidatedTopicStore instead of MapStore
  */
 export function createWidgetConsumer<T extends WidgetType>(
 	config: WidgetChannelConfig<T>,
 	consumerId: string
 ): ValidatedConsumer<WidgetDataTypeMap[T]> {
 	console.log(`\n🔧 [createWidgetConsumer] Called for channel: ${config.channelId}, consumer: ${consumerId}`);
-	const stream = mapStore.getStream(config.channelId, consumerId);
-	
-	// Adapter to match expected interface (subscribe + get)
-	const consumer = {
-		subscribe: stream.subscribe,
-		get: () => stream.get() as WidgetDataTypeMap[T] | undefined
-	};
-	
-	console.log(`   ↳ Registered consumer in mapStore`);
+	console.log(`   ↳ Using ValidatedTopicStore at topic: widgets/${config.widgetType}/${config.channelId}`);
 
 	return new ValidatedConsumerImpl(
 		config.schema,
-		consumer,
-		`${config.channelId}:${consumerId}`
+		config.channelId,
+		config.widgetType
 	);
 }
 
@@ -187,7 +212,7 @@ export interface JobWidgetBridge {
  * This automatically:
  * - Listens to job updates
  * - Validates the job result against the widget schema
- * - Publishes valid data to the widget channel
+ * - Publishes valid data to the widget channel via ValidatedTopicStore
  */
 export function createJobWidgetBridge<T extends WidgetType>(
 	config: WidgetDataBridgeConfig<T>
@@ -250,13 +275,13 @@ export function createJobWidgetBridge<T extends WidgetType>(
 			const widgetData = transform(latestUpdate.result!);
 			console.log(`   ✅ Transform successful:`, widgetData);
 
-			// Publish to widget channel (with validation)
-			console.log(`   📤 Publishing to widget channel...`);
+			// Publish to widget channel via ValidatedTopicStore (with validation)
+			console.log(`   📤 Publishing to ValidatedTopicStore...`);
 			publisher.publish(widgetData);
 			lastUpdate = new Date();
 			lastError = undefined;
 
-			console.log(`✅ [JobWidgetBridge:${bridgeId}] Successfully published data to widget channel`);
+			console.log(`✅ [JobWidgetBridge:${bridgeId}] Successfully published data to ValidatedTopicStore`);
 		} catch (error) {
 			if (error instanceof z.ZodError) {
 				lastError = error;
@@ -546,146 +571,3 @@ export const WidgetStores = {
 	map: (channelId: string, widgetId: string) =>
 		createReactiveWidgetConsumer(WidgetChannels.map(channelId), widgetId)
 } as const;
-
-// ===== Example Usage =====
-
-/*
-// ============================================================================
-// Example 1: Simple paragraph widget with AI job
-// ============================================================================
-import { WidgetChannels, bridgeJobToWidget } from '$lib/dashboard/types/widgetBridge';
-
-async function setupParagraphWidget() {
-  // Submit AI job
-  const jobId = await submitJob({
-    request: "Generate a summary of recent sales",
-    priority: "HIGH"
-  });
-  
-  // Create bridge to paragraph widget (NEW CLEANER API)
-  const bridge = bridgeJobToWidget({
-    jobId,
-    channel: WidgetChannels.paragraph('sales-summary'),
-    transformer: (result) => {
-      const data = JSON.parse(result);
-      return {
-        content: data.summary,
-        markdown: true
-      };
-    }
-  });
-  
-  return { jobId, bridge };
-}
-
-// ============================================================================
-// Example 2: Using Preset Publishers/Consumers
-// ============================================================================
-import { Publishers, Consumers, WidgetStores } from '$lib/dashboard/types/widgetBridge';
-
-// Direct publishing (without AI job)
-function publishMetricData() {
-  const publisher = Publishers.metric('cpu-usage', 'system-monitor');
-  
-  publisher.publish({
-    label: 'CPU Usage',
-    value: 75.5,
-    unit: '%',
-    changeType: 'increase',
-    change: 5.2
-  });
-}
-
-// ============================================================================
-// Example 3: In a Svelte component
-// ============================================================================
-<script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
-  import { WidgetStores } from '$lib/dashboard/types/widgetBridge';
-  
-  let dataStore = WidgetStores.paragraph('sales-summary', 'widget-1');
-  let content: string | undefined;
-  
-  const unsubscribe = dataStore.subscribe(data => {
-    content = data?.content;
-  });
-  
-  onDestroy(unsubscribe);
-</script>
-
-{#if content}
-  <div>{content}</div>
-{/if}
-
-// ============================================================================
-// Example 4: Multiple widgets from one job
-// ============================================================================
-import { bridgeJobToMultipleWidgets, WidgetChannels } from '$lib/dashboard/types/widgetBridge';
-
-async function setupDashboard() {
-  const jobId = await submitJob({
-    request: "Analyze quarterly performance",
-    priority: "HIGH"
-  });
-  
-  const bridge = bridgeJobToMultipleWidgets(jobId, [
-    {
-      channel: WidgetChannels.metric('revenue-metric'),
-      transformer: (result) => {
-        const data = JSON.parse(result);
-        return {
-          label: 'Q4 Revenue',
-          value: data.revenue,
-          change: data.revenueChange,
-          changeType: data.revenueChange > 0 ? 'increase' : 'decrease',
-          unit: '$'
-        };
-      }
-    },
-    {
-      channel: WidgetChannels.lineChart('revenue-chart'),
-      transformer: (result) => {
-        const data = JSON.parse(result);
-        return {
-          datasets: [{
-            label: 'Revenue',
-            data: data.monthlyRevenue,
-            color: '#10b981'
-          }],
-          labels: data.months
-        };
-      }
-    },
-    {
-      channel: WidgetChannels.paragraph('analysis'),
-      transformer: (result) => {
-        const data = JSON.parse(result);
-        return {
-          content: data.analysis,
-          markdown: true
-        };
-      }
-    }
-  ]);
-  
-  return { jobId, bridge };
-}
-
-// ============================================================================
-// Example 5: Legacy API (still supported for backward compatibility)
-// ============================================================================
-import { createWidgetConsumer, createJobWidgetBridge } from '$lib/dashboard/types/widgetBridge';
-
-const consumer = createWidgetConsumer(
-  WidgetChannels.paragraphContent,
-  'my-paragraph-widget'
-);
-
-consumer.subscribe((data) => {
-  if (data) {
-    console.log('Received validated data:', data);
-    // data is fully typed as ParagraphWidgetData
-  }
-});
-*/
-

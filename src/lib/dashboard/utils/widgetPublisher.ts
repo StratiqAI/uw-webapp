@@ -1,12 +1,12 @@
 /**
  * Widget Publisher Utilities
  * 
- * Helper functions for publishing data to widget topics using the new MapStore API.
- * Uses the topic naming convention: widget:${type}:${widgetId}
+ * Helper functions for publishing data to widget topics using ValidatedTopicStore.
+ * Uses the topic naming convention: widgets/${type}/${widgetId}
  */
 
-import { mapStore } from '$lib/stores/MapStore';
-import { getWidgetTopic, getWidgetSchemaId } from '$lib/dashboard/setup/widgetSchemaRegistration';
+import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
+import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
 import type { WidgetType } from '$lib/dashboard/types/widget';
 
 /**
@@ -31,41 +31,66 @@ export function createWidgetPublisher<T = unknown>(
 	producerId: string
 ) {
 	const topic = getWidgetTopic(widgetType, widgetId);
-	const schemaId = getWidgetSchemaId(widgetType);
 
-	// Enforce schema on the topic
-	mapStore.enforceTopicSchema(topic, schemaId);
-
-	// Get publisher from MapStore
-	const publisher = mapStore.getPublisher(topic, producerId);
+	console.log(`📡 [createWidgetPublisher] Creating publisher for topic: ${topic} (producer: ${producerId})`);
 
 	return {
 		publish: (data: T) => {
-			publisher.publish(data);
+			const success = validatedTopicStore.publish(topic, data);
+			if (success) {
+				console.log(`   ✅ Published to ${topic}`);
+			} else {
+				console.error(`   ❌ Failed to publish to ${topic} - validation failed`);
+			}
+			return success;
 		},
 		dispose: () => {
-			publisher.dispose();
+			// ValidatedTopicStore doesn't require explicit disposal
+			console.log(`   🗑️ Disposed publisher for ${topic}`);
 		}
 	};
 }
 
 /**
- * Get a stream for a widget topic
+ * Get the current value at a widget topic
  * 
  * @param widgetType - The widget type
  * @param widgetId - The widget instance ID
- * @returns Readable stream for the widget topic
+ * @returns Current value at the topic or undefined
  * 
  * @example
  * ```typescript
- * const stream = getWidgetStream('title', 'widget-123');
- * stream.subscribe((data) => {
- *   console.log('Widget data updated:', data);
- * });
+ * const data = getWidgetData('title', 'widget-123');
+ * console.log('Widget data:', data);
  * ```
  */
-export function getWidgetStream<T = unknown>(widgetType: WidgetType, widgetId: string) {
+export function getWidgetData<T = unknown>(widgetType: WidgetType, widgetId: string): T | undefined {
 	const topic = getWidgetTopic(widgetType, widgetId);
-	return mapStore.getStream(topic) as any;
+	return validatedTopicStore.at<T>(topic);
 }
 
+/**
+ * Subscribe to a widget topic
+ * 
+ * @param widgetType - The widget type
+ * @param widgetId - The widget instance ID
+ * @param callback - Callback function called when data changes
+ * @returns Unsubscribe function
+ * 
+ * @example
+ * ```typescript
+ * const unsubscribe = subscribeToWidget('title', 'widget-123', (data) => {
+ *   console.log('Widget data updated:', data);
+ * });
+ * // ... later
+ * unsubscribe();
+ * ```
+ */
+export function subscribeToWidget<T = unknown>(
+	widgetType: WidgetType,
+	widgetId: string,
+	callback: (data: T | undefined) => void
+): () => void {
+	const topic = getWidgetTopic(widgetType, widgetId);
+	return validatedTopicStore.subscribe(topic, callback as (value: unknown) => void);
+}

@@ -5,9 +5,9 @@
  -->
 <script lang="ts">
 	// Importing Svelte Library Functions
-	import { getContext, onDestroy } from 'svelte';
+	import { getContext } from 'svelte';
 
-    // Importing 3rd Party Libraries
+	// Importing 3rd Party Libraries
 	import { z } from 'zod';
 
 	// Data Types
@@ -18,8 +18,10 @@
 	import type { CurrentUser } from '$lib/types/auth';
 	import type { JobUpdate } from '$lib/dashboard/lib/JobManager';
 
-	// Utils - NEW UPGRADED API
-	import { Publishers, WidgetStores } from '$lib/dashboard/types/widgetBridge';
+	// ValidatedTopicStore integration
+	import { useReactiveValidatedTopic } from '$lib/hooks/validatedTopicStoreRunes.svelte';
+	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
+	import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
 	import { submitAIJob, type JobSubmissionCallbacks } from './utils/aiJobSubmission';
 	import { paragraphTitleQuery } from '$lib/dashboard/types/OpenAIQueryDefs';
 	import { project as projectStore } from '$lib/stores/appStateStore';
@@ -28,16 +30,8 @@
 	type ParagraphWidgetData = z.infer<typeof ParagraphWidgetDataSchema>;
 			
 	// UI Components
-	import { Button, Alert, Spinner } from 'flowbite-svelte';
+	import { Alert, Spinner } from 'flowbite-svelte';
 	import TypeWriter from '$lib/components/TypeWriter/TypeWriter.svelte';
-
-	//////////////////////////////////////////////////////////////////////////////////////////////
-	// Constants
-	//////////////////////////////////////////////////////////////////////////////////////////////
-
-	const PARAGRAPH_WIDGET_DATA_CHANNEL_ID = 'paragraph-content';
-	const PARAGRAPH_WIDGET_ID = 'paragraph-widget';
-	const WIDGET_TYPE = 'paragraph';
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 	// Component Props & State
@@ -46,10 +40,10 @@
 	interface Props {
 		data: ParagraphWidget['data'];
 		darkMode?: boolean;
-		/** Optional custom channel ID (defaults to 'paragraph-content') */
-		channelId?: string;
 		/** Optional custom widget ID for consumer registration */
 		widgetId?: string;
+		/** Optional topic override */
+		topicOverride?: string;
 		/** Optional prompt for AI content generation */
 		defaultPrompt?: string;
 		/** Enable/disable AI generation button */
@@ -65,8 +59,8 @@
 	const {
 		data,
 		darkMode = false,
-		channelId = PARAGRAPH_WIDGET_DATA_CHANNEL_ID,
-		widgetId = PARAGRAPH_WIDGET_ID,
+		widgetId = 'paragraph-widget-default',
+		topicOverride,
 		defaultPrompt = 'Write a paragraph about the economy around the property',
 		enableAIGeneration = true,
 		class: className = '',
@@ -74,8 +68,10 @@
 		onFlipControlReady
 	}: Props = $props();
 
+	// Get topic path for this widget
+	const topic = $derived(getWidgetTopic('paragraph', widgetId, topicOverride));
+
 	// Local state management
-	let widgetData = $state<ParagraphWidgetData>(validateData(data));
 	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 	let lastUpdateTime = $state<Date | null>(null);
@@ -101,6 +97,33 @@
 	);
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
+	// ValidatedTopicStore Integration
+	//////////////////////////////////////////////////////////////////////////////////////////////
+
+	// Subscribe to data updates using ValidatedTopicStore hook (reactive to topic changes)
+	const dataStream = useReactiveValidatedTopic<ParagraphWidgetData>(() => topic);
+	
+	// Merge store data with initial data
+	let widgetData = $derived<ParagraphWidgetData>({
+		title: dataStream.current?.title ?? data.title,
+		content: dataStream.current?.content ?? data.content,
+		markdown: dataStream.current?.markdown ?? data.markdown ?? false
+	});
+
+	// Track when data updates from store
+	$effect(() => {
+		if (dataStream.current) {
+			lastUpdateTime = new Date();
+		}
+	});
+
+	$effect(() => {
+		console.log(`📝 ParagraphWidget:${widgetId} - Initialized with ValidatedTopicStore`);
+		console.log(`   Topic: ${topic}`);
+		console.log(`   Initial data:`, data);
+	});
+
+	//////////////////////////////////////////////////////////////////////////////////////////////
 	// Helper Functions
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -121,44 +144,6 @@
 		error = null;
 	}
 
-	function handleDataUpdate(newData: ParagraphWidgetData) {
-		try {
-			// Normalize data to ensure markdown is never undefined
-			const normalized = {
-				...newData,
-				markdown: newData.markdown ?? false
-			};
-			widgetData = validateData(normalized);
-			lastUpdateTime = new Date();
-			error = null;
-		} catch (err) {
-			console.error('Failed to update widget data:', err);
-			error = 'Failed to update content';
-		}
-	}
-
-	//////////////////////////////////////////////////////////////////////////////////////////////
-	// Channel Setup - UPGRADED API
-	//////////////////////////////////////////////////////////////////////////////////////////////
-
-	// Setup content publisher using new Publishers preset
-	const contentPublisher = Publishers.paragraph(channelId, `content-generator-agent-${widgetId}`);
-
-	// Setup reactive store using new WidgetStores preset
-	const widgetStore = WidgetStores.paragraph(channelId, widgetId);
-
-	// Subscribe to widget store updates
-	const unsubscribe = widgetStore.subscribe((validatedData) => {
-		if (validatedData) {
-			handleDataUpdate(validatedData);
-		}
-	});
-
-	// Cleanup on destroy
-	onDestroy(() => {
-		unsubscribe();
-	});
-
 	//////////////////////////////////////////////////////////////////////////////////////////////
 	// AI Job Management
 	//////////////////////////////////////////////////////////////////////////////////////////////
@@ -175,14 +160,21 @@
 					throw new Error('Invalid AI response format');
 				}
 
-				const newData = {
+				const newData: ParagraphWidgetData = {
 					title: parsedOutput.title || null,
 					content: parsedOutput.content || '',
 					markdown: (parsedOutput.markdown ?? false) as boolean | null
 				};
 
 				console.log(`✅ AI content generated: "${newData.title || 'Untitled'}"`);
-				contentPublisher.publish(newData);
+				
+				// Publish to ValidatedTopicStore using the current topic
+				const currentTopic = getWidgetTopic('paragraph', widgetId, topicOverride);
+				const published = validatedTopicStore.publish(currentTopic, newData);
+				if (!published) {
+					console.error('❌ Failed to publish to ValidatedTopicStore');
+					error = 'Failed to save generated content';
+				}
 			} catch (err) {
 				console.error('Failed to process AI response:', err);
 				error = 'Failed to process AI response';
@@ -198,12 +190,10 @@
 
 		onStatusUpdate: (update: JobUpdate) => {
 			console.log('📊 Job status:', update.status);
-			// Could add more granular status tracking here
 		},
 
 		onConnectionStateChange: (state: string) => {
 			console.log('🔌 Connection state:', state);
-			// Map technical states to user-friendly labels
 			const stateMap: Record<string, typeof connectionState> = {
 				connected: 'Researching',
 				connecting: 'Ready',
@@ -227,7 +217,6 @@
 
 			console.log('projectStore:', $projectStore);
 			console.log('projectStore.vectorStoreId:', $projectStore?.vectorStoreId);
-			// Get vector store ID from current project
 			const vectorStoreId = $projectStore?.vectorStoreId || 'vs_68da2c6862088191a5b51b8b4566b300';
 
 			await submitAIJob(
@@ -410,7 +399,7 @@
 							}}
 						></textarea>
 						<p class="mt-2 text-xs {darkMode ? 'text-slate-300' : 'text-slate-600'}">
-							💡 Tip: Press <kbd class="rounded {darkMode ? 'bg-slate-700' : 'bg-slate-200'} px-1.5 py-0.5"
+							Tip: Press <kbd class="rounded {darkMode ? 'bg-slate-700' : 'bg-slate-200'} px-1.5 py-0.5"
 								>Ctrl+Enter</kbd
 							>
 							to submit, <kbd class="rounded {darkMode ? 'bg-slate-700' : 'bg-slate-200'} px-1.5 py-0.5">Esc</kbd> to

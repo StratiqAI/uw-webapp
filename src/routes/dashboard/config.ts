@@ -8,7 +8,7 @@ export const dashboardWidgets: Widget[] = [
 		gridRow: 1,
 		colSpan: 12,
 		rowSpan: 1,
-		data: {} as any // Data is published via MapStore topic
+		data: {} as any // Data is published via ValidatedTopicStore
 	},
 	{
 		id: 'widget-4',
@@ -18,7 +18,7 @@ export const dashboardWidgets: Widget[] = [
 		colSpan: 4,
 		rowSpan: 4,
 		minHeight: 2,
-		data: {} as any // Data is published via MapStore topic
+		data: {} as any // Data is published via ValidatedTopicStore
 	},
 	// {
 	// 	id: 'widget-5',
@@ -44,7 +44,7 @@ export const dashboardWidgets: Widget[] = [
 		rowSpan: 4,
 		minWidth: 3,
 		minHeight: 2,
-		data: {} as any // Data is published via MapStore topic
+		data: {} as any // Data is published via ValidatedTopicStore
 	},
 	{
 		id: 'widget-6',
@@ -55,7 +55,7 @@ export const dashboardWidgets: Widget[] = [
 		rowSpan: 2,
 		minWidth: 2,
 		minHeight: 2,
-		data: {} as any // Data is published via MapStore topic
+		data: {} as any // Data is published via ValidatedTopicStore
 	},
 	{
 		id: 'widget-8',
@@ -66,7 +66,7 @@ export const dashboardWidgets: Widget[] = [
 		rowSpan: 1,
 		minWidth: 1,
 		minHeight: 1,
-		data: {} as any // Data is published via MapStore topic
+		data: {} as any // Data is published via ValidatedTopicStore
 	},
 	{
 		id: 'widget-1760034441135',
@@ -77,7 +77,7 @@ export const dashboardWidgets: Widget[] = [
 		rowSpan: 1,
 		minWidth: 1,
 		minHeight: 1,
-		data: {} as any // Data is published via MapStore topic
+		data: {} as any // Data is published via ValidatedTopicStore
 	},
 	{
 		id: 'widget-1760034444139',
@@ -88,7 +88,7 @@ export const dashboardWidgets: Widget[] = [
 		rowSpan: 1,
 		minWidth: 1,
 		minHeight: 1,
-		data: {} as any // Data is published via MapStore topic
+		data: {} as any // Data is published via ValidatedTopicStore
 	},
 	{
 		id: 'widget-1760034594067',
@@ -99,7 +99,7 @@ export const dashboardWidgets: Widget[] = [
 		rowSpan: 1,
 		minWidth: 1,
 		minHeight: 1,
-		data: {} as any // Data is published via MapStore topic
+		data: {} as any // Data is published via ValidatedTopicStore
 	},
 	{
 		id: 'widget-1760034597055',
@@ -110,7 +110,7 @@ export const dashboardWidgets: Widget[] = [
 		rowSpan: 1,
 		minWidth: 1,
 		minHeight: 1,
-		data: {} as any // Data is published via MapStore topic
+		data: {} as any // Data is published via ValidatedTopicStore
 	},
 	{
 		id: 'widget-1760034608731',
@@ -121,7 +121,7 @@ export const dashboardWidgets: Widget[] = [
 		rowSpan: 1,
 		minWidth: 1,
 		minHeight: 1,
-		data: {} as any // Data is published via MapStore topic
+		data: {} as any // Data is published via ValidatedTopicStore
 	},
 	{
 		id: 'widget-1760034608732',
@@ -132,7 +132,7 @@ export const dashboardWidgets: Widget[] = [
 		rowSpan: 1,
 		minWidth: 1,
 		minHeight: 1,
-		data: {} as any // Data is published via MapStore topic
+		data: {} as any // Data is published via ValidatedTopicStore
 	},
 	{
 		id: 'widget-1760034605935',
@@ -143,7 +143,7 @@ export const dashboardWidgets: Widget[] = [
 		rowSpan: 1,
 		minWidth: 1,
 		minHeight: 1,
-		data: {} as any // Data is published via MapStore topic
+		data: {} as any // Data is published via ValidatedTopicStore
 	},
 	{
 		id: 'widget-1760034612393',
@@ -154,7 +154,7 @@ export const dashboardWidgets: Widget[] = [
 		rowSpan: 1,
 		minWidth: 1,
 		minHeight: 1,
-		data: {} as any // Data is published via MapStore topic
+		data: {} as any // Data is published via ValidatedTopicStore
 	},
 	{
 		id: 'widget-1760034618243',
@@ -165,7 +165,7 @@ export const dashboardWidgets: Widget[] = [
 		rowSpan: 1,
 		minWidth: 1,
 		minHeight: 1,
-		data: {} as any // Data is published via MapStore topic
+		data: {} as any // Data is published via ValidatedTopicStore
 	},
 	{
 		id: 'widget-1760034621635',
@@ -176,7 +176,7 @@ export const dashboardWidgets: Widget[] = [
 		rowSpan: 1,
 		minWidth: 1,
 		minHeight: 1,
-		data: {} as any // Data is published via MapStore topic
+		data: {} as any // Data is published via ValidatedTopicStore
 	},
 	{
 		id: 'widget-1760034624211',
@@ -187,7 +187,7 @@ export const dashboardWidgets: Widget[] = [
 		rowSpan: 1,
 		minWidth: 1,
 		minHeight: 1,
-		data: {} as any // Data is published via MapStore topic
+		data: {} as any // Data is published via ValidatedTopicStore
 	},
 	{
 		id: 'widget-barchart-1',
@@ -198,6 +198,6 @@ export const dashboardWidgets: Widget[] = [
 		rowSpan: 3,
 		minWidth: 3,
 		minHeight: 2,
-		data: {} as any // Data is published via MapStore topic
+		data: {} as any // Data is published via ValidatedTopicStore
 	}
 ];

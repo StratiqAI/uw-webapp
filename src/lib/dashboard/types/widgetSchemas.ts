@@ -1,6 +1,7 @@
 // Widget Schema Registry with Zod
 // This file defines Zod schemas for widget data and provides type-safe bridges
-// between AI JobSubmission, mapObjectStore, and widget components.
+// between AI JobSubmission, ValidatedTopicStore, and widget components.
+// All widgets now use ValidatedTopicStore for reactive data binding with schema validation.
 
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
@@ -74,15 +75,6 @@ export const MetricWidgetDataSchema = z.object({
 	unit: z.string().nullable().optional()
 });
 
-export const ValidatedMetricWidgetDataSchema = z.object({
-	label: z.string(),
-	value: z.union([z.string(), z.number()]),
-	change: z.number().nullable().optional(),
-	changeType: z.enum(['increase', 'decrease']).nullable().optional(),
-	unit: z.string().nullable().optional(),
-	topic: z.string().nullable().optional() // Topic path in ValidatedTopicStore
-});
-
 export const MapWidgetDataSchema = z.object({
 	title: z.string().nullable().optional(),
 	description: z.string().nullable().optional(),
@@ -108,7 +100,6 @@ export const WidgetDataSchemas = {
 	lineChart: LineChartWidgetDataSchema,
 	barChart: BarChartWidgetDataSchema,
 	metric: MetricWidgetDataSchema,
-	validatedMetric: ValidatedMetricWidgetDataSchema,
 	map: MapWidgetDataSchema,
 	schema: SchemaWidgetDataSchema
 } as const;
@@ -122,7 +113,6 @@ export type ImageWidgetData = z.infer<typeof ImageWidgetDataSchema>;
 export type LineChartWidgetData = z.infer<typeof LineChartWidgetDataSchema>;
 export type BarChartWidgetData = z.infer<typeof BarChartWidgetDataSchema>;
 export type MetricWidgetData = z.infer<typeof MetricWidgetDataSchema>;
-export type ValidatedMetricWidgetData = z.infer<typeof ValidatedMetricWidgetDataSchema>;
 export type MapWidgetData = z.infer<typeof MapWidgetDataSchema>;
 export type SchemaWidgetData = z.infer<typeof SchemaWidgetDataSchema>;
 
@@ -135,7 +125,6 @@ export type WidgetData =
 	| LineChartWidgetData
 	| BarChartWidgetData
 	| MetricWidgetData
-	| ValidatedMetricWidgetData
 	| MapWidgetData
 	| SchemaWidgetData;
 
@@ -149,7 +138,6 @@ export interface WidgetDataTypeMap {
 	lineChart: LineChartWidgetData;
 	barChart: BarChartWidgetData;
 	metric: MetricWidgetData;
-	validatedMetric: ValidatedMetricWidgetData;
 	map: MapWidgetData;
 	schema: SchemaWidgetData;
 }
@@ -157,7 +145,7 @@ export interface WidgetDataTypeMap {
 // ===== Widget Channel Configuration =====
 
 /**
- * Configuration for a widget's data channel in the mapObjectStore
+ * Configuration for a widget's data channel in ValidatedTopicStore
  * @template T - The widget type
  */
 export interface WidgetChannelConfig<T extends WidgetType = WidgetType> {
@@ -288,32 +276,11 @@ export function getWidgetTextFormat<T extends WidgetType>(
 	return textFormat as OpenAITextFormatConfig;
 }
 
-// /**
-//  * Get OpenAI structured output config for a specific widget type
-//  * @deprecated Use getWidgetTextFormat() instead for proper OpenAI text format
-//  * @param widgetType - The widget type
-//  * @param name - Optional custom name (defaults to widgetType)
-//  * @param description - Optional description
-//  */
-// export function getWidgetOpenAIConfig<T extends WidgetType>(
-// 	widgetType: T,
-// 	name?: string,
-// 	description?: string
-// ): OpenAIStructuredOutputConfig {
-// 	console.log(`\n🔧 [getWidgetOpenAIConfig] Getting OpenAI config for widget type: ${widgetType}`);
-// 	console.log(`   ⚠️  DEPRECATED: Use getWidgetTextFormat() instead`);
-// 	const schema = WidgetDataSchemas[widgetType];
-// 	const configName = name || `${widgetType}WidgetData`;
-// 	const configDescription = description || `Data for ${widgetType} widget`;
-	
-// 	return zodSchemaToOpenAI(configName, schema, configDescription);
-// }
-
 // ===== Validated Data Publisher =====
 
 /**
  * Create a validated publisher for widget data
- * This ensures that data published to mapObjectStore is validated against the schema
+ * This ensures that data published to ValidatedTopicStore is validated against the schema
  */
 export interface ValidatedPublisher<T = any> {
 	/**
@@ -331,7 +298,7 @@ export interface ValidatedPublisher<T = any> {
 
 /**
  * Create a validated consumer for widget data
- * This ensures that data received from mapObjectStore is validated
+ * This ensures that data received from ValidatedTopicStore is validated
  */
 export interface ValidatedConsumer<T = any> {
 	/**
@@ -543,4 +510,3 @@ export function isWidgetType(type: string): type is WidgetType {
 export function hasWidgetSchema(type: WidgetType): type is keyof typeof WidgetDataSchemas {
 	return type in WidgetDataSchemas;
 }
-

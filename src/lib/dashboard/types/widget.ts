@@ -1,4 +1,5 @@
 // Widget type definitions
+// All widgets now use ValidatedTopicStore for reactive data binding with schema validation
 export type WidgetType =
 	| 'table'
 	| 'title'
@@ -7,7 +8,6 @@ export type WidgetType =
 	| 'lineChart'
 	| 'barChart'
 	| 'metric'
-	| 'validatedMetric'
 	| 'map'
 	| 'schema';
 
@@ -52,7 +52,6 @@ export type WidgetAction =
 	| 'settings'
 	| 'remove';
 
-// Rest of the widget interfaces remain the same...
 export interface TableWidget extends BaseWidget {
 	type: 'table';
 	data: {
@@ -153,18 +152,6 @@ export interface MetricWidget extends BaseWidget {
 	};
 }
 
-export interface ValidatedMetricWidget extends BaseWidget {
-	type: 'validatedMetric';
-	data: {
-		label: string;
-		value: string | number;
-		change?: number;
-		changeType?: 'increase' | 'decrease';
-		unit?: string;
-		topic?: string; // Topic path in ValidatedTopicStore (e.g., 'app/metrics/sales')
-	};
-}
-
 export type Widget =
 	| TableWidget
 	| TitleWidget
@@ -173,7 +160,6 @@ export type Widget =
 	| LineChartWidget
 	| BarChartWidget
 	| MetricWidget
-	| ValidatedMetricWidget
 	| MapWidget
 	| SchemaWidget;
 

@@ -7,11 +7,8 @@
 <script lang="ts">
 	import { PUBLIC_GEOAPIFY_API_KEY } from '$env/static/public';
 	import type { MapWidget } from '$lib/dashboard/types/widget';
-	import { mapStore } from '$lib/stores/MapStore';
-	import { useTopic } from '$lib/hooks/mapStoreRunes.svelte';
-	import { getWidgetTopic, getWidgetSchemaId } from '$lib/dashboard/setup/widgetSchemaRegistration';
-	import { onMount } from 'svelte';
-	import { browser } from '$app/environment';
+	import { useReactiveValidatedTopic } from '$lib/hooks/validatedTopicStoreRunes.svelte';
+	import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
 
 	interface Props {
 		data: MapWidget['data'];
@@ -25,22 +22,15 @@
 	// Use topic override if provided, otherwise use default topic naming convention
 	const topic = $derived(getWidgetTopic('map', widgetId, topicOverride));
 	
-	// Subscribe to data updates using useTopic hook
-	const dataStream = useTopic<MapWidget['data']>(topic, `map-widget-consumer-${widgetId}`);
+	// Subscribe to data updates using ValidatedTopicStore hook (reactive to topic changes)
+	const dataStream = useReactiveValidatedTopic<MapWidget['data']>(() => topic);
 	let widgetData = $derived<MapWidget['data']>(dataStream.current || data);
 
-	// Enforce schema on mount
-	onMount(() => {
-		if (browser) {
-			const schemaId = getWidgetSchemaId('map');
-			mapStore.enforceTopicSchema(topic, schemaId);
-			console.log(`🗺️ MapWidget:${widgetId} - Schema enforced: ${schemaId} on topic: ${topic}`);
-		}
+	$effect(() => {
+		console.log(`🗺️ MapWidget:${widgetId} - Initialized with ValidatedTopicStore`);
+		console.log(`   Topic: ${topic}`);
+		console.log(`   Initial data:`, data);
 	});
-
-	console.log(`🗺️ MapWidget:${widgetId} - Initialized`);
-	console.log(`   Topic: ${topic}`);
-	console.log(`   Initial data:`, data);
 
 	const apiKey = PUBLIC_GEOAPIFY_API_KEY;
 

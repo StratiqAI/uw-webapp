@@ -1,5 +1,5 @@
 import type { Widget, DashboardConfig } from '$lib/dashboard/types/widget';
-import { mapStore } from '$lib/stores/MapStore';
+import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 
 const STORAGE_KEYS = {
 	WIDGETS: 'dashboard_widgets',
@@ -16,10 +16,10 @@ function getProjectScopedKey(baseKey: string, projectId: string | null): string 
 	return `${baseKey}_project_${projectId}`;
 }
 
-const CURRENT_VERSION = '2.0.0'; // Bumped version to include widget data
+const CURRENT_VERSION = '3.0.0'; // Bumped version for ValidatedTopicStore migration
 
 export interface WidgetDataSnapshot {
-	[channelId: string]: any;
+	[topic: string]: any;
 }
 
 export interface DashboardState {
@@ -56,7 +56,7 @@ export class DashboardStorage {
 
 	/**
 	 * Save only widget data (debounced)
-	 * Called automatically when mapObjectStore data changes
+	 * Called automatically when ValidatedTopicStore data changes
 	 */
 	static autoSaveWidgetData(): void {
 		if (!autoSaveWidgetDataEnabled) return;
@@ -75,6 +75,7 @@ export class DashboardStorage {
 
 	/**
 	 * Save only widget data (without full dashboard)
+	 * Captures all data under the 'widgets/' path in ValidatedTopicStore
 	 */
 	private static saveWidgetDataOnly(): boolean {
 		if (!this.isLocalStorageAvailable()) {
@@ -82,18 +83,26 @@ export class DashboardStorage {
 		}
 
 		try {
-			// Capture current widget data from mapStore
-			const allData = mapStore.getAllData();
+			// Capture current widget data from ValidatedTopicStore
 			const widgetData: WidgetDataSnapshot = {};
+			const tree = validatedTopicStore.tree;
 			
-			allData.forEach(item => {
-				if (item.value !== undefined) {
-					widgetData[item.typeId] = item.value; // typeId is actually topic name for compatibility
+			// Get all widget data from the 'widgets' namespace
+			if (tree.widgets && typeof tree.widgets === 'object') {
+				// Iterate through widget types (metric, paragraph, etc.)
+				for (const [widgetType, widgetTypeData] of Object.entries(tree.widgets)) {
+					if (widgetTypeData && typeof widgetTypeData === 'object') {
+						// Iterate through widget instances
+						for (const [widgetId, data] of Object.entries(widgetTypeData)) {
+							const topic = `widgets/${widgetType}/${widgetId}`;
+							widgetData[topic] = data;
+						}
+					}
 				}
-			});
+			}
 
 			localStorage.setItem(STORAGE_KEYS.WIDGET_DATA, JSON.stringify(widgetData));
-			console.log(`   ✅ Auto-saved ${Object.keys(widgetData).length} channels`);
+			console.log(`   ✅ Auto-saved ${Object.keys(widgetData).length} widget topics`);
 
 			return true;
 		} catch (error) {
@@ -111,18 +120,24 @@ export class DashboardStorage {
 		}
 
 		try {
-			// Capture current widget data from mapStore
-			const allData = mapStore.getAllData();
+			// Capture current widget data from ValidatedTopicStore
 			const widgetData: WidgetDataSnapshot = {};
+			const tree = validatedTopicStore.tree;
 			
-			allData.forEach(item => {
-				if (item.value !== undefined) {
-					widgetData[item.typeId] = item.value; // typeId is actually topic name for compatibility
-					console.log(`   ✅ Captured data for channel: ${item.typeId}`);
+			// Get all widget data from the 'widgets' namespace
+			if (tree.widgets && typeof tree.widgets === 'object') {
+				for (const [widgetType, widgetTypeData] of Object.entries(tree.widgets)) {
+					if (widgetTypeData && typeof widgetTypeData === 'object') {
+						for (const [widgetId, data] of Object.entries(widgetTypeData)) {
+							const topic = `widgets/${widgetType}/${widgetId}`;
+							widgetData[topic] = data;
+							console.log(`   ✅ Captured data for topic: ${topic}`);
+						}
+					}
 				}
-			});
+			}
 
-			console.log(`   Total channels saved: ${Object.keys(widgetData).length}`);
+			console.log(`   Total topics saved: ${Object.keys(widgetData).length}`);
 
 			const state: DashboardState = {
 				widgets,
@@ -198,9 +213,9 @@ export class DashboardStorage {
 			}
 
 			console.log(`   ✅ Loaded ${widgets.length} widgets`);
-			console.log(`   ✅ Loaded ${Object.keys(widgetData).length} widget data channels`);
+			console.log(`   ✅ Loaded ${Object.keys(widgetData).length} widget data topics`);
 
-			// Restore widget data to mapObjectStore
+			// Restore widget data to ValidatedTopicStore
 			this.restoreWidgetData(widgetData);
 
 			return {
@@ -223,24 +238,20 @@ export class DashboardStorage {
 	}
 
 	/**
-	 * Restore widget data to mapStore
+	 * Restore widget data to ValidatedTopicStore
 	 */
 	private static restoreWidgetData(widgetData: WidgetDataSnapshot): void {
-		console.log('\n📤 [DashboardStorage] Restoring widget data to mapStore...');
+		console.log('\n📤 [DashboardStorage] Restoring widget data to ValidatedTopicStore...');
 		
 		Object.entries(widgetData).forEach(([topic, data]) => {
 			try {
-				// Create a temporary publisher to restore the data
-				const publisher = mapStore.getPublisher(
-					topic,
-					'dashboard-storage-restore'
-				);
-				
-				publisher.publish(data);
-				console.log(`   ✅ Restored data for topic: ${topic}`);
-				
-				// Dispose the temporary publisher
-				publisher.dispose();
+				// Publish directly to ValidatedTopicStore
+				const success = validatedTopicStore.publish(topic, data);
+				if (success) {
+					console.log(`   ✅ Restored data for topic: ${topic}`);
+				} else {
+					console.warn(`   ⚠️ Validation failed for topic: ${topic}`);
+				}
 			} catch (error) {
 				console.error(`   ❌ Failed to restore data for topic ${topic}:`, error);
 			}

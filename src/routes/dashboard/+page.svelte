@@ -55,14 +55,12 @@
 	}
 
 	onMount(() => {
-		// Safety timeout to ensure loading state is cleared even if something goes wrong
-		const safetyTimeout = setTimeout(() => {
-			if (isLoading) {
-				console.warn('Dashboard loading timeout - forcing loading state to false');
-				isLoading = false;
-			}
-		}, 5000); // 5 second timeout
-
+		console.log('🚀 Dashboard onMount started');
+		
+		// Set loading to false immediately - widgets will render with their default/empty state
+		// and then update reactively when data is published
+		isLoading = false;
+		
 		// Handle responsive grid adjustment
 		function updateGridSize() {
 			try {
@@ -177,19 +175,13 @@
 					console.error('Error saving dashboard on beforeunload:', error);
 				}
 			});
-
-			// Clear safety timeout since we completed successfully
-			clearTimeout(safetyTimeout);
-			isLoading = false;
+			
+			console.log('✅ Dashboard initialization complete');
 		} catch (error) {
 			console.error('Error initializing dashboard:', error);
-			// Ensure loading state is cleared even on error
-			clearTimeout(safetyTimeout);
-			isLoading = false;
 		}
 
 		return () => {
-			clearTimeout(safetyTimeout);
 			window.removeEventListener('resize', updateGridSize);
 			// Save any pending changes
 			try {

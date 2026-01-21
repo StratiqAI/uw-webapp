@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
-	import { mapStore } from '$lib/stores/MapStore';
+	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
+	import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
 	import type { ParagraphWidget, Widget, WidgetType } from '../types/widget';
 	import { findAvailablePosition } from '../utils/grid';
 	import { PUBLIC_GEOAPIFY_API_KEY } from '$env/static/public';
@@ -81,11 +82,6 @@
 	}
 
 	function handleUpdateParagraphWidget() {
-		const contentPublisher = mapStore.getPublisher(
-			'paragraph-content',
-			'content-generator-agent'
-		);
-
 		const topics = [
 			{
 				title: 'AI Dashboard Update',
@@ -132,7 +128,11 @@
 		};
 
 		console.log(`🤖 AI Agent generated new content: "${topic.title}"`);
-		contentPublisher.publish(data);
+		
+		// Publish to ValidatedTopicStore using the standard widget topic path
+		// Using widget-6 as that's the paragraph widget in the default config
+		const paragraphTopic = getWidgetTopic('paragraph', 'widget-6');
+		validatedTopicStore.publish(paragraphTopic, data);
 	}
 
 	function generateWidgetId(): string {
@@ -147,7 +147,6 @@
 		const defaultSizes: Record<WidgetType, { colSpan: number; rowSpan: number }> = {
 			title: { colSpan: 12, rowSpan: 1 },
 			metric: { colSpan: 2, rowSpan: 1 },
-			validatedMetric: { colSpan: 2, rowSpan: 1 },
 			paragraph: { colSpan: 6, rowSpan: 2 },
 			table: { colSpan: 6, rowSpan: 4 },
 			image: { colSpan: 6, rowSpan: 4 },
@@ -203,17 +202,6 @@
 					data: {
 						label: 'METRIC',
 						value: '0'
-					}
-				} as Widget;
-
-			case 'validatedMetric':
-				return {
-					...baseWidget,
-					type: 'validatedMetric',
-					data: {
-						label: 'VALIDATED METRIC',
-						value: '0',
-						topic: `app/metrics/${widgetId}` // Default topic path
 					}
 				} as Widget;
 
@@ -337,7 +325,6 @@
 	const widgetTypes: Array<{ type: WidgetType; label: string; icon: string }> = [
 		{ type: 'title', label: 'Title', icon: '📝' },
 		{ type: 'metric', label: 'Metric', icon: '📊' },
-		{ type: 'validatedMetric', label: 'Validated Metric', icon: '✅' },
 		{ type: 'paragraph', label: 'Paragraph', icon: '📄' },
 		{ type: 'table', label: 'Table', icon: '📋' },
 		{ type: 'image', label: 'Image', icon: '🖼️' },
