@@ -18,9 +18,6 @@
 	// Subscribe to data updates - reactive to topic changes
 	const dataStream = useReactiveValidatedTopic<TitleWidget['data']>(() => topic);
 	let widgetData = $derived<TitleWidget['data']>(dataStream.current || data);
-
-	console.log(`🏷️ TitleWidget:${widgetId} - Initialized with ValidatedTopicStore`);
-	console.log(`   Topic: ${topic}`);
 </script>
 
 <div class="title-widget flex h-full flex-col {darkMode ? 'bg-slate-800' : 'bg-slate-50'} justify-center text-{widgetData.alignment || 'left'}">

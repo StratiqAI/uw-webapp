@@ -151,20 +151,58 @@
   function handleClick() {
     if (skipOnClick && isTyping) skip();
   }
+
+  function handleKeydown(event: KeyboardEvent) {
+    if (skipOnClick && isTyping && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault();
+      skip();
+    }
+  }
 </script>
 
 <!-- Accessible live region so screen readers announce updates politely -->
-<span class="ai-writer {darkMode ? 'text-slate-200' : 'text-slate-700'}" aria-live="polite" role="status" on:click={handleClick}>
-  {output}
-  {#if cursorStyle && !done}
-    <span class="cursor {cursorStyle}" aria-hidden="true"></span>
-  {/if}
-</span>
+{#if skipOnClick}
+  <button
+    type="button"
+    class="ai-writer {darkMode ? 'text-slate-200' : 'text-slate-700'}"
+    aria-live="polite"
+    onclick={handleClick}
+    onkeydown={handleKeydown}
+    aria-label={isTyping ? 'Press Enter or Space to skip animation' : undefined}
+  >
+    {output}
+    {#if cursorStyle && !done}
+      <span class="cursor {cursorStyle}" aria-hidden="true"></span>
+    {/if}
+  </button>
+{:else}
+  <span
+    class="ai-writer {darkMode ? 'text-slate-200' : 'text-slate-700'}"
+    aria-live="polite"
+    role="status"
+  >
+    {output}
+    {#if cursorStyle && !done}
+      <span class="cursor {cursorStyle}" aria-hidden="true"></span>
+    {/if}
+  </span>
+{/if}
 
 <style>
   .ai-writer {
     white-space: pre-wrap;
     font-variant-ligatures: none; /* avoids weird caret jumps with ligatures */
+    cursor: text;
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    text-align: inherit;
+    font: inherit;
+    color: inherit;
+  }
+  
+  button.ai-writer {
     cursor: text;
   }
 

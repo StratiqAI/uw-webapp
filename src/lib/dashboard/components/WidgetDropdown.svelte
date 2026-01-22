@@ -135,12 +135,6 @@
 			icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z'
 		});
 
-		// items.push({
-		// 	action: 'edit' as WidgetAction,
-		// 	label: 'Edit Widget',
-		// 	icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z'
-		// });
-
 		items.push({
 			action: 'duplicate' as WidgetAction,
 			label: 'Duplicate',
@@ -161,21 +155,6 @@
 				icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'
 			});
 		}
-
-		items.push({ divider: true } as any);
-
-		// Layer controls
-		// items.push({
-		// 	action: 'bringToFront' as WidgetAction,
-		// 	label: 'Bring to Front',
-		// 	icon: 'M3 3h18v18H3z M7 7h10v10H7z'
-		// });
-
-		// items.push({
-		// 	action: 'sendToBack' as WidgetAction,
-		// 	label: 'Send to Back',
-		// 	icon: 'M3 3h10v10H3z M7 7h14v14H7z'
-		// });
 
 		items.push({ divider: true } as any);
 
@@ -237,47 +216,7 @@
 		aria-label="Widget menu"
 		aria-expanded={isOpen}
 	>
-    <!-- <svg class="h-10 w-10 text-gray-600" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-        <line x1="100" y1="30" x2="100" y2="50" stroke="#4a5568" stroke-width="3" stroke-linecap="round"/>
-        <circle cx="100" cy="28" r="5" fill="#4a5568"/>
-        
-        <rect x="60" y="50" width="80" height="60" rx="10" fill="#718096" stroke="#2d3748" stroke-width="2"/>
-        
-        <circle cx="75" cy="75" r="8" fill="#48bb78">
-          <animate attributeName="r" values="8;6;8" dur="3s" repeatCount="indefinite"/>
-        </circle>
-        <circle cx="125" cy="75" r="8" fill="#48bb78">
-          <animate attributeName="r" values="8;6;8" dur="3s" repeatCount="indefinite"/>
-        </circle>
-        
-        <rect x="85" y="90" width="30" height="8" rx="2" fill="#2d3748"/>
-        <line x1="90" y1="94" x2="110" y2="94" stroke="#4a5568" stroke-width="1"/>
-        
-        <rect x="50" y="115" width="100" height="70" rx="5" fill="#718096" stroke="#2d3748" stroke-width="2"/>
-        
-          <rect x="70" y="130" width="60" height="40" rx="3" fill="#2d3748"/>
-        <circle cx="85" cy="145" r="3" fill="#f56565"/>
-        <circle cx="100" cy="145" r="3" fill="#48bb78"/>
-        <circle cx="115" cy="145" r="3" fill="#4299e1"/>
-        <rect x="80" y="155" width="40" height="8" rx="2" fill="#4a5568"/>
-        
- 
-        <rect x="35" y="125" width="12" height="40" rx="6" fill="#718096" stroke="#2d3748" stroke-width="2"/>
-        <rect x="153" y="125" width="12" height="40" rx="6" fill="#718096" stroke="#2d3748" stroke-width="2"/>
-        
-  
-        <circle cx="41" cy="170" r="8" fill="#4a5568"/>
-        <circle cx="159" cy="170" r="8" fill="#4a5568"/>
-      </svg> -->
-        <img src="/images/icons/robot2.png" alt="Robot" class="h-8 w-8" />
-		<!-- <svg class="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-			<path
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				stroke-width="2"
-				d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
-			></path>
-		</svg> -->
+		<img src="/images/icons/robot2.png" alt="Robot" class="h-8 w-8" />
 	</button>
 
 	<!-- Dropdown Menu (rendered conditionally) -->

@@ -2,7 +2,6 @@
 	import type { PageData } from './$types';
 	import Dashboard from '$lib/dashboard/components/Dashboard.svelte';
 	import DashboardControls from '$lib/dashboard/components/DashboardControls.svelte';
-	import MapStoreDebugPanel from '$lib/dashboard/components/widgets/MapStoreDebugWidget.svelte';
 	import ParagraphDisplayParent from '$lib/dashboard/examples/ParagraphDisplayParent.svelte';
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
 	import type { Widget } from '$lib/dashboard/types/widget';
@@ -340,9 +339,6 @@
 
 <DashboardControls />
 
-<div class="mx-auto max-w-7xl px-4 pb-4">
-	<MapStoreDebugPanel />
-</div>
 
 <main class="mx-auto max-w-7xl p-4">
 	{#if isLoading}

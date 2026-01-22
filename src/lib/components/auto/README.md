@@ -20,7 +20,7 @@ The Universal Rendering Engine provides automatic UI generation based on schema 
    - Recursively handles nested objects and arrays
    - Renders tables for arrays, description lists for objects
 
-4. **JsonFallback** (`$lib/components/auto/JsonFallback.svelte`)
+3. **JsonFallback** (`$lib/components/auto/JsonFallback.svelte`)
    - Fallback component for data without schemas
    - Displays raw JSON in a formatted view
 
@@ -30,10 +30,15 @@ The Universal Rendering Engine provides automatic UI generation based on schema 
 
 ```svelte
 <script>
-  import UniversalWidget from '$lib/components/UniversalWidget.svelte';
+  import AutoDataView from '$lib/components/auto/AutoDataView.svelte';
+  import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
+  
+  // Get data from ValidatedTopicStore
+  const data = validatedTopicStore.at('my:topic:name');
+  const schemaId = 'my:schema-id'; // Optional: schema ID for the topic
 </script>
 
-<UniversalWidget topic="my:topic:name" />
+<AutoDataView {data} {schemaId} />
 ```
 
 ### Registering Custom Components
@@ -90,8 +95,8 @@ uiRegistry.registerPattern(/^sys:alert:/, AlertBanner, {
 
 1. **AI generates a new schema** (e.g., "Drone Survey Results")
 2. **Schema is registered** via Schema Builder or programmatically
-3. **Data is published** to a topic with the schema enforced
-4. **UniversalWidget automatically renders** using AutoDataView
+3. **Data is published** to a topic with the schema enforced in ValidatedTopicStore
+4. **AutoDataView automatically renders** the data based on the schema
 5. **No custom component code needed!**
 
 ## Testing
@@ -100,13 +105,18 @@ See `src/routes/(experiments)/(good)/admin/datatypes/universal-widget-demo/+page
 
 ## Integration with Dashboard
 
-The UniversalWidget can be used in any dashboard grid system:
+AutoDataView can be used directly in dashboard widgets:
 
 ```svelte
-<!-- In your dashboard grid -->
-<div class="grid-item">
-  <UniversalWidget topic="property:123" />
-</div>
+<!-- In your dashboard widget -->
+<script>
+  import AutoDataView from '$lib/components/auto/AutoDataView.svelte';
+  import { useReactiveValidatedTopic } from '$lib/hooks/validatedTopicStoreRunes.svelte';
+  
+  const { data, schemaId } = useReactiveValidatedTopic(() => 'property:123');
+</script>
+
+<AutoDataView {data} {schemaId} />
 ```
 
 ## Benefits

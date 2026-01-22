@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { schemaRegistry } from '$lib/stores/SchemaRegistry';
 	import type { JsonSchemaDefinition } from '$lib/types/models';
+	import AutoDataView from './AutoDataView.svelte';
 
 	interface Props {
 		data: unknown;
@@ -75,10 +76,10 @@
 					<!-- RECURSION: Render value based on type -->
 					{#if propSchema.type === 'object' && value && typeof value === 'object' && !Array.isArray(value)}
 						<div class="ml-4 border-l-2 pl-3 {darkMode ? 'border-slate-600' : 'border-slate-300'}">
-							<svelte:self data={value} fieldSchema={propSchema} {darkMode} />
+							<AutoDataView data={value} fieldSchema={propSchema} {darkMode} />
 						</div>
 					{:else if propSchema.type === 'array' && Array.isArray(value)}
-						<svelte:self data={value} fieldSchema={propSchema} {darkMode} />
+						<AutoDataView data={value} fieldSchema={propSchema} {darkMode} />
 					{:else}
 						<!-- Simple Primitive Render -->
 						{formatValue(value, propSchema)}
@@ -115,10 +116,10 @@
 										<!-- RECURSION for cell content -->
 										{#if colSchema.type === 'object' && cellValue && typeof cellValue === 'object' && !Array.isArray(cellValue)}
 											<div class="ml-2">
-												<svelte:self data={cellValue} fieldSchema={colSchema} {darkMode} />
+												<AutoDataView data={cellValue} fieldSchema={colSchema} {darkMode} />
 											</div>
 										{:else if colSchema.type === 'array' && Array.isArray(cellValue)}
-											<svelte:self data={cellValue} fieldSchema={colSchema} {darkMode} />
+											<AutoDataView data={cellValue} fieldSchema={colSchema} {darkMode} />
 										{:else}
 											{formatValue(cellValue, colSchema)}
 										{/if}

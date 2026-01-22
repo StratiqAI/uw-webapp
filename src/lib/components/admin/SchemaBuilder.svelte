@@ -218,7 +218,7 @@
 		>
 			<strong>Tip:</strong> After registering, use{' '}
 			<code class="{darkMode ? 'bg-indigo-900/50' : 'bg-indigo-100'} px-1.5 py-0.5 rounded">
-				mapStore.enforceTopicSchema(topic, '{schema.id}')
+				validatedTopicStore.registerSchema(topic, schema)
 			</code>{' '}
 			to bind a topic to this schema.
 		</div>

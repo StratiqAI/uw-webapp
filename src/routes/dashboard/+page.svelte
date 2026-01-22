@@ -4,8 +4,6 @@
 	import DashboardControls from '$lib/dashboard/components/DashboardControls.svelte';
 	import ValidatedTopicStoreSidebar from '$lib/dashboard/components/ValidatedTopicStoreSidebar.svelte';
 	import ProjectSwitcher from '$lib/dashboard/components/ProjectSwitcher.svelte';
-	import MapStoreDebugPanel from '$lib/dashboard/components/widgets/MapStoreDebugWidget.svelte';
-	import ParagraphDisplayParent from '$lib/dashboard/examples/ParagraphDisplayParent.svelte';
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
 	import { DashboardStorage } from '$lib/dashboard/utils/storage';
 	import { dashboardWidgets } from './config';
@@ -244,10 +242,6 @@
 
 		<DashboardControls {darkMode} />
 
-	<!-- MapStore Debug Panel -->
-	<!-- <div class="mx-auto max-w-7xl px-4 pb-4">
-		<MapStoreDebugPanel />
-	</div> -->
 
 	<!-- AI Job → Paragraph Widget Example -->
 	<!-- <div class="mx-auto max-w-7xl px-4 pb-4">

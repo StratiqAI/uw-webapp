@@ -101,14 +101,6 @@
 				dashboard.updateWidget(widget.id, { locked: false });
 				break;
 
-			case 'bringToFront':
-				dashboard.bringWidgetToFront(widget.id);
-				break;
-
-			case 'sendToBack':
-				dashboard.sendWidgetToBack(widget.id);
-				break;
-
 			case 'exportData':
 				exportWidgetData();
 				break;

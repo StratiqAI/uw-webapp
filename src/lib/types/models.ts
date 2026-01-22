@@ -42,7 +42,7 @@ export interface DynamicSchemaDefinition {
 }
 
 // ===== Data Envelope =====
-// What flows through the MapStore
+// What flows through the ValidatedTopicStore
 export interface Envelope<T = unknown> {
 	topic: string;
 	schemaId?: string; // If present, implies validation occurred
