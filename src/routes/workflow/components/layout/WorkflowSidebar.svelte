@@ -47,8 +47,46 @@
 	const filteredOutputNodes = $derived(allElementTypes.filter((t) => t.type === 'output' && filterMatches(t)));
 	const filteredToolNodes = $derived(allElementTypes.filter((t) => t.type === 'tools' && filterMatches(t)));
 
+	// Process node categories
+	const processNodeCategories = $derived({
+		'Financial Performance': filteredProcessNodes.filter((n) =>
+			['calculate-noi', 'calculate-cap-rate', 'calculate-grm', 'calculate-oer', 'calculate-noi-margin', 'calculate-break-even-occupancy'].includes(n.id)
+		),
+		'Return & Yield': filteredProcessNodes.filter((n) =>
+			['calculate-cash-on-cash', 'calculate-equity-multiple', 'calculate-yield-on-cost', 'calculate-simple-irr'].includes(n.id)
+		),
+		'Debt & Leverage': filteredProcessNodes.filter((n) =>
+			['calculate-dscr', 'calculate-ltv', 'calculate-debt-yield', 'calculate-icr', 'calculate-min-dscr'].includes(n.id)
+		),
+		'Per-Unit & Efficiency': filteredProcessNodes.filter((n) =>
+			['calculate-price-per-sqft', 'calculate-rent-per-sqft', 'calculate-noi-per-sqft', 'calculate-price-per-unit', 'calculate-rent-per-unit'].includes(n.id)
+		),
+		'Occupancy & Vacancy': filteredProcessNodes.filter((n) =>
+			['calculate-egi', 'calculate-vacancy-rate', 'calculate-occupancy-rate'].includes(n.id)
+		),
+		'Expense Analysis': filteredProcessNodes.filter((n) =>
+			['calculate-expense-ratio', 'calculate-maintenance-ratio', 'calculate-management-fee'].includes(n.id)
+		),
+		'Time-Based & Projection': filteredProcessNodes.filter((n) =>
+			['calculate-cash-flow', 'calculate-payback-period', 'calculate-annual-appreciation', 'calculate-total-return'].includes(n.id)
+		),
+		'Advanced': filteredProcessNodes.filter((n) =>
+			['calculate-adjusted-noi', 'calculate-net-cash-flow-after-tax', 'calculate-cap-rate-spread', 'calculate-value-add-potential'].includes(n.id)
+		)
+	});
+
 	let showInputNodes = $state(true);
 	let showProcessNodes = $state(true);
+	let showProcessCategory: Record<string, boolean> = $state({
+		'Financial Performance': true,
+		'Return & Yield': true,
+		'Debt & Leverage': true,
+		'Per-Unit & Efficiency': true,
+		'Occupancy & Vacancy': true,
+		'Expense Analysis': true,
+		'Time-Based & Projection': true,
+		'Advanced': false
+	});
 	let showAiNodes = $state(true);
 	let showOutputNodes = $state(true);
 	let showTools = $state(true);
@@ -208,20 +246,48 @@
 				{/if}
 			</div>
 			{#if showProcessNodes}
-				<div id="sidebar-process-nodes" class="space-y-2.5">
-					{#each filteredProcessNodes as elementType}
-						<button
-							class="w-full p-3.5 {getSidebarButtonColor(elementType.type, darkMode)} rounded-lg cursor-move transition-all flex items-center gap-3 border shadow-sm hover:shadow-md hover:scale-[1.02] group"
-							onmousedown={(e) => handleDragStart(elementType, e)}
-						>
-							<span class="text-sm font-semibold w-10 h-10 flex items-center justify-center {getIconBgColor(elementType.type, darkMode)} {getIconTextColor(elementType.type, darkMode)} rounded-lg transition-colors group-hover:scale-105">
-								{elementType.icon}
-							</span>
-							<span class="text-sm font-semibold flex-1 text-left {getLabelTextColor(darkMode)}">{elementType.label}</span>
-							<svg class="w-4 h-4 {darkMode ? 'text-slate-500' : 'text-slate-400'} opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16m-7-7l7 7-7 7"></path>
-							</svg>
-						</button>
+				<div id="sidebar-process-nodes" class="space-y-4">
+					{#each Object.entries(processNodeCategories) as [categoryName, categoryNodes]}
+						{#if categoryNodes.length > 0}
+							<div class="space-y-2">
+								<button
+									class="flex items-center gap-2 text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-wider w-full text-left px-1 py-1 hover:{darkMode ? 'text-slate-300' : 'text-slate-600'} transition-colors"
+									onclick={() => (showProcessCategory[categoryName] = !showProcessCategory[categoryName])}
+									aria-expanded={showProcessCategory[categoryName]}
+								>
+									<svg
+										class="w-3 h-3 transition-transform {showProcessCategory[categoryName] ? 'rotate-90' : ''} {darkMode ? 'text-slate-500' : 'text-slate-400'}"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+									</svg>
+									{categoryName}
+									<span class="ml-auto text-xs {darkMode ? 'text-slate-500' : 'text-slate-400'}">
+										({categoryNodes.length})
+									</span>
+								</button>
+								{#if showProcessCategory[categoryName]}
+									<div class="space-y-2 pl-4">
+										{#each categoryNodes as elementType}
+											<button
+												class="w-full p-3 {getSidebarButtonColor(elementType.type, darkMode)} rounded-lg cursor-move transition-all flex items-center gap-3 border shadow-sm hover:shadow-md hover:scale-[1.02] group"
+												onmousedown={(e) => handleDragStart(elementType, e)}
+											>
+												<span class="text-sm font-semibold w-9 h-9 flex items-center justify-center {getIconBgColor(elementType.type, darkMode)} {getIconTextColor(elementType.type, darkMode)} rounded-lg transition-colors group-hover:scale-105">
+													{elementType.icon}
+												</span>
+												<span class="text-sm font-semibold flex-1 text-left {getLabelTextColor(darkMode)}">{elementType.label}</span>
+												<svg class="w-4 h-4 {darkMode ? 'text-slate-500' : 'text-slate-400'} opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16m-7-7l7 7-7 7"></path>
+												</svg>
+											</button>
+										{/each}
+									</div>
+								{/if}
+							</div>
+						{/if}
 					{/each}
 				</div>
 			{/if}

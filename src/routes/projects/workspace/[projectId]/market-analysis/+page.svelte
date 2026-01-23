@@ -2,13 +2,10 @@
 	import type { PageData } from './$types';
 	import Dashboard from '$lib/dashboard/components/Dashboard.svelte';
 	import DashboardControls from '$lib/dashboard/components/DashboardControls.svelte';
-	import ParagraphDisplayParent from '$lib/dashboard/examples/ParagraphDisplayParent.svelte';
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
 	import type { Widget } from '$lib/dashboard/types/widget';
 	import { onMount, setContext } from 'svelte';
 	import { PUBLIC_GEOAPIFY_API_KEY } from '$env/static/public';
-	import SimpleWidgetExample from '$lib/dashboard/examples/SimpleWidgetExample.svelte';
-	import SimplifiedParagraphDisplay from '$lib/dashboard/examples/SimplifiedParagraphDisplay.svelte';
 
 	interface Props {
 		data: PageData;
