@@ -59,9 +59,14 @@
 	import { getAppSyncWsClient, initAppSyncWsClient } from '$lib/realtime/websocket/wsClient';
 	import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from '$env/static/public';
 	import type { ElementType, GridElement, Connection } from './types';
+	import { isExecutableNode } from './types/node';
 	import type { PageData } from './$types';
-	import type { Project } from '@stratiqai/types-simple';
+	import type { Project, WorkflowExecution } from '@stratiqai/types-simple';
 	import type { WorkflowJSON } from './types/workflow';
+	import { WorkflowSyncManager } from '$lib/realtime/websocket/syncManagers/WorkflowSyncManager';
+	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
+	import { toTopicPath } from '$lib/realtime/store/TopicMapper';
+	import { onMount, onDestroy } from 'svelte';
 	
 	// M_UPDATE_WORKFLOW mutation - matches the structure from @stratiqai/types-simple
 	// Uses CompositeKeyInput since Workflow is a child entity (has parentId)
@@ -77,7 +82,26 @@
 				deletedAt
 				sharingMode
 				name
-				definitionJSON
+				definition
+				ui {
+					elements {
+						id
+						type
+						category
+						typeLabel
+						x
+						y
+						width
+						height
+					}
+					connections {
+						id
+						from
+						to
+						fromSide
+						toSide
+					}
+				}
 			}
 		}
 	`;
@@ -95,7 +119,26 @@
 				deletedAt
 				sharingMode
 				name
-				definitionJSON
+				definition
+				ui {
+					elements {
+						id
+						type
+						category
+						typeLabel
+						x
+						y
+						width
+						height
+					}
+					connections {
+						id
+						from
+						to
+						fromSide
+						toSide
+					}
+				}
 			}
 		}
 	`;
@@ -104,7 +147,26 @@
 	type Workflow = {
 		id: string;
 		name: string;
-		definitionJSON: any;
+		definition: any;
+		ui?: {
+			elements: Array<{
+				id: string;
+				type: string;
+				category: string;
+				typeLabel: string;
+				x: number;
+				y: number;
+				width: number;
+				height: number;
+			}>;
+			connections: Array<{
+				id: string;
+				from: string;
+				to: string;
+				fromSide: string;
+				toSide: string;
+			}>;
+		};
 		[key: string]: any;
 	};
 	
@@ -123,7 +185,26 @@
 				deletedAt
 				sharingMode
 				name
-				definitionJSON
+				definition
+				ui {
+					elements {
+						id
+						type
+						category
+						typeLabel
+						x
+						y
+						width
+						height
+					}
+					connections {
+						id
+						from
+						to
+						fromSide
+						toSide
+					}
+				}
 			}
 		}
 	`;
@@ -174,7 +255,6 @@
 	let showingInputGallery = $state(false);
 	let showingProcessGallery = $state(false);
 	let aiGalleryFilter = $state('');
-	let workflowResults = $state<any[]>([]);
 	let editingAIQuery = $state<GridElement | null>(null);
 	let editingNodeOptions = $state<GridElement | null>(null);
 	let showingWorkflowJSON = $state(false);
@@ -206,6 +286,31 @@
 	let executionsLoading = $state(false);
 	let selectedExecutionId = $state<string | null>(null);
 	const executionsSubscriptionSpecRef = { current: null as { query: any; variables: any; next: (p: any) => void } | null };
+
+	// ------------------------------------------------------------------------------------------------
+	// Workflow Sync Manager
+	// ------------------------------------------------------------------------------------------------
+	let workflowSyncManager = $state<WorkflowSyncManager | null>(null);
+
+	onMount(async () => {
+		if (data.idToken) {
+			try {
+				workflowSyncManager = await WorkflowSyncManager.create({
+					idToken: data.idToken,
+					setupSubscriptions: true
+				});
+			} catch (error) {
+				console.error('Failed to initialize WorkflowSyncManager:', error);
+			}
+		}
+	});
+
+	onDestroy(() => {
+		if (workflowSyncManager) {
+			workflowSyncManager.cleanup();
+			workflowSyncManager = null;
+		}
+	});
 
 	// Function to load workflow executions for the selected workflow
 	async function loadWorkflowExecutions() {
@@ -241,16 +346,40 @@
 
 		loadingWorkflows = true;
 		try {
-			// Query the project to get its workflows using the exact query structure
-			const response = await gql<{ getProject: { workflows?: { items: Workflow[]; nextToken?: string | null } } | null }>(
+			// Query the project to get its workflows and workflowExecutions
+			const response = await gql<{ 
+				getProject: { 
+					workflows?: { items: Workflow[]; nextToken?: string | null };
+					workflowexecutions?: { items: WorkflowExecution[]; nextToken?: string | null };
+				} | null 
+			}>(
 				Q_GET_PROJECT,
 				{ id: projectId },
 				data.idToken
 			);
 			
-			const workflowItems = response?.getProject?.workflows?.items || [];
+			const project = response?.getProject;
+			const workflowItems = project?.workflows?.items || [];
+			const executionItems = project?.workflowexecutions?.items || [];
+			
 			console.log('Loaded workflows for project:', projectId, workflowItems);
+			console.log('Loaded workflow executions for project:', projectId, executionItems.length, executionItems);
+			
 			workflows = workflowItems;
+
+			// Publish workflow executions to the store (use 'workflowExecutions' camelCase to match sync manager)
+			if (executionItems.length > 0) {
+				for (const execution of executionItems) {
+					const topic = toTopicPath('workflowExecutions', execution.id);
+					const published = validatedTopicStore.publish(topic, execution);
+					console.log(`[loadWorkflowsForProject] Published execution ${execution.id} to ${topic}:`, published, execution);
+				}
+				console.log(`[loadWorkflowsForProject] Published ${executionItems.length} workflow executions to store`);
+				
+				// Verify they're in the store
+				const stored = validatedTopicStore.getAllAtArray<WorkflowExecution>('workflowExecutions');
+				console.log(`[loadWorkflowsForProject] Verified: ${stored.length} executions now in store:`, stored.map(e => ({ id: e.id, workflowId: e.workflowId })));
+			}
 		} catch (error) {
 			console.error('Failed to load workflows:', error);
 			workflows = [];
@@ -356,24 +485,64 @@
 		return null;
 	}
 
+	/**
+	 * Generate UI structure from gridElements and connections for the ui field
+	 */
+	function generateWorkflowUI() {
+		return {
+			elements: gridElements.map((el) => {
+				const category = el.type.type;
+				const typeIdWithoutPrefix = el.type.id.replace(/^(input|output|process|ai)-/, '');
+				return {
+					id: el.id,
+					type: typeIdWithoutPrefix,
+					category,
+					typeLabel: el.type.label,
+					x: el.x,
+					y: el.y,
+					width: el.width,
+					height: el.height
+				};
+			}),
+			connections: connections.map((conn) => ({
+				id: conn.id,
+				from: conn.from,
+				to: conn.to,
+				fromSide: conn.fromSide,
+				toSide: conn.toSide
+			}))
+		};
+	}
+
 	function loadWorkflowIntoCanvas(workflow: Workflow) {
-		if (!workflow.definitionJSON) {
-			console.error('Workflow has no definitionJSON');
-			return;
-		}
+		// Clear current canvas
+		gridElements = [];
+		connections = [];
 
 		try {
-			const workflowData: WorkflowJSON = typeof workflow.definitionJSON === 'string' 
-				? JSON.parse(workflow.definitionJSON)
-				: workflow.definitionJSON;
+			// Prefer loading from ui field if available, otherwise fall back to definition
+			let elementsData: any[] = [];
+			let connectionsData: any[] = [];
 
-			// Clear current canvas
-			gridElements = [];
-			connections = [];
+			if (workflow.ui && workflow.ui.elements && workflow.ui.connections) {
+				// Load from ui field
+				elementsData = workflow.ui.elements;
+				connectionsData = workflow.ui.connections;
+			} else if (workflow.definition) {
+				// Fall back to definition for backward compatibility
+				const workflowData: WorkflowJSON = typeof workflow.definition === 'string' 
+					? JSON.parse(workflow.definition)
+					: workflow.definition;
+				elementsData = workflowData.elements || [];
+				connectionsData = workflowData.connections || [];
+			} else {
+				console.error('Workflow has no ui or definition');
+				return;
+			}
 
 			// Deserialize elements
 			const newElements: GridElement[] = [];
-			for (const elData of workflowData.elements || []) {
+			for (const elData of elementsData) {
 				// Handle comments specially since they're not in the element types library
 				let elementType: ElementType | null = null;
 				if (elData.category === 'comment') {
@@ -382,8 +551,7 @@
 						id: 'comment',
 						type: 'comment',
 						label: 'Comment',
-						icon: '💬',
-						execute: () => null
+						icon: '💬'
 					};
 				} else {
 					elementType = findElementTypeByTypeAndCategory(elData.type, elData.category);
@@ -410,13 +578,31 @@
 			}
 
 			// Deserialize connections
-			const newConnections: Connection[] = (workflowData.connections || []).map((connData) => ({
+			const newConnections: Connection[] = connectionsData.map((connData) => ({
 				id: connData.id,
 				from: connData.from,
 				to: connData.to,
 				fromSide: connData.fromSide,
 				toSide: connData.toSide
 			}));
+
+			// If we loaded from ui field, we still need to load additional data (aiQueryData, nodeOptions, etc.) from definition
+			if (workflow.ui && workflow.definition) {
+				const workflowData: WorkflowJSON = typeof workflow.definition === 'string' 
+					? JSON.parse(workflow.definition)
+					: workflow.definition;
+				
+				// Merge additional data from definition into elements
+				for (const elData of workflowData.elements || []) {
+					const gridElement = newElements.find((el) => el.id === elData.id);
+					if (gridElement) {
+						if (elData.aiQueryData) gridElement.aiQueryData = elData.aiQueryData;
+						if (elData.output !== undefined) gridElement.output = elData.output;
+						if (elData.nodeOptions !== undefined) gridElement.nodeOptions = elData.nodeOptions;
+						if (elData.commentText) gridElement.commentText = elData.commentText;
+					}
+				}
+			}
 
 			gridElements = newElements;
 			connections = newConnections;
@@ -437,7 +623,6 @@
 			// Clear canvas when "New Workflow" is selected
 			gridElements = [];
 			connections = [];
-			workflowResults = [];
 		}
 	}
 
@@ -490,7 +675,6 @@
 				selectedWorkflowId = null;
 				gridElements = [];
 				connections = [];
-				workflowResults = [];
 			}
 
 			console.log('Workflow deleted successfully:', response.deleteWorkflow);
@@ -526,16 +710,21 @@
 		try {
 			// UpdateWorkflowInput - both fields are optional, so we can update just the name
 			// For a rename, we only need to send the name field
-			const input: { name: string; definitionJSON?: string } = {
+			const input: { name: string; definition?: string; ui?: any } = {
 				name: newName
 			};
 			
-			// Optionally include definitionJSON to preserve it during the update
+			// Optionally include definition to preserve it during the update
 			// Convert to string if it's an object (AWSJSON expects a string)
-			if (workflow.definitionJSON) {
-				input.definitionJSON = typeof workflow.definitionJSON === 'string' 
-					? workflow.definitionJSON 
-					: JSON.stringify(workflow.definitionJSON);
+			if (workflow.definition) {
+				input.definition = typeof workflow.definition === 'string' 
+					? workflow.definition 
+					: JSON.stringify(workflow.definition);
+			}
+			
+			// Preserve ui field if it exists
+			if (workflow.ui) {
+				input.ui = workflow.ui;
 			}
 
 			// CompositeKeyInput requires both id and parentId for child entities
@@ -594,6 +783,9 @@
 			// Generate workflow JSON
 			const workflowJSON = generateWorkflowJSON(gridElements, connections);
 
+			// Generate UI structure
+			const workflowUI = generateWorkflowUI();
+
 			// Check if we're updating an existing workflow or creating a new one
 			if (selectedWorkflowId) {
 				// Update existing workflow
@@ -603,9 +795,10 @@
 					return;
 				}
 
-				const input: { name: string; definitionJSON: string } = {
+				const input: { name: string; definition: string; ui: typeof workflowUI } = {
 					name: workflow.name, // Keep existing name, or you could update it
-					definitionJSON: workflowJSON
+					definition: workflowJSON,
+					ui: workflowUI
 				};
 
 				// CompositeKeyInput requires both id and parentId for child entities
@@ -614,7 +807,7 @@
 					parentId: selectedProjectId
 				};
 
-				const response = await gql<{ updateWorkflow: { id: string; name: string; definitionJSON: any } | null }>(
+				const response = await gql<{ updateWorkflow: { id: string; name: string; definition: any } | null }>(
 					M_UPDATE_WORKFLOW,
 					{ key, input },
 					data.idToken
@@ -642,11 +835,12 @@
 				// Create new workflow
 				const input = {
 					name: 'New Workflow',
-					definitionJSON: workflowJSON,
+					definition: workflowJSON,
+					ui: workflowUI,
 					parentId: selectedProjectId
 				};
 
-				const response = await gql<{ createWorkflow: { id: string; name: string; definitionJSON: any } | null }>(
+				const response = await gql<{ createWorkflow: { id: string; name: string; definition: any } | null }>(
 					M_CREATE_WORKFLOW,
 					{ input },
 					data.idToken
@@ -722,73 +916,11 @@
 	// ------------------------------------------------------------------------------------------------
 
 	// ------------------------------------------------------------------------------------------------
-	// Workflow execution: topological run and results capture (in-browser / local preview only)
-	// - Starts from output nodes when present; otherwise from sink nodes (no outgoing connections)
-	//   so workflows like Input -> AI without an Output node still run.
-	// - Does NOT call the backend; for real runs (Pinecone/Gemini, etc.) use "Test run" when available.
+	// Workflow execution: All executions are handled by AWS backend
+	// Local execution has been removed - workflows run on AWS when triggered by events
 	// ------------------------------------------------------------------------------------------------
 	async function executeWorkflow() {
-		workflowResults = [];
-
-		const processed = new Set<string>();
-		const results = new Map<string, any>();
-
-		async function executeElement(elementId: string): Promise<any> {
-			if (processed.has(elementId)) {
-				return results.get(elementId);
-			}
-
-			const element = gridElements.find((el) => el.id === elementId);
-			if (!element) return null;
-
-			const inputConnections = connections.filter((conn) => conn.to === elementId);
-			let input: any = null;
-
-			if (inputConnections.length > 0) {
-				const inputs = await Promise.all(
-					inputConnections.map((conn) => executeElement(conn.from))
-				);
-				input = inputs.length === 1 ? inputs[0] : inputs;
-			} else if (element.type.type === 'input') {
-				// Input nodes: use nodeOptions when set, or synthetic placeholder for local run
-				input = element.nodeOptions ?? {
-					_source: 'local-run',
-					doclinkId: 'local-placeholder',
-					documentId: 'local-placeholder',
-					filename: 'test-document.pdf'
-				};
-			}
-
-			const outputPromise = element.type.execute(input, element.aiQueryData);
-			const output = await Promise.resolve(outputPromise);
-			element.output = output;
-			results.set(elementId, output);
-			processed.add(elementId);
-
-			return output;
-		}
-
-		// Start from output-type nodes if any; otherwise from sink nodes (no outgoing) so
-		// workflows like Input -> AI run without requiring an Output node.
-		const outputTypeElements = gridElements.filter((el) => el.type.type === 'output');
-		const sinkElements = gridElements.filter((el) => !connections.some((c) => c.from === el.id));
-		const roots = outputTypeElements.length > 0 ? outputTypeElements : sinkElements;
-
-		if (roots.length === 0) {
-			// No sink and no output: try running from every node (e.g. single disconnected node)
-			await Promise.all(gridElements.map((el) => executeElement(el.id)));
-		} else {
-			await Promise.all(roots.map((el) => executeElement(el.id)));
-		}
-
-		workflowResults = Array.from(results.entries()).map(([id, value]) => {
-			const element = gridElements.find((el) => el.id === id);
-			return {
-				elementId: id,
-				label: element?.type.label || element?.type.id || '',
-				value
-			};
-		});
+		// No-op: Local execution removed. All workflows run on AWS backend.
 	}
 
 	// Delete element
@@ -796,7 +928,6 @@
 		event.stopPropagation();
 		gridElements = gridElements.filter((el) => el.id !== elementId);
 		connections = connections.filter((conn) => conn.from !== elementId && conn.to !== elementId);
-		executeWorkflow();
 	}
 
 	// ------------------------------------------------------------------------------------------------
@@ -876,7 +1007,6 @@
 			onClear={() => {
 				gridElements = [];
 				connections = [];
-				workflowResults = [];
 			}}
 			onToggleDarkMode={toggleDarkMode}
 			onProjectChange={handleProjectChange}
@@ -904,13 +1034,12 @@
 		/>
 
 		<WorkflowBottomPanel
-			results={workflowResults}
-			onClearResults={() => (workflowResults = [])}
 			{executions}
 			executionsLoading={executionsLoading}
 			{selectedWorkflowId}
 			onSelectExecution={(exec) => (selectedExecutionId = exec.id)}
 			onRefreshExecutions={loadWorkflowExecutions}
+			syncManager={workflowSyncManager}
 			{darkMode}
 		/>
 	</div>

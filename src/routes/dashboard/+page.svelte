@@ -289,6 +289,13 @@
 					</div>
 				{/if}
 			</div>
+			<!-- Overlay -->
+			<div class="absolute inset-0 flex items-center justify-center {darkMode ? 'bg-slate-900/80' : 'bg-white/80'} backdrop-blur-sm z-50">
+				<div class="text-center px-6">
+					<h2 class="text-3xl font-semibold mb-2 {darkMode ? 'text-white' : 'text-slate-900'}">Dashboards will be live soon</h2>
+					<p class="text-lg {darkMode ? 'text-slate-300' : 'text-slate-600'}">We're working on bringing you an amazing dashboard experience.</p>
+				</div>
+			</div>
 		</div>
 	</div>
 	<ValidatedTopicStoreSidebar {darkMode} />

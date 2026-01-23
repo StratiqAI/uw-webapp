@@ -3,6 +3,7 @@ import type {
 	WorkflowNodeType,
 	InputNode,
 	ProcessNode,
+	ProcessNodeRequiredInput,
 	OutputNode,
 	AINode,
 	CommentNode,
@@ -47,6 +48,8 @@ export class WorkflowNode implements IWorkflowNodeBase {
 	formatInputForAppend?: (input: unknown) => string;
 	content?: string;
 	toolType?: string;
+	requiredInputs?: ProcessNodeRequiredInput[];
+	formula?: string;
 
 	constructor(config: WorkflowNodeConfig) {
 		this.id = config.id;
@@ -67,6 +70,15 @@ export class WorkflowNode implements IWorkflowNodeBase {
 
 		if (config.type === 'output' && 'outputFormat' in config) {
 			this.outputFormat = config.outputFormat;
+		}
+
+		if (config.type === 'process') {
+			if ('requiredInputs' in config && config.requiredInputs) {
+				this.requiredInputs = config.requiredInputs;
+			}
+			if ('formula' in config && config.formula) {
+				this.formula = config.formula;
+			}
 		}
 
 		if (config.type === 'ai') {
@@ -143,7 +155,9 @@ export class WorkflowNode implements IWorkflowNodeBase {
 				return {
 					...base,
 					type: 'process',
-					execute: this.execute!
+					execute: this.execute!,
+					...(this.requiredInputs && this.requiredInputs.length > 0 && { requiredInputs: this.requiredInputs }),
+					...(this.formula && { formula: this.formula })
 				} as ProcessNode;
 			case 'output':
 				return {

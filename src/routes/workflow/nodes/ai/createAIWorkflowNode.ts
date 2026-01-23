@@ -128,10 +128,19 @@ export function createAIWorkflowNode(config: AIWorkflowNodeConfig): WorkflowNode
 				// Build messages array (handles both old and new formats)
 				const messages = buildMessages(customData, formattedPrompt);
 
-				// Build API request with all parameters
-				const requestBody = buildAPIRequest(customData, messages);
+				// Build API request for Vercel AI SDK
+				const requestBody: Record<string, unknown> = {
+					model: customData.model || 'gemini-3-flash-preview',
+					messages
+				};
 
-				const response = await fetch('/api/openai-responses', {
+				// Add optional parameters
+				if (customData.temperature !== undefined) requestBody.temperature = customData.temperature;
+				if (customData.maxTokens !== undefined) requestBody.maxTokens = customData.maxTokens;
+				if (customData.topP !== undefined) requestBody.topP = customData.topP;
+				if (customData.stop !== undefined) requestBody.stop = customData.stop;
+
+				const response = await fetch('/api/ai-query', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify(requestBody)
@@ -139,16 +148,12 @@ export function createAIWorkflowNode(config: AIWorkflowNodeConfig): WorkflowNode
 
 				if (!response.ok) {
 					const error = await response.json();
-					throw new Error(error.error || 'Failed to call OpenAI API');
+					throw new Error(error.error || 'Failed to call AI API');
 				}
 
 				const result = await response.json();
-				if (result.data) {
-					if (result.data.output && Array.isArray(result.data.output)) {
-						const firstOutput = result.data.output[0];
-						if (firstOutput?.content) return firstOutput.content;
-						if (typeof firstOutput === 'string') return firstOutput;
-					}
+				if (result.success && result.data) {
+					// Vercel AI SDK returns content directly
 					if (result.data.content) return result.data.content;
 					if (typeof result.data === 'string') return result.data;
 					return JSON.stringify(result.data);

@@ -7,7 +7,7 @@
 	type Workflow = {
 		id: string;
 		name: string;
-		definitionJSON: any;
+		definition: any;
 		[key: string]: any;
 	};
 

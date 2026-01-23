@@ -6,10 +6,24 @@ export const calculateDscrNode = new WorkflowNode({
 	label: 'Calculate DSCR',
 	icon: 'DSCR',
 	description: 'Calculate Debt Service Coverage Ratio.',
+	requiredInputs: [
+		{
+			name: 'noi',
+			description: 'Net Operating Income (annual).',
+			alternateNames: ['netOperatingIncome']
+		},
+		{
+			name: 'debtService',
+			description: 'Monthly debt service payment.',
+			alternateNames: ['monthlyPayment']
+		}
+	],
+	formula: 'DSCR = NOI / (debtService × 12)',
 	execute: (input) => {
 		if (typeof input === 'object' && input !== null) {
-			const noi = input.noi || input.netOperatingIncome || 0;
-			const debtService = input.debtService || input.monthlyPayment || 0;
+			const o = input as Record<string, unknown>;
+			const noi = (o.noi ?? o.netOperatingIncome) as number || 0;
+			const debtService = (o.debtService ?? o.monthlyPayment) as number || 0;
 			if (debtService > 0) {
 				return (noi / (debtService * 12)).toFixed(2);
 			}

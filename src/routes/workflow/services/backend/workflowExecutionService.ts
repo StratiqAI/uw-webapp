@@ -15,6 +15,8 @@ export type WorkflowExecutionListItem = Pick<
 	| 'completedNodes'
 	| 'currentNodeId'
 	| 'createdAt'
+	| 'outputData'
+	| 'inputData'
 > & { workflow?: { id: string; name: string } | null };
 
 /**
@@ -47,7 +49,7 @@ export async function fetchWorkflowExecutions(
 						workflow {
 							id
 							name
-							definitionJSON
+							definition
 						}
 						status
 						startedAt
@@ -159,7 +161,7 @@ export async function fetchWorkflowExecutionDetail(
 								deletedAt
 								sharingMode
 								name
-								definitionJSON
+								definition
 							}
 							status
 							startedAt

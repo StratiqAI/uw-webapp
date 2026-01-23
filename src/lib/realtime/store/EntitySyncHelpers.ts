@@ -61,6 +61,32 @@ export function createPromptTemplateSyncConfig(
 }
 
 /**
+ * Create a standard entity sync configuration for Workflows
+ */
+export function createWorkflowSyncConfig(
+	listQuery: string | any,
+	getQuery: string | any,
+	updateSubscription: string | any,
+	deleteSubscription: string | any,
+	createSubscription?: string | any
+): EntitySyncConfig {
+	return {
+		entityType: 'workflows',
+		listQuery,
+		getQuery,
+		createSubscription,
+		updateSubscription,
+		deleteSubscription,
+		listResponsePath: 'listWorkflows.items',
+		getResponsePath: 'getWorkflow',
+		createSubscriptionPath: 'onCreateWorkflow',
+		updateSubscriptionPath: 'onUpdateWorkflow',
+		deleteSubscriptionPath: 'onDeleteWorkflow',
+		getEntityId: (workflow: any) => workflow.id
+	};
+}
+
+/**
  * Generic helper to create entity sync configuration
  */
 export function createEntitySyncConfig<T extends { id: string }>(config: {
