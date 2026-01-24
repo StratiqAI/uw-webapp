@@ -29,7 +29,8 @@
 		onProjectChange,
 		onWorkflowChange,
 		onRenameWorkflow,
-		onDeleteWorkflow
+		onDeleteWorkflow,
+		onShowOutputSchema
 	}: {
 		zoomLevel?: number;
 		darkMode?: boolean;
@@ -49,6 +50,7 @@
 		onWorkflowChange?: (workflowId: string | null) => void;
 		onRenameWorkflow?: (workflowId: string, newName: string) => Promise<void>;
 		onDeleteWorkflow?: (workflowId: string) => Promise<void>;
+		onShowOutputSchema?: () => void;
 	} = $props();
 </script>
 
@@ -96,6 +98,18 @@
 						onclick={onExport}
 					>
 						Export
+					</button>
+				{/if}
+				{#if onShowOutputSchema}
+					<button
+						class="px-3 py-1.5 text-sm font-medium {darkMode ? 'text-amber-300 hover:text-amber-200 hover:bg-amber-900/20' : 'text-amber-700 hover:text-amber-800 hover:bg-amber-50'} rounded-md transition-colors flex items-center gap-1.5"
+						onclick={onShowOutputSchema}
+						title="Define workflow output schema"
+					>
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+						</svg>
+						Output Schema
 					</button>
 				{/if}
 			</div>

@@ -45,9 +45,17 @@ export async function executeWorkflow(
 		return output;
 	}
 
-	const outputTypeElements = gridElements.filter((el) => el.type.type === 'output');
+	// Prioritize Workflow Output node as the single root
+	const workflowOutputElement = gridElements.find((el) => el.type.id === 'workflow-output');
+	const outputTypeElements = gridElements.filter((el) => el.type.type === 'output' && el.type.id !== 'workflow-output');
 	const sinkElements = gridElements.filter((el) => !connections.some((c) => c.from === el.id));
-	const roots = outputTypeElements.length > 0 ? outputTypeElements : sinkElements;
+	
+	// Use Workflow Output if present, otherwise fall back to other output nodes or sinks
+	const roots = workflowOutputElement 
+		? [workflowOutputElement]
+		: outputTypeElements.length > 0 
+			? outputTypeElements 
+			: sinkElements;
 
 	if (roots.length === 0) {
 		await Promise.all(gridElements.map((el) => executeElement(el.id)));

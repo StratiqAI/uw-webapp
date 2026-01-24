@@ -52,6 +52,7 @@ import { aiQueryNode } from './ai/aiQueryNode';
 import { investmentReportNode } from './outputs/investmentReport';
 import { financialSummaryNode } from './outputs/financialSummary';
 import { analysisReportNode } from './outputs/analysisReport';
+import { workflowOutputNode } from './outputs/workflowOutput';
 
 export const elementTypes = [
 	// Tool Nodes
@@ -109,6 +110,7 @@ export const elementTypes = [
 	// AI Nodes
 	aiQueryNode,
 	// Output Nodes
+	workflowOutputNode, // Special: single workflow output sink
 	investmentReportNode,
 	financialSummaryNode,
 	analysisReportNode

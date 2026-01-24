@@ -163,6 +163,16 @@
 			const x = (event.clientX - rect.left - panX) / zoomLevel - dragOffset.x;
 			const y = (event.clientY - rect.top - panY) / zoomLevel - dragOffset.y;
 
+			// Enforce only one Workflow Output node
+			if (draggedElementType.id === 'workflow-output') {
+				const existingWorkflowOutput = gridElements.find((el) => el.type.id === 'workflow-output');
+				if (existingWorkflowOutput) {
+					// Don't add another one - could show a message here
+					draggedElementType = null;
+					return;
+				}
+			}
+
 			const maxX = (rect.width - panX) / zoomLevel - 100;
 			const maxY = (rect.height - panY) / zoomLevel - 80;
 			if (x > -panX / zoomLevel && y > -panY / zoomLevel && x < maxX && y < maxY) {
@@ -193,6 +203,11 @@
 		event.stopPropagation();
 		const element = gridElements.find((el) => el.id === elementId);
 		if (!element) return;
+
+		// Workflow Output node cannot have outgoing connections (it's the final sink)
+		if (element.type.id === 'workflow-output' && side === 'right') {
+			return;
+		}
 
 		const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
 		const gridRect = gridContainer?.getBoundingClientRect();

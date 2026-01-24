@@ -42,6 +42,7 @@
 	import WorkflowAIGalleryModal from '../../components/modals/WorkflowAIGalleryModal.svelte';
 	import WorkflowJsonExportModal from '../../components/modals/WorkflowJsonExportModal.svelte';
 	import WorkflowCreateCustomAIModal from '../../components/modals/WorkflowCreateCustomAIModal.svelte';
+	import WorkflowOutputSchemaModal from '../../components/modals/WorkflowOutputSchemaModal.svelte';
 	import {
 		loadCustomAINodesFromStorage,
 		createCustomAINodeState,
@@ -57,6 +58,7 @@
 		M_CREATE_WORKFLOW,
 		M_UPDATE_WORKFLOW,
 		M_DELETE_WORKFLOW,
+		M_START_WORKFLOW_EXECUTION,
 		type CreateWorkflowMutation,
 		type UpdateWorkflowMutation,
 		type DeleteWorkflowMutation
@@ -127,6 +129,8 @@
 	let editingAIQuery = $state<GridElement | null>(null);
 	let editingNodeOptions = $state<GridElement | null>(null);
 	let showingWorkflowJSON = $state(false);
+	let showingOutputSchema = $state(false);
+	let outputSchema = $state<Record<string, unknown> | null>(null);
 	let canvasRef: any = null;
 
 	// ------------------------------------------------------------------------------------------------
@@ -429,6 +433,7 @@
 		// Clear current canvas
 		gridElements = [];
 		connections = [];
+		outputSchema = null;
 
 		try {
 			// Prefer loading from ui field if available, otherwise fall back to definition
@@ -446,6 +451,10 @@
 					: workflow.definition;
 				elementsData = workflowData.elements || [];
 				connectionsData = workflowData.connections || [];
+				// Extract outputSchema from definition if present
+				if (workflowData.outputSchema) {
+					outputSchema = workflowData.outputSchema;
+				}
 			} else {
 				console.error('Workflow has no ui or definition');
 				return;
@@ -502,6 +511,11 @@
 				const workflowData: WorkflowJSON = typeof workflow.definition === 'string' 
 					? JSON.parse(workflow.definition)
 					: workflow.definition;
+				
+				// Extract outputSchema from definition if present
+				if (workflowData.outputSchema) {
+					outputSchema = workflowData.outputSchema;
+				}
 				
 				// Merge additional data from definition into elements
 				for (const elData of workflowData.elements || []) {
@@ -702,7 +716,7 @@
 
 		try {
 			// Generate workflow JSON
-			const workflowJSON = generateWorkflowJSON(gridElements, connections);
+			const workflowJSON = generateWorkflowJSON(gridElements, connections, outputSchema);
 
 			// Generate UI structure
 			const workflowUI = generateWorkflowUI();
@@ -845,10 +859,62 @@
 
 	// ------------------------------------------------------------------------------------------------
 	// Workflow execution: All executions are handled by AWS backend
-	// Local execution has been removed - workflows run on AWS when triggered by events
 	// ------------------------------------------------------------------------------------------------
+	let isExecutingWorkflow = $state(false);
+
 	async function executeWorkflow() {
-		// No-op: Local execution removed. All workflows run on AWS backend.
+		if (!selectedWorkflowId || !selectedProjectId || !data.idToken) {
+			console.error('Cannot execute workflow: missing workflowId, projectId, or idToken');
+			alert('Cannot execute workflow: Please ensure a workflow is selected and you are authenticated.');
+			return;
+		}
+
+		if (isExecutingWorkflow) {
+			console.log('Workflow execution already in progress');
+			return;
+		}
+
+		try {
+			isExecutingWorkflow = true;
+			console.log('Starting workflow execution', {
+				workflowId: selectedWorkflowId,
+				projectId: selectedProjectId,
+			});
+
+			const response = await gql<{ startWorkflowExecution: WorkflowExecution }>(
+				M_START_WORKFLOW_EXECUTION,
+				{
+					key: {
+						id: selectedWorkflowId,
+						parentId: selectedProjectId,
+					},
+				},
+				data.idToken
+			);
+
+			const execution = response?.startWorkflowExecution;
+			if (!execution) {
+				throw new Error('No execution returned from mutation');
+			}
+
+			console.log('Workflow execution started successfully', {
+				executionId: execution.id,
+				status: execution.status,
+			});
+
+			// Refresh executions list to show the new execution
+			await loadWorkflowExecutions();
+
+			// Show success notification (you can replace with a toast library if preferred)
+			console.log('✅ Workflow execution started:', execution.id);
+		} catch (error) {
+			console.error('Failed to start workflow execution:', error);
+			alert(
+				`Failed to start workflow execution: ${error instanceof Error ? error.message : String(error)}`
+			);
+		} finally {
+			isExecutingWorkflow = false;
+		}
 	}
 
 	// Delete element
@@ -864,7 +930,10 @@
 	// Handle double-click on element
 	function handleElementDoubleClick(element: GridElement, event: MouseEvent) {
 		event.stopPropagation();
-		if (element.type.type === 'ai') {
+		if (element.type.id === 'workflow-output') {
+			// Open schema editor for Workflow Output node
+			showingOutputSchema = true;
+		} else if (element.type.type === 'ai') {
 			editingAIQuery = element;
 		} else {
 			editingNodeOptions = element;
@@ -915,6 +984,7 @@
 			}
 		}}
 		onExecuteWorkflow={executeWorkflow}
+		isExecutingWorkflow={isExecutingWorkflow}
 	/>
 
 	<!-- Main Grid Area -->
@@ -929,6 +999,7 @@
 			{selectedWorkflowId}
 			onSave={saveWorkflow}
 			onExport={() => (showingWorkflowJSON = true)}
+			onShowOutputSchema={() => (showingOutputSchema = true)}
 			onZoomIn={zoomIn}
 			onZoomOut={zoomOut}
 			onResetZoom={resetZoom}
@@ -1051,6 +1122,16 @@
 			{gridElements}
 			{connections}
 			onClose={() => (showingWorkflowJSON = false)}
+		/>
+	{/if}
+
+	<!-- Workflow Output Schema Modal -->
+	{#if showingOutputSchema}
+		<WorkflowOutputSchemaModal
+			{darkMode}
+			bind:outputSchema={outputSchema}
+			onSave={saveWorkflow}
+			onClose={() => (showingOutputSchema = false)}
 		/>
 	{/if}
 

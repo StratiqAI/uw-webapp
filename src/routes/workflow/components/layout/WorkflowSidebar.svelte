@@ -12,7 +12,8 @@
 		onShowProcessGallery,
 		onShowAIGallery,
 		onExecuteWorkflow,
-		onAddComment
+		onAddComment,
+		isExecutingWorkflow = false
 	}: {
 		allElementTypes?: ElementType[];
 		darkMode?: boolean;
@@ -24,6 +25,7 @@
 		onShowAIGallery?: () => void;
 		onExecuteWorkflow?: () => void;
 		onAddComment?: () => void;
+		isExecutingWorkflow?: boolean;
 	} = $props();
 
 	function handleDragStart(elementType: ElementType, event: MouseEvent) {
@@ -45,6 +47,8 @@
 	const filteredProcessNodes = $derived(allElementTypes.filter((t) => t.type === 'process' && filterMatches(t)));
 	const filteredAINodes = $derived(allElementTypes.filter((t) => t.type === 'ai' && filterMatches(t)));
 	const filteredOutputNodes = $derived(allElementTypes.filter((t) => t.type === 'output' && filterMatches(t)));
+	const workflowOutputNode = $derived(allElementTypes.find((t) => t.id === 'workflow-output' && filterMatches(t)));
+	const otherOutputNodes = $derived(filteredOutputNodes.filter((t) => t.id !== 'workflow-output'));
 	const filteredToolNodes = $derived(allElementTypes.filter((t) => t.type === 'tools' && filterMatches(t)));
 
 	// Process node categories
@@ -345,6 +349,38 @@
 			{/if}
 		</div>
 
+		<!-- Workflow Output (Special - Single Sink) -->
+		{#if workflowOutputNode}
+			<div class="mb-6">
+				<div class="text-xs font-semibold {darkMode ? 'text-slate-300' : 'text-slate-600'} uppercase tracking-wider mb-3 flex items-center gap-2">
+					<svg class="w-4 h-4 {darkMode ? 'text-amber-400' : 'text-amber-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+					</svg>
+					Workflow Output
+				</div>
+				<button
+					class="w-full relative pl-4 pr-6 py-3 {darkMode ? 'bg-gradient-to-l from-amber-500/20 via-slate-700/80 to-slate-800/80 hover:from-amber-500/25 hover:via-slate-700 hover:to-slate-700 border-slate-600/60 hover:border-amber-400/60' : 'bg-gradient-to-l from-amber-50 via-white to-slate-50/50 hover:from-amber-100/50 hover:via-white hover:to-slate-50 border-slate-200 hover:border-amber-300/70'} rounded-l-2xl rounded-r-full cursor-move transition-all duration-300 flex items-center gap-3 border-r-2 {darkMode ? 'border-r-amber-400/70 group-hover:border-r-amber-400' : 'border-r-amber-500/80 group-hover:border-r-amber-600'} shadow-md hover:shadow-lg hover:shadow-amber-500/20 hover:scale-[1.02] hover:-translate-y-0.5 group overflow-hidden ring-2 {darkMode ? 'ring-amber-500/30' : 'ring-amber-500/20'}"
+					onmousedown={(e) => handleDragStart(workflowOutputNode, e)}
+					title="Single workflow output sink - connect all final nodes here"
+				>
+					<span class="relative z-10 text-base w-12 h-12 flex items-center justify-center {darkMode ? 'bg-gradient-to-br from-amber-500/30 via-amber-600/40 to-amber-700/50 group-hover:from-amber-500/40 group-hover:via-amber-600/50 group-hover:to-amber-700/60' : 'bg-gradient-to-br from-amber-200 via-amber-100 to-amber-200 group-hover:from-amber-300 group-hover:via-amber-200 group-hover:to-amber-300'} {darkMode ? 'text-amber-200 group-hover:text-amber-100' : 'text-amber-700 group-hover:text-amber-800'} rounded-full transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-amber-500/40 border-2 {darkMode ? 'border-amber-500/50 group-hover:border-amber-400/70' : 'border-amber-300/70 group-hover:border-amber-400/90'} backdrop-blur-sm">
+						{workflowOutputNode.icon}
+					</span>
+					<span class="relative z-10 text-sm font-bold flex-1 text-left {darkMode ? 'text-slate-100 group-hover:text-white' : 'text-slate-900 group-hover:text-slate-950'} transition-colors duration-300">
+						{workflowOutputNode.label}
+					</span>
+					<div class="absolute right-0 top-1/2 mr-1 -translate-y-1/2 w-6 h-6 {darkMode ? 'bg-amber-500/40 group-hover:bg-amber-500/50' : 'bg-amber-500/30 group-hover:bg-amber-500/40'} rounded-full flex items-center justify-center transition-all duration-300 group-hover:scale-110 z-10">
+						<svg class="w-3 h-3 {darkMode ? 'text-amber-200' : 'text-amber-700'} group-hover:text-amber-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 17l-5-5m0 0l5-5m-5 5h12"></path>
+						</svg>
+					</div>
+				</button>
+				<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-2 ml-4">
+					Define output schema in workflow settings
+				</p>
+			</div>
+		{/if}
+
 		<!-- Output Nodes -->
 		<div>
 			<button
@@ -365,7 +401,7 @@
 			</button>
 			{#if showOutputNodes}
 				<div id="sidebar-output-nodes" class="space-y-3">
-					{#each filteredOutputNodes as elementType}
+					{#each otherOutputNodes as elementType}
 						<button
 							class="w-full relative pl-4 pr-6 py-2.5 {darkMode ? 'bg-gradient-to-l from-emerald-500/10 via-slate-700/80 to-slate-800/80 hover:from-emerald-500/15 hover:via-slate-700 hover:to-slate-700 border-slate-600/60 hover:border-emerald-400/50' : 'bg-gradient-to-l from-emerald-50 via-white to-slate-50/50 hover:from-emerald-100/50 hover:via-white hover:to-slate-50 border-slate-200 hover:border-emerald-300/60'} rounded-l-2xl rounded-r-full cursor-move transition-all duration-300 flex items-center gap-3 border-r-2 {darkMode ? 'border-r-emerald-400/60 group-hover:border-r-emerald-400' : 'border-r-emerald-400/70 group-hover:border-r-emerald-500'} shadow-sm hover:shadow-lg hover:shadow-emerald-500/10 hover:scale-[1.02] hover:-translate-y-0.5 group overflow-hidden"
 							onmousedown={(e) => handleDragStart(elementType, e)}
@@ -453,20 +489,30 @@
 		{/if}
 	</div>
 
-	<!-- Execute Button (local preview only; backend runs need Test run or triggers) -->
+	<!-- Execute Button (starts real backend workflow execution) -->
 	{#if onExecuteWorkflow}
 		<div class="p-5 border-t {darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-slate-50'}">
 			<button
-				disabled
-				class="w-full px-4 py-3 {darkMode ? 'bg-slate-600' : 'bg-slate-400'} text-white rounded-md transition-colors font-semibold text-sm shadow-sm flex items-center justify-center gap-2 cursor-not-allowed opacity-60"
+				disabled={isExecutingWorkflow}
+				class="w-full px-4 py-3 {isExecutingWorkflow 
+					? (darkMode ? 'bg-slate-600' : 'bg-slate-400') + ' cursor-not-allowed opacity-60'
+					: (darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600') + ' cursor-pointer'
+				} text-white rounded-md transition-colors font-semibold text-sm shadow-sm flex items-center justify-center gap-2"
 				onclick={onExecuteWorkflow}
-				title="Execute Workflow is currently disabled."
+				title={isExecutingWorkflow ? "Workflow execution in progress..." : "Start a real workflow execution on the backend"}
 			>
-				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-				</svg>
-				Execute Workflow
+				{#if isExecutingWorkflow}
+					<svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+					</svg>
+					Starting...
+				{:else}
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+					</svg>
+					Execute Workflow
+				{/if}
 			</button>
 		</div>
 	{/if}

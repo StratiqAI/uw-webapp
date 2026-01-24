@@ -3,7 +3,8 @@ import type { Connection } from '../../types/connection';
 
 export function generateWorkflowJSON(
 	gridElements: GridElement[],
-	connections: Connection[]
+	connections: Connection[],
+	outputSchema?: Record<string, unknown> | null
 ): string {
 	const workflow: WorkflowJSON = {
 		elements: gridElements.map((el) => {
@@ -32,7 +33,8 @@ export function generateWorkflowJSON(
 			to: conn.to,
 			fromSide: conn.fromSide,
 			toSide: conn.toSide
-		}))
+		})),
+		...(outputSchema && { outputSchema })
 	};
 	return JSON.stringify(workflow, null, 2);
 }
