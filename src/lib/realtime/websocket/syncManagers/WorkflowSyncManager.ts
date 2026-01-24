@@ -25,6 +25,7 @@ import {
 	destroyAppSyncWsClient,
 	type AppSyncWsClient
 } from '../wsClient';
+import type { SubscriptionSpec } from '../types';
 import { GraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
 import { EntitySyncManager } from '$lib/realtime/store/EntitySyncManager';
 import type { EntitySyncOptions, EntitySyncResult } from '$lib/realtime/store/EntitySyncConfig';
@@ -156,6 +157,9 @@ export class WorkflowSyncManager {
 	// --- Subscription Events Tracking ---
 	private _subscriptionEvents: SubscriptionEvent[] = [];
 	private eventListeners: Set<(event: SubscriptionEvent) => void> = new Set();
+
+	/** Tracks active WorkflowNodeExecution status-change subscriptions by workflowExecutionId. */
+	private nodeExecutionSubscriptions: Map<string, SubscriptionSpec<any>> = new Map();
 
 	private constructor() {}
 
@@ -385,7 +389,7 @@ export class WorkflowSyncManager {
 			return { entities: [], count: 0, subscriptionsEnabled: false };
 		}
 		this.#ensureReady();
-		return this.#runWithStatus(
+		const result = await this.#runWithStatus(
 			() =>
 				this.workflowNodeExecutionSyncManager!.syncList({
 					...options,
@@ -393,6 +397,10 @@ export class WorkflowSyncManager {
 				}),
 			'Failed to sync workflow node execution list'
 		);
+		if (options?.setupSubscriptions) {
+			this.setupWorkflowNodeExecutionSubscriptions(workflowExecutionId);
+		}
+		return result;
 	}
 
 	/**
@@ -417,12 +425,50 @@ export class WorkflowSyncManager {
 
 	/**
 	 * Sets up subscriptions for workflow node execution status changes for a specific workflow execution.
+	 * Publishes updates to validatedTopicStore; WorkflowExecutionsPanel reacts via store subscriptions.
 	 */
 	setupWorkflowNodeExecutionSubscriptions(workflowExecutionId: string): void {
 		this.#ensureReady();
-		// Note: This would require custom subscription setup since the status change subscription
-		// uses different variables. For now, we'll rely on the standard update subscription.
-		// The EntitySyncManager will handle update subscriptions automatically.
+
+		if (this.nodeExecutionSubscriptions.has(workflowExecutionId)) {
+			return;
+		}
+
+		const spec: SubscriptionSpec<any> = {
+			query: S_ON_WORKFLOW_NODE_EXECUTION_STATUS_CHANGE,
+			variables: { parentId: workflowExecutionId },
+			next: (payload: any) => {
+				const nodeExec = payload?.onWorkflowNodeExecutionStatusChange;
+				if (nodeExec && nodeExec.parentId === workflowExecutionId) {
+					const topicPath = toTopicPath('workflowNodeExecutions', nodeExec.id);
+					store.publish(topicPath, nodeExec);
+					this.#recordEvent('workflowNodeExecution', 'statusChange', nodeExec.id, nodeExec);
+				}
+			},
+			error: (e: any) => {
+				this.#recordEvent(
+					'workflowNodeExecution',
+					'statusChange',
+					workflowExecutionId,
+					null,
+					e?.message ?? 'Unknown error'
+				);
+			}
+		};
+
+		this.subscriptionClient!.addSubscription(spec);
+		this.nodeExecutionSubscriptions.set(workflowExecutionId, spec);
+	}
+
+	/**
+	 * Removes the WorkflowNodeExecution status-change subscription for a workflow execution.
+	 */
+	removeWorkflowNodeExecutionSubscriptions(workflowExecutionId: string): void {
+		const spec = this.nodeExecutionSubscriptions.get(workflowExecutionId);
+		if (spec && this.subscriptionClient) {
+			this.subscriptionClient.removeSubscription(spec);
+			this.nodeExecutionSubscriptions.delete(workflowExecutionId);
+		}
 	}
 
 	/**
@@ -490,6 +536,11 @@ export class WorkflowSyncManager {
 	 * Cleans up resources, unsubscribes from real-time updates, and destroys clients if they are owned by this manager.
 	 */
 	cleanup(): void {
+		// Remove all WorkflowNodeExecution status-change subscriptions before tearing down clients
+		for (const execId of [...this.nodeExecutionSubscriptions.keys()]) {
+			this.removeWorkflowNodeExecutionSubscriptions(execId);
+		}
+
 		this.workflowSyncManager?.cleanup();
 		this.workflowExecutionSyncManager?.cleanup();
 		this.workflowNodeExecutionSyncManager?.cleanup();

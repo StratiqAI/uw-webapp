@@ -3,7 +3,6 @@
 	import type { WorkflowSyncManager } from '$lib/realtime/websocket/syncManagers/WorkflowSyncManager';
 	import type { WorkflowExecution, WorkflowNodeExecution } from '@stratiqai/types-simple';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
-	import { onMount, onDestroy } from 'svelte';
 
 	const {
 		executions = [],
