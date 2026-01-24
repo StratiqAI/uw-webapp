@@ -9,6 +9,7 @@
 		executions = [],
 		loading = false,
 		selectedWorkflowId = null,
+		selectedProjectId = null,
 		darkMode = false,
 		onSelectExecution,
 		onRefresh,
@@ -17,6 +18,7 @@
 		executions?: WorkflowExecutionListItem[];
 		loading?: boolean;
 		selectedWorkflowId?: string | null;
+		selectedProjectId?: string | null;
 		darkMode?: boolean;
 		onSelectExecution?: (exec: WorkflowExecutionListItem) => void;
 		onRefresh?: () => void;
@@ -29,9 +31,11 @@
 	let unsubscribeExecutions: (() => void) | null = null;
 	let unsubscribeNodeExecutions: (() => void) | null = null;
 
-	// Load executions from store when workflow changes
+		// Load executions from store when workflow changes
 	async function loadFromStore() {
-		if (!selectedWorkflowId) {
+		// Use projectId as parentId when workflowId is not available (e.g., when saving a new workflow)
+		const parentId = selectedWorkflowId || selectedProjectId;
+		if (!parentId) {
 			storeExecutions = [];
 			storeNodeExecutions = new Map();
 			return;
@@ -39,26 +43,26 @@
 
 		isLoadingFromStore = true;
 		try {
-			// First, check if we already have executions in the store (e.g., from project query)
-			let allExecutions = validatedTopicStore.getAllAtArray<WorkflowExecution>('workflowExecutions');
-			console.log('[WorkflowExecutionsPanel] All executions in store:', allExecutions.length, allExecutions);
-			
-			let filtered = allExecutions.filter((exec) => exec?.workflowId === selectedWorkflowId);
-			console.log('[WorkflowExecutionsPanel] Filtered executions for workflow', selectedWorkflowId, ':', filtered.length, filtered);
-
 			// If sync manager is ready, sync to get latest data and set up subscriptions
+			// Backend now filters by workflowId and provides chronological sorting
+			// Use projectId as parentId when workflowId is not available
 			if (syncManager?.isReady) {
-				console.log('[WorkflowExecutionsPanel] Syncing executions for workflow:', selectedWorkflowId);
-				await syncManager.syncWorkflowExecutionList(selectedWorkflowId, {
+				console.log('[WorkflowExecutionsPanel] Syncing executions for workflow:', selectedWorkflowId, 'or project:', selectedProjectId);
+				await syncManager.syncWorkflowExecutionList(selectedWorkflowId ?? undefined, selectedProjectId ?? undefined, {
 					setupSubscriptions: true
 				});
-
-				// Re-read from store after sync (in case new data was added)
-				allExecutions = validatedTopicStore.getAllAtArray<WorkflowExecution>('workflowExecutions');
-				filtered = allExecutions.filter((exec) => exec?.workflowId === selectedWorkflowId);
-				console.log('[WorkflowExecutionsPanel] After sync, filtered executions:', filtered.length, filtered);
 			}
 
+			// Read from store (backend already filtered by workflowId and sorted chronologically)
+			let allExecutions = validatedTopicStore.getAllAtArray<WorkflowExecution>('workflowExecutions');
+			console.log('[WorkflowExecutionsPanel] All executions in store:', allExecutions.length);
+			
+			// Filter by workflowId (defensive - in case store has executions from other workflows)
+			// Backend should already filter, but this ensures correctness
+			let filtered = allExecutions.filter((exec) => exec?.workflowId === selectedWorkflowId);
+			console.log('[WorkflowExecutionsPanel] Filtered executions for workflow', selectedWorkflowId, ':', filtered.length);
+
+			// Backend provides chronological sorting (newest first), so no client-side sorting needed
 			storeExecutions = filtered;
 
 			// Load node executions for each workflow execution
@@ -122,14 +126,20 @@
 			const exec = (value as any)?.data || (value as WorkflowExecution);
 			if (exec?.workflowId === selectedWorkflowId) {
 				// Update or add execution
-				storeExecutions = [
-					...storeExecutions.filter((e) => e.id !== exec.id),
-					exec
-				].sort((a, b) => {
-					const aTime = a.startedAt || a.createdAt || '';
-					const bTime = b.startedAt || b.createdAt || '';
-					return bTime.localeCompare(aTime);
-				});
+				// Backend provides chronological sorting, so we maintain order by inserting at correct position
+				// or replacing existing item
+				const existingIndex = storeExecutions.findIndex((e) => e.id === exec.id);
+				if (existingIndex >= 0) {
+					// Update existing execution in place
+					storeExecutions = [
+						...storeExecutions.slice(0, existingIndex),
+						exec,
+						...storeExecutions.slice(existingIndex + 1)
+					];
+				} else {
+					// New execution - insert at beginning (newest first from backend)
+					storeExecutions = [exec, ...storeExecutions];
+				}
 			}
 		});
 

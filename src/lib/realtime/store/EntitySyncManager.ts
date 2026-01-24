@@ -123,7 +123,7 @@ export class EntitySyncManager<T extends { id: string } = any> {
 		
 		// Set up subscriptions if requested
 		if (setupSubscriptions) {
-			this.setupCreateSubscription();
+			this.setupCreateSubscription(queryVariables);
 			this.setupSubscriptionsForEntities(entities);
 		}
 		
@@ -161,7 +161,8 @@ export class EntitySyncManager<T extends { id: string } = any> {
 		
 		// Set up subscriptions if requested
 		if (setupSubscriptions) {
-			this.setupCreateSubscription();
+			// Pass entity so configs can derive create-sub variables (e.g. workflowId from execution)
+			this.setupCreateSubscription({ entityId, entity });
 			this.setupSubscriptionsForEntities([entity]);
 		}
 		
@@ -258,12 +259,27 @@ export class EntitySyncManager<T extends { id: string } = any> {
 
 	/**
 	 * Set up a create subscription (if configured) to receive new entities.
+	 * @param options Optional variables to pass to buildCreateVariables (e.g., { projectId })
+	 * If a subscription already exists, it will be removed and recreated with the new variables.
 	 */
-	setupCreateSubscription(): void {
+	setupCreateSubscription(options?: Record<string, any>): void {
 		if (!this.config.createSubscription) return;
-		if (this.activeSubscriptions.has(EntitySyncManager.CREATE_SUBSCRIPTION_KEY)) return;
+		
+		// Remove existing subscription if it exists (to allow updating with new variables)
+		if (this.activeSubscriptions.has(EntitySyncManager.CREATE_SUBSCRIPTION_KEY)) {
+			const existingSpec = this.activeSubscriptions.get(EntitySyncManager.CREATE_SUBSCRIPTION_KEY);
+			if (existingSpec) {
+				this.subscriptionClient.removeSubscription(existingSpec);
+				this.activeSubscriptions.delete(EntitySyncManager.CREATE_SUBSCRIPTION_KEY);
+			}
+		}
 
-		const variables = this.config.buildCreateVariables ? this.config.buildCreateVariables() : {};
+		const variables = this.config.buildCreateVariables ? this.config.buildCreateVariables(options) : {};
+
+		// Skip if workflowId is required but missing (e.g. onCreateWorkflowExecution)
+		if ('workflowId' in variables && (variables.workflowId == null || variables.workflowId === '')) {
+			return;
+		}
 
 		const createSpec: SubscriptionSpec<T> = {
 			query: this.config.createSubscription,

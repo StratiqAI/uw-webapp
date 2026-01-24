@@ -45,13 +45,18 @@ if (browser && typeof window !== 'undefined') {
 /**
  * Configuration for synchronizing Workflow entities.
  */
-const workflowSyncConfig = createWorkflowSyncConfig(
-	Q_LIST_WORKFLOWS,
-	Q_GET_WORKFLOW,
-	S_ON_UPDATE_WORKFLOW,
-	S_ON_DELETE_WORKFLOW,
-	S_ON_CREATE_WORKFLOW
-);
+const workflowSyncConfig = {
+	...createWorkflowSyncConfig(
+		Q_LIST_WORKFLOWS,
+		Q_GET_WORKFLOW,
+		S_ON_UPDATE_WORKFLOW,
+		S_ON_DELETE_WORKFLOW,
+		S_ON_CREATE_WORKFLOW
+	),
+	buildCreateVariables: (options?: Record<string, any>) => ({
+		parentId: options?.projectId || undefined
+	})
+};
 
 /**
  * Configuration for synchronizing WorkflowExecution entities.
@@ -69,12 +74,16 @@ const workflowExecutionSyncConfig = createEntitySyncConfig<WorkflowExecution>({
 	updateSubscriptionPath: 'onUpdateWorkflowExecution',
 	deleteSubscriptionPath: 'onUpdateWorkflowExecution',
 	buildListVariables: (options?: Record<string, any>) => ({
-		workflowId: options?.workflowId,
+		// Use projectId as parentId when workflowId is not available (e.g., when saving a new workflow)
+		parentId: options?.workflowId || options?.projectId,
 		status: options?.status,
 		limit: options?.limit,
 		nextToken: options?.nextToken
 	}),
-	buildCreateVariables: () => ({}),
+	buildCreateVariables: (options?: Record<string, any>) => ({
+		// onCreateWorkflowExecution(workflowId: ID!) requires workflowId
+		workflowId: options?.workflowId ?? (options?.entity as { workflowId?: string } | undefined)?.workflowId
+	}),
 	buildUpdateVariables: (id: string) => ({ id })
 });
 
@@ -94,7 +103,7 @@ const workflowNodeExecutionSyncConfig = createEntitySyncConfig<WorkflowNodeExecu
 	updateSubscriptionPath: 'onUpdateWorkflowNodeExecution',
 	deleteSubscriptionPath: 'onUpdateWorkflowNodeExecution',
 	buildListVariables: (options?: Record<string, any>) => ({
-		workflowExecutionId: options?.workflowExecutionId,
+		parentId: options?.workflowExecutionId,
 		status: options?.status,
 		limit: options?.limit,
 		nextToken: options?.nextToken
@@ -274,12 +283,13 @@ export class WorkflowSyncManager {
 				}
 
 				if (setupSubscriptions) {
-					workflowSyncManager.setupCreateSubscription();
+					// Note: Create subscription will be set up with projectId when project is selected
+					// (see updateCreateWorkflowSubscription in the workflow page)
 					workflowSyncManager.setupSubscriptionsForEntities(initialWorkflows);
 				}
-			} else if (setupSubscriptions) {
-				workflowSyncManager.setupCreateSubscription();
 			}
+			// Note: Create subscription is not set up here because we need projectId
+			// It will be set up via updateCreateWorkflowSubscription when project is selected
 
 			this._status = 'ready';
 		}, 'Failed to initialize workflow sync').finally(() => {
@@ -318,18 +328,29 @@ export class WorkflowSyncManager {
 
 	/**
 	 * Fetches a list of workflow executions from the API and syncs them to the store.
+	 * Uses projectId as parentId when workflowId is not available (e.g., when saving a new workflow).
+	 * Skips the API call if both workflowId and projectId are missing (listWorkflowExecutions requires parentId: ID!).
 	 * @throws Error if the manager is not ready.
 	 */
 	async syncWorkflowExecutionList(
 		workflowId?: string,
+		projectId?: string,
 		options?: EntitySyncOptions
 	): Promise<EntitySyncResult<WorkflowExecution>> {
+		// Use projectId as parentId when workflowId is not available
+		const parentId = workflowId || projectId;
+		if (!parentId) {
+			return { entities: [], count: 0, subscriptionsEnabled: false };
+		}
 		this.#ensureReady();
+		// onCreateWorkflowExecution(workflowId: ID!) requires workflowId; skip create subscription when missing
+		const setupSubscriptions = options?.setupSubscriptions && !!workflowId;
 		return this.#runWithStatus(
 			() =>
 				this.workflowExecutionSyncManager!.syncList({
 					...options,
-					queryVariables: { ...options?.queryVariables, workflowId }
+					setupSubscriptions,
+					queryVariables: { ...options?.queryVariables, workflowId, projectId }
 				}),
 			'Failed to sync workflow execution list'
 		);
@@ -349,12 +370,16 @@ export class WorkflowSyncManager {
 
 	/**
 	 * Fetches a list of workflow node executions from the API and syncs them to the store.
+	 * Skips the API call if workflowExecutionId is missing (listWorkflowNodeExecutions requires parentId: ID!).
 	 * @throws Error if the manager is not ready.
 	 */
 	async syncWorkflowNodeExecutionList(
-		workflowExecutionId: string,
+		workflowExecutionId?: string,
 		options?: EntitySyncOptions
 	): Promise<EntitySyncResult<WorkflowNodeExecution>> {
+		if (!workflowExecutionId) {
+			return { entities: [], count: 0, subscriptionsEnabled: false };
+		}
 		this.#ensureReady();
 		return this.#runWithStatus(
 			() =>
@@ -364,6 +389,16 @@ export class WorkflowSyncManager {
 				}),
 			'Failed to sync workflow node execution list'
 		);
+	}
+
+	/**
+	 * Updates the create workflow subscription with the current projectId.
+	 * This ensures that onCreateWorkflow events are filtered by the correct parentId.
+	 * @param projectId The project ID to filter workflow creations by
+	 */
+	updateCreateWorkflowSubscription(projectId?: string): void {
+		this.#ensureReady();
+		this.workflowSyncManager!.setupCreateSubscription({ projectId });
 	}
 
 	/**

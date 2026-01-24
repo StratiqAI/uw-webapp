@@ -59,7 +59,7 @@ export interface EntitySyncConfig<T = any> {
 	buildGetVariables?: (id: string) => Record<string, any>;
 	
 	/** Optional function to build subscription variables for create */
-	buildCreateVariables?: () => Record<string, any>;
+	buildCreateVariables?: (options?: Record<string, any>) => Record<string, any>;
 	
 	/** Optional function to build subscription variables for update */
 	buildUpdateVariables?: (id: string) => Record<string, any>;

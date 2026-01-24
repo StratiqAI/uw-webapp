@@ -52,7 +52,15 @@
 	import { generateWorkflowJSON } from './services/serialization/workflowSerializationService';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
 	import WorkflowSwitcher from '$lib/dashboard/components/WorkflowSwitcher.svelte';
-	import { Q_GET_PROJECT } from '@stratiqai/types-simple';
+	import {
+		Q_GET_PROJECT,
+		M_CREATE_WORKFLOW,
+		M_UPDATE_WORKFLOW,
+		M_DELETE_WORKFLOW,
+		type CreateWorkflowMutation,
+		type UpdateWorkflowMutation,
+		type DeleteWorkflowMutation
+	} from '@stratiqai/types-simple';
 	import { S_ON_WORKFLOW_EXECUTION_STATUS_CHANGE } from '$lib/graphql/workflowExecutionSubscriptions';
 	import { fetchWorkflowExecutions } from './services/backend/workflowExecutionService';
 	import type { WorkflowExecutionListItem } from './services/backend/workflowExecutionService';
@@ -61,154 +69,13 @@
 	import type { ElementType, GridElement, Connection } from './types';
 	import { isExecutableNode } from './types/node';
 	import type { PageData } from './$types';
-	import type { Project, WorkflowExecution } from '@stratiqai/types-simple';
+	import type { Project, Workflow, WorkflowExecution } from '@stratiqai/types-simple';
 	import type { WorkflowJSON } from './types/workflow';
 	import { WorkflowSyncManager } from '$lib/realtime/websocket/syncManagers/WorkflowSyncManager';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import { toTopicPath } from '$lib/realtime/store/TopicMapper';
 	import { onMount, onDestroy } from 'svelte';
 	
-	// M_UPDATE_WORKFLOW mutation - matches the structure from @stratiqai/types-simple
-	// Uses CompositeKeyInput since Workflow is a child entity (has parentId)
-	const M_UPDATE_WORKFLOW = `
-		mutation UpdateWorkflow($key: CompositeKeyInput!, $input: UpdateWorkflowInput!) {
-			updateWorkflow(key: $key, input: $input) {
-				id
-				entityType
-				tenantId
-				ownerId
-				createdAt
-				updatedAt
-				deletedAt
-				sharingMode
-				name
-				definition
-				ui {
-					elements {
-						id
-						type
-						category
-						typeLabel
-						x
-						y
-						width
-						height
-					}
-					connections {
-						id
-						from
-						to
-						fromSide
-						toSide
-					}
-				}
-			}
-		}
-	`;
-	
-	// M_DELETE_WORKFLOW mutation - uses CompositeKeyInput since Workflow is a child entity
-	const M_DELETE_WORKFLOW = `
-		mutation DeleteWorkflow($key: CompositeKeyInput!) {
-			deleteWorkflow(key: $key) {
-				id
-				entityType
-				tenantId
-				ownerId
-				createdAt
-				updatedAt
-				deletedAt
-				sharingMode
-				name
-				definition
-				ui {
-					elements {
-						id
-						type
-						category
-						typeLabel
-						x
-						y
-						width
-						height
-					}
-					connections {
-						id
-						from
-						to
-						fromSide
-						toSide
-					}
-				}
-			}
-		}
-	`;
-	
-	// Workflow type - defined locally since it may not be exported from types-simple
-	type Workflow = {
-		id: string;
-		name: string;
-		definition: any;
-		ui?: {
-			elements: Array<{
-				id: string;
-				type: string;
-				category: string;
-				typeLabel: string;
-				x: number;
-				y: number;
-				width: number;
-				height: number;
-			}>;
-			connections: Array<{
-				id: string;
-				from: string;
-				to: string;
-				fromSide: string;
-				toSide: string;
-			}>;
-		};
-		[key: string]: any;
-	};
-	
-	// M_CREATE_WORKFLOW mutation - matches the structure from @stratiqai/types-simple
-	// This is the same mutation defined in types-simple/src/graphql/mutations/Workflow.ts
-	// Using inline definition since TypeScript exports may not be available, but structure matches exactly
-	const M_CREATE_WORKFLOW = `
-		mutation CreateWorkflow($input: CreateWorkflowInput!) {
-			createWorkflow(input: $input) {
-				id
-				entityType
-				tenantId
-				ownerId
-				createdAt
-				updatedAt
-				deletedAt
-				sharingMode
-				name
-				definition
-				ui {
-					elements {
-						id
-						type
-						category
-						typeLabel
-						x
-						y
-						width
-						height
-					}
-					connections {
-						id
-						from
-						to
-						fromSide
-						toSide
-					}
-				}
-			}
-		}
-	`;
-
 	interface Props {
 		data: PageData;
 	}
@@ -317,6 +184,7 @@
 		const wfId = selectedWorkflowId;
 		const projectId = selectedProjectId;
 		const token = data.idToken;
+		console.log('[loadWorkflowExecutions] Loading executions:', { wfId, projectId, token });
 		if (!wfId || !projectId || !token) {
 			executions = [];
 			return;
@@ -392,12 +260,20 @@
 		selectedProjectId = projectId;
 		selectedWorkflowId = null; // Clear selected workflow when project changes
 		loadWorkflowsForProject(projectId);
+		// Update the create workflow subscription to filter by the new projectId
+		if (workflowSyncManager?.isReady) {
+			workflowSyncManager.updateCreateWorkflowSubscription(projectId ?? undefined);
+		}
 	}
 
 	// Load workflows when project is selected (including on initial load)
 	$effect(() => {
 		if (selectedProjectId && data.idToken) {
 			loadWorkflowsForProject(selectedProjectId);
+		}
+		// Update the create workflow subscription when project changes
+		if (workflowSyncManager?.isReady) {
+			workflowSyncManager.updateCreateWorkflowSubscription(selectedProjectId ?? undefined);
 		}
 	});
 
@@ -655,7 +531,7 @@
 				parentId: selectedProjectId
 			};
 
-			const response = await gql<{ deleteWorkflow: { id: string } | null }>(
+			const response = await gql<DeleteWorkflowMutation>(
 				M_DELETE_WORKFLOW,
 				{ key },
 				data.idToken
@@ -733,7 +609,7 @@
 				parentId: selectedProjectId
 			};
 
-			const response = await gql<{ updateWorkflow: { id: string; name: string } | null }>(
+			const response = await gql<UpdateWorkflowMutation>(
 				M_UPDATE_WORKFLOW,
 				{ key, input },
 				data.idToken
@@ -807,7 +683,7 @@
 					parentId: selectedProjectId
 				};
 
-				const response = await gql<{ updateWorkflow: { id: string; name: string; definition: any } | null }>(
+				const response = await gql<UpdateWorkflowMutation>(
 					M_UPDATE_WORKFLOW,
 					{ key, input },
 					data.idToken
@@ -840,7 +716,9 @@
 					parentId: selectedProjectId
 				};
 
-				const response = await gql<{ createWorkflow: { id: string; name: string; definition: any } | null }>(
+				console.log('[saveWorkflow] Creating new workflow:', { input });
+
+				const response = await gql<CreateWorkflowMutation>(
 					M_CREATE_WORKFLOW,
 					{ input },
 					data.idToken
@@ -1037,6 +915,7 @@
 			{executions}
 			executionsLoading={executionsLoading}
 			{selectedWorkflowId}
+			selectedProjectId={selectedProjectId}
 			onSelectExecution={(exec) => (selectedExecutionId = exec.id)}
 			onRefreshExecutions={loadWorkflowExecutions}
 			syncManager={workflowSyncManager}

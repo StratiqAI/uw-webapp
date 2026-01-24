@@ -1,5 +1,5 @@
 import { gql } from '$lib/realtime/graphql/requestHandler';
-import { Q_GET_WORKFLOW_EXECUTION } from '@stratiqai/types-simple';
+import { Q_GET_WORKFLOW_EXECUTION, Q_LIST_WORKFLOW_EXECUTIONS } from '@stratiqai/types-simple';
 import type { WorkflowExecution } from '@stratiqai/types-simple';
 
 export type WorkflowExecutionListItem = Pick<
@@ -20,225 +20,85 @@ export type WorkflowExecutionListItem = Pick<
 > & { workflow?: { id: string; name: string } | null };
 
 /**
- * Fetch a list of workflow executions for a workflow by querying the project.
- * Uses the parent-child relationship: Project → WorkflowExecution
- * Filters by workflowId on the client side since workflowexecutions returns all executions for the project
+ * Fetch a list of workflow executions for a workflow using hierarchical query.
+ * Uses direct listWorkflowExecutions query with workflowId filter.
+ * Results are automatically sorted chronologically by the backend (newest first).
  */
 export async function fetchWorkflowExecutions(
 	workflowId: string,
-	projectId: string,
+	projectId: string, // Kept for backward compatibility, but not used in query
 	idToken: string,
 	options?: { limit?: number; status?: string; nextToken?: string | null }
 ): Promise<{ items: WorkflowExecutionListItem[]; nextToken?: string | null }> {
 	const limit = options?.limit ?? 50;
-	const QUERY_PROJECT_WITH_WORKFLOW_EXECUTIONS = `
-		query GetProjectWithWorkflowExecutions($id: ID!, $executionsLimit: Int, $executionsNextToken: String) {
-			getProject(id: $id) {
-				id
-				workflowexecutions(limit: $executionsLimit, nextToken: $executionsNextToken) {
-					items {
-						id
-						entityType
-						tenantId
-						ownerId
-						createdAt
-						updatedAt
-						deletedAt
-						parentId
-						workflowId
-						workflow {
-							id
-							name
-							definition
-						}
-						status
-						startedAt
-						completedAt
-						cancelledAt
-						triggerEvent
-						inputData
-						outputData
-						errorMessage
-						totalNodes
-						completedNodes
-						currentNodeId
-					}
-					nextToken
-				}
-			}
-		}
-	`;
+
+	console.log('[fetchWorkflowExecutions] Fetching executions for workflow:', {
+		workflowId,
+		limit,
+		status: options?.status,
+		nextToken: options?.nextToken
+	});
 
 	const response = await gql<{
-		getProject: {
-			workflowexecutions?: {
-				items: WorkflowExecutionListItem[];
-				nextToken?: string | null;
-			} | null;
-		} | null;
+		listWorkflowExecutions: {
+			items: WorkflowExecutionListItem[];
+			nextToken?: string | null;
+		};
 	}>(
-		QUERY_PROJECT_WITH_WORKFLOW_EXECUTIONS,
+		Q_LIST_WORKFLOW_EXECUTIONS,
 		{
-			id: projectId,
-			executionsLimit: limit,
-			executionsNextToken: options?.nextToken ?? null
+			parentId: workflowId, // Backend expects parentId (workflow ID)
+			status: options?.status || undefined,
+			limit: limit,
+			nextToken: options?.nextToken || null
 		},
 		idToken
 	);
 
-	// Get all executions from the project
-	const project = response?.getProject;
-	const allExecutions = project?.workflowexecutions?.items ?? [];
-	const nextToken = project?.workflowexecutions?.nextToken ?? null;
+	const executions = response?.listWorkflowExecutions?.items ?? [];
+	const nextToken = response?.listWorkflowExecutions?.nextToken ?? null;
 
-	console.log('[fetchWorkflowExecutions] Debug:', {
-		projectId,
+	console.log('[fetchWorkflowExecutions] Results:', {
 		workflowId,
-		totalExecutions: allExecutions.length,
-		executionWorkflowIds: allExecutions.map((e) => e.workflowId),
-		executionIds: allExecutions.map((e) => e.id)
+		count: executions.length,
+		executionIds: executions.map((e) => e.id),
+		hasNextToken: !!nextToken
 	});
 
-	// Filter by workflowId and optionally by status
-	let filteredExecutions = allExecutions.filter((exec) => exec.workflowId === workflowId);
-	if (options?.status) {
-		filteredExecutions = filteredExecutions.filter((exec) => exec.status === options.status);
-	}
-
-	console.log('[fetchWorkflowExecutions] Filtered:', {
-		filteredCount: filteredExecutions.length,
-		filteredIds: filteredExecutions.map((e) => e.id)
-	});
-
-	// Sort by creation date (newest first)
-	const sortedItems = [...filteredExecutions].sort((a, b) => {
-		const aTime = new Date(a.createdAt || a.startedAt || 0).getTime();
-		const bTime = new Date(b.createdAt || b.startedAt || 0).getTime();
-		return bTime - aTime;
-	});
-
+	// Results are already filtered by workflowId and sorted chronologically by backend
+	// No client-side filtering or sorting needed
 	return {
-		items: sortedItems,
+		items: executions,
 		nextToken
 	};
 }
 
 /**
  * Fetch a single workflow execution with node executions.
- * If projectId is provided, fetches through the project relationship (more reliable for child entities).
+ * Uses direct getWorkflowExecution query (GSI1 lookup for O(1) access).
+ * Node executions are fetched via the field resolver (more efficient with hierarchical schema).
  */
 export async function fetchWorkflowExecutionDetail(
 	id: string,
 	idToken: string,
-	projectId?: string
+	projectId?: string // Kept for backward compatibility, but not used in query
 ): Promise<WorkflowExecution | null> {
-	console.log('[fetchWorkflowExecutionDetail] Fetching execution:', { id, projectId });
+	console.log('[fetchWorkflowExecutionDetail] Fetching execution:', { id });
 	
-	// If projectId is provided, fetch through project relationship (more reliable)
-	if (projectId) {
-		const QUERY_PROJECT_WITH_EXECUTION = `
-			query GetProjectWithExecution($projectId: ID!, $executionId: ID!) {
-				getProject(id: $projectId) {
-					id
-					workflowexecutions(limit: 1000) {
-						items {
-							id
-							entityType
-							tenantId
-							ownerId
-							createdAt
-							updatedAt
-							deletedAt
-							parentId
-							workflowId
-							workflow {
-								id
-								entityType
-								tenantId
-								ownerId
-								createdAt
-								updatedAt
-								deletedAt
-								sharingMode
-								name
-								definition
-							}
-							status
-							startedAt
-							completedAt
-							cancelledAt
-							triggerEvent
-							inputData
-							outputData
-							errorMessage
-							totalNodes
-							completedNodes
-							currentNodeId
-							nodeExecutions(limit: 100) {
-								items {
-									id
-									entityType
-									tenantId
-									ownerId
-									createdAt
-									updatedAt
-									deletedAt
-									parentId
-									workflowExecutionId
-									nodeId
-									nodeCategory
-									nodeName
-									nodeType
-									status
-									startedAt
-									completedAt
-									inputData
-									outputData
-									errorMessage
-									errorDetails
-								}
-								nextToken
-							}
-						}
-					}
-				}
-			}
-		`;
-
-		try {
-			const response = await gql<{
-				getProject: {
-					workflowexecutions?: {
-						items: WorkflowExecution[];
-					} | null;
-				} | null;
-			}>(QUERY_PROJECT_WITH_EXECUTION, { projectId, executionId: id }, idToken);
-			
-			const executions = response?.getProject?.workflowexecutions?.items ?? [];
-			const execution = executions.find((e) => e.id === id);
-			
-			if (execution) {
-				console.log('[fetchWorkflowExecutionDetail] Found execution via project:', execution.id);
-				return execution;
-			}
-			console.warn('[fetchWorkflowExecutionDetail] Execution not found in project executions');
-		} catch (error) {
-			console.error('[fetchWorkflowExecutionDetail] Error fetching via project:', error);
-			// Fall through to direct query
-		}
-	}
-
-	// Fallback to direct query
+	// Use direct query (GSI1 lookup) - more efficient than querying through Project
+	// The hierarchical schema supports O(1) lookup via GSI1
 	try {
 		const response = await gql<{ getWorkflowExecution: WorkflowExecution | null }>(
 			Q_GET_WORKFLOW_EXECUTION,
 			{ id },
 			idToken
 		);
-		console.log('[fetchWorkflowExecutionDetail] Direct query response:', response);
+		console.log('[fetchWorkflowExecutionDetail] Query response:', response);
 		const result = response?.getWorkflowExecution ?? null;
 		if (!result) {
 			console.warn('[fetchWorkflowExecutionDetail] Execution not found for id:', id);
+		} else {
+			console.log('[fetchWorkflowExecutionDetail] Found execution:', result.id);
 		}
 		return result;
 	} catch (error) {

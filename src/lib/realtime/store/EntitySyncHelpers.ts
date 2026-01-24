@@ -101,7 +101,11 @@ export function createEntitySyncConfig<T extends { id: string }>(config: {
 	createSubscriptionPath?: string;
 	updateSubscriptionPath?: string;
 	deleteSubscriptionPath?: string;
-	buildCreateVariables?: () => Record<string, any>;
+	buildListVariables?: (options?: Record<string, any>) => Record<string, any>;
+	buildGetVariables?: (id: string) => Record<string, any>;
+	buildCreateVariables?: (options?: Record<string, any>) => Record<string, any>;
+	buildUpdateVariables?: (id: string) => Record<string, any>;
+	buildDeleteVariables?: (id: string) => Record<string, any>;
 	onUpdate?: (entity: T) => void;
 	onDelete?: (entity: T) => void;
 	onCreate?: (entity: T) => void;

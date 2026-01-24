@@ -11,6 +11,7 @@
 		executions = [],
 		executionsLoading = false,
 		selectedWorkflowId = null,
+		selectedProjectId = null,
 		onSelectExecution,
 		onRefreshExecutions,
 		syncManager = null,
@@ -19,6 +20,7 @@
 		executions?: WorkflowExecutionListItem[];
 		executionsLoading?: boolean;
 		selectedWorkflowId?: string | null;
+		selectedProjectId?: string | null;
 		onSelectExecution?: (exec: WorkflowExecutionListItem) => void;
 		onRefreshExecutions?: () => void;
 		syncManager?: WorkflowSyncManager | null;
@@ -182,6 +184,7 @@
 				{executions}
 				loading={executionsLoading}
 				{selectedWorkflowId}
+				{selectedProjectId}
 				{darkMode}
 				onSelectExecution={onSelectExecution}
 				onRefresh={onRefreshExecutions}
