@@ -276,8 +276,8 @@ export class EntitySyncManager<T extends { id: string } = any> {
 
 		const variables = this.config.buildCreateVariables ? this.config.buildCreateVariables(options) : {};
 
-		// Skip if workflowId is required but missing (e.g. onCreateWorkflowExecution)
-		if ('workflowId' in variables && (variables.workflowId == null || variables.workflowId === '')) {
+		// Skip if parentId is required but missing (e.g. onCreateWorkflowExecution)
+		if ('parentId' in variables && (variables.parentId == null || variables.parentId === '')) {
 			return;
 		}
 

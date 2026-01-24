@@ -277,7 +277,7 @@
 				
 				// Verify they're in the store
 				const stored = validatedTopicStore.getAllAtArray<WorkflowExecution>('workflowExecutions');
-				console.log(`[loadWorkflowsForProject] Verified: ${stored.length} executions now in store:`, stored.map(e => ({ id: e.id, workflowId: e.workflowId })));
+				console.log(`[loadWorkflowsForProject] Verified: ${stored.length} executions now in store:`, stored.map(e => ({ id: e.id, parentId: e.parentId })));
 			}
 		} catch (error) {
 			console.error('Failed to load workflows:', error);
@@ -344,7 +344,7 @@
 			});
 			const spec = {
 				query: S_ON_WORKFLOW_EXECUTION_STATUS_CHANGE,
-				variables: { workflowId: wfId },
+				variables: { parentId: wfId },
 				next: (payload: any) => {
 					if (cancelled) return;
 					const d = payload?.onWorkflowExecutionStatusChange;
@@ -1149,9 +1149,10 @@
 	{/if}
 
 	<!-- Workflow Execution Detail Modal -->
-	{#if selectedExecutionId && data.idToken}
+	{#if selectedExecutionId && selectedWorkflowId && data.idToken}
 		<WorkflowExecutionDetailModal
 			executionId={selectedExecutionId}
+			workflowId={selectedWorkflowId}
 			idToken={data.idToken}
 			projectId={selectedProjectId ?? undefined}
 			{darkMode}

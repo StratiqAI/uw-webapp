@@ -23,12 +23,12 @@ export const S_ON_UPDATE_WORKFLOW_EXECUTION = gql`
 
 export const S_ON_WORKFLOW_EXECUTION_STATUS_CHANGE = gql`
   subscription OnWorkflowExecutionStatusChange(
-    $workflowId: ID
+    $parentId: ID
     $status: WorkflowExecutionStatus
   ) {
-    onWorkflowExecutionStatusChange(workflowId: $workflowId, status: $status) {
+    onWorkflowExecutionStatusChange(parentId: $parentId, status: $status) {
       id
-      workflowId
+      parentId
       workflow { id name }
       status
       startedAt
@@ -43,10 +43,10 @@ export const S_ON_WORKFLOW_EXECUTION_STATUS_CHANGE = gql`
 `;
 
 export const S_ON_WORKFLOW_NODE_EXECUTION_STATUS_CHANGE = gql`
-  subscription OnWorkflowNodeExecutionStatusChange($workflowExecutionId: ID!) {
-    onWorkflowNodeExecutionStatusChange(workflowExecutionId: $workflowExecutionId) {
+  subscription OnWorkflowNodeExecutionStatusChange($parentId: ID!) {
+    onWorkflowNodeExecutionStatusChange(parentId: $parentId) {
       id
-      workflowExecutionId
+      parentId
       nodeId
       nodeCategory
       nodeName

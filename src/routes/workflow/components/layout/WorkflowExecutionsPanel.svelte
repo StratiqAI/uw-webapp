@@ -57,9 +57,9 @@
 			let allExecutions = validatedTopicStore.getAllAtArray<WorkflowExecution>('workflowExecutions');
 			console.log('[WorkflowExecutionsPanel] All executions in store:', allExecutions.length);
 			
-			// Filter by workflowId (defensive - in case store has executions from other workflows)
+			// Filter by parentId (defensive - in case store has executions from other workflows)
 			// Backend should already filter, but this ensures correctness
-			let filtered = allExecutions.filter((exec) => exec?.workflowId === selectedWorkflowId);
+			let filtered = allExecutions.filter((exec) => exec?.parentId === selectedWorkflowId);
 			console.log('[WorkflowExecutionsPanel] Filtered executions for workflow', selectedWorkflowId, ':', filtered.length);
 
 			// Backend provides chronological sorting (newest first), so no client-side sorting needed
@@ -71,7 +71,7 @@
 				// Check store first
 				let nodeExecs = validatedTopicStore
 					.getAllAtArray<WorkflowNodeExecution>('workflowNodeExecutions')
-					.filter((ne) => ne?.workflowExecutionId === exec.id);
+					.filter((ne) => ne?.parentId === exec.id);
 
 				// If sync manager is ready, sync to get latest node executions
 				if (syncManager?.isReady) {
@@ -82,7 +82,7 @@
 						// Re-read from store after sync
 						nodeExecs = validatedTopicStore
 							.getAllAtArray<WorkflowNodeExecution>('workflowNodeExecutions')
-							.filter((ne) => ne?.workflowExecutionId === exec.id);
+							.filter((ne) => ne?.parentId === exec.id);
 					} catch (err) {
 						console.error(`Failed to load node executions for ${exec.id}:`, err);
 					}
@@ -124,7 +124,7 @@
 		const execUnsub = validatedTopicStore.subscribe('workflowExecutions/+', (value: unknown) => {
 			// Value can be either the entity directly or { id, data }
 			const exec = (value as any)?.data || (value as WorkflowExecution);
-			if (exec?.workflowId === selectedWorkflowId) {
+			if (exec?.parentId === selectedWorkflowId) {
 				// Update or add execution
 				// Backend provides chronological sorting, so we maintain order by inserting at correct position
 				// or replacing existing item
@@ -147,8 +147,8 @@
 		const nodeUnsub = validatedTopicStore.subscribe('workflowNodeExecutions/+', (value: unknown) => {
 			// Value can be either the entity directly or { id, data }
 			const nodeExec = (value as any)?.data || (value as WorkflowNodeExecution);
-			if (nodeExec?.workflowExecutionId) {
-				const exec = storeExecutions.find((e) => e.id === nodeExec.workflowExecutionId);
+			if (nodeExec?.parentId) {
+				const exec = storeExecutions.find((e) => e.id === nodeExec.parentId);
 				if (exec) {
 					const existing = storeNodeExecutions.get(exec.id) || [];
 					const updated = [
@@ -178,7 +178,7 @@
 		if (storeExecutions.length > 0) {
 			return storeExecutions.map((exec) => ({
 				id: exec.id,
-				workflowId: exec.workflowId,
+				parentId: exec.parentId,
 				workflow: exec.workflow,
 				status: exec.status,
 				startedAt: exec.startedAt,
@@ -263,6 +263,13 @@
 
 	const displayLoading = $derived.by(() => loading || isLoadingFromStore);
 
+	// Separate latest execution from others
+	const latestExecution = $derived(displayExecutions.length > 0 ? displayExecutions[0] : null);
+	const olderExecutions = $derived(displayExecutions.slice(1));
+
+	// Track which execution is expanded
+	let expandedExecutionId = $state<string | null>(null);
+
 	async function handleRefresh() {
 		if (syncManager?.isReady && selectedWorkflowId) {
 			await loadFromStore();
@@ -274,6 +281,13 @@
 	function getNodeExecutionsForExecution(executionId: string): WorkflowNodeExecution[] {
 		return storeNodeExecutions.get(executionId) || [];
 	}
+
+	// Auto-expand latest execution
+	$effect(() => {
+		if (latestExecution && !expandedExecutionId) {
+			expandedExecutionId = latestExecution.id;
+		}
+	});
 
 	function statusColor(status: string) {
 		switch (status) {
@@ -371,175 +385,372 @@
 			No executions yet. Runs start when this workflow's trigger (e.g. Doclink Created) fires.
 		</p>
 	{:else}
-		<div class="space-y-2 max-h-48 overflow-y-auto">
-			{#each displayExecutions as exec (exec.id)}
+		<div class="space-y-4">
+			<!-- Latest Execution - Prominently Displayed -->
+			{#if latestExecution}
+				{@const exec = latestExecution}
+				{@const isExpanded = expandedExecutionId === exec.id}
+				{@const nodeExecs = getNodeExecutionsForExecution(exec.id)}
 				<div
 					class="{darkMode
-						? 'bg-slate-800 border-slate-700'
-						: 'bg-slate-50 border-slate-200'} border rounded-lg"
+						? 'bg-gradient-to-br from-slate-800 via-slate-800 to-slate-900 border-indigo-500/30'
+						: 'bg-gradient-to-br from-white via-slate-50 to-slate-100 border-indigo-200'} border-2 rounded-lg shadow-lg"
 				>
-					<button
-						type="button"
-						class="w-full text-left p-3 {darkMode
-							? 'hover:border-slate-600 hover:bg-slate-750'
-							: 'hover:border-slate-300 hover:bg-slate-100'} transition-colors"
-						onclick={() => onSelectExecution?.(exec)}
-					>
-						<div class="flex items-center justify-between gap-2 mb-1">
-							<span class="text-xs font-mono {darkMode ? 'text-slate-500' : 'text-slate-500'} truncate">
-								{exec.id.slice(0, 8)}…
-							</span>
-							<span
-								class="text-[10px] font-medium px-1.5 py-0.5 rounded {statusColor(exec.status)}"
-							>
-								{exec.status}
-							</span>
+					<!-- Latest Execution Header -->
+					<div class="p-4 border-b {darkMode ? 'border-slate-700' : 'border-slate-200'}">
+						<div class="flex items-center justify-between mb-3">
+							<div class="flex items-center gap-3">
+								<div class="flex items-center gap-2">
+									<span class="text-xs font-semibold px-2 py-1 rounded {darkMode ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-100 text-indigo-700'}">
+										Latest
+									</span>
+									<span
+										class="text-xs font-medium px-2 py-1 rounded {statusColor(exec.status)}"
+									>
+										{exec.status}
+									</span>
+								</div>
+								<span class="text-xs font-mono {darkMode ? 'text-slate-400' : 'text-slate-500'}">
+									{exec.id.slice(0, 8)}…
+								</span>
+							</div>
+							<div class="flex items-center gap-2">
+								<button
+									type="button"
+									onclick={() => {
+										expandedExecutionId = isExpanded ? null : exec.id;
+									}}
+									class="p-1.5 rounded {darkMode
+										? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700'
+										: 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'} transition-colors"
+									title={isExpanded ? 'Collapse' : 'Expand'}
+									aria-label={isExpanded ? 'Collapse execution details' : 'Expand execution details'}
+								>
+									<svg
+										class="w-4 h-4 transition-transform {isExpanded ? 'rotate-180' : ''}"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+									</svg>
+								</button>
+								<button
+									type="button"
+									onclick={() => onSelectExecution?.(exec)}
+									class="px-3 py-1.5 text-xs font-medium {darkMode
+										? 'text-indigo-300 hover:text-indigo-200 hover:bg-indigo-900/30'
+										: 'text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50'} rounded transition-colors"
+								>
+									View Details
+								</button>
+							</div>
 						</div>
-						<div class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'}">
-							{progressText(exec)}
-							<span class="mx-1">·</span>
-							{formatDate(exec.startedAt || exec.createdAt)}
+						<div class="flex items-center gap-4 text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'}">
+							<span>{progressText(exec)}</span>
+							<span>·</span>
+							<span>{formatDate(exec.startedAt || exec.createdAt)}</span>
+							{#if exec.completedAt}
+								<span>·</span>
+								<span>Completed: {formatDate(exec.completedAt)}</span>
+							{/if}
 						</div>
 						{#if exec.errorMessage}
 							<div
-								class="mt-1 text-[10px] {darkMode ? 'text-red-400' : 'text-red-600'} truncate"
-								title={exec.errorMessage}
+								class="mt-2 p-2 text-xs {darkMode ? 'bg-red-900/30 text-red-300 border-red-700' : 'bg-red-50 text-red-700 border-red-200'} border rounded"
 							>
-								{exec.errorMessage}
+								<strong>Error:</strong> {exec.errorMessage}
 							</div>
-						{/if}
-					</button>
-					
-					<!-- Execution Input/Output -->
-					<div class="border-t {darkMode ? 'border-slate-700' : 'border-slate-200'} px-3 py-2 space-y-2">
-						{#if exec.inputData}
-							<details class="text-[10px]">
-								<summary
-									class="font-medium {darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-700'} cursor-pointer mb-1"
-								>
-									Input Data
-								</summary>
-								<pre
-									class="text-xs {darkMode
-										? 'text-slate-300 bg-slate-900 border-slate-700'
-										: 'text-slate-700 bg-white border-slate-200'} p-2 rounded border overflow-x-auto mt-1"
-								>{formatDataForDisplay(exec.inputData)}</pre>
-							</details>
-						{/if}
-						
-						{#if exec.outputData}
-							{@const outputText = extractOutputText(exec.outputData)}
-							{#if outputText}
-								<details class="text-[10px]">
-									<summary
-										class="font-medium {darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-700'} cursor-pointer mb-1"
-									>
-										Output Text
-									</summary>
-									<div class="text-xs {darkMode ? 'text-slate-300' : 'text-slate-700'} mt-1 whitespace-pre-wrap break-words">
-										{outputText}
-									</div>
-								</details>
-							{:else}
-								<details class="text-[10px]">
-									<summary
-										class="font-medium {darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-700'} cursor-pointer mb-1"
-									>
-										Output Data
-									</summary>
-									<pre
-										class="text-xs {darkMode
-											? 'text-slate-300 bg-slate-900 border-slate-700'
-											: 'text-slate-700 bg-white border-slate-200'} p-2 rounded border overflow-x-auto mt-1"
-									>{formatDataForDisplay(exec.outputData)}</pre>
-								</details>
-							{/if}
 						{/if}
 					</div>
 
-					<!-- Node Executions -->
-					{#if getNodeExecutionsForExecution(exec.id).length > 0}
-						<div class="border-t {darkMode ? 'border-slate-700' : 'border-slate-200'} px-3 py-2">
-							<div class="text-[10px] font-medium {darkMode ? 'text-slate-400' : 'text-slate-600'} mb-2">
-								Nodes ({getNodeExecutionsForExecution(exec.id).length}):
-							</div>
-							<div class="space-y-2">
-								{#each getNodeExecutionsForExecution(exec.id) as nodeExec (nodeExec.id)}
-									<div
-										class="{darkMode
-											? 'bg-slate-900 border-slate-700'
-											: 'bg-white border-slate-200'} border rounded p-2"
-									>
-										<div class="flex items-center justify-between mb-1">
-											<span class="text-[10px] font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} truncate">
-												{nodeExec.nodeName || nodeExec.nodeId}
-											</span>
-											<span
-												class="px-1 py-0.5 rounded text-[9px] {statusColor(nodeExec.status)}"
-											>
-												{nodeExec.status}
-											</span>
+					<!-- Latest Execution Content - Expanded by default -->
+					{#if isExpanded}
+						<div class="p-4 space-y-4">
+							<!-- Workflow Input/Output - Always Visible -->
+							<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+								{#if exec.inputData}
+									<div>
+										<div class="text-xs font-semibold {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2 flex items-center gap-2">
+											<svg class="w-4 h-4 {darkMode ? 'text-indigo-400' : 'text-indigo-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+											</svg>
+											Workflow Input
 										</div>
-										
-										{#if nodeExec.inputData}
-											<details class="text-[10px] mt-1">
-												<summary
-													class="font-medium {darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-700'} cursor-pointer mb-0.5"
-												>
-													Input
-												</summary>
-												<pre
-													class="text-[9px] {darkMode
-														? 'text-slate-300 bg-slate-950 border-slate-800'
-														: 'text-slate-700 bg-slate-50 border-slate-300'} p-1.5 rounded border overflow-x-auto mt-0.5"
-												>{formatDataForDisplay(nodeExec.inputData)}</pre>
-											</details>
-										{/if}
-										
-										{#if nodeExec.outputData}
-											{@const nodeOutputText = extractOutputText(nodeExec.outputData)}
-											{#if nodeOutputText}
-												<details class="text-[10px] mt-1">
-													<summary
-														class="font-medium {darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-700'} cursor-pointer mb-0.5"
-													>
-														Output Text
-													</summary>
-													<div class="text-[9px] {darkMode ? 'text-slate-300' : 'text-slate-700'} mt-0.5 whitespace-pre-wrap break-words">
-														{nodeOutputText}
-													</div>
-												</details>
-											{:else}
-												<details class="text-[10px] mt-1">
-													<summary
-														class="font-medium {darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-700'} cursor-pointer mb-0.5"
-													>
-														Output
-													</summary>
-													<pre
-														class="text-[9px] {darkMode
-															? 'text-slate-300 bg-slate-950 border-slate-800'
-															: 'text-slate-700 bg-slate-50 border-slate-300'} p-1.5 rounded border overflow-x-auto mt-0.5"
-													>{formatDataForDisplay(nodeExec.outputData)}</pre>
-												</details>
-											{/if}
-										{/if}
-										
-										{#if nodeExec.errorMessage}
-											<div
-												class="mt-1 text-[9px] {darkMode ? 'text-red-400' : 'text-red-600'} truncate"
-												title={nodeExec.errorMessage}
-											>
-												Error: {nodeExec.errorMessage}
+										<pre
+											class="text-xs {darkMode
+												? 'text-slate-200 bg-slate-900 border-slate-700'
+												: 'text-slate-800 bg-white border-slate-200'} p-3 rounded border overflow-x-auto max-h-48 overflow-y-auto"
+										>{formatDataForDisplay(exec.inputData)}</pre>
+									</div>
+								{/if}
+								
+								{#if exec.outputData}
+									{@const outputText = extractOutputText(exec.outputData)}
+									<div>
+										<div class="text-xs font-semibold {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2 flex items-center gap-2">
+											<svg class="w-4 h-4 {darkMode ? 'text-emerald-400' : 'text-emerald-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+											</svg>
+											Workflow Output
+										</div>
+										{#if outputText}
+											<div class="text-xs {darkMode ? 'text-slate-200 bg-slate-900 border-slate-700' : 'text-slate-800 bg-white border-slate-200'} p-3 rounded border max-h-48 overflow-y-auto whitespace-pre-wrap break-words">
+												{outputText}
 											</div>
+										{:else}
+											<pre
+												class="text-xs {darkMode
+													? 'text-slate-200 bg-slate-900 border-slate-700'
+													: 'text-slate-800 bg-white border-slate-200'} p-3 rounded border overflow-x-auto max-h-48 overflow-y-auto"
+											>{formatDataForDisplay(exec.outputData)}</pre>
 										{/if}
 									</div>
-								{/each}
+								{/if}
 							</div>
+
+							<!-- Node Executions - Improved Layout -->
+							{#if nodeExecs.length > 0}
+								<div class="border-t {darkMode ? 'border-slate-700' : 'border-slate-200'} pt-4">
+									<div class="text-sm font-semibold {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-3 flex items-center gap-2">
+										<svg class="w-4 h-4 {darkMode ? 'text-slate-400' : 'text-slate-500'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+										</svg>
+										Node Executions ({nodeExecs.length})
+									</div>
+									<div class="space-y-3">
+										{#each nodeExecs as nodeExec (nodeExec.id)}
+											<div
+												class="{darkMode
+													? 'bg-slate-900/50 border-slate-700'
+													: 'bg-slate-50 border-slate-200'} border rounded-lg p-3"
+											>
+												<div class="flex items-center justify-between mb-3">
+													<span class="text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-800'}">
+														{nodeExec.nodeName || nodeExec.nodeId}
+													</span>
+													<span
+														class="text-xs font-medium px-2 py-1 rounded {statusColor(nodeExec.status)}"
+													>
+														{nodeExec.status}
+													</span>
+												</div>
+												
+												<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+													{#if nodeExec.inputData}
+														<div>
+															<div class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-600'} mb-1.5">
+																Input
+															</div>
+															<pre
+																class="text-xs {darkMode
+																	? 'text-slate-200 bg-slate-950 border-slate-800'
+																	: 'text-slate-700 bg-white border-slate-300'} p-2 rounded border overflow-x-auto max-h-32 overflow-y-auto"
+															>{formatDataForDisplay(nodeExec.inputData)}</pre>
+														</div>
+													{/if}
+													
+													{#if nodeExec.outputData}
+														{@const nodeOutputText = extractOutputText(nodeExec.outputData)}
+														<div>
+															<div class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-600'} mb-1.5">
+																Output
+															</div>
+															{#if nodeOutputText}
+																<div class="text-xs {darkMode ? 'text-slate-200 bg-slate-950 border-slate-800' : 'text-slate-700 bg-white border-slate-300'} p-2 rounded border max-h-32 overflow-y-auto whitespace-pre-wrap break-words">
+																	{nodeOutputText}
+																</div>
+															{:else}
+																<pre
+																	class="text-xs {darkMode
+																		? 'text-slate-200 bg-slate-950 border-slate-800'
+																		: 'text-slate-700 bg-white border-slate-300'} p-2 rounded border overflow-x-auto max-h-32 overflow-y-auto"
+																>{formatDataForDisplay(nodeExec.outputData)}</pre>
+															{/if}
+														</div>
+													{/if}
+												</div>
+												
+												{#if nodeExec.errorMessage}
+													<div
+														class="mt-2 p-2 text-xs {darkMode ? 'bg-red-900/30 text-red-300 border-red-700' : 'bg-red-50 text-red-700 border-red-200'} border rounded"
+													>
+														<strong>Error:</strong> {nodeExec.errorMessage}
+													</div>
+												{/if}
+											</div>
+										{/each}
+									</div>
+								</div>
+							{/if}
 						</div>
 					{/if}
 				</div>
-			{/each}
+			{/if}
+
+			<!-- Older Executions - Collapsed List -->
+			{#if olderExecutions.length > 0}
+				<div>
+					<div class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-600'} mb-2 px-1">
+						Older Executions ({olderExecutions.length})
+					</div>
+					<div class="space-y-2 max-h-64 overflow-y-auto">
+						{#each olderExecutions as exec (exec.id)}
+							{@const isExpanded = expandedExecutionId === exec.id}
+							{@const nodeExecs = getNodeExecutionsForExecution(exec.id)}
+							<div
+								class="{darkMode
+									? 'bg-slate-800 border-slate-700'
+									: 'bg-slate-50 border-slate-200'} border rounded-lg"
+							>
+								<button
+									type="button"
+									class="w-full text-left p-3 {darkMode
+										? 'hover:bg-slate-750'
+										: 'hover:bg-slate-100'} transition-colors"
+									onclick={() => {
+										expandedExecutionId = isExpanded ? null : exec.id;
+									}}
+								>
+									<div class="flex items-center justify-between gap-2 mb-1">
+										<span class="text-xs font-mono {darkMode ? 'text-slate-400' : 'text-slate-500'}">
+											{exec.id.slice(0, 8)}…
+										</span>
+										<span
+											class="text-xs font-medium px-2 py-1 rounded {statusColor(exec.status)}"
+										>
+											{exec.status}
+										</span>
+									</div>
+									<div class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'}">
+										{progressText(exec)} · {formatDate(exec.startedAt || exec.createdAt)}
+									</div>
+									{#if exec.errorMessage}
+										<div
+											class="mt-1 text-xs {darkMode ? 'text-red-400' : 'text-red-600'} truncate"
+											title={exec.errorMessage}
+										>
+											{exec.errorMessage}
+										</div>
+									{/if}
+								</button>
+								
+								{#if isExpanded}
+									<div class="border-t {darkMode ? 'border-slate-700' : 'border-slate-200'} p-3 space-y-3">
+										<!-- Workflow Input/Output -->
+										<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+											{#if exec.inputData}
+												<div>
+													<div class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-600'} mb-1.5">
+														Input
+													</div>
+													<pre
+														class="text-xs {darkMode
+															? 'text-slate-200 bg-slate-900 border-slate-700'
+															: 'text-slate-700 bg-white border-slate-200'} p-2 rounded border overflow-x-auto max-h-32 overflow-y-auto"
+													>{formatDataForDisplay(exec.inputData)}</pre>
+												</div>
+											{/if}
+											
+											{#if exec.outputData}
+												{@const outputText = extractOutputText(exec.outputData)}
+												<div>
+													<div class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-600'} mb-1.5">
+														Output
+													</div>
+													{#if outputText}
+														<div class="text-xs {darkMode ? 'text-slate-200 bg-slate-900 border-slate-700' : 'text-slate-700 bg-white border-slate-200'} p-2 rounded border max-h-32 overflow-y-auto whitespace-pre-wrap break-words">
+															{outputText}
+														</div>
+													{:else}
+														<pre
+															class="text-xs {darkMode
+																? 'text-slate-200 bg-slate-900 border-slate-700'
+																: 'text-slate-700 bg-white border-slate-200'} p-2 rounded border overflow-x-auto max-h-32 overflow-y-auto"
+														>{formatDataForDisplay(exec.outputData)}</pre>
+													{/if}
+												</div>
+											{/if}
+										</div>
+
+										<!-- Node Executions -->
+										{#if nodeExecs.length > 0}
+											<div class="border-t {darkMode ? 'border-slate-700' : 'border-slate-200'} pt-3">
+												<div class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-600'} mb-2">
+													Nodes ({nodeExecs.length})
+												</div>
+												<div class="space-y-2">
+													{#each nodeExecs as nodeExec (nodeExec.id)}
+														<div
+															class="{darkMode
+																? 'bg-slate-900/50 border-slate-700'
+																: 'bg-white border-slate-200'} border rounded p-2"
+														>
+															<div class="flex items-center justify-between mb-2">
+																<span class="text-xs font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'}">
+																	{nodeExec.nodeName || nodeExec.nodeId}
+																</span>
+																<span
+																	class="text-xs font-medium px-1.5 py-0.5 rounded {statusColor(nodeExec.status)}"
+																>
+																	{nodeExec.status}
+																</span>
+															</div>
+															
+															<div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+																{#if nodeExec.inputData}
+																	<div>
+																		<div class="text-[10px] font-semibold {darkMode ? 'text-slate-400' : 'text-slate-600'} mb-1">
+																			Input
+																		</div>
+																		<pre
+																			class="text-[10px] {darkMode
+																				? 'text-slate-200 bg-slate-950 border-slate-800'
+																				: 'text-slate-700 bg-slate-50 border-slate-300'} p-1.5 rounded border overflow-x-auto max-h-24 overflow-y-auto"
+																		>{formatDataForDisplay(nodeExec.inputData)}</pre>
+																	</div>
+																{/if}
+																
+																{#if nodeExec.outputData}
+																	{@const nodeOutputText = extractOutputText(nodeExec.outputData)}
+																	<div>
+																		<div class="text-[10px] font-semibold {darkMode ? 'text-slate-400' : 'text-slate-600'} mb-1">
+																			Output
+																		</div>
+																		{#if nodeOutputText}
+																			<div class="text-[10px] {darkMode ? 'text-slate-200 bg-slate-950 border-slate-800' : 'text-slate-700 bg-slate-50 border-slate-300'} p-1.5 rounded border max-h-24 overflow-y-auto whitespace-pre-wrap break-words">
+																				{nodeOutputText}
+																			</div>
+																		{:else}
+																			<pre
+																				class="text-[10px] {darkMode
+																					? 'text-slate-200 bg-slate-950 border-slate-800'
+																					: 'text-slate-700 bg-slate-50 border-slate-300'} p-1.5 rounded border overflow-x-auto max-h-24 overflow-y-auto"
+																			>{formatDataForDisplay(nodeExec.outputData)}</pre>
+																		{/if}
+																	</div>
+																{/if}
+															</div>
+															
+															{#if nodeExec.errorMessage}
+																<div
+																	class="mt-1.5 p-1.5 text-[10px] {darkMode ? 'bg-red-900/30 text-red-300 border-red-700' : 'bg-red-50 text-red-700 border-red-200'} border rounded"
+																>
+																	<strong>Error:</strong> {nodeExec.errorMessage}
+																</div>
+															{/if}
+														</div>
+													{/each}
+												</div>
+											</div>
+										{/if}
+									</div>
+								{/if}
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
 		</div>
 	{/if}
 </div>

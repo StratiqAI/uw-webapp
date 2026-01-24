@@ -9,8 +9,9 @@
 	import { fetchWorkflowExecutionDetail } from '../../services/backend/workflowExecutionService';
 	import type { WorkflowExecution, WorkflowNodeExecution } from '@stratiqai/types-simple';
 
-	const { executionId, idToken, projectId, darkMode = false, onClose }: {
+	const { executionId, workflowId, idToken, projectId, darkMode = false, onClose }: {
 		executionId: string;
+		workflowId: string; // parentId - the Workflow ID (execution's parent)
 		idToken: string;
 		projectId?: string;
 		darkMode?: boolean;
@@ -53,16 +54,16 @@
 	}
 
 	onMount(async () => {
-		if (!executionId || !idToken) {
-			console.error('[WorkflowExecutionDetailModal] Missing executionId or idToken', { executionId, hasToken: !!idToken });
+		if (!executionId || !workflowId || !idToken) {
+			console.error('[WorkflowExecutionDetailModal] Missing executionId, workflowId, or idToken', { executionId, workflowId, hasToken: !!idToken });
 			return;
 		}
 
 		loading = true;
 		error = null;
-		console.log('[WorkflowExecutionDetailModal] Fetching execution:', { executionId, projectId });
+		console.log('[WorkflowExecutionDetailModal] Fetching execution:', { executionId, workflowId, projectId });
 		try {
-			const result = await fetchWorkflowExecutionDetail(executionId, idToken, projectId);
+			const result = await fetchWorkflowExecutionDetail(executionId, workflowId, idToken);
 			console.log('[WorkflowExecutionDetailModal] Fetched execution:', result);
 			if (result) {
 				console.log('[WorkflowExecutionDetailModal] Node executions count:', result.nodeExecutions?.items?.length ?? 0);
@@ -100,7 +101,7 @@
 
 		const h2 = client.subscribe({
 			query: S_ON_WORKFLOW_NODE_EXECUTION_STATUS_CHANGE,
-			variables: { workflowExecutionId: executionId },
+			variables: { parentId: executionId }, // parentId is the WorkflowExecution ID (WorkflowNodeExecution's parent)
 			next: (payload: any) => {
 				const data = payload?.onWorkflowNodeExecutionStatusChange;
 				if (data && execution?.nodeExecutions?.items) {

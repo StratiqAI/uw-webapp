@@ -65,7 +65,7 @@
 		"@google/generative-ai": "^0.24.1",
 		"@stratiqai/aws-utils": "^1.0.29",
 		"@stratiqai/types": "^2.0.39",
-		"@stratiqai/types-simple": "^1.0.32",
+		"@stratiqai/types-simple": "^1.0.33",
 		"@turf/turf": "^7.2.0",
 		"ai": "^6.0.48",
 		"ajv": "^8.17.1",

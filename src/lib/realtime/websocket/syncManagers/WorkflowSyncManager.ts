@@ -81,8 +81,8 @@ const workflowExecutionSyncConfig = createEntitySyncConfig<WorkflowExecution>({
 		nextToken: options?.nextToken
 	}),
 	buildCreateVariables: (options?: Record<string, any>) => ({
-		// onCreateWorkflowExecution(workflowId: ID!) requires workflowId
-		workflowId: options?.workflowId ?? (options?.entity as { workflowId?: string } | undefined)?.workflowId
+		// onCreateWorkflowExecution(parentId: ID!) requires parentId (workflow ID)
+		parentId: options?.workflowId ?? (options?.entity as { parentId?: string } | undefined)?.parentId
 	}),
 	buildUpdateVariables: (id: string) => ({ id })
 });
@@ -108,7 +108,10 @@ const workflowNodeExecutionSyncConfig = createEntitySyncConfig<WorkflowNodeExecu
 		limit: options?.limit,
 		nextToken: options?.nextToken
 	}),
-	buildCreateVariables: () => ({}),
+	buildCreateVariables: (options?: Record<string, any>) => ({
+		// onCreateWorkflowNodeExecution(parentId: ID!) requires parentId (workflowExecution ID)
+		parentId: options?.workflowExecutionId ?? (options?.entity as { parentId?: string } | undefined)?.parentId
+	}),
 	buildUpdateVariables: (id: string) => ({ id })
 });
 
@@ -343,7 +346,7 @@ export class WorkflowSyncManager {
 			return { entities: [], count: 0, subscriptionsEnabled: false };
 		}
 		this.#ensureReady();
-		// onCreateWorkflowExecution(workflowId: ID!) requires workflowId; skip create subscription when missing
+		// onCreateWorkflowExecution(parentId: ID!) requires parentId (workflow ID); skip create subscription when missing
 		const setupSubscriptions = options?.setupSubscriptions && !!workflowId;
 		return this.#runWithStatus(
 			() =>
@@ -371,6 +374,7 @@ export class WorkflowSyncManager {
 	/**
 	 * Fetches a list of workflow node executions from the API and syncs them to the store.
 	 * Skips the API call if workflowExecutionId is missing (listWorkflowNodeExecutions requires parentId: ID!).
+	 * Note: workflowExecutionId parameter is the WorkflowExecution ID (parent of node executions), which is passed as parentId to the query.
 	 * @throws Error if the manager is not ready.
 	 */
 	async syncWorkflowNodeExecutionList(
@@ -385,7 +389,7 @@ export class WorkflowSyncManager {
 			() =>
 				this.workflowNodeExecutionSyncManager!.syncList({
 					...options,
-					queryVariables: { ...options?.queryVariables, workflowExecutionId }
+					queryVariables: { ...options?.queryVariables, workflowExecutionId } // buildListVariables maps this to parentId
 				}),
 			'Failed to sync workflow node execution list'
 		);

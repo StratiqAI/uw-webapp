@@ -5,7 +5,7 @@ import type { WorkflowExecution } from '@stratiqai/types-simple';
 export type WorkflowExecutionListItem = Pick<
 	WorkflowExecution,
 	| 'id'
-	| 'workflowId'
+	| 'parentId'
 	| 'workflow'
 	| 'status'
 	| 'startedAt'
@@ -75,22 +75,22 @@ export async function fetchWorkflowExecutions(
 
 /**
  * Fetch a single workflow execution with node executions.
- * Uses direct getWorkflowExecution query (GSI1 lookup for O(1) access).
+ * Uses direct getWorkflowExecution query (requires composite key: id + parentId).
  * Node executions are fetched via the field resolver (more efficient with hierarchical schema).
  */
 export async function fetchWorkflowExecutionDetail(
 	id: string,
-	idToken: string,
-	projectId?: string // Kept for backward compatibility, but not used in query
+	workflowId: string, // parentId - the Workflow ID (execution's parent)
+	idToken: string
 ): Promise<WorkflowExecution | null> {
-	console.log('[fetchWorkflowExecutionDetail] Fetching execution:', { id });
+	console.log('[fetchWorkflowExecutionDetail] Fetching execution:', { id, workflowId });
 	
-	// Use direct query (GSI1 lookup) - more efficient than querying through Project
-	// The hierarchical schema supports O(1) lookup via GSI1
+	// getWorkflowExecution requires composite key: { id, parentId }
+	// parentId is the Workflow ID (WorkflowExecution is a child of Workflow)
 	try {
 		const response = await gql<{ getWorkflowExecution: WorkflowExecution | null }>(
 			Q_GET_WORKFLOW_EXECUTION,
-			{ id },
+			{ key: { id, parentId: workflowId } },
 			idToken
 		);
 		console.log('[fetchWorkflowExecutionDetail] Query response:', response);

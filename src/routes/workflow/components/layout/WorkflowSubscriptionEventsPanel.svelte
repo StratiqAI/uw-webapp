@@ -61,7 +61,7 @@
 		}
 		
 		if (event.entityType === 'workflowExecution') {
-			return event.data?.workflowId === workflowId;
+			return event.data?.parentId === workflowId;
 		}
 		
 		if (event.entityType === 'workflowNodeExecution') {
