@@ -310,27 +310,24 @@
 	role="button"
 	tabindex="0"
 >
-	<!-- Zoomed Container -->
-	<div
-		class="absolute inset-0 origin-top-left"
-		style="transform: translate({panX}px, {panY}px) scale({zoomLevel}); transform-origin: 0 0; width: 100%; height: 100%;"
-	>
-		<!-- SVG for connections -->
-		<svg bind:this={svgContainer} class="absolute inset-0 w-full h-full pointer-events-none">
-			<defs>
-				<marker
-					id="arrowhead"
-					markerWidth="10"
-					markerHeight="10"
-					refX="9"
-					refY="3"
-					orient="auto"
-					markerUnits="userSpaceOnUse"
-				>
-					<polygon points="0 0, 10 3, 0 6" fill={darkMode ? '#cbd5e1' : '#475569'} />
-				</marker>
-			</defs>
+	<!-- SVG for connections (outside transformed container to avoid coordinate system issues) -->
+	<svg bind:this={svgContainer} class="absolute inset-0 w-full h-full pointer-events-none">
+		<defs>
+			<marker
+				id="arrowhead"
+				markerWidth="10"
+				markerHeight="10"
+				refX="9"
+				refY="3"
+				orient="auto"
+				markerUnits="userSpaceOnUse"
+			>
+				<polygon points="0 0, 10 3, 0 6" fill={darkMode ? '#cbd5e1' : '#475569'} />
+			</marker>
+		</defs>
 
+		<!-- Transform group to match the container's CSS transform -->
+		<g transform="translate({panX}, {panY}) scale({zoomLevel})">
 			<!-- Existing connections -->
 			{#each connections as connection}
 				{@const fromElement = findElement(connection.from)}
@@ -360,7 +357,14 @@
 					/>
 				{/if}
 			{/if}
-		</svg>
+		</g>
+	</svg>
+
+	<!-- Zoomed Container -->
+	<div
+		class="absolute inset-0 origin-top-left"
+		style="transform: translate({panX}px, {panY}px) scale({zoomLevel}); transform-origin: 0 0; width: 100%; height: 100%;"
+	>
 
 		<!-- Grid Elements -->
 		{#each gridElements as element (element.id)}
