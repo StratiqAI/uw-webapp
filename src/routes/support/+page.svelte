@@ -48,7 +48,7 @@
 			icon: '📚',
 			items: [
 				{
-					title: 'Agent Library',
+					title: 'Prompt Library',
 					description: 'Create and manage AI analysis agents',
 					href: '/docs/agents'
 				},

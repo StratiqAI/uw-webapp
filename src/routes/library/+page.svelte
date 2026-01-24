@@ -299,7 +299,7 @@
 					</div>
 					<div>
 						<h1 class="text-2xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">
-							The Automated Professional Library
+							The Prompt Library
 						</h1>
 						<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-0.5">
 							AI Query Templates for your projects
