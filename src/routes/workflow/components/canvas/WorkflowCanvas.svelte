@@ -20,7 +20,10 @@
 		onNodeDoubleClick,
 		onExecuteWorkflow,
 		nodeExecutionStatus = {},
+		workflowExecutionOutput = null,
 		onClearExecution,
+		showSampleStatuses = false,
+		onToggleSampleStatuses,
 		generateId
 	}: {
 		gridElements?: GridElement[];
@@ -38,7 +41,12 @@
 		onExecuteWorkflow?: () => void;
 		/** Map nodeId -> WORKFLOW_NODE_EXECUTION status (RUNNING, COMPLETED, FAILED, CANCELLED) */
 		nodeExecutionStatus?: Record<string, string>;
+		/** Workflow execution outputData to display next to workflow-output node */
+		workflowExecutionOutput?: any;
 		onClearExecution?: () => void;
+		/** Debug: Show sample status indicators */
+		showSampleStatuses?: boolean;
+		onToggleSampleStatuses?: () => void;
 		generateId: () => string;
 	} = $props();
 
@@ -464,6 +472,7 @@
 					{darkMode}
 					isDragged={draggedGridElement?.id === element.id}
 					nodeStatus={nodeExecutionStatus[element.id]}
+					workflowOutput={element.type.id === 'workflow-output' ? workflowExecutionOutput : undefined}
 					onDelete={onNodeDelete}
 					onDragStart={startDragOnGrid}
 					onDoubleClick={onNodeDoubleClick}
@@ -491,9 +500,25 @@
 		</div>
 	{/if}
 
-	<!-- Clear execution indicators button (shown when any node has status) -->
-	{#if Object.keys(nodeExecutionStatus).length > 0 && onClearExecution}
-		<div class="absolute top-4 right-4 z-50 pointer-events-auto">
+	<!-- Control buttons (top right) -->
+	<div class="absolute top-4 right-4 z-50 pointer-events-auto flex items-center gap-2">
+		<!-- Toggle sample statuses button (debug) -->
+		{#if onToggleSampleStatuses}
+			<button
+				type="button"
+				onclick={onToggleSampleStatuses}
+				class="px-4 py-2 text-sm font-medium {showSampleStatuses ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'} text-white rounded-lg shadow-lg flex items-center gap-2 transition-colors"
+				title={showSampleStatuses ? 'Hide sample status indicators' : 'Show sample status indicators'}
+			>
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+				</svg>
+				{showSampleStatuses ? 'Hide Samples' : 'Show Samples'}
+			</button>
+		{/if}
+		<!-- Clear execution indicators button (shown when any node has status) -->
+		{#if Object.keys(nodeExecutionStatus).length > 0 && onClearExecution}
 			<button
 				type="button"
 				onclick={onClearExecution}
@@ -505,6 +530,6 @@
 				</svg>
 				Clear Indicators
 			</button>
-		</div>
-	{/if}
+		{/if}
+	</div>
 </div>

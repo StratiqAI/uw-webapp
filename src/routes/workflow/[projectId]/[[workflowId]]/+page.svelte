@@ -864,6 +864,8 @@
 	let currentExecutionId = $state<string | null>(null);
 	/** Map nodeId (GridElement.id) -> WORKFLOW_NODE_EXECUTION status (RUNNING, COMPLETED, FAILED, CANCELLED) */
 	let nodeExecutionStatus = $state<Record<string, string>>({});
+	/** Workflow execution outputData when execution completes */
+	let workflowExecutionOutput = $state<any>(null);
 	let unsubscribeNodeExecutions: (() => void) | null = null;
 
 	// Subscribe to WorkflowNodeExecution updates for the current execution
@@ -892,6 +894,27 @@
 				timestamp: new Date().toISOString()
 			});
 			if (exec?.id === currentExecutionId) {
+				// If execution completed, store the outputData to display next to workflow output node
+				if (exec.status === 'COMPLETED' && exec.outputData) {
+					try {
+						// Parse outputData if it's a string (AWSJSON comes as string from GraphQL)
+						const parsed = typeof exec.outputData === 'string' 
+							? JSON.parse(exec.outputData) 
+							: exec.outputData;
+						workflowExecutionOutput = parsed;
+						console.log('[Workflow Execution Subscription] Stored workflow output:', {
+							executionId: exec.id,
+							outputData: workflowExecutionOutput
+						});
+					} catch (err) {
+						console.error('[Workflow Execution Subscription] Failed to parse outputData:', err);
+						workflowExecutionOutput = exec.outputData;
+					}
+				} else if (exec.status === 'FAILED' || exec.status === 'CANCELLED') {
+					// Clear output on failure/cancellation
+					workflowExecutionOutput = null;
+				}
+				
 				// If execution completed, failed, or was cancelled, clear indicators after a delay
 				if (exec.status === 'COMPLETED' || exec.status === 'FAILED' || exec.status === 'CANCELLED') {
 					// Clear indicators after 2 seconds to allow user to see final state
@@ -927,13 +950,36 @@
 				const nodeId = nodeExec.nodeId;
 				const status = nodeExec.status;
 				if (nodeId && status) {
+					// Debug: Check if nodeId matches any GridElement.id
+					const matchingElement = gridElements.find((el) => el.id === nodeId);
 					console.log('[Node Execution Subscription] Processing node execution:', {
 						nodeId,
 						status,
-						executionId: currentExecutionId
+						executionId: currentExecutionId,
+						nodeName: nodeExec.nodeName,
+						hasMatchingElement: !!matchingElement,
+						matchingElementId: matchingElement?.id,
+						matchingElementType: matchingElement?.type?.id,
+						allGridElementIds: gridElements.map((el) => el.id),
+						currentNodeExecutionStatus: nodeExecutionStatus
 					});
 					// Store status for this node; node stays highlighted with status indicator
-					nodeExecutionStatus = { ...nodeExecutionStatus, [nodeId]: status };
+					// Use reactive assignment to ensure Svelte detects the change
+					const updated = { ...nodeExecutionStatus };
+					updated[nodeId] = status;
+					nodeExecutionStatus = updated;
+					console.log('[Node Execution Subscription] Updated nodeExecutionStatus:', {
+						nodeId,
+						status,
+						updatedStatus: nodeExecutionStatus,
+						allNodeIds: Object.keys(nodeExecutionStatus)
+					});
+				} else {
+					console.warn('[Node Execution Subscription] Missing nodeId or status:', {
+						nodeId,
+						status,
+						nodeExec
+					});
 				}
 			}
 		});
@@ -955,10 +1001,43 @@
 	function clearExecutionState() {
 		currentExecutionId = null;
 		nodeExecutionStatus = {};
+		workflowExecutionOutput = null;
 		if (unsubscribeNodeExecutions) {
 			unsubscribeNodeExecutions();
 			unsubscribeNodeExecutions = null;
 		}
+	}
+
+	// Debug mode: Show sample status indicators on all nodes
+	let showSampleStatuses = $state(false);
+	
+	function toggleSampleStatuses() {
+		if (showSampleStatuses) {
+			// Clear sample statuses
+			nodeExecutionStatus = {};
+			workflowExecutionOutput = null;
+		} else {
+			// Set sample statuses on different nodes
+			const sampleStatuses: Record<string, string> = {};
+			const statuses = ['RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED'];
+			gridElements.forEach((el, index) => {
+				if (el.type.type !== 'comment') {
+					sampleStatuses[el.id] = statuses[index % statuses.length];
+				}
+			});
+			nodeExecutionStatus = sampleStatuses;
+			
+			// Set sample output for workflow-output node
+			const workflowOutputNode = gridElements.find((el) => el.type.id === 'workflow-output');
+			if (workflowOutputNode) {
+				workflowExecutionOutput = {
+					result: {
+						text: 'This is a sample workflow result. It demonstrates how the output will appear when a workflow execution completes successfully.'
+					}
+				};
+			}
+		}
+		showSampleStatuses = !showSampleStatuses;
 	}
 
 	async function executeWorkflow() {
@@ -1149,7 +1228,10 @@
 			onNodeDoubleClick={handleElementDoubleClick}
 			onExecuteWorkflow={executeWorkflow}
 			nodeExecutionStatus={nodeExecutionStatus}
+			workflowExecutionOutput={workflowExecutionOutput}
 			onClearExecution={clearExecutionState}
+			showSampleStatuses={showSampleStatuses}
+			onToggleSampleStatuses={toggleSampleStatuses}
 			{generateId}
 		/>
 

@@ -15,6 +15,8 @@
 		isDragged = false,
 		/** WORKFLOW_NODE_EXECUTION status: RUNNING, COMPLETED, FAILED, CANCELLED */
 		nodeStatus = undefined,
+		/** Workflow execution outputData to display (only for workflow-output node) */
+		workflowOutput = undefined,
 		onDelete,
 		onDragStart,
 		onDoubleClick,
@@ -24,6 +26,7 @@
 		darkMode?: boolean;
 		isDragged?: boolean;
 		nodeStatus?: string;
+		workflowOutput?: any;
 		onDelete?: (id: string, event: MouseEvent) => void;
 		onDragStart?: (element: GridElement, event: MouseEvent) => void;
 		onDoubleClick?: (element: GridElement, event: MouseEvent) => void;
@@ -32,6 +35,20 @@
 
 	const isExecuting = $derived(nodeStatus === 'RUNNING');
 	const hasStatus = $derived(!!nodeStatus);
+	
+	// Debug logging when status changes
+	$effect(() => {
+		if (nodeStatus) {
+			console.log('[WorkflowNode] Node status detected:', {
+				elementId: element.id,
+				elementLabel: element.type.label,
+				elementType: element.type.id,
+				nodeStatus,
+				hasStatus,
+				isExecuting
+			});
+		}
+	});
 
 	/** Border/ring, overlay, badge and arrow colors by status */
 	function statusStyles(status: string) {
@@ -240,6 +257,30 @@
 				</div>
 			{/if}
 			<span class="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded {styles.badge} shadow-sm whitespace-nowrap" aria-label="Status: {nodeStatus}">{nodeStatus}</span>
+		</div>
+	{/if}
+
+	<!-- Workflow execution result next to workflow-output node -->
+	{#if element.type.id === 'workflow-output' && workflowOutput != null}
+		{@const formattedOutput = typeof workflowOutput === 'string' ? (() => { try { return JSON.parse(workflowOutput); } catch { return workflowOutput; } })() : workflowOutput}
+		{@const outputText = formattedOutput?.result?.text || formattedOutput?.text || formattedOutput?.output?.text || (typeof formattedOutput === 'string' ? formattedOutput : null)}
+		<div
+			class="absolute top-full left-0 mt-4 z-30 pointer-events-auto"
+			style="width: {Math.max(element.width, 300)}px; max-width: 500px;"
+		>
+			<div class="{darkMode ? 'bg-slate-800 border-emerald-500/50' : 'bg-white border-emerald-200'} border-2 rounded-lg shadow-xl p-4">
+				<div class="flex items-center gap-2 mb-3">
+					<div class="w-2 h-2 {darkMode ? 'bg-emerald-400' : 'bg-emerald-500'} rounded-full"></div>
+					<h3 class="text-sm font-semibold {darkMode ? 'text-emerald-400' : 'text-emerald-600'}">Workflow Result</h3>
+				</div>
+				<div class="max-h-64 overflow-y-auto">
+					{#if outputText}
+						<p class="text-sm {darkMode ? 'text-slate-200' : 'text-slate-800'} whitespace-pre-wrap break-words leading-relaxed">{outputText}</p>
+					{:else}
+						<pre class="text-xs {darkMode ? 'text-slate-300 bg-slate-900/50' : 'text-slate-700 bg-slate-50'} p-3 rounded overflow-x-auto border {darkMode ? 'border-slate-700' : 'border-slate-200'}">{JSON.stringify(formattedOutput, null, 2)}</pre>
+					{/if}
+				</div>
+			</div>
 		</div>
 	{/if}
 
