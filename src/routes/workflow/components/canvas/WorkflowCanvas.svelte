@@ -19,6 +19,8 @@
 		onNodeDelete,
 		onNodeDoubleClick,
 		onExecuteWorkflow,
+		nodeExecutionStatus = {},
+		onClearExecution,
 		generateId
 	}: {
 		gridElements?: GridElement[];
@@ -34,6 +36,9 @@
 		onNodeDelete?: (id: string, event: MouseEvent) => void;
 		onNodeDoubleClick?: (element: GridElement, event: MouseEvent) => void;
 		onExecuteWorkflow?: () => void;
+		/** Map nodeId -> WORKFLOW_NODE_EXECUTION status (RUNNING, COMPLETED, FAILED, CANCELLED) */
+		nodeExecutionStatus?: Record<string, string>;
+		onClearExecution?: () => void;
 		generateId: () => string;
 	} = $props();
 
@@ -458,6 +463,7 @@
 					{element}
 					{darkMode}
 					isDragged={draggedGridElement?.id === element.id}
+					nodeStatus={nodeExecutionStatus[element.id]}
 					onDelete={onNodeDelete}
 					onDragStart={startDragOnGrid}
 					onDoubleClick={onNodeDoubleClick}
@@ -482,6 +488,23 @@
 				<div class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'}">Drag elements from the sidebar to begin creating your workflow</div>
 				<div class="text-xs {darkMode ? 'text-slate-500' : 'text-slate-400'} mt-4">Click connection points to link elements together</div>
 			</div>
+		</div>
+	{/if}
+
+	<!-- Clear execution indicators button (shown when any node has status) -->
+	{#if Object.keys(nodeExecutionStatus).length > 0 && onClearExecution}
+		<div class="absolute top-4 right-4 z-50 pointer-events-auto">
+			<button
+				type="button"
+				onclick={onClearExecution}
+				class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-lg flex items-center gap-2 transition-colors"
+				title="Clear execution indicators"
+			>
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+				</svg>
+				Clear Indicators
+			</button>
 		</div>
 	{/if}
 </div>

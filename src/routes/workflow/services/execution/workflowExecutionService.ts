@@ -28,12 +28,7 @@ export async function executeWorkflow(
 			);
 			input = inputs.length === 1 ? inputs[0] : inputs;
 		} else if (element.type.type === 'input') {
-			input = (element as any).nodeOptions ?? {
-				_source: 'local-run',
-				doclinkId: 'local-placeholder',
-				documentId: 'local-placeholder',
-				filename: 'test-document.pdf'
-			};
+			input = (element as any).nodeOptions ?? {};
 		}
 
 		const exec = (element.type as any).execute;

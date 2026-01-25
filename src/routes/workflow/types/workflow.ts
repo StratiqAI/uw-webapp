@@ -42,6 +42,7 @@ export type WorkflowJSON = {
 		fromSide: Connection['fromSide'];
 		toSide: Connection['toSide'];
 	}>;
+	outputSchema?: Record<string, unknown> | null;
 };
 
 

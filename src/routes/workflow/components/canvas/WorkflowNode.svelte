@@ -13,6 +13,8 @@
 		element,
 		darkMode = false,
 		isDragged = false,
+		/** WORKFLOW_NODE_EXECUTION status: RUNNING, COMPLETED, FAILED, CANCELLED */
+		nodeStatus = undefined,
 		onDelete,
 		onDragStart,
 		onDoubleClick,
@@ -21,11 +23,67 @@
 		element: GridElement;
 		darkMode?: boolean;
 		isDragged?: boolean;
+		nodeStatus?: string;
 		onDelete?: (id: string, event: MouseEvent) => void;
 		onDragStart?: (element: GridElement, event: MouseEvent) => void;
 		onDoubleClick?: (element: GridElement, event: MouseEvent) => void;
 		onConnectionPointClick?: (elementId: string, side: ConnectionSide, event: MouseEvent) => void;
 	} = $props();
+
+	const isExecuting = $derived(nodeStatus === 'RUNNING');
+	const hasStatus = $derived(!!nodeStatus);
+
+	/** Border/ring, overlay, badge and arrow colors by status */
+	function statusStyles(status: string) {
+		switch (status) {
+			case 'RUNNING':
+				return {
+					border: darkMode ? 'border-amber-400/80' : 'border-amber-500/80',
+					ring: darkMode ? 'ring-2 ring-amber-400/50' : 'ring-2 ring-amber-500/50',
+					overlay: darkMode ? 'bg-amber-500/20' : 'bg-amber-500/10',
+					badge: darkMode ? 'bg-amber-500/90 text-amber-100' : 'bg-amber-500 text-white',
+					arrow: darkMode ? 'bg-amber-500/40' : 'bg-amber-500/30',
+					arrowIcon: darkMode ? 'text-amber-200' : 'text-amber-700'
+				};
+			case 'COMPLETED':
+				return {
+					border: darkMode ? 'border-emerald-400/80' : 'border-emerald-500/80',
+					ring: darkMode ? 'ring-2 ring-emerald-400/50' : 'ring-2 ring-emerald-500/50',
+					overlay: darkMode ? 'bg-emerald-500/10' : 'bg-emerald-500/5',
+					badge: darkMode ? 'bg-emerald-500/90 text-emerald-100' : 'bg-emerald-500 text-white',
+					arrow: darkMode ? 'bg-emerald-500/40' : 'bg-emerald-500/30',
+					arrowIcon: darkMode ? 'text-emerald-200' : 'text-emerald-700'
+				};
+			case 'FAILED':
+				return {
+					border: darkMode ? 'border-red-400/80' : 'border-red-500/80',
+					ring: darkMode ? 'ring-2 ring-red-400/50' : 'ring-2 ring-red-500/50',
+					overlay: darkMode ? 'bg-red-500/10' : 'bg-red-500/5',
+					badge: darkMode ? 'bg-red-500/90 text-red-100' : 'bg-red-500 text-white',
+					arrow: darkMode ? 'bg-red-500/40' : 'bg-red-500/30',
+					arrowIcon: darkMode ? 'text-red-200' : 'text-red-700'
+				};
+			case 'CANCELLED':
+				return {
+					border: darkMode ? 'border-slate-400/80' : 'border-slate-400/80',
+					ring: darkMode ? 'ring-2 ring-slate-400/50' : 'ring-2 ring-slate-500/50',
+					overlay: darkMode ? 'bg-slate-500/10' : 'bg-slate-500/5',
+					badge: darkMode ? 'bg-slate-500/90 text-slate-200' : 'bg-slate-500 text-white',
+					arrow: darkMode ? 'bg-slate-500/40' : 'bg-slate-500/30',
+					arrowIcon: darkMode ? 'text-slate-200' : 'text-slate-700'
+				};
+			default:
+				return {
+					border: darkMode ? 'border-slate-400/60' : 'border-slate-400/60',
+					ring: darkMode ? 'ring-2 ring-slate-400/40' : 'ring-2 ring-slate-500/40',
+					overlay: darkMode ? 'bg-slate-500/10' : 'bg-slate-500/5',
+					badge: darkMode ? 'bg-slate-500/90 text-slate-200' : 'bg-slate-500 text-white',
+					arrow: darkMode ? 'bg-slate-500/40' : 'bg-slate-500/30',
+					arrowIcon: darkMode ? 'text-slate-200' : 'text-slate-700'
+				};
+		}
+	}
+	const styles = $derived(nodeStatus ? statusStyles(nodeStatus) : null);
 
 	function handleDelete(e: MouseEvent) {
 		e.stopPropagation();
@@ -68,13 +126,14 @@
 		{darkMode ? 'shadow-2xl shadow-black/50' : 'shadow-lg'} 
 		cursor-move 
 		{element.type.type === 'input' 
-			? 'border-2 ' + (darkMode ? 'border-slate-600/60 border-l-indigo-400/60' : 'border-slate-200 border-l-indigo-400/70')
+			? 'border-2 ' + (hasStatus && styles ? styles.border : (darkMode ? 'border-slate-600/60 border-l-indigo-400/60' : 'border-slate-200 border-l-indigo-400/70'))
 			: element.type.type === 'output'
-			? 'border-2 ' + (darkMode ? 'border-slate-600/60 border-r-emerald-400/60' : 'border-slate-200 border-r-emerald-400/70')
-			: 'border-2 ' + getElementBorderColor(element.type.type, darkMode)
+			? 'border-2 ' + (hasStatus && styles ? styles.border : (darkMode ? 'border-slate-600/60 border-r-emerald-400/60' : 'border-slate-200 border-r-emerald-400/70'))
+			: 'border-2 ' + (hasStatus && styles ? styles.border : getElementBorderColor(element.type.type, darkMode))
 		} 
+		{hasStatus && styles ? styles.ring : ''}
 		{isDragged ? '' : 'hover:shadow-2xl hover:scale-[1.02] transition-all'} 
-		{getNodeAccentColor(element.type.type, darkMode) ? getNodeAccentColor(element.type.type, darkMode) + ' ring-1' : ''}"
+		{!hasStatus && getNodeAccentColor(element.type.type, darkMode) ? getNodeAccentColor(element.type.type, darkMode) + ' ring-1' : ''}"
 		style="width: {element.width}px; height: {element.height}px; {isDragged ? 'transition: none;' : ''}"
 		onmousedown={handleDragStart}
 		ondblclick={handleDoubleClickEvent}
@@ -82,18 +141,22 @@
 		tabindex="0"
 	>
 		<div class="relative w-full h-full flex flex-col items-center justify-center group overflow-visible">
+			{#if hasStatus && styles}
+				<!-- Status overlay -->
+				<div class="absolute inset-0 {styles.overlay} rounded-xl z-0 {isExecuting ? 'animate-pulse' : ''}"></div>
+			{/if}
 			{#if element.type.type === 'input'}
 				<!-- Entry indicator arrow on the left -->
-				<div class="absolute left-0 top-1/2 -translate-y-1/2 w-6 h-6 {darkMode ? 'bg-indigo-500/30' : 'bg-indigo-500/20'} rounded-full flex items-center justify-center z-10">
-					<svg class="w-3 h-3 {darkMode ? 'text-indigo-300' : 'text-indigo-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<div class="absolute left-0 top-1/2 -translate-y-1/2 w-6 h-6 {hasStatus && styles ? styles.arrow : (darkMode ? 'bg-indigo-500/30' : 'bg-indigo-500/20')} rounded-full flex items-center justify-center z-10">
+					<svg class="w-3 h-3 {hasStatus && styles ? styles.arrowIcon : (darkMode ? 'text-indigo-300' : 'text-indigo-600')}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
 					</svg>
 				</div>
 			{/if}
 			{#if element.type.type === 'output'}
 				<!-- Exit indicator arrow on the right -->
-				<div class="absolute right-0 top-1/2 -translate-y-1/2 w-6 h-6 {darkMode ? 'bg-emerald-500/30' : 'bg-emerald-500/20'} rounded-full flex items-center justify-center z-10">
-					<svg class="w-3 h-3 {darkMode ? 'text-emerald-300' : 'text-emerald-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<div class="absolute right-0 top-1/2 -translate-y-1/2 w-6 h-6 {hasStatus && styles ? styles.arrow : (darkMode ? 'bg-emerald-500/30' : 'bg-emerald-500/20')} rounded-full flex items-center justify-center z-10">
+					<svg class="w-3 h-3 {hasStatus && styles ? styles.arrowIcon : (darkMode ? 'text-emerald-300' : 'text-emerald-600')}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 17l-5-5m0 0l5-5m-5 5h12"></path>
 					</svg>
 				</div>
@@ -149,6 +212,36 @@
 			{/if}
 		</div>
 	</div>
+
+	<!-- Status indicator next to node (WORKFLOW_NODE_EXECUTION status) -->
+	{#if hasStatus && styles && nodeStatus}
+		<div
+			class="absolute top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-20 pointer-events-none"
+			style="left: {element.width + 6}px;"
+			title="Node execution status: {nodeStatus}"
+		>
+			{#if isExecuting}
+				<div class="w-5 h-5 {styles.badge} rounded-full flex items-center justify-center shadow-md shrink-0">
+					<svg class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+					</svg>
+				</div>
+			{:else if nodeStatus === 'COMPLETED'}
+				<div class="w-5 h-5 {styles.badge} rounded-full flex items-center justify-center shadow-md shrink-0">
+					<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+				</div>
+			{:else if nodeStatus === 'FAILED'}
+				<div class="w-5 h-5 {styles.badge} rounded-full flex items-center justify-center shadow-md shrink-0">
+					<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+				</div>
+			{:else if nodeStatus === 'CANCELLED'}
+				<div class="w-5 h-5 {styles.badge} rounded-full flex items-center justify-center shadow-md shrink-0">
+					<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+				</div>
+			{/if}
+			<span class="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded {styles.badge} shadow-sm whitespace-nowrap" aria-label="Status: {nodeStatus}">{nodeStatus}</span>
+		</div>
+	{/if}
 
 	<!-- Description/Label (below the node) -->
 	<div class="text-center whitespace-nowrap pointer-events-none mt-3" style="width: {element.width}px; {element.type.type === 'input' ? 'margin-left: 6px;' : element.type.type === 'output' ? 'margin-left: -6px;' : ''}">

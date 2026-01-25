@@ -861,6 +861,105 @@
 	// Workflow execution: All executions are handled by AWS backend
 	// ------------------------------------------------------------------------------------------------
 	let isExecutingWorkflow = $state(false);
+	let currentExecutionId = $state<string | null>(null);
+	/** Map nodeId (GridElement.id) -> WORKFLOW_NODE_EXECUTION status (RUNNING, COMPLETED, FAILED, CANCELLED) */
+	let nodeExecutionStatus = $state<Record<string, string>>({});
+	let unsubscribeNodeExecutions: (() => void) | null = null;
+
+	// Subscribe to WorkflowNodeExecution updates for the current execution
+	$effect(() => {
+		if (!currentExecutionId) {
+			if (unsubscribeNodeExecutions) {
+				unsubscribeNodeExecutions();
+				unsubscribeNodeExecutions = null;
+			}
+			nodeExecutionStatus = {};
+			return;
+		}
+
+		// Also subscribe to workflow execution updates to detect completion/failure
+		const execUnsub = validatedTopicStore.subscribe('workflowExecutions/+', (value: unknown, topic?: string) => {
+			const exec = (value as any)?.data || (value as any);
+			const updateType = exec?.status ? `STATUS_${exec.status}` : 'UPDATE';
+			console.log('[Workflow Execution Subscription] Store Update Received - WORKFLOW_EXECUTION:', {
+				entityType: 'WORKFLOW_EXECUTION',
+				subscriptionType: 'validatedTopicStore.subscribe',
+				subscriptionOperation: updateType,
+				topic: topic || 'workflowExecutions/+',
+				execution: exec,
+				currentExecutionId,
+				matches: exec?.id === currentExecutionId,
+				timestamp: new Date().toISOString()
+			});
+			if (exec?.id === currentExecutionId) {
+				// If execution completed, failed, or was cancelled, clear indicators after a delay
+				if (exec.status === 'COMPLETED' || exec.status === 'FAILED' || exec.status === 'CANCELLED') {
+					// Clear indicators after 2 seconds to allow user to see final state
+					setTimeout(() => {
+						if (currentExecutionId === exec.id) {
+							clearExecutionState();
+						}
+					}, 2000);
+				}
+			}
+		});
+
+		// Subscribe to node execution updates for this execution
+		const nodeUnsub = validatedTopicStore.subscribe('workflowNodeExecutions/+', (value: unknown, topic?: string) => {
+			// Value can be either the entity directly or { id, data }
+			const nodeExec = (value as any)?.data || (value as any);
+			// Determine update type based on the data structure
+			const updateType = nodeExec?.status ? `STATUS_${nodeExec.status}` : 'UNKNOWN';
+			console.log('[Node Execution Subscription] Store Update Received - WORKFLOW_NODE_EXECUTION:', {
+				entityType: 'WORKFLOW_NODE_EXECUTION',
+				subscriptionType: 'validatedTopicStore.subscribe',
+				subscriptionOperation: updateType,
+				topic: topic || 'workflowNodeExecutions/+',
+				nodeExec,
+				currentExecutionId,
+				parentId: nodeExec?.parentId,
+				matches: nodeExec?.parentId === currentExecutionId,
+				timestamp: new Date().toISOString()
+			});
+			
+			if (nodeExec?.parentId === currentExecutionId) {
+				// Map WorkflowNodeExecution.nodeId to GridElement.id
+				const nodeId = nodeExec.nodeId;
+				const status = nodeExec.status;
+				if (nodeId && status) {
+					console.log('[Node Execution Subscription] Processing node execution:', {
+						nodeId,
+						status,
+						executionId: currentExecutionId
+					});
+					// Store status for this node; node stays highlighted with status indicator
+					nodeExecutionStatus = { ...nodeExecutionStatus, [nodeId]: status };
+				}
+			}
+		});
+
+		unsubscribeNodeExecutions = () => {
+			execUnsub();
+			nodeUnsub();
+		};
+
+		return () => {
+			if (unsubscribeNodeExecutions) {
+				unsubscribeNodeExecutions();
+				unsubscribeNodeExecutions = null;
+			}
+		};
+	});
+
+	// Clear execution state
+	function clearExecutionState() {
+		currentExecutionId = null;
+		nodeExecutionStatus = {};
+		if (unsubscribeNodeExecutions) {
+			unsubscribeNodeExecutions();
+			unsubscribeNodeExecutions = null;
+		}
+	}
 
 	async function executeWorkflow() {
 		if (!selectedWorkflowId || !selectedProjectId || !data.idToken) {
@@ -876,6 +975,9 @@
 
 		try {
 			isExecutingWorkflow = true;
+			// Clear previous execution state
+			clearExecutionState();
+			
 			console.log('Starting workflow execution', {
 				workflowId: selectedWorkflowId,
 				projectId: selectedProjectId,
@@ -902,6 +1004,21 @@
 				status: execution.status,
 			});
 
+			// Set current execution ID to track node executions
+			currentExecutionId = execution.id;
+
+			// Set up subscriptions for node executions immediately
+			if (workflowSyncManager?.isReady) {
+				try {
+					await workflowSyncManager.syncWorkflowNodeExecutionList(execution.id, {
+						setupSubscriptions: true
+					});
+					console.log('Node execution subscriptions set up for execution:', execution.id);
+				} catch (err) {
+					console.error('Failed to set up node execution subscriptions:', err);
+				}
+			}
+
 			// Refresh executions list to show the new execution
 			await loadWorkflowExecutions();
 
@@ -912,6 +1029,8 @@
 			alert(
 				`Failed to start workflow execution: ${error instanceof Error ? error.message : String(error)}`
 			);
+			// Clear execution state on error
+			clearExecutionState();
 		} finally {
 			isExecutingWorkflow = false;
 		}
@@ -1029,6 +1148,8 @@
 			onNodeDelete={deleteElement}
 			onNodeDoubleClick={handleElementDoubleClick}
 			onExecuteWorkflow={executeWorkflow}
+			nodeExecutionStatus={nodeExecutionStatus}
+			onClearExecution={clearExecutionState}
 			{generateId}
 		/>
 

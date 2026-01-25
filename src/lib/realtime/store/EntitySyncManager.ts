@@ -213,8 +213,32 @@ export class EntitySyncManager<T extends { id: string } = any> {
 				variables: updateVariables,
 				path: this.config.updateSubscriptionPath,
 				next: (updatedEntity: T) => {
-					const topic = toTopicPath(this.config.entityType, this.config.getEntityId(updatedEntity));
+					const entityId = this.config.getEntityId(updatedEntity);
+					const subscriptionType = this.config.updateSubscriptionPath || 'onUpdate';
+					const entityTypeLabel = this.config.entityType === 'workflowNodeExecutions' 
+						? 'WORKFLOW_NODE_EXECUTION' 
+						: this.config.entityType === 'workflowExecutions'
+						? 'WORKFLOW_EXECUTION'
+						: this.config.entityType.toUpperCase();
+					console.log(`[EntitySyncManager] GraphQL Subscription Update Received - ${entityTypeLabel}:`, {
+						entityType: entityTypeLabel,
+						subscriptionType,
+						subscriptionOperation: 'UPDATE',
+						entityTypePath: this.config.entityType,
+						entityId,
+						entity: updatedEntity,
+						timestamp: new Date().toISOString()
+					});
+					const topic = toTopicPath(this.config.entityType, entityId);
 					this.store.publish(topic, updatedEntity);
+					console.log(`[EntitySyncManager] Published ${entityTypeLabel} to store:`, {
+						entityType: entityTypeLabel,
+						subscriptionType,
+						subscriptionOperation: 'UPDATE',
+						topic,
+						entityTypePath: this.config.entityType,
+						entityId
+					});
 					if (this.config.onUpdate) {
 						this.config.onUpdate(updatedEntity);
 					}
@@ -239,8 +263,32 @@ export class EntitySyncManager<T extends { id: string } = any> {
 				variables: deleteVariables,
 				path: this.config.deleteSubscriptionPath,
 				next: (deletedEntity: T) => {
-					const topic = toTopicPath(this.config.entityType, this.config.getEntityId(deletedEntity));
+					const entityId = this.config.getEntityId(deletedEntity);
+					const subscriptionType = this.config.deleteSubscriptionPath || 'onDelete';
+					const entityTypeLabel = this.config.entityType === 'workflowNodeExecutions' 
+						? 'WORKFLOW_NODE_EXECUTION' 
+						: this.config.entityType === 'workflowExecutions'
+						? 'WORKFLOW_EXECUTION'
+						: this.config.entityType.toUpperCase();
+					console.log(`[EntitySyncManager] GraphQL Subscription Update Received - ${entityTypeLabel}:`, {
+						entityType: entityTypeLabel,
+						subscriptionType,
+						subscriptionOperation: 'DELETE',
+						entityTypePath: this.config.entityType,
+						entityId,
+						entity: deletedEntity,
+						timestamp: new Date().toISOString()
+					});
+					const topic = toTopicPath(this.config.entityType, entityId);
 					this.store.delete(topic);
+					console.log(`[EntitySyncManager] Deleted ${entityTypeLabel} from store:`, {
+						entityType: entityTypeLabel,
+						subscriptionType,
+						subscriptionOperation: 'DELETE',
+						topic,
+						entityTypePath: this.config.entityType,
+						entityId
+					});
 					if (this.config.onDelete) {
 						this.config.onDelete(deletedEntity);
 					}
@@ -287,9 +335,37 @@ export class EntitySyncManager<T extends { id: string } = any> {
 			path: this.config.createSubscriptionPath,
 			next: (createdEntity: T) => {
 				const id = this.config.getEntityId(createdEntity);
+				const subscriptionType = this.config.createSubscriptionPath || 'onCreate';
+				const entityTypeLabel = this.config.entityType === 'workflowNodeExecutions' 
+					? 'WORKFLOW_NODE_EXECUTION' 
+					: this.config.entityType === 'workflowExecutions'
+					? 'WORKFLOW_EXECUTION'
+					: this.config.entityType.toUpperCase();
+				console.log(`[EntitySyncManager] GraphQL Subscription Update Received - ${entityTypeLabel}:`, {
+					entityType: entityTypeLabel,
+					subscriptionType,
+					subscriptionOperation: 'CREATE',
+					entityTypePath: this.config.entityType,
+					entityId: id,
+					entity: createdEntity,
+					timestamp: new Date().toISOString()
+				});
 				if (id) {
 					const topic = toTopicPath(this.config.entityType, id);
 					this.store.publish(topic, createdEntity);
+					const entityTypeLabel = this.config.entityType === 'workflowNodeExecutions' 
+						? 'WORKFLOW_NODE_EXECUTION' 
+						: this.config.entityType === 'workflowExecutions'
+						? 'WORKFLOW_EXECUTION'
+						: this.config.entityType.toUpperCase();
+					console.log(`[EntitySyncManager] Published ${entityTypeLabel} to store:`, {
+						entityType: entityTypeLabel,
+						subscriptionType,
+						subscriptionOperation: 'CREATE',
+						topic,
+						entityTypePath: this.config.entityType,
+						entityId: id
+					});
 					// Ensure new entities get update/delete subscriptions
 					this.setupSubscriptionsForEntities([createdEntity]);
 				}

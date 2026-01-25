@@ -398,7 +398,11 @@ export class WorkflowSyncManager {
 			'Failed to sync workflow node execution list'
 		);
 		if (options?.setupSubscriptions) {
+			// Set up the status change subscription
 			this.setupWorkflowNodeExecutionSubscriptions(workflowExecutionId);
+			// Also ensure create subscription is set up with the correct parentId
+			// The EntitySyncManager should have already set it up, but we ensure it has the right variables
+			this.workflowNodeExecutionSyncManager!.setupCreateSubscription({ workflowExecutionId });
 		}
 		return result;
 	}
@@ -431,21 +435,53 @@ export class WorkflowSyncManager {
 		this.#ensureReady();
 
 		if (this.nodeExecutionSubscriptions.has(workflowExecutionId)) {
+			console.log('[WorkflowSyncManager] Node execution subscription already exists for:', workflowExecutionId);
 			return;
 		}
+
+		console.log('[WorkflowSyncManager] Setting up node execution subscription for:', workflowExecutionId);
 
 		const spec: SubscriptionSpec<any> = {
 			query: S_ON_WORKFLOW_NODE_EXECUTION_STATUS_CHANGE,
 			variables: { parentId: workflowExecutionId },
 			next: (payload: any) => {
+				const subscriptionType = 'onWorkflowNodeExecutionStatusChange';
 				const nodeExec = payload?.onWorkflowNodeExecutionStatusChange;
+				console.log('[WorkflowSyncManager] GraphQL Subscription Update Received - WORKFLOW_NODE_EXECUTION:', {
+					entityType: 'WORKFLOW_NODE_EXECUTION',
+					subscriptionType,
+					subscriptionOperation: 'STATUS_CHANGE',
+					workflowExecutionId,
+					nodeExec,
+					payload,
+					timestamp: new Date().toISOString()
+				});
 				if (nodeExec && nodeExec.parentId === workflowExecutionId) {
 					const topicPath = toTopicPath('workflowNodeExecutions', nodeExec.id);
+					console.log('[WorkflowSyncManager] Publishing WORKFLOW_NODE_EXECUTION to store:', {
+						entityType: 'WORKFLOW_NODE_EXECUTION',
+						subscriptionType,
+						subscriptionOperation: 'STATUS_CHANGE',
+						topicPath,
+						nodeExecId: nodeExec.id,
+						status: nodeExec.status,
+						nodeId: nodeExec.nodeId,
+						timestamp: new Date().toISOString()
+					});
 					store.publish(topicPath, nodeExec);
 					this.#recordEvent('workflowNodeExecution', 'statusChange', nodeExec.id, nodeExec);
+				} else {
+					console.warn('[WorkflowSyncManager] Node execution parentId mismatch or missing:', {
+						subscriptionType,
+						subscriptionOperation: 'STATUS_CHANGE',
+						expected: workflowExecutionId,
+						received: nodeExec?.parentId,
+						nodeExec
+					});
 				}
 			},
 			error: (e: any) => {
+				console.error('[WorkflowSyncManager] Node execution subscription error:', e);
 				this.#recordEvent(
 					'workflowNodeExecution',
 					'statusChange',
@@ -458,6 +494,7 @@ export class WorkflowSyncManager {
 
 		this.subscriptionClient!.addSubscription(spec);
 		this.nodeExecutionSubscriptions.set(workflowExecutionId, spec);
+		console.log('[WorkflowSyncManager] Node execution subscription added successfully for:', workflowExecutionId);
 	}
 
 	/**
