@@ -46,9 +46,7 @@
 	const filteredInputNodes = $derived(allElementTypes.filter((t) => t.type === 'input' && filterMatches(t)));
 	const filteredProcessNodes = $derived(allElementTypes.filter((t) => t.type === 'process' && filterMatches(t)));
 	const filteredAINodes = $derived(allElementTypes.filter((t) => t.type === 'ai' && filterMatches(t)));
-	const filteredOutputNodes = $derived(allElementTypes.filter((t) => t.type === 'output' && filterMatches(t)));
 	const workflowOutputNode = $derived(allElementTypes.find((t) => t.id === 'workflow-output' && filterMatches(t)));
-	const otherOutputNodes = $derived(filteredOutputNodes.filter((t) => t.id !== 'workflow-output'));
 	const filteredToolNodes = $derived(allElementTypes.filter((t) => t.type === 'tools' && filterMatches(t)));
 
 	// Process node categories
@@ -92,7 +90,6 @@
 		'Advanced': false
 	});
 	let showAiNodes = $state(true);
-	let showOutputNodes = $state(true);
 	let showTools = $state(true);
 </script>
 
@@ -381,61 +378,6 @@
 			</div>
 		{/if}
 
-		<!-- Output Nodes -->
-		<div>
-			<button
-				class="flex items-center gap-2 text-xs font-semibold {darkMode ? 'text-slate-300' : 'text-slate-600'} uppercase tracking-wider mb-3"
-				onclick={() => (showOutputNodes = !showOutputNodes)}
-				aria-expanded={showOutputNodes}
-				aria-controls="sidebar-output-nodes"
-			>
-				<svg
-					class="w-4 h-4 transition-transform {showOutputNodes ? 'rotate-90' : ''} {darkMode ? 'text-slate-400' : 'text-slate-500'}"
-					fill="none"
-					stroke="currentColor"
-					viewBox="0 0 24 24"
-				>
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-				</svg>
-				Reports & Outputs
-			</button>
-			{#if showOutputNodes}
-				<div id="sidebar-output-nodes" class="space-y-3">
-					{#each otherOutputNodes as elementType}
-						<button
-							class="w-full relative pl-4 pr-6 py-2.5 {darkMode ? 'bg-gradient-to-l from-emerald-500/10 via-slate-700/80 to-slate-800/80 hover:from-emerald-500/15 hover:via-slate-700 hover:to-slate-700 border-slate-600/60 hover:border-emerald-400/50' : 'bg-gradient-to-l from-emerald-50 via-white to-slate-50/50 hover:from-emerald-100/50 hover:via-white hover:to-slate-50 border-slate-200 hover:border-emerald-300/60'} rounded-l-2xl rounded-r-full cursor-move transition-all duration-300 flex items-center gap-3 border-r-2 {darkMode ? 'border-r-emerald-400/60 group-hover:border-r-emerald-400' : 'border-r-emerald-400/70 group-hover:border-r-emerald-500'} shadow-sm hover:shadow-lg hover:shadow-emerald-500/10 hover:scale-[1.02] hover:-translate-y-0.5 group overflow-hidden"
-							onmousedown={(e) => handleDragStart(elementType, e)}
-						>
-							<!-- Subtle gradient overlay on hover -->
-							<div class="absolute inset-0 bg-gradient-to-l from-emerald-500/0 via-emerald-500/0 to-emerald-500/0 group-hover:from-emerald-500/5 group-hover:via-emerald-500/3 group-hover:to-emerald-500/0 transition-all duration-300 pointer-events-none"></div>
-							
-							<!-- Enhanced icon container with gradient and glow -->
-							<span class="relative z-10 text-sm w-10 h-10 flex items-center justify-center {darkMode ? 'bg-gradient-to-br from-emerald-500/20 via-emerald-600/30 to-emerald-700/40 group-hover:from-emerald-500/30 group-hover:via-emerald-600/40 group-hover:to-emerald-700/50' : 'bg-gradient-to-br from-emerald-100 via-emerald-50 to-emerald-100 group-hover:from-emerald-200 group-hover:via-emerald-100 group-hover:to-emerald-200'} {darkMode ? 'text-emerald-300 group-hover:text-emerald-200' : 'text-emerald-600 group-hover:text-emerald-700'} rounded-full transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-emerald-500/30 border {darkMode ? 'border-emerald-500/30 group-hover:border-emerald-400/50' : 'border-emerald-200/50 group-hover:border-emerald-300/70'} backdrop-blur-sm">
-								{elementType.icon}
-							</span>
-							
-							<!-- Enhanced label with better typography -->
-							<span class="relative z-10 text-sm font-semibold flex-1 text-left {darkMode ? 'text-slate-100 group-hover:text-white' : 'text-slate-800 group-hover:text-slate-900'} transition-colors duration-300 tracking-tight">
-								{elementType.label}
-							</span>
-							
-							<!-- Exit indicator arrow on the right -->
-							<div class="absolute right-0 top-1/2 mr-1 -translate-y-1/2 w-6 h-6 {darkMode ? 'bg-emerald-500/30 group-hover:bg-emerald-500/40' : 'bg-emerald-500/20 group-hover:bg-emerald-500/30'} rounded-full flex items-center justify-center transition-all duration-300 group-hover:scale-110 z-10">
-								<svg class="w-3 h-3 {darkMode ? 'text-emerald-300' : 'text-emerald-600'} group-hover:text-emerald-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 17l-5-5m0 0l5-5m-5 5h12"></path>
-								</svg>
-							</div>
-							
-							<!-- Subtle shine effect on hover -->
-							<div class="absolute inset-0 translate-x-full group-hover:translate-x-0 transition-transform duration-700 ease-in-out pointer-events-none">
-								<div class="w-full h-full bg-gradient-to-l from-transparent via-white/10 to-transparent"></div>
-							</div>
-						</button>
-					{/each}
-				</div>
-			{/if}
-		</div>
-
 		<!-- Tools -->
 		{#if filteredToolNodes.length > 0 || onAddComment}
 			<div>
@@ -459,16 +401,14 @@
 					<div id="sidebar-tools" class="space-y-2.5">
 						{#each filteredToolNodes as elementType}
 							<button
-								class="w-full p-3.5 {darkMode ? 'bg-purple-900/30 hover:bg-purple-900/40 border-purple-600/50' : 'bg-purple-50 hover:bg-purple-100 border-purple-200'} rounded-lg cursor-move transition-all flex items-center gap-3 border shadow-sm hover:shadow-md hover:scale-[1.02] group"
-								onmousedown={(e) => handleDragStart(elementType, e)}
+								disabled
+								title="Coming Soon"
+								class="w-full p-3.5 {darkMode ? 'bg-purple-900/20 border-purple-600/30' : 'bg-purple-50/60 border-purple-200/60'} rounded-lg cursor-not-allowed opacity-50 transition-all flex items-center gap-3 border"
 							>
-								<span class="text-sm font-semibold w-10 h-10 flex items-center justify-center {darkMode ? 'bg-purple-800/50' : 'bg-purple-100'} {darkMode ? 'text-purple-200' : 'text-purple-700'} rounded-lg transition-colors group-hover:scale-105">
+								<span class="text-sm font-semibold w-10 h-10 flex items-center justify-center {darkMode ? 'bg-purple-800/40' : 'bg-purple-100/80'} {darkMode ? 'text-purple-300/80' : 'text-purple-600/80'} rounded-lg">
 									{elementType.icon}
 								</span>
-								<span class="text-sm font-semibold flex-1 text-left {darkMode ? 'text-slate-200' : 'text-slate-900'}">{elementType.label}</span>
-								<svg class="w-4 h-4 {darkMode ? 'text-slate-500' : 'text-slate-400'} opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16m-7-7l7 7-7 7"></path>
-								</svg>
+								<span class="text-sm font-semibold flex-1 text-left {darkMode ? 'text-slate-400' : 'text-slate-500'}">{elementType.label}</span>
 							</button>
 						{/each}
 						{#if onAddComment}
