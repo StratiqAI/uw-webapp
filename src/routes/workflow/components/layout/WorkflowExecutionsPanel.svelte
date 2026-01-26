@@ -9,6 +9,7 @@
 		loading = false,
 		selectedWorkflowId = null,
 		selectedProjectId = null,
+		selectedExecutionId = null,
 		darkMode = false,
 		onSelectExecution,
 		onRefresh,
@@ -18,6 +19,7 @@
 		loading?: boolean;
 		selectedWorkflowId?: string | null;
 		selectedProjectId?: string | null;
+		selectedExecutionId?: string | null;
 		darkMode?: boolean;
 		onSelectExecution?: (exec: WorkflowExecutionListItem) => void;
 		onRefresh?: () => void;
@@ -288,24 +290,42 @@
 		}
 	});
 
-	function statusColor(status: string) {
-		switch (status) {
-			case 'COMPLETED':
-				return darkMode ? 'bg-emerald-900/50 text-emerald-300' : 'bg-emerald-100 text-emerald-800';
-			case 'RUNNING':
-				return darkMode ? 'bg-amber-900/50 text-amber-300' : 'bg-amber-100 text-amber-800';
-			case 'FAILED':
-				return darkMode ? 'bg-red-900/50 text-red-300' : 'bg-red-100 text-red-800';
-			case 'CANCELLED':
-				return darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-700';
-			default:
-				return darkMode ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-600';
+		function statusColor(status: string) {
+			switch (status) {
+				case 'COMPLETED':
+					return darkMode ? 'bg-emerald-900/50 text-emerald-300' : 'bg-emerald-100 text-emerald-800';
+				case 'RUNNING':
+					return darkMode ? 'bg-amber-900/50 text-amber-300' : 'bg-amber-100 text-amber-800';
+				case 'FAILED':
+					return darkMode ? 'bg-red-900/50 text-red-300' : 'bg-red-100 text-red-800';
+				case 'CANCELLED':
+					return darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-700';
+				case 'SKIPPED':
+					return darkMode ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-600';
+				default:
+					return darkMode ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-600';
+			}
 		}
-	}
 
 	function formatDate(iso: string | null | undefined) {
 		if (!iso) return '—';
 		const d = new Date(iso);
+		return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
+	}
+
+	function formatRelativeTime(iso: string | null | undefined): string {
+		if (!iso) return '—';
+		const d = new Date(iso);
+		const now = new Date();
+		const sec = Math.floor((now.getTime() - d.getTime()) / 1000);
+		if (sec < 60) return 'Just now';
+		const min = Math.floor(sec / 60);
+		if (min < 60) return `${min} min ago`;
+		const hr = Math.floor(min / 60);
+		if (hr < 24) return `${hr} hr ago`;
+		const day = Math.floor(hr / 24);
+		if (day === 1) return 'Yesterday';
+		if (day < 7) return `${day} days ago`;
 		return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
 	}
 
@@ -389,54 +409,93 @@
 			{#if latestExecution}
 				{@const exec = latestExecution}
 				{@const isExpanded = expandedExecutionId === exec.id}
+				{@const isHighlighted = selectedExecutionId === exec.id}
 				{@const nodeExecs = getNodeExecutionsForExecution(exec.id)}
 				<div
+					role="button"
+					tabindex="0"
 					class="{darkMode
 						? 'bg-gradient-to-br from-slate-800 via-slate-800 to-slate-900 border-indigo-500/30'
-						: 'bg-gradient-to-br from-white via-slate-50 to-slate-100 border-indigo-200'} border-2 rounded-lg shadow-lg"
+						: 'bg-gradient-to-br from-white via-slate-50 to-slate-100 border-indigo-200'} border-2 rounded-lg shadow-lg {isHighlighted
+						? darkMode
+							? 'ring-2 ring-indigo-400 ring-offset-2 ring-offset-slate-800'
+							: 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-white'
+						: ''} cursor-pointer"
+					onclick={(e) => {
+						if ((e.target as HTMLElement).closest('[data-expand-toggle]')) return;
+						onSelectExecution?.(exec);
+					}}
+					onkeydown={(e) => {
+						if (e.key === 'Enter' && !(e.target as HTMLElement).closest('[data-expand-toggle]')) onSelectExecution?.(exec);
+					}}
+					title="Click to show this execution on the workflow canvas"
 				>
-					<!-- Latest Execution Header -->
-					<div class="p-4 border-b {darkMode ? 'border-slate-700' : 'border-slate-200'}">
-						<div class="flex items-center justify-between mb-3">
-							<div class="flex items-center gap-3">
-								<div class="flex items-center gap-2">
-									<span class="text-xs font-semibold px-2 py-1 rounded {darkMode ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-100 text-indigo-700'}">
-										Latest
-									</span>
-									<span
-										class="text-xs font-medium px-2 py-1 rounded {statusColor(exec.status)}"
-									>
-										{exec.status}
-									</span>
-								</div>
-								<span class="text-xs font-mono {darkMode ? 'text-slate-400' : 'text-slate-500'}">
-									{exec.id.slice(0, 8)}…
+					<!-- Latest Execution Header: chevron = expand/collapse; click header = expand/collapse; "View details" = show on canvas -->
+					<div
+						class="p-4 border-b {darkMode ? 'border-slate-700' : 'border-slate-200'} cursor-pointer"
+						role="button"
+						tabindex="0"
+						onclick={(e) => {
+							if ((e.target as HTMLElement).closest('button')) return;
+							e.stopPropagation();
+							expandedExecutionId = isExpanded ? null : exec.id;
+						}}
+						onkeydown={(e) => {
+							if (e.key === 'Enter' && !(e.target as HTMLElement).closest('button')) {
+								e.stopPropagation();
+								expandedExecutionId = isExpanded ? null : exec.id;
+							}
+						}}
+						title={isExpanded ? 'Collapse details' : 'Expand details'}
+					>
+						<div class="flex items-center justify-between mb-2 gap-2">
+							<div class="flex items-center gap-3 flex-wrap min-w-0">
+								<span class="text-sm font-semibold {darkMode ? 'text-slate-100' : 'text-slate-800'}">
+									Run 1
+								</span>
+								<span class="text-xs font-semibold px-2 py-1 rounded {darkMode ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-100 text-indigo-700'}">
+									Latest
+								</span>
+								<span
+									class="text-xs font-medium px-2 py-1 rounded {statusColor(exec.status)}"
+								>
+									{exec.status}
+								</span>
+								<span class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'}" title={formatDate(exec.startedAt || exec.createdAt)}>
+									{formatRelativeTime(exec.startedAt || exec.createdAt)}
 								</span>
 							</div>
-							<div class="flex items-center gap-2">
+							<div class="flex items-center gap-2 shrink-0">
 								<button
 									type="button"
-									onclick={() => {
-										expandedExecutionId = isExpanded ? null : exec.id;
-									}}
-									class="p-1.5 rounded {darkMode
+									data-expand-toggle
+									class="p-2 rounded shrink-0 pointer-events-auto {darkMode
 										? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700'
 										: 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'} transition-colors"
 									title={isExpanded ? 'Collapse' : 'Expand'}
 									aria-label={isExpanded ? 'Collapse execution details' : 'Expand execution details'}
+									onclick={(e) => {
+										e.preventDefault();
+										e.stopPropagation();
+										expandedExecutionId = isExpanded ? null : exec.id;
+									}}
 								>
 									<svg
 										class="w-4 h-4 transition-transform {isExpanded ? 'rotate-180' : ''}"
 										fill="none"
 										stroke="currentColor"
 										viewBox="0 0 24 24"
+										aria-hidden="true"
 									>
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
 									</svg>
 								</button>
 								<button
 									type="button"
-									onclick={() => onSelectExecution?.(exec)}
+									onclick={(e) => {
+										e.stopPropagation();
+										onSelectExecution?.(exec);
+									}}
 									class="px-3 py-1.5 text-xs font-medium {darkMode
 										? 'text-indigo-300 hover:text-indigo-200 hover:bg-indigo-900/30'
 										: 'text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50'} rounded transition-colors"
@@ -445,13 +504,13 @@
 								</button>
 							</div>
 						</div>
-						<div class="flex items-center gap-4 text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'}">
+						<div class="flex items-center gap-3 text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'}">
 							<span>{progressText(exec)}</span>
-							<span>·</span>
+							<span aria-hidden="true">·</span>
 							<span>{formatDate(exec.startedAt || exec.createdAt)}</span>
 							{#if exec.completedAt}
-								<span>·</span>
-								<span>Completed: {formatDate(exec.completedAt)}</span>
+								<span aria-hidden="true">·</span>
+								<span>Completed {formatRelativeTime(exec.completedAt)}</span>
 							{/if}
 						</div>
 						{#if exec.errorMessage}
@@ -591,48 +650,102 @@
 			{#if olderExecutions.length > 0}
 				<div>
 					<div class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-600'} mb-2 px-1">
-						Older Executions ({olderExecutions.length})
+						Older runs ({olderExecutions.length})
 					</div>
 					<div class="space-y-2 max-h-64 overflow-y-auto">
-						{#each olderExecutions as exec (exec.id)}
+						{#each olderExecutions as exec, index (exec.id)}
+							{@const runNumber = index + 2}
 							{@const isExpanded = expandedExecutionId === exec.id}
+							{@const isHighlighted = selectedExecutionId === exec.id}
 							{@const nodeExecs = getNodeExecutionsForExecution(exec.id)}
 							<div
+								role="button"
+								tabindex="0"
 								class="{darkMode
 									? 'bg-slate-800 border-slate-700'
-									: 'bg-slate-50 border-slate-200'} border rounded-lg"
+									: 'bg-slate-50 border-slate-200'} border rounded-lg {isHighlighted
+									? darkMode
+										? 'ring-2 ring-indigo-400 ring-offset-2 ring-offset-slate-800'
+										: 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-slate-100'
+									: ''} cursor-pointer"
+								onclick={(e) => {
+									if ((e.target as HTMLElement).closest('button')) return;
+									onSelectExecution?.(exec);
+								}}
+								onkeydown={(e) => {
+									if (e.key === 'Enter' && !(e.target as HTMLElement).closest('button')) onSelectExecution?.(exec);
+								}}
+								title="Click to show this execution on the workflow canvas"
 							>
-								<button
-									type="button"
-									class="w-full text-left p-3 {darkMode
-										? 'hover:bg-slate-750'
-										: 'hover:bg-slate-100'} transition-colors"
-									onclick={() => {
-										expandedExecutionId = isExpanded ? null : exec.id;
-									}}
-								>
-									<div class="flex items-center justify-between gap-2 mb-1">
-										<span class="text-xs font-mono {darkMode ? 'text-slate-400' : 'text-slate-500'}">
-											{exec.id.slice(0, 8)}…
-										</span>
-										<span
-											class="text-xs font-medium px-2 py-1 rounded {statusColor(exec.status)}"
-										>
-											{exec.status}
-										</span>
-									</div>
-									<div class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'}">
-										{progressText(exec)} · {formatDate(exec.startedAt || exec.createdAt)}
-									</div>
-									{#if exec.errorMessage}
-										<div
-											class="mt-1 text-xs {darkMode ? 'text-red-400' : 'text-red-600'} truncate"
-											title={exec.errorMessage}
-										>
-											{exec.errorMessage}
+								<div class="flex items-center gap-2 p-3">
+									<button
+										type="button"
+										class="flex-1 min-w-0 text-left {darkMode
+											? 'hover:bg-slate-750'
+											: 'hover:bg-slate-100'} transition-colors -m-2 p-2 rounded"
+										onclick={() => {
+											expandedExecutionId = isExpanded ? null : exec.id;
+											onSelectExecution?.(exec);
+										}}
+									>
+										<div class="flex items-center justify-between gap-2 mb-1 flex-wrap">
+											<span class="text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-800'}">
+												Run {runNumber}
+											</span>
+											<span
+												class="text-xs font-medium px-2 py-1 rounded {statusColor(exec.status)}"
+											>
+												{exec.status}
+											</span>
 										</div>
-									{/if}
-								</button>
+										<div class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'}" title={formatDate(exec.startedAt || exec.createdAt)}>
+											{progressText(exec)}
+											<span aria-hidden="true"> · </span>
+											{formatRelativeTime(exec.startedAt || exec.createdAt)}
+										</div>
+										{#if exec.errorMessage}
+											<div
+												class="mt-1 text-xs {darkMode ? 'text-red-400' : 'text-red-600'} truncate"
+												title={exec.errorMessage}
+											>
+												{exec.errorMessage}
+											</div>
+										{/if}
+									</button>
+									<button
+										type="button"
+										class="p-2 rounded shrink-0 {darkMode
+											? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700'
+											: 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'} transition-colors"
+										title={isExpanded ? 'Collapse' : 'Expand'}
+										aria-label={isExpanded ? 'Collapse' : 'Expand'}
+										onclick={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
+											expandedExecutionId = isExpanded ? null : exec.id;
+										}}
+									>
+										<svg
+											class="w-4 h-4 transition-transform {isExpanded ? 'rotate-180' : ''}"
+											fill="none"
+											stroke="currentColor"
+											viewBox="0 0 24 24"
+											aria-hidden="true"
+										>
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+										</svg>
+									</button>
+									<button
+										type="button"
+										onclick={() => onSelectExecution?.(exec)}
+										class="px-2 py-1 text-xs font-medium shrink-0 {darkMode
+											? 'text-indigo-300 hover:text-indigo-200 hover:bg-indigo-900/30'
+											: 'text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50'} rounded transition-colors"
+										title="Show this execution on the workflow canvas"
+									>
+										View details
+									</button>
+								</div>
 								
 								{#if isExpanded}
 									<div class="border-t {darkMode ? 'border-slate-700' : 'border-slate-200'} p-3 space-y-3">

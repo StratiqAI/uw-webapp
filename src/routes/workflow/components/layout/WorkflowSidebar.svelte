@@ -214,6 +214,58 @@
 			{/if}
 		</div>
 
+
+				<!-- AI Nodes -->
+				<div>
+					<div class="flex items-center justify-between mb-3">
+						<button
+							class="flex items-center gap-2 text-xs font-semibold {darkMode ? 'text-slate-300' : 'text-slate-600'} uppercase tracking-wider"
+							onclick={() => (showAiNodes = !showAiNodes)}
+							aria-expanded={showAiNodes}
+							aria-controls="sidebar-ai-nodes"
+						>
+							<svg
+								class="w-4 h-4 transition-transform {showAiNodes ? 'rotate-90' : ''} {darkMode ? 'text-slate-400' : 'text-slate-500'}"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+							</svg>
+							AI Analysis
+						</button>
+						{#if onShowAIGallery}
+							<button
+								onclick={onShowAIGallery}
+								class="px-2 py-1 text-xs font-medium {darkMode ? 'text-indigo-400 hover:text-indigo-300 hover:bg-indigo-900/20' : 'text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50'} rounded transition-colors flex items-center gap-1"
+								title="Browse AI Query library"
+							>
+								<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+								</svg>
+								Browse
+							</button>
+						{/if}
+					</div>
+					{#if showAiNodes}
+						<div id="sidebar-ai-nodes" class="space-y-2.5">
+							{#each filteredAINodes as elementType}
+								<button
+									class="w-full p-3.5 {getSidebarButtonColor(elementType.type, darkMode)} rounded-lg cursor-move transition-all flex items-center gap-3 border shadow-sm hover:shadow-md hover:scale-[1.02] group"
+									onmousedown={(e) => handleDragStart(elementType, e)}
+								>
+									<span class="text-xs font-bold w-10 h-10 flex items-center justify-center {getIconBgColor(elementType.type, darkMode)} {getIconTextColor(elementType.type, darkMode)} rounded-lg transition-colors group-hover:scale-105">
+										{elementType.icon}
+									</span>
+									<span class="text-sm font-semibold flex-1 text-left {getLabelTextColor(darkMode)}">{elementType.label}</span>
+									<svg class="w-4 h-4 {darkMode ? 'text-slate-500' : 'text-slate-400'} opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16m-7-7l7 7-7 7"></path>
+									</svg>
+								</button>
+							{/each}
+						</div>
+					{/if}
+				</div>
 		<!-- Process Nodes -->
 		<div>
 			<div class="flex items-center justify-between mb-3">
@@ -294,57 +346,7 @@
 			{/if}
 		</div>
 
-		<!-- AI Nodes -->
-		<div>
-			<div class="flex items-center justify-between mb-3">
-				<button
-					class="flex items-center gap-2 text-xs font-semibold {darkMode ? 'text-slate-300' : 'text-slate-600'} uppercase tracking-wider"
-					onclick={() => (showAiNodes = !showAiNodes)}
-					aria-expanded={showAiNodes}
-					aria-controls="sidebar-ai-nodes"
-				>
-					<svg
-						class="w-4 h-4 transition-transform {showAiNodes ? 'rotate-90' : ''} {darkMode ? 'text-slate-400' : 'text-slate-500'}"
-						fill="none"
-						stroke="currentColor"
-						viewBox="0 0 24 24"
-					>
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-					</svg>
-					AI Analysis
-				</button>
-				{#if onShowAIGallery}
-					<button
-						onclick={onShowAIGallery}
-						class="px-2 py-1 text-xs font-medium {darkMode ? 'text-indigo-400 hover:text-indigo-300 hover:bg-indigo-900/20' : 'text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50'} rounded transition-colors flex items-center gap-1"
-						title="Browse AI Query library"
-					>
-						<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-						</svg>
-						Browse
-					</button>
-				{/if}
-			</div>
-			{#if showAiNodes}
-				<div id="sidebar-ai-nodes" class="space-y-2.5">
-					{#each filteredAINodes as elementType}
-						<button
-							class="w-full p-3.5 {getSidebarButtonColor(elementType.type, darkMode)} rounded-lg cursor-move transition-all flex items-center gap-3 border shadow-sm hover:shadow-md hover:scale-[1.02] group"
-							onmousedown={(e) => handleDragStart(elementType, e)}
-						>
-							<span class="text-xs font-bold w-10 h-10 flex items-center justify-center {getIconBgColor(elementType.type, darkMode)} {getIconTextColor(elementType.type, darkMode)} rounded-lg transition-colors group-hover:scale-105">
-								{elementType.icon}
-							</span>
-							<span class="text-sm font-semibold flex-1 text-left {getLabelTextColor(darkMode)}">{elementType.label}</span>
-							<svg class="w-4 h-4 {darkMode ? 'text-slate-500' : 'text-slate-400'} opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16m-7-7l7 7-7 7"></path>
-							</svg>
-						</button>
-					{/each}
-				</div>
-			{/if}
-		</div>
+
 
 		<!-- Workflow Output (Special - Single Sink) -->
 		{#if workflowOutputNode}

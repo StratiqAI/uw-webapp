@@ -157,6 +157,15 @@ export interface IExecutableNode extends IWorkflowNodeBase {
 }
 
 /**
+ * Trigger event configuration for input nodes (e.g. EventBridge source/detailType).
+ * Stored in the node's configuration and used when starting workflow execution.
+ */
+export interface TriggerEventConfig {
+	source: string;
+	detailType: string;
+}
+
+/**
  * Standardized interface for input nodes.
  * Input nodes receive data from external sources (events, uploads, etc.)
  */
@@ -164,6 +173,8 @@ export interface IInputNode extends IExecutableNode {
 	type: 'input';
 	/** Default input value to use when no input is provided */
 	defaultInput?: unknown;
+	/** Trigger event (source, detailType) for EventBridge-style workflows. Gold default: com.stratiqai.doclink / Created */
+	triggerEvent?: TriggerEventConfig;
 }
 
 /**

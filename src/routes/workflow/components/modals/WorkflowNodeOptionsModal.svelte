@@ -1,8 +1,12 @@
 <script lang="ts">
 	import type { GridElement } from '../../types';
-	import { isProcessNode } from '../../types/node';
+	import { isProcessNode, isInputNode } from '../../types/node';
 	import type { ProcessNodeRequiredInput } from '../../types/node';
 	import WorkflowModal from './WorkflowModal.svelte';
+
+	/** Gold default for Input node trigger (e.g. doclink created). */
+	const DEFAULT_TRIGGER_SOURCE = 'com.stratiqai.doclink';
+	const DEFAULT_TRIGGER_DETAIL_TYPE = 'Created';
 
 	let {
 		darkMode = false,
@@ -27,7 +31,12 @@
 	let processRequiredInputsError = $state('');
 	let processFunctionError = $state('');
 
+	// Input node editing state (trigger event: source, detailType)
+	let triggerSource = $state('');
+	let triggerDetailType = $state('');
+
 	const isProcess = $derived(editingNodeOptions && isProcessNode(editingNodeOptions.type));
+	const isInput = $derived(editingNodeOptions != null && isInputNode(editingNodeOptions.type));
 	const processType = $derived(
 		isProcess && editingNodeOptions ? (editingNodeOptions.type as { requiredInputs?: ProcessNodeRequiredInput[]; formula?: string; execute?: (input: unknown) => unknown }) : null
 	);
@@ -36,31 +45,36 @@
 		if (element.type.type !== 'input') {
 			return {};
 		}
-
+		// Gold default: EventBridge-style trigger for doclink created
+		const triggerDefaults = { source: DEFAULT_TRIGGER_SOURCE, detailType: DEFAULT_TRIGGER_DETAIL_TYPE };
+		if (element.nodeOptions && (element.nodeOptions.source != null || element.nodeOptions.detailType != null)) {
+			return { ...triggerDefaults, ...element.nodeOptions };
+		}
 		try {
 			const fallbackOptions = element.type.execute(null);
 			if (fallbackOptions && typeof (fallbackOptions as Promise<any>).then === 'function') {
-				return {};
+				return triggerDefaults;
 			}
-			let options = fallbackOptions ?? {};
-			
+			let options = (fallbackOptions ?? {}) as Record<string, unknown>;
+			if (options.source == null) options.source = DEFAULT_TRIGGER_SOURCE;
+			if (options.detailType == null) options.detailType = DEFAULT_TRIGGER_DETAIL_TYPE;
 			// For Document Knowledge Base node, ensure it has projectId
 			if (element.type.id === 'property-data') {
-				options = {
-					...options,
-					projectId: selectedProjectId || ''
-				};
+				options = { ...options, projectId: selectedProjectId || '' };
 			}
-			
 			return options;
 		} catch (error) {
 			console.warn('Failed to resolve default node options', error);
-			return {};
+			return triggerDefaults;
 		}
 	}
 
 	$effect(() => {
-		if (editingNodeOptions && !isProcessNode(editingNodeOptions.type)) {
+		if (editingNodeOptions && isInputNode(editingNodeOptions.type)) {
+			const fallbackOptions = getDefaultNodeOptions(editingNodeOptions) as { source?: string; detailType?: string };
+			triggerSource = editingNodeOptions.nodeOptions?.source ?? fallbackOptions?.source ?? DEFAULT_TRIGGER_SOURCE;
+			triggerDetailType = editingNodeOptions.nodeOptions?.detailType ?? fallbackOptions?.detailType ?? DEFAULT_TRIGGER_DETAIL_TYPE;
+		} else if (editingNodeOptions && !isProcessNode(editingNodeOptions.type)) {
 			nodeOptionsError = '';
 			const fallbackOptions = getDefaultNodeOptions(editingNodeOptions);
 			const optionsValue = editingNodeOptions.nodeOptions ?? fallbackOptions ?? {};
@@ -93,12 +107,26 @@
 			processFunctionText = '';
 			processRequiredInputsError = '';
 			processFunctionError = '';
+			triggerSource = '';
+			triggerDetailType = '';
 		}
 	});
 
 	function saveNodeOptions() {
 		if (!editingNodeOptions) return;
-		
+
+		if (isInputNode(editingNodeOptions.type)) {
+			editingNodeOptions.nodeOptions = {
+				source: triggerSource.trim() || DEFAULT_TRIGGER_SOURCE,
+				detailType: triggerDetailType.trim() || DEFAULT_TRIGGER_DETAIL_TYPE
+			};
+			editingNodeOptions = null;
+			triggerSource = '';
+			triggerDetailType = '';
+			onSave?.();
+			return;
+		}
+
 		if (isProcessNode(editingNodeOptions.type)) {
 			// Save process node customizations
 			try {
@@ -183,6 +211,8 @@
 		processFunctionText = '';
 		processRequiredInputsError = '';
 		processFunctionError = '';
+		triggerSource = '';
+		triggerDetailType = '';
 		onClose?.();
 	}
 
@@ -226,12 +256,14 @@
 			</div>
 			<div>
 				<h2 id="node-options-title" class="text-xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">
-					{isProcess ? 'Process node' : 'Configure'} {editingNodeOptions?.type.label}
+					{isProcess ? 'Process node' : isInput ? 'Input node' : 'Configure'} {editingNodeOptions?.type.label}
 				</h2>
 				<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-0.5">
 					{isProcess
 						? 'Edit required inputs and processing function'
-						: 'Set node options as JSON'}
+						: isInput
+							? 'Set the trigger event (source and detail type) for this workflow.'
+							: 'Set node options as JSON'}
 				</p>
 			</div>
 		</div>
@@ -321,8 +353,60 @@
 					Cancel
 				</button>
 			</div>
+		{:else if isInput}
+			<!-- Input node: trigger event (source, detailType) -->
+			<div class="space-y-4">
+				<p class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'}">
+					This event identifies when the workflow is triggered (e.g. doclink created). Stored as the node configuration and used when starting runs.
+				</p>
+				<div>
+					<label for="trigger-source" class="block text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'} mb-2">
+						Source
+					</label>
+					<input
+						id="trigger-source"
+						type="text"
+						bind:value={triggerSource}
+						class="w-full px-3 py-2.5 {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm font-mono"
+						placeholder={DEFAULT_TRIGGER_SOURCE}
+					/>
+					<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1.5">
+						Event source (e.g. com.stratiqai.doclink).
+					</p>
+				</div>
+				<div>
+					<label for="trigger-detail-type" class="block text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'} mb-2">
+						Detail type
+					</label>
+					<input
+						id="trigger-detail-type"
+						type="text"
+						bind:value={triggerDetailType}
+						class="w-full px-3 py-2.5 {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm font-mono"
+						placeholder={DEFAULT_TRIGGER_DETAIL_TYPE}
+					/>
+					<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1.5">
+						Event detail type (e.g. Created).
+					</p>
+				</div>
+			</div>
+
+			<div class="flex gap-3 mt-8 pt-6 {darkMode ? 'border-slate-700' : 'border-slate-200'} border-t">
+				<button
+					onclick={saveNodeOptions}
+					class="flex-1 px-4 py-2.5 {darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-900 hover:bg-slate-800'} text-white rounded-md transition-colors font-semibold text-sm shadow-sm hover:shadow"
+				>
+					Save Configuration
+				</button>
+				<button
+					onclick={cancelNodeOptions}
+					class="flex-1 px-4 py-2.5 {darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-200 border-slate-600' : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300'} rounded-md transition-colors font-semibold text-sm border"
+				>
+					Cancel
+				</button>
+			</div>
 		{:else}
-			<!-- Non-process: JSON options editor -->
+			<!-- Non-process, non-input: JSON options editor -->
 			<div class="space-y-4">
 				<div>
 					<label for="node-options-json" class="block text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'} mb-2">

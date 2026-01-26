@@ -6,11 +6,15 @@
 		fieldSchema: JsonSchemaDefinition;
 		required: boolean;
 		darkMode?: boolean;
+		/** When false, the Required checkbox is hidden and the field is always treated as required. */
+		showRequiredCheckbox?: boolean;
+		/** When true, the description field is always shown and marked required. */
+		descriptionRequired?: boolean;
 		onUpdate: (name: string, schema: JsonSchemaDefinition, isRequired: boolean) => void;
 		onRemove: () => void;
 	}
 
-	let { fieldName, fieldSchema, required, darkMode = false, onUpdate, onRemove }: Props = $props();
+	let { fieldName, fieldSchema, required, darkMode = false, showRequiredCheckbox = true, descriptionRequired = false, onUpdate, onRemove }: Props = $props();
 
 	const types: Array<JsonSchemaDefinition['type']> = ['string', 'number', 'integer', 'boolean', 'object', 'array'];
 
@@ -59,7 +63,7 @@
 			updatedSchema.items = fieldSchema.items;
 		}
 
-		onUpdate(localName, updatedSchema, localRequired);
+		onUpdate(localName, updatedSchema, showRequiredCheckbox ? localRequired : true);
 	}
 
 	// Watch for changes
@@ -137,14 +141,16 @@
 			{/each}
 		</select>
 
-		<label class="flex gap-1.5 items-center cursor-pointer">
-			<input
-				type="checkbox"
-				bind:checked={localRequired}
-				class="h-4 w-4 rounded {darkMode ? 'text-indigo-500' : 'text-indigo-600'} focus:ring-indigo-500"
-			/>
-			<span class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-700'}">Required</span>
-		</label>
+		{#if showRequiredCheckbox}
+			<label class="flex gap-1.5 items-center cursor-pointer">
+				<input
+					type="checkbox"
+					bind:checked={localRequired}
+					class="h-4 w-4 rounded {darkMode ? 'text-indigo-500' : 'text-indigo-600'} focus:ring-indigo-500"
+				/>
+				<span class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-700'}">Required</span>
+			</label>
+		{/if}
 
 		{#if localType === 'string' && !localEnum}
 			<select
@@ -228,14 +234,20 @@
 		</button>
 	</div>
 
-	{#if localDescription !== undefined}
-		<input
-			bind:value={localDescription}
-			placeholder="Description (optional)"
-			class="w-full mt-2 rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 {darkMode
-				? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400'
-				: 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'}"
-		/>
+	{#if descriptionRequired || localDescription !== undefined}
+		<div class="mt-2">
+			<span class="block text-xs font-medium {darkMode ? 'text-slate-400' : 'text-slate-500'} mb-1">
+				Description{descriptionRequired ? ' (required)' : ''}
+			</span>
+			<input
+				bind:value={localDescription}
+				required={descriptionRequired}
+				placeholder={descriptionRequired ? 'Describe this property for the AI' : 'Description (optional)'}
+				class="w-full rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 {darkMode
+					? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400'
+					: 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'}"
+			/>
+		</div>
 	{:else}
 		<button
 			onclick={() => {
@@ -256,6 +268,8 @@
 						fieldName={subName}
 						fieldSchema={subSchema}
 						required={fieldSchema.required?.includes(subName) || false}
+						showRequiredCheckbox={showRequiredCheckbox}
+						descriptionRequired={descriptionRequired}
 						onUpdate={(name, updatedSchema, isRequired) => {
 							if (name !== subName && fieldSchema.properties) {
 								delete fieldSchema.properties[subName];
@@ -309,6 +323,8 @@
 								fieldName={itemPropName}
 								fieldSchema={itemPropSchema}
 								required={fieldSchema.items.required?.includes(itemPropName) || false}
+								showRequiredCheckbox={showRequiredCheckbox}
+								descriptionRequired={descriptionRequired}
 								onUpdate={(name, updatedSchema, isRequired) => {
 									if (!fieldSchema.items || fieldSchema.items.type !== 'object') return;
 									if (name !== itemPropName && fieldSchema.items.properties) {

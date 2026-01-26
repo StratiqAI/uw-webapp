@@ -122,7 +122,7 @@
 			<input
 				type="text"
 				bind:value={property.description}
-				placeholder="Description (optional)"
+				placeholder="Description (required for the AI to understand the property)"
 				class="font-inherit w-full rounded-lg border-2 border-slate-200 bg-white px-4 py-2.5 text-[0.9375rem] font-medium text-slate-800 shadow-sm transition-all duration-200 hover:border-indigo-300 hover:shadow-md focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
 				aria-label="Property description"
 			/>

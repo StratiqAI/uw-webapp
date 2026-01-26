@@ -43,6 +43,8 @@
 	import WorkflowJsonExportModal from '../../components/modals/WorkflowJsonExportModal.svelte';
 	import WorkflowCreateCustomAIModal from '../../components/modals/WorkflowCreateCustomAIModal.svelte';
 	import WorkflowOutputSchemaModal from '../../components/modals/WorkflowOutputSchemaModal.svelte';
+	import ToastContainer from '$lib/components/Toast/ToastContainer.svelte';
+	import { toastStore } from '$lib/stores/toastStore.svelte';
 	import {
 		loadCustomAINodesFromStorage,
 		createCustomAINodeState,
@@ -50,7 +52,13 @@
 		resetCustomAINodeDraft
 	} from '../../services/nodes/customAiNodes';
 	import { getElementTypes } from '../../services/nodes/nodeLibraryService';
-	import { generateWorkflowJSON } from '../../services/serialization/workflowSerializationService';
+	import {
+		generateWorkflowJSON,
+		buildWorkflowDefinitionInput,
+		definitionToInput,
+		definitionToApiVariables,
+		type WorkflowDefinitionInput
+	} from '../../services/serialization/workflowSerializationService';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
 	import WorkflowSwitcher from '$lib/dashboard/components/WorkflowSwitcher.svelte';
 	import {
@@ -63,7 +71,7 @@
 		type UpdateWorkflowMutation,
 		type DeleteWorkflowMutation
 	} from '@stratiqai/types-simple';
-	import { S_ON_WORKFLOW_EXECUTION_STATUS_CHANGE } from '$lib/graphql/workflowExecutionSubscriptions';
+	import { S_ON_WORKFLOW_EXECUTION_STATUS_CHANGE } from '@stratiqai/types-simple';
 	import { fetchWorkflowExecutions } from '../../services/backend/workflowExecutionService';
 	import type { WorkflowExecutionListItem } from '../../services/backend/workflowExecutionService';
 	import { getAppSyncWsClient, initAppSyncWsClient } from '$lib/realtime/websocket/wsClient';
@@ -71,15 +79,15 @@
 	import type { ElementType, GridElement, Connection } from '../../types';
 	import { isExecutableNode } from '../../types/node';
 	import type { PageData } from './$types';
-	import type { Project, Workflow, WorkflowExecution } from '@stratiqai/types-simple';
-	import type { WorkflowJSON } from '../../types/workflow';
+	import type { Project, Workflow, WorkflowExecution, WorkflowNodeExecution } from '@stratiqai/types-simple';
 	import { WorkflowSyncManager } from '$lib/realtime/websocket/syncManagers/WorkflowSyncManager';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import { toTopicPath } from '$lib/realtime/store/TopicMapper';
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, tick } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	
+	import { browser } from '$app/environment';
+
 	interface Props {
 		data: PageData;
 	}
@@ -444,19 +452,73 @@
 				// Load from ui field
 				elementsData = workflow.ui.elements;
 				connectionsData = workflow.ui.connections;
-			} else if (workflow.definition) {
-				// Fall back to definition for backward compatibility
-				const workflowData: WorkflowJSON = typeof workflow.definition === 'string' 
-					? JSON.parse(workflow.definition)
-					: workflow.definition;
-				elementsData = workflowData.elements || [];
-				connectionsData = workflowData.connections || [];
-				// Extract outputSchema from definition if present
-				if (workflowData.outputSchema) {
-					outputSchema = workflowData.outputSchema;
+			} else if (
+				workflow.definition &&
+				typeof workflow.definition === 'object' &&
+				Array.isArray((workflow.definition as { nodes?: unknown[] }).nodes) &&
+				Array.isArray((workflow.definition as { edges?: unknown[] }).edges)
+			) {
+				// Typed shape: definition.nodes + definition.edges (layout from workflow.ui if present)
+				const def = workflow.definition as { nodes: Array<{ id: string; kind: string; label?: string | null; configuration?: any; config?: any; aiConfig?: any; processConfig?: any; toolsConfig?: any; options?: any }>; edges: Array<{ id: string; sourceId: string; targetId: string; sourcePort?: string | null; targetPort?: string | null }> };
+				const uiElementsById = new Map(
+					(workflow.ui?.elements ?? []).map((e) => [e.id, e])
+				);
+				const kindToDefaultType: Record<string, string> = {
+					INPUT: 'property-data',
+					OUTPUT: 'workflow-output',
+					PROCESS: 'passthrough',
+					AI: 'ai-query',
+					TOOLS: 'passthrough',
+					COMMENT: 'comment'
+				};
+				elementsData = def.nodes.map((node) => {
+					const ui = uiElementsById.get(node.id);
+					const category = node.kind.toLowerCase();
+					const typeId = kindToDefaultType[node.kind] ?? 'passthrough';
+					const el: any = {
+						id: node.id,
+						type: typeId,
+						category,
+						typeLabel: node.label ?? node.kind,
+						x: ui?.x ?? 0,
+						y: ui?.y ?? 0,
+						width: ui?.width ?? 200,
+						height: ui?.height ?? 80
+					};
+					const config = node.configuration ?? node.config ?? (node.aiConfig || node.processConfig || node.toolsConfig);
+					if (config && typeof config === 'object') {
+						if ('prompt' in config || 'model' in config) {
+							el.aiQueryData = { prompt: (config as any).prompt ?? '', model: (config as any).model ?? '', systemPrompt: (config as any).systemPrompt };
+						}
+						if ('staticOutput' in config || 'options' in config) {
+							el.output = (config as any).staticOutput;
+							el.nodeOptions = (config as any).options;
+						}
+						if ('options' in config && node.kind === 'TOOLS') {
+							el.nodeOptions = (config as any).options;
+						}
+						if ((node.kind === 'INPUT') && ('source' in config || 'detailType' in config)) {
+							el.nodeOptions = { source: (config as any).source, detailType: (config as any).detailType };
+						}
+					}
+					if (node.options && typeof node.options === 'object' && (node.options as any).commentText) {
+						el.commentText = (node.options as any).commentText;
+					}
+					return el;
+				});
+				connectionsData = def.edges.map((e) => ({
+					id: e.id,
+					from: e.sourceId,
+					to: e.targetId,
+					fromSide: e.sourcePort ?? 'right',
+					toSide: e.targetPort ?? 'left'
+				}));
+				if ((workflow as any).structuredOutputSchema?.jsonSchema != null) {
+					const raw = (workflow as any).structuredOutputSchema.jsonSchema;
+					outputSchema = typeof raw === 'string' ? (JSON.parse(raw) as Record<string, unknown>) : (raw as Record<string, unknown>);
 				}
 			} else {
-				console.error('Workflow has no ui or definition');
+				console.error('Workflow has no ui or definition (expected definition.nodes and definition.edges)');
 				return;
 			}
 
@@ -506,25 +568,51 @@
 				toSide: connData.toSide
 			}));
 
-			// If we loaded from ui field, we still need to load additional data (aiQueryData, nodeOptions, etc.) from definition
+			// If we loaded from ui field, merge additional data (aiQueryData, nodeOptions, etc.) from definition.nodes
 			if (workflow.ui && workflow.definition) {
-				const workflowData: WorkflowJSON = typeof workflow.definition === 'string' 
-					? JSON.parse(workflow.definition)
-					: workflow.definition;
-				
-				// Extract outputSchema from definition if present
-				if (workflowData.outputSchema) {
-					outputSchema = workflowData.outputSchema;
-				}
-				
-				// Merge additional data from definition into elements
-				for (const elData of workflowData.elements || []) {
-					const gridElement = newElements.find((el) => el.id === elData.id);
-					if (gridElement) {
-						if (elData.aiQueryData) gridElement.aiQueryData = elData.aiQueryData;
-						if (elData.output !== undefined) gridElement.output = elData.output;
-						if (elData.nodeOptions !== undefined) gridElement.nodeOptions = elData.nodeOptions;
-						if (elData.commentText) gridElement.commentText = elData.commentText;
+				const def = workflow.definition as { nodes?: Array<{ id: string; kind: string; configuration?: any; config?: any; aiConfig?: any; processConfig?: any; toolsConfig?: any; options?: any }>; edges?: unknown[] };
+				if (Array.isArray(def.nodes) && Array.isArray(def.edges)) {
+					const w = workflow as { structuredOutputSchema?: { jsonSchema?: unknown } };
+					if (w.structuredOutputSchema?.jsonSchema != null) {
+						const raw = w.structuredOutputSchema.jsonSchema;
+						outputSchema = typeof raw === 'string' ? (JSON.parse(raw) as Record<string, unknown>) : (raw as Record<string, unknown>);
+					}
+					for (const node of def.nodes || []) {
+						const gridElement = newElements.find((el) => el.id === node.id);
+						if (!gridElement) continue;
+						const config = node.configuration ?? node.config ?? (node.aiConfig || node.processConfig || node.toolsConfig);
+						if (config && typeof config === 'object') {
+							if ('prompt' in config || 'model' in config) {
+								const rawSchema = config.structuredOutputSchema?.jsonSchema;
+								const schemaObj =
+									rawSchema != null
+										? typeof rawSchema === 'string'
+											? (JSON.parse(rawSchema) as Record<string, unknown>)
+											: (rawSchema as Record<string, unknown>)
+										: undefined;
+								gridElement.aiQueryData = {
+									prompt: config.prompt ?? '',
+									model: config.model ?? '',
+									systemPrompt: config.systemPrompt,
+									...(schemaObj && {
+										responseFormat: { type: 'json_schema' as const, schema: schemaObj }
+									})
+								};
+							}
+							if ('staticOutput' in config || 'options' in config) {
+								gridElement.output = config.staticOutput;
+								gridElement.nodeOptions = config.options;
+							}
+							if (node.kind === 'TOOLS' && config.options !== undefined) {
+								gridElement.nodeOptions = config.options;
+							}
+							if (node.kind === 'INPUT' && ('source' in config || 'detailType' in config)) {
+								gridElement.nodeOptions = { source: config.source, detailType: config.detailType };
+							}
+						}
+						if (node.options?.commentText) {
+							gridElement.commentText = node.options.commentText;
+						}
 					}
 				}
 			}
@@ -533,31 +621,31 @@
 			connections = newConnections;
 		} catch (error) {
 			console.error('Failed to load workflow into canvas:', error);
-			alert(`Error loading workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			toastStore.error(`Error loading workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
 		}
 	}
 
 	async function handleWorkflowChange(workflowId: string | null) {
 		selectedWorkflowId = workflowId;
-		
-		// Navigate to new URL
-		if (selectedProjectId) {
-			if (workflowId) {
-				await goto(`/workflow/${selectedProjectId}/${workflowId}`, { replaceState: true });
-			} else {
-				await goto(`/workflow/${selectedProjectId}`, { replaceState: true });
-			}
-		}
-		
+
 		if (workflowId) {
 			const workflow = workflows.find((w) => w.id === workflowId);
 			if (workflow) {
 				loadWorkflowIntoCanvas(workflow);
 			}
 		} else {
-			// Clear canvas when "New Workflow" is selected
 			gridElements = [];
 			connections = [];
+		}
+
+		// Defer URL update to avoid SvelteKit navigation intent bug (undefined hash)
+		if (selectedProjectId && browser) {
+			const path = workflowId
+				? `/workflow/${selectedProjectId}/${workflowId}`
+				: `/workflow/${selectedProjectId}`;
+			await tick();
+			const url = new URL(path, window.location.origin).href;
+			await goto(url, { replaceState: true });
 		}
 	}
 
@@ -567,13 +655,13 @@
 	async function handleDeleteWorkflow(workflowId: string) {
 		if (!data.idToken) {
 			console.error('No authentication token available');
-			alert('Error: Not authenticated. Please refresh the page.');
+			toastStore.error('Not authenticated. Please refresh the page.');
 			return;
 		}
 
 		if (!selectedProjectId) {
 			console.error('No project selected');
-			alert('Error: Please select a project before deleting the workflow.');
+			toastStore.error('Please select a project before deleting the workflow.');
 			return;
 		}
 
@@ -598,7 +686,7 @@
 
 			if (!response.deleteWorkflow) {
 				console.error('Workflow deletion returned null');
-				alert('Error deleting workflow: No workflow returned');
+				toastStore.error('Error deleting workflow: No workflow returned');
 				return;
 			}
 
@@ -615,7 +703,7 @@
 			console.log('Workflow deleted successfully:', response.deleteWorkflow);
 		} catch (error) {
 			console.error('Failed to delete workflow:', error);
-			alert(`Error deleting workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			toastStore.error(`Error deleting workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
 			throw error;
 		}
 	}
@@ -626,13 +714,13 @@
 	async function handleRenameWorkflow(workflowId: string, newName: string) {
 		if (!data.idToken) {
 			console.error('No authentication token available');
-			alert('Error: Not authenticated. Please refresh the page.');
+			toastStore.error('Not authenticated. Please refresh the page.');
 			return;
 		}
 
 		if (!selectedProjectId) {
 			console.error('No project selected');
-			alert('Error: Please select a project before renaming the workflow.');
+			toastStore.error('Please select a project before renaming the workflow.');
 			return;
 		}
 
@@ -643,18 +731,16 @@
 		}
 
 		try {
-			// UpdateWorkflowInput - both fields are optional, so we can update just the name
-			// For a rename, we only need to send the name field
-			const input: { name: string; definition?: string; ui?: any } = {
+			// UpdateWorkflowInput - include definition (AWSJSON fields as strings for API)
+			const input: { name: string; definition?: ReturnType<typeof definitionToApiVariables>; ui?: any } = {
 				name: newName
 			};
-			
-			// Optionally include definition to preserve it during the update
-			// Convert to string if it's an object (AWSJSON expects a string)
 			if (workflow.definition) {
-				input.definition = typeof workflow.definition === 'string' 
-					? workflow.definition 
-					: JSON.stringify(workflow.definition);
+				const raw =
+					typeof workflow.definition === 'string'
+						? (JSON.parse(workflow.definition) as { nodes?: unknown[]; edges?: unknown[] })
+						: workflow.definition;
+				input.definition = definitionToApiVariables(definitionToInput(raw));
 			}
 			
 			// Preserve ui field if it exists
@@ -676,7 +762,7 @@
 
 			if (!response.updateWorkflow) {
 				console.error('Workflow update returned null');
-				alert('Error renaming workflow: No workflow returned');
+				toastStore.error('Error renaming workflow: No workflow returned');
 				return;
 			}
 
@@ -694,7 +780,7 @@
 			console.log('Workflow renamed successfully:', response.updateWorkflow);
 		} catch (error) {
 			console.error('Failed to rename workflow:', error);
-			alert(`Error renaming workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			toastStore.error(`Error renaming workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
 			throw error; // Re-throw so the component can handle it
 		}
 	}
@@ -705,20 +791,24 @@
 	async function saveWorkflow() {
 		if (!data.idToken) {
 			console.error('No authentication token available');
-			alert('Error: Not authenticated. Please refresh the page.');
+			toastStore.error('Not authenticated. Please refresh the page.');
 			return;
 		}
 
 		if (!selectedProjectId) {
-			alert('Error: Please select a project before saving the workflow.');
+			toastStore.error('Please select a project before saving the workflow.');
 			return;
 		}
 
 		try {
-			// Generate workflow JSON
-			const workflowJSON = generateWorkflowJSON(gridElements, connections, outputSchema);
+			// Build typed definition (nodes + edges) and optional structuredOutputSchema for API
+			const { definition, structuredOutputSchema } = buildWorkflowDefinitionInput(
+				gridElements,
+				connections,
+				outputSchema
+			);
 
-			// Generate UI structure
+			// Generate UI structure (layout)
 			const workflowUI = generateWorkflowUI();
 
 			// Check if we're updating an existing workflow or creating a new one
@@ -726,15 +816,18 @@
 				// Update existing workflow
 				const workflow = workflows.find((w) => w.id === selectedWorkflowId);
 				if (!workflow) {
-					alert('Error: Selected workflow not found.');
+					toastStore.error('Selected workflow not found.');
 					return;
 				}
 
-				const input: { name: string; definition: string; ui: typeof workflowUI } = {
-					name: workflow.name, // Keep existing name, or you could update it
-					definition: workflowJSON,
+				const input: { name: string; definition: ReturnType<typeof definitionToApiVariables>; ui: typeof workflowUI; structuredOutputSchema?: typeof structuredOutputSchema } = {
+					name: workflow.name,
+					definition: definitionToApiVariables(definition),
 					ui: workflowUI
 				};
+				if (structuredOutputSchema) {
+					input.structuredOutputSchema = structuredOutputSchema;
+				}
 
 				// CompositeKeyInput requires both id and parentId for child entities
 				const key = {
@@ -750,7 +843,7 @@
 
 				if (!response.updateWorkflow) {
 					console.error('Workflow update returned null');
-					alert('Error updating workflow: No workflow returned');
+					toastStore.error('Error updating workflow: No workflow returned');
 					return;
 				}
 
@@ -765,15 +858,18 @@
 				}
 
 				console.log('Workflow updated successfully:', response.updateWorkflow);
-				alert('Workflow updated successfully!');
+				toastStore.success('Workflow updated successfully!');
 			} else {
 				// Create new workflow
-				const input = {
+				const input: { name: string; definition: ReturnType<typeof definitionToApiVariables>; ui: typeof workflowUI; parentId: string; structuredOutputSchema?: typeof structuredOutputSchema } = {
 					name: 'New Workflow',
-					definition: workflowJSON,
+					definition: definitionToApiVariables(definition),
 					ui: workflowUI,
 					parentId: selectedProjectId
 				};
+				if (structuredOutputSchema) {
+					input.structuredOutputSchema = structuredOutputSchema;
+				}
 
 				console.log('[saveWorkflow] Creating new workflow:', { input });
 
@@ -785,7 +881,7 @@
 
 				if (!response.createWorkflow) {
 					console.error('Workflow creation returned null');
-					alert('Error saving workflow: No workflow returned');
+					toastStore.error('Error saving workflow: No workflow returned');
 					return;
 				}
 
@@ -799,11 +895,11 @@
 				}
 
 				console.log('Workflow created successfully:', response.createWorkflow);
-				alert('Workflow created successfully!');
+				toastStore.success('Workflow created successfully!');
 			}
 		} catch (error) {
 			console.error('Failed to save workflow:', error);
-			alert(`Error saving workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			toastStore.error(`Error saving workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
 		}
 	}
 
@@ -866,16 +962,74 @@
 	let nodeExecutionStatus = $state<Record<string, string>>({});
 	/** Workflow execution outputData when execution completes */
 	let workflowExecutionOutput = $state<any>(null);
+	/** When false, Hide Labels was pressed; status badges and Start labels are hidden until Show Labels */
+	let executionLabelsVisible = $state(true);
 	let unsubscribeNodeExecutions: (() => void) | null = null;
 
-	// Subscribe to WorkflowNodeExecution updates for the current execution
+	// When user selects an execution in the bottom bar, load its node statuses and show on canvas
+	$effect(() => {
+		const selId = selectedExecutionId;
+		const curId = currentExecutionId;
+		if (!selId) {
+			// No selection: if no current run, clear canvas status (subscription effect clears when !currentExecutionId)
+			if (!curId) {
+				// Cleared by the subscription effect when !currentExecutionId
+			}
+			return;
+		}
+		// Showing a selected (possibly past) execution on canvas
+		if (selId === curId) {
+			// Subscription will keep nodeExecutionStatus updated for current run
+			return;
+		}
+		let cancelled = false;
+		(async () => {
+			try {
+				if (workflowSyncManager?.isReady) {
+					await workflowSyncManager.syncWorkflowNodeExecutionList(selId, { setupSubscriptions: false });
+				}
+				if (cancelled || selectedExecutionId !== selId) return;
+				// Read from store (either just synced or already loaded by executions panel)
+				const all = validatedTopicStore.getAllAtArray<WorkflowNodeExecution>('workflowNodeExecutions');
+				const forExecution = all.filter((ne) => ne?.parentId === selId);
+				const statusMap: Record<string, string> = {};
+				for (const ne of forExecution) {
+					if (ne?.nodeId && ne?.status) statusMap[ne.nodeId] = ne.status;
+				}
+				nodeExecutionStatus = statusMap;
+				executionLabelsVisible = true;
+				const execs = validatedTopicStore.getAllAtArray<WorkflowExecution>('workflowExecutions');
+				const exec = execs.find((e) => e?.id === selId);
+				if (exec?.status === 'COMPLETED' && exec?.outputData) {
+					try {
+						workflowExecutionOutput = typeof exec.outputData === 'string' ? JSON.parse(exec.outputData) : exec.outputData;
+					} catch {
+						workflowExecutionOutput = exec.outputData;
+					}
+				} else {
+					workflowExecutionOutput = null;
+				}
+			} catch (err) {
+				console.error('[Workflow] Failed to load selected execution node statuses:', err);
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	});
+
+	// Subscribe to WorkflowNodeExecution updates for the current execution (only applies when showing current run)
 	$effect(() => {
 		if (!currentExecutionId) {
 			if (unsubscribeNodeExecutions) {
 				unsubscribeNodeExecutions();
 				unsubscribeNodeExecutions = null;
 			}
-			nodeExecutionStatus = {};
+			// Clear canvas status only when nothing is selected (otherwise selected-execution effect owns the display)
+			if (!selectedExecutionId) {
+				nodeExecutionStatus = {};
+				workflowExecutionOutput = null;
+			}
 			return;
 		}
 
@@ -927,61 +1081,56 @@
 			}
 		});
 
+		// Only apply subscription updates when canvas is showing the current run (not a selected past execution)
+		const showingCurrentRun = selectedExecutionId == null || selectedExecutionId === currentExecutionId;
+		if (!showingCurrentRun) {
+			return () => {};
+		}
+
 		// Subscribe to node execution updates for this execution
 		const nodeUnsub = validatedTopicStore.subscribe('workflowNodeExecutions/+', (value: unknown, topic?: string) => {
-			// Value can be either the entity directly or { id, data }
-			const nodeExec = (value as any)?.data || (value as any);
-			// Determine update type based on the data structure
-			const updateType = nodeExec?.status ? `STATUS_${nodeExec.status}` : 'UNKNOWN';
+			// Value can be: (1) raw entity { id, parentId, nodeId, status, ... }, (2) { data: entity }, or
+			// (3) enriched payload { entityType, subscriptionType, topicPath, nodeExecId, status, nodeId, timestamp }
+			const raw = (value as any)?.data ?? (value as any);
+			const nodeId = raw?.nodeId ?? (value as any)?.nodeId;
+			const status = raw?.status ?? (value as any)?.status;
+			const parentId = raw?.parentId ?? (value as any)?.parentId;
+
+			const updateType = status ? `STATUS_${status}` : 'UNKNOWN';
 			console.log('[Node Execution Subscription] Store Update Received - WORKFLOW_NODE_EXECUTION:', {
 				entityType: 'WORKFLOW_NODE_EXECUTION',
 				subscriptionType: 'validatedTopicStore.subscribe',
 				subscriptionOperation: updateType,
-				topic: topic || 'workflowNodeExecutions/+',
-				nodeExec,
+				topic: topic ?? 'workflowNodeExecutions/+',
+				nodeId,
+				status,
+				parentId,
 				currentExecutionId,
-				parentId: nodeExec?.parentId,
-				matches: nodeExec?.parentId === currentExecutionId,
+				matches: parentId != null ? parentId === currentExecutionId : true,
 				timestamp: new Date().toISOString()
 			});
-			
-			if (nodeExec?.parentId === currentExecutionId) {
-				// Map WorkflowNodeExecution.nodeId to GridElement.id
-				const nodeId = nodeExec.nodeId;
-				const status = nodeExec.status;
-				if (nodeId && status) {
-					// Debug: Check if nodeId matches any GridElement.id
-					const matchingElement = gridElements.find((el) => el.id === nodeId);
-					console.log('[Node Execution Subscription] Processing node execution:', {
-						nodeId,
-						status,
-						executionId: currentExecutionId,
-						nodeName: nodeExec.nodeName,
-						hasMatchingElement: !!matchingElement,
-						matchingElementId: matchingElement?.id,
-						matchingElementType: matchingElement?.type?.id,
-						allGridElementIds: gridElements.map((el) => el.id),
-						currentNodeExecutionStatus: nodeExecutionStatus
-					});
-					// Store status for this node; node stays highlighted with status indicator
-					// Use reactive assignment to ensure Svelte detects the change
-					const updated = { ...nodeExecutionStatus };
-					updated[nodeId] = status;
-					nodeExecutionStatus = updated;
-					console.log('[Node Execution Subscription] Updated nodeExecutionStatus:', {
-						nodeId,
-						status,
-						updatedStatus: nodeExecutionStatus,
-						allNodeIds: Object.keys(nodeExecutionStatus)
-					});
-				} else {
-					console.warn('[Node Execution Subscription] Missing nodeId or status:', {
-						nodeId,
-						status,
-						nodeExec
-					});
-				}
+
+			// Only apply when we have the fields needed to update the canvas
+			if (!nodeId || !status) {
+				console.warn('[Node Execution Subscription] Missing nodeId or status:', { nodeId, status, value: raw });
+				return;
 			}
+			// If parentId is present, must match current execution; if absent (e.g. enriched payload), apply for current execution
+			if (parentId != null && parentId !== currentExecutionId) {
+				return;
+			}
+
+			const matchingElement = gridElements.find((el) => el.id === nodeId);
+			console.log('[Node Execution Subscription] Applying node execution status:', {
+				nodeId,
+				status,
+				executionId: currentExecutionId,
+				hasMatchingElement: !!matchingElement,
+				allGridElementIds: gridElements.map((el) => el.id)
+			});
+			const updated = { ...nodeExecutionStatus };
+			updated[nodeId] = status;
+			nodeExecutionStatus = updated;
 		});
 
 		unsubscribeNodeExecutions = () => {
@@ -997,53 +1146,58 @@
 		};
 	});
 
-	// Clear execution state
+	// Clear execution state (hides labels on canvas, including Start labels on input nodes)
 	function clearExecutionState() {
 		currentExecutionId = null;
 		nodeExecutionStatus = {};
 		workflowExecutionOutput = null;
+		executionLabelsVisible = false;
 		if (unsubscribeNodeExecutions) {
 			unsubscribeNodeExecutions();
 			unsubscribeNodeExecutions = null;
 		}
 	}
 
-	// Debug mode: Show sample status indicators on all nodes
-	let showSampleStatuses = $state(false);
-	
-	function toggleSampleStatuses() {
-		if (showSampleStatuses) {
-			// Clear sample statuses
-			nodeExecutionStatus = {};
-			workflowExecutionOutput = null;
-		} else {
-			// Set sample statuses on different nodes
-			const sampleStatuses: Record<string, string> = {};
-			const statuses = ['RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED'];
-			gridElements.forEach((el, index) => {
-				if (el.type.type !== 'comment') {
-					sampleStatuses[el.id] = statuses[index % statuses.length];
-				}
-			});
-			nodeExecutionStatus = sampleStatuses;
-			
-			// Set sample output for workflow-output node
-			const workflowOutputNode = gridElements.find((el) => el.type.id === 'workflow-output');
-			if (workflowOutputNode) {
-				workflowExecutionOutput = {
-					result: {
-						text: 'This is a sample workflow result. It demonstrates how the output will appear when a workflow execution completes successfully.'
-					}
-				};
-			}
+	// Re-show labels for the selected execution, current run, or latest execution
+	async function showLabels() {
+		let selId = selectedExecutionId ?? currentExecutionId;
+		if (!selId && executions.length > 0) {
+			selId = executions[0].id;
+			selectedExecutionId = executions[0].id;
 		}
-		showSampleStatuses = !showSampleStatuses;
+		if (!selId) return;
+		executionLabelsVisible = true;
+		try {
+			if (workflowSyncManager?.isReady) {
+				await workflowSyncManager.syncWorkflowNodeExecutionList(selId, { setupSubscriptions: false });
+			}
+			const all = validatedTopicStore.getAllAtArray<WorkflowNodeExecution>('workflowNodeExecutions');
+			const forExecution = all.filter((ne) => ne?.parentId === selId);
+			const statusMap: Record<string, string> = {};
+			for (const ne of forExecution) {
+				if (ne?.nodeId && ne?.status) statusMap[ne.nodeId] = ne.status;
+			}
+			nodeExecutionStatus = statusMap;
+			const execs = validatedTopicStore.getAllAtArray<WorkflowExecution>('workflowExecutions');
+			const exec = execs.find((e) => e?.id === selId);
+			if (exec?.status === 'COMPLETED' && exec?.outputData) {
+				try {
+					workflowExecutionOutput = typeof exec.outputData === 'string' ? JSON.parse(exec.outputData) : exec.outputData;
+				} catch {
+					workflowExecutionOutput = exec.outputData;
+				}
+			} else {
+				workflowExecutionOutput = null;
+			}
+		} catch (err) {
+			console.error('[Workflow] Failed to show labels:', err);
+		}
 	}
 
 	async function executeWorkflow() {
 		if (!selectedWorkflowId || !selectedProjectId || !data.idToken) {
 			console.error('Cannot execute workflow: missing workflowId, projectId, or idToken');
-			alert('Cannot execute workflow: Please ensure a workflow is selected and you are authenticated.');
+			toastStore.error('Cannot execute workflow: ensure a workflow is selected and you are authenticated.');
 			return;
 		}
 
@@ -1083,8 +1237,10 @@
 				status: execution.status,
 			});
 
-			// Set current execution ID to track node executions
+			// Set current execution ID and highlight it in the executions list so canvas shows its node statuses
 			currentExecutionId = execution.id;
+			selectedExecutionId = execution.id;
+			executionLabelsVisible = true;
 
 			// Set up subscriptions for node executions immediately
 			if (workflowSyncManager?.isReady) {
@@ -1101,11 +1257,11 @@
 			// Refresh executions list to show the new execution
 			await loadWorkflowExecutions();
 
-			// Show success notification (you can replace with a toast library if preferred)
+			toastStore.success('Workflow execution started.');
 			console.log('✅ Workflow execution started:', execution.id);
 		} catch (error) {
 			console.error('Failed to start workflow execution:', error);
-			alert(
+			toastStore.error(
 				`Failed to start workflow execution: ${error instanceof Error ? error.message : String(error)}`
 			);
 			// Clear execution state on error
@@ -1164,6 +1320,7 @@
 
 <!-- Layout: sidebar + canvas workspace + modal layers -->
 <div class="flex h-screen w-full overflow-hidden {darkMode ? 'bg-slate-900' : 'bg-slate-50'}">
+	<ToastContainer {darkMode} />
 	<WorkflowSidebar
 		allElementTypes={allElementTypes}
 		darkMode={darkMode}
@@ -1229,9 +1386,10 @@
 			onExecuteWorkflow={executeWorkflow}
 			nodeExecutionStatus={nodeExecutionStatus}
 			workflowExecutionOutput={workflowExecutionOutput}
+			labelsVisible={executionLabelsVisible}
 			onClearExecution={clearExecutionState}
-			showSampleStatuses={showSampleStatuses}
-			onToggleSampleStatuses={toggleSampleStatuses}
+			onShowLabels={showLabels}
+			canShowLabels={!!selectedExecutionId || !!currentExecutionId || executions.length > 0}
 			{generateId}
 		/>
 
@@ -1240,6 +1398,7 @@
 			executionsLoading={executionsLoading}
 			{selectedWorkflowId}
 			selectedProjectId={selectedProjectId}
+			{selectedExecutionId}
 			onSelectExecution={(exec) => (selectedExecutionId = exec.id)}
 			onRefreshExecutions={loadWorkflowExecutions}
 			syncManager={workflowSyncManager}
@@ -1277,22 +1436,22 @@
 		/>
 	{/if}
 
-	<!-- AI Query Edit Modal -->
+	<!-- AI Query Edit Modal: save updates workflow definition (node config), do not start execution -->
 	{#if editingAIQuery}
 		<WorkflowAIQueryEditModal
 			{darkMode}
 			bind:editingAIQuery={editingAIQuery}
-			onSave={executeWorkflow}
+			onSave={saveWorkflow}
 		/>
 	{/if}
 
-	<!-- Node Options Modal -->
+	<!-- Node Options Modal: save updates workflow definition (node config), do not start execution -->
 	{#if editingNodeOptions}
 		<WorkflowNodeOptionsModal
 			{darkMode}
 			bind:editingNodeOptions={editingNodeOptions}
 			{selectedProjectId}
-			onSave={executeWorkflow}
+			onSave={saveWorkflow}
 		/>
 	{/if}
 
@@ -1351,16 +1510,5 @@
 		/>
 	{/if}
 
-	<!-- Workflow Execution Detail Modal -->
-	{#if selectedExecutionId && selectedWorkflowId && data.idToken}
-		<WorkflowExecutionDetailModal
-			executionId={selectedExecutionId}
-			workflowId={selectedWorkflowId}
-			idToken={data.idToken}
-			projectId={selectedProjectId ?? undefined}
-			{darkMode}
-			onClose={() => (selectedExecutionId = null)}
-		/>
-	{/if}
 </div>
 

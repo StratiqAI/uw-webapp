@@ -21,9 +21,10 @@
 		onExecuteWorkflow,
 		nodeExecutionStatus = {},
 		workflowExecutionOutput = null,
+		labelsVisible = true,
 		onClearExecution,
-		showSampleStatuses = false,
-		onToggleSampleStatuses,
+		onShowLabels,
+		canShowLabels = false,
 		generateId
 	}: {
 		gridElements?: GridElement[];
@@ -43,10 +44,12 @@
 		nodeExecutionStatus?: Record<string, string>;
 		/** Workflow execution outputData to display next to workflow-output node */
 		workflowExecutionOutput?: any;
+		/** When false, status badges and Start labels are hidden (Hide Labels pressed) */
+		labelsVisible?: boolean;
 		onClearExecution?: () => void;
-		/** Debug: Show sample status indicators */
-		showSampleStatuses?: boolean;
-		onToggleSampleStatuses?: () => void;
+		onShowLabels?: () => void;
+		/** When true, Show Labels button is available (e.g. an execution is selected but labels were hidden) */
+		canShowLabels?: boolean;
 		generateId: () => string;
 	} = $props();
 
@@ -252,7 +255,6 @@
 					toSide: side
 				};
 				connections = [...connections, newConnection];
-				onExecuteWorkflow?.();
 			}
 			connectingFrom = null;
 		}
@@ -260,7 +262,6 @@
 
 	function deleteConnection(connectionId: string) {
 		connections = connections.filter((conn) => conn.id !== connectionId);
-		onExecuteWorkflow?.();
 	}
 
 	function saveComment() {
@@ -473,6 +474,7 @@
 					isDragged={draggedGridElement?.id === element.id}
 					nodeStatus={nodeExecutionStatus[element.id]}
 					workflowOutput={element.type.id === 'workflow-output' ? workflowExecutionOutput : undefined}
+					{labelsVisible}
 					onDelete={onNodeDelete}
 					onDragStart={startDragOnGrid}
 					onDoubleClick={onNodeDoubleClick}
@@ -502,33 +504,30 @@
 
 	<!-- Control buttons (top right) -->
 	<div class="absolute top-4 right-4 z-50 pointer-events-auto flex items-center gap-2">
-		<!-- Toggle sample statuses button (debug) -->
-		{#if onToggleSampleStatuses}
-			<button
-				type="button"
-				onclick={onToggleSampleStatuses}
-				class="px-4 py-2 text-sm font-medium {showSampleStatuses ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'} text-white rounded-lg shadow-lg flex items-center gap-2 transition-colors"
-				title={showSampleStatuses ? 'Hide sample status indicators' : 'Show sample status indicators'}
-			>
-				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-				</svg>
-				{showSampleStatuses ? 'Hide Samples' : 'Show Samples'}
-			</button>
-		{/if}
-		<!-- Clear execution indicators button (shown when any node has status) -->
 		{#if Object.keys(nodeExecutionStatus).length > 0 && onClearExecution}
 			<button
 				type="button"
 				onclick={onClearExecution}
 				class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-lg flex items-center gap-2 transition-colors"
-				title="Clear execution indicators"
+				title="Hide execution labels"
 			>
 				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
 				</svg>
-				Clear Indicators
+				Hide Labels
+			</button>
+		{:else if canShowLabels && onShowLabels}
+			<button
+				type="button"
+				onclick={onShowLabels}
+				class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-lg flex items-center gap-2 transition-colors"
+				title="Show execution labels"
+			>
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+				</svg>
+				Show Labels
 			</button>
 		{/if}
 	</div>

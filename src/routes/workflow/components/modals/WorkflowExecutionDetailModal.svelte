@@ -5,7 +5,7 @@
 	import {
 		S_ON_UPDATE_WORKFLOW_EXECUTION,
 		S_ON_WORKFLOW_NODE_EXECUTION_STATUS_CHANGE
-	} from '$lib/graphql/workflowExecutionSubscriptions';
+	} from '@stratiqai/types-simple';
 	import { fetchWorkflowExecutionDetail } from '../../services/backend/workflowExecutionService';
 	import type { WorkflowExecution, WorkflowNodeExecution } from '@stratiqai/types-simple';
 
@@ -33,6 +33,8 @@
 				return darkMode ? 'bg-red-900/50 text-red-300' : 'bg-red-100 text-red-800';
 			case 'CANCELLED':
 				return darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-700';
+			case 'SKIPPED':
+				return darkMode ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-600';
 			default:
 				return darkMode ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-600';
 		}

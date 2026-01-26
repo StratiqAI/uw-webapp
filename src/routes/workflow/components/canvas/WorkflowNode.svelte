@@ -17,6 +17,8 @@
 		nodeStatus = undefined,
 		/** Workflow execution outputData to display (only for workflow-output node) */
 		workflowOutput = undefined,
+		/** When false, Hide Labels was pressed; don't show status or Start badge */
+		labelsVisible = true,
 		onDelete,
 		onDragStart,
 		onDoubleClick,
@@ -27,6 +29,7 @@
 		isDragged?: boolean;
 		nodeStatus?: string;
 		workflowOutput?: any;
+		labelsVisible?: boolean;
 		onDelete?: (id: string, event: MouseEvent) => void;
 		onDragStart?: (element: GridElement, event: MouseEvent) => void;
 		onDoubleClick?: (element: GridElement, event: MouseEvent) => void;
@@ -35,6 +38,10 @@
 
 	const isExecuting = $derived(nodeStatus === 'RUNNING');
 	const hasStatus = $derived(!!nodeStatus);
+	const isInputNode = $derived(element.type.type === 'input');
+	/** Displayed badge: execution status or "Start" for input nodes with no status */
+	const displayStatus = $derived(nodeStatus ?? (isInputNode ? 'START' : null));
+	const showStatusBadge = $derived(labelsVisible && !!displayStatus);
 	
 	// Debug logging when status changes
 	$effect(() => {
@@ -89,6 +96,24 @@
 					arrow: darkMode ? 'bg-slate-500/40' : 'bg-slate-500/30',
 					arrowIcon: darkMode ? 'text-slate-200' : 'text-slate-700'
 				};
+			case 'SKIPPED':
+				return {
+					border: darkMode ? 'border-slate-400/70' : 'border-slate-400/70',
+					ring: darkMode ? 'ring-2 ring-slate-400/40' : 'ring-2 ring-slate-500/40',
+					overlay: darkMode ? 'bg-slate-500/10' : 'bg-slate-500/5',
+					badge: darkMode ? 'bg-slate-500/90 text-slate-200' : 'bg-slate-500 text-white',
+					arrow: darkMode ? 'bg-slate-500/40' : 'bg-slate-500/30',
+					arrowIcon: darkMode ? 'text-slate-200' : 'text-slate-700'
+				};
+			case 'START':
+				return {
+					border: darkMode ? 'border-indigo-400/70' : 'border-indigo-500/70',
+					ring: darkMode ? 'ring-2 ring-indigo-400/40' : 'ring-2 ring-indigo-500/40',
+					overlay: darkMode ? 'bg-indigo-500/10' : 'bg-indigo-500/5',
+					badge: darkMode ? 'bg-indigo-500/90 text-indigo-100' : 'bg-indigo-500 text-white',
+					arrow: darkMode ? 'bg-indigo-500/40' : 'bg-indigo-500/30',
+					arrowIcon: darkMode ? 'text-indigo-200' : 'text-indigo-700'
+				};
 			default:
 				return {
 					border: darkMode ? 'border-slate-400/60' : 'border-slate-400/60',
@@ -100,7 +125,7 @@
 				};
 		}
 	}
-	const styles = $derived(nodeStatus ? statusStyles(nodeStatus) : null);
+	const styles = $derived(displayStatus ? statusStyles(displayStatus) : null);
 
 	function handleDelete(e: MouseEvent) {
 		e.stopPropagation();
@@ -129,7 +154,14 @@
 	}
 </script>
 
-<div class="absolute overflow-visible" style="left: {element.x}px; top: {element.y}px;">
+<div class="absolute overflow-visible group/node" style="left: {element.x}px; top: {element.y}px;">
+	<!-- Status tooltip on hover (above node) -->
+	<div
+		class="absolute left-1/2 -translate-x-1/2 px-2.5 py-1.5 rounded-md text-xs font-medium whitespace-nowrap pointer-events-none z-40 opacity-0 group-hover/node:opacity-100 transition-opacity shadow-lg border {hasStatus && styles ? styles.badge + (darkMode ? ' border-slate-600' : ' border-slate-200') : darkMode ? 'bg-slate-700 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-600'}"
+		style="bottom: 100%; margin-bottom: {element.height + 8}px;"
+	>
+		{hasStatus ? `Execution status: ${nodeStatus}` : 'No execution status'}
+	</div>
 	<!-- Node Container -->
 	<div
 		class="{element.type.type === 'input' 
@@ -230,12 +262,12 @@
 		</div>
 	</div>
 
-	<!-- Status indicator next to node (WORKFLOW_NODE_EXECUTION status) -->
-	{#if hasStatus && styles && nodeStatus}
+	<!-- Status indicator next to node (WORKFLOW_NODE_EXECUTION status, or "Start" for input nodes) -->
+	{#if showStatusBadge && styles}
 		<div
 			class="absolute top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-20 pointer-events-none"
 			style="left: {element.width + 6}px;"
-			title="Node execution status: {nodeStatus}"
+			title={displayStatus === 'START' ? 'Workflow start (input node)' : `Node execution status: ${displayStatus}`}
 		>
 			{#if isExecuting}
 				<div class="w-5 h-5 {styles.badge} rounded-full flex items-center justify-center shadow-md shrink-0">
@@ -243,20 +275,28 @@
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
 					</svg>
 				</div>
-			{:else if nodeStatus === 'COMPLETED'}
+			{:else if displayStatus === 'COMPLETED'}
 				<div class="w-5 h-5 {styles.badge} rounded-full flex items-center justify-center shadow-md shrink-0">
 					<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
 				</div>
-			{:else if nodeStatus === 'FAILED'}
+			{:else if displayStatus === 'FAILED'}
 				<div class="w-5 h-5 {styles.badge} rounded-full flex items-center justify-center shadow-md shrink-0">
 					<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
 				</div>
-			{:else if nodeStatus === 'CANCELLED'}
+			{:else if displayStatus === 'CANCELLED'}
 				<div class="w-5 h-5 {styles.badge} rounded-full flex items-center justify-center shadow-md shrink-0">
 					<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+				</div>
+			{:else if displayStatus === 'SKIPPED'}
+				<div class="w-5 h-5 {styles.badge} rounded-full flex items-center justify-center shadow-md shrink-0">
+					<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>
+				</div>
+			{:else if displayStatus === 'START'}
+				<div class="w-5 h-5 {styles.badge} rounded-full flex items-center justify-center shadow-md shrink-0">
+					<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
 				</div>
 			{/if}
-			<span class="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded {styles.badge} shadow-sm whitespace-nowrap" aria-label="Status: {nodeStatus}">{nodeStatus}</span>
+			<span class="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded {styles.badge} shadow-sm whitespace-nowrap" aria-label={displayStatus === 'START' ? 'Start' : `Status: ${displayStatus}`}>{displayStatus === 'SKIPPED' ? 'Skipped' : displayStatus === 'START' ? 'Start' : displayStatus}</span>
 		</div>
 	{/if}
 
