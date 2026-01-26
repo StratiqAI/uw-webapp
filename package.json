@@ -54,6 +54,7 @@
 	},
 	"dependencies": {
 		"@agnathan/types-simple": "^1.0.39",
+		"@flowbite-svelte-plugins/chart": "^0.2.4",
 		"@ai-sdk/google": "^3.0.13",
 		"@aws-sdk/client-cognito-identity-provider": "^3.806.0",
 		"@aws-sdk/client-s3": "^3.931.0",

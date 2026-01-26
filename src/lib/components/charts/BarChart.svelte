@@ -1,5 +1,6 @@
 <script>
-    import { Chart, Card, A, Button, Dropdown, DropdownItem } from 'flowbite-svelte';
+    import { Chart } from '@flowbite-svelte-plugins/chart';
+    import { Card, A, Button, Dropdown, DropdownItem } from 'flowbite-svelte';
     import { UsersGroupOutline, ArrowUpOutline, ChevronDownOutline, ChevronRightOutline, DollarOutline } from 'flowbite-svelte-icons';
   
     const options = {

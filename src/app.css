@@ -61,6 +61,7 @@ html, body {
 
 @source "../node_modules/flowbite-svelte/dist";
 @source "../node_modules/flowbite-svelte-icons/dist";
+@source "../node_modules/@flowbite-svelte-plugins/chart/dist";
 
 /* Custom fade-in animation used by class `animate-fadeIn` */
 @keyframes fade-in {
