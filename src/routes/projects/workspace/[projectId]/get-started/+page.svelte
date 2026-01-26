@@ -8,7 +8,7 @@
 	import { DocumentEntitiesSyncManager } from '$lib/realtime/websocket/syncManagers/DocumentEntitiesSyncManager';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
-	import type { Project, Doclink } from '@stratiqai/types-simple';
+	import type { Project, Doclink } from '@agnathan/types-simple';
 
 	let { data } = $props();
 

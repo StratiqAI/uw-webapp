@@ -6,7 +6,7 @@
 	import UploadList from './UploadList.svelte';
 	import DocumentProcessingModal from '../DocumentProcessing/DocumentProcessingModal.svelte';
 	import { store } from '$lib/realtime/websocket/projectSync';
-	import type { Project, Doclink } from '@stratiqai/types-simple';
+	import type { Project, Doclink } from '@agnathan/types-simple';
 	import type { DocumentListItem } from './types';
 
 	import { SUPPORTED_FILE_TYPES, MAX_FILE_SIZE } from './constants';

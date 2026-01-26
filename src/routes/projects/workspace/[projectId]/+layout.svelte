@@ -10,7 +10,7 @@
 	import { notificationStore, S_ON_CREATE_NOTIFICATION, type Notification } from '$lib/stores/notifications.svelte';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import { ui } from '$lib/stores/ui.svelte';
-	import type { Project } from '@stratiqai/types-simple';
+	import type { Project } from '@agnathan/types-simple';
 	import { print } from 'graphql';
 	import { logger } from '$lib/logging/debug';
 	import RightChatDrawer from '$lib/components/RightChatDrawer.svelte';

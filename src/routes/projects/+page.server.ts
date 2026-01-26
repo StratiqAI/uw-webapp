@@ -11,11 +11,11 @@ import type { PageServerLoad } from './$types';
 import { gql } from '$lib/realtime/graphql/requestHandler';
 
 // GraphQL operation
-import { Q_LIST_PROJECTS } from '@stratiqai/types-simple';
+import { Q_LIST_PROJECTS } from '@agnathan/types-simple';
 import { print } from 'graphql';
 
 // Types
-import type { Project } from '@stratiqai/types-simple';
+import type { Project } from '@agnathan/types-simple';
 
 // Server-side load
 export const load: PageServerLoad = async ({ cookies, url }) => {

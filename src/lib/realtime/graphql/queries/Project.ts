@@ -1,6 +1,6 @@
-// Re-export Q_LIST_PROJECTS from @stratiqai/types-simple for backward compatibility
+// Re-export Q_LIST_PROJECTS from @agnathan/types-simple for backward compatibility
 // Note: Q_LIST_PROJECTS uses the same query structure
-export { Q_LIST_PROJECTS as Q_LIST_USER_PROJECTS } from '@stratiqai/types-simple';
+export { Q_LIST_PROJECTS as Q_LIST_USER_PROJECTS } from '@agnathan/types-simple';
 
 
 
@@ -66,5 +66,5 @@ export const Q_GET_PROJECT_BY_ID_WITH_DOCLINKS_OLD = `
 	}
   `;
 
-// Re-export mutations from @stratiqai/types-simple for backward compatibility
-export { M_CREATE_PROJECT, M_DELETE_PROJECT } from '@stratiqai/types-simple';
+// Re-export mutations from @agnathan/types-simple for backward compatibility
+export { M_CREATE_PROJECT, M_DELETE_PROJECT } from '@agnathan/types-simple';

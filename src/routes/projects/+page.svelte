@@ -17,8 +17,8 @@
 
 	// Types Section
 	import type { PageProps } from './$types';
-	import type { Project } from '@stratiqai/types-simple';
-	import { M_CREATE_PROJECT, M_DELETE_PROJECT, S_ON_CREATE_NOTIFICATION } from '@stratiqai/types-simple';
+	import type { Project } from '@agnathan/types-simple';
+	import { M_CREATE_PROJECT, M_DELETE_PROJECT, S_ON_CREATE_NOTIFICATION } from '@agnathan/types-simple';
 	import { print } from 'graphql';
 
 	// Dark Mode Section

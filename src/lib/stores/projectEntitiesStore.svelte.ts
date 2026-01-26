@@ -8,7 +8,7 @@
  * Migrated to Svelte 5 runes pattern
  */
 
-import type { Text, Table, Image } from '@stratiqai/types-simple';
+import type { Text, Table, Image } from '@agnathan/types-simple';
 import { writable, type Writable } from 'svelte/store';
 
 interface ProjectEntities {

@@ -1,6 +1,6 @@
 import { gql } from '$lib/realtime/graphql/requestHandler';
-import { Q_GET_WORKFLOW_EXECUTION, Q_LIST_WORKFLOW_EXECUTIONS } from '@stratiqai/types-simple';
-import type { WorkflowExecution } from '@stratiqai/types-simple';
+import { Q_GET_WORKFLOW_EXECUTION, Q_LIST_WORKFLOW_EXECUTIONS } from '@agnathan/types-simple';
+import type { WorkflowExecution } from '@agnathan/types-simple';
 
 export type WorkflowExecutionListItem = Pick<
 	WorkflowExecution,

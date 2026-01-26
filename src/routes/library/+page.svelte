@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import type { PromptTemplate, Project } from '@stratiqai/types-simple';
+	import type { PromptTemplate, Project } from '@agnathan/types-simple';
 	import { PromptTemplateSyncManager } from '$lib/realtime/websocket/syncManagers/PromptTemplateSyncManager';
 	import { ProjectSyncManager } from '$lib/realtime/websocket/syncManagers/ProjectSyncManager';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';

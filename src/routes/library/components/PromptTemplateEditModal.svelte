@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { PromptTemplate } from '@stratiqai/types-simple';
+	import type { PromptTemplate } from '@agnathan/types-simple';
 	import { parseTemplateToAIQueryData, type AIQueryData } from '../libraryService';
 
 	let {

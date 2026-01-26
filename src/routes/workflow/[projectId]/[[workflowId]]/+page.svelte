@@ -70,8 +70,8 @@
 		type CreateWorkflowMutation,
 		type UpdateWorkflowMutation,
 		type DeleteWorkflowMutation
-	} from '@stratiqai/types-simple';
-	import { S_ON_WORKFLOW_EXECUTION_STATUS_CHANGE } from '@stratiqai/types-simple';
+	} from '@agnathan/types-simple';
+	import { S_ON_WORKFLOW_EXECUTION_STATUS_CHANGE } from '@agnathan/types-simple';
 	import { fetchWorkflowExecutions } from '../../services/backend/workflowExecutionService';
 	import type { WorkflowExecutionListItem } from '../../services/backend/workflowExecutionService';
 	import { getAppSyncWsClient, initAppSyncWsClient } from '$lib/realtime/websocket/wsClient';
@@ -79,7 +79,7 @@
 	import type { ElementType, GridElement, Connection } from '../../types';
 	import { isExecutableNode } from '../../types/node';
 	import type { PageData } from './$types';
-	import type { Project, Workflow, WorkflowExecution, WorkflowNodeExecution } from '@stratiqai/types-simple';
+	import type { Project, Workflow, WorkflowExecution, WorkflowNodeExecution } from '@agnathan/types-simple';
 	import { WorkflowSyncManager } from '$lib/realtime/websocket/syncManagers/WorkflowSyncManager';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import { toTopicPath } from '$lib/realtime/store/TopicMapper';

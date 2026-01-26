@@ -3,8 +3,8 @@ import type { LayoutServerLoad } from './$types';
 import { print } from 'graphql';
 
 // External types
-import type { Project } from '@stratiqai/types-simple';
-import { Q_GET_PROJECT } from '@stratiqai/types-simple';
+import type { Project } from '@agnathan/types-simple';
+import { Q_GET_PROJECT } from '@agnathan/types-simple';
 
 // Internal imports
 import { gql } from '$lib/realtime/graphql/requestHandler';
@@ -64,7 +64,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, url, parent }) =
 		}
 
 		// Note: Data validation is currently handled by TypeScript types from
-		// @stratiqai/types-simple. If runtime validation (e.g., Zod) is needed in the future,
+		// @agnathan/types-simple. If runtime validation (e.g., Zod) is needed in the future,
 		// add it here before returning.
 
 		return {

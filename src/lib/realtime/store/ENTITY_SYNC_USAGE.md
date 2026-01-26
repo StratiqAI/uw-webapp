@@ -6,9 +6,9 @@ The `EntitySyncManager` class simplifies querying entities and managing update/d
 
 ```typescript
 import { EntitySyncManager, createProjectSyncConfig } from '$lib/realtime/store';
-import { Q_LIST_PROJECTS, Q_GET_PROJECT } from '@stratiqai/types-simple';
-import { S_ON_UPDATE_PROJECT, S_ON_DELETE_PROJECT } from '@stratiqai/types-simple';
-import type { Project } from '@stratiqai/types-simple';
+import { Q_LIST_PROJECTS, Q_GET_PROJECT } from '@agnathan/types-simple';
+import { S_ON_UPDATE_PROJECT, S_ON_DELETE_PROJECT } from '@agnathan/types-simple';
+import type { Project } from '@agnathan/types-simple';
 
 // Create configuration
 const config = createProjectSyncConfig(

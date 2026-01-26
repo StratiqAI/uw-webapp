@@ -7,7 +7,7 @@
  */
 
 import { writable, derived, type Writable, type Readable } from 'svelte/store';
-import type { Text, Table, Image } from '@stratiqai/types-simple';
+import type { Text, Table, Image } from '@agnathan/types-simple';
 
 interface ProjectEntities {
 	texts: Text[];

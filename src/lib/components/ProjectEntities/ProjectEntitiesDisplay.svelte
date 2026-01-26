@@ -14,7 +14,7 @@
 <script lang="ts">
 	import { getProjectTextsStore, getProjectTablesStore, getProjectImagesStore } from '$lib/stores/projectEntitiesStore';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
-	import type { Text, Table, Image } from '@stratiqai/types-simple';
+	import type { Text, Table, Image } from '@agnathan/types-simple';
 
 	// Document type matching what's passed from parent
 	interface ProjectDocument {

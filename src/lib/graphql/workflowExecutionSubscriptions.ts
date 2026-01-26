@@ -2,8 +2,8 @@ import { gql } from 'graphql-tag';
 
 /**
  * Workflow execution subscription documents.
- * Mirrors @stratiqai/types-simple so the app works before the package is updated.
- * Prefer importing from @stratiqai/types-simple when available.
+ * Mirrors @agnathan/types-simple so the app works before the package is updated.
+ * Prefer importing from @agnathan/types-simple when available.
  */
 
 export const S_ON_UPDATE_WORKFLOW_EXECUTION = gql`

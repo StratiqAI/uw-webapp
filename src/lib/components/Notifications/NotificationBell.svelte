@@ -2,7 +2,7 @@
 	import { notificationStore, type Notification } from '$lib/stores/notifications.svelte';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import { goto } from '$app/navigation';
-	import type { Project } from '@stratiqai/types-simple';
+	import type { Project } from '@agnathan/types-simple';
 
 	interface NotificationBellProps {
 		projects?: Project[];

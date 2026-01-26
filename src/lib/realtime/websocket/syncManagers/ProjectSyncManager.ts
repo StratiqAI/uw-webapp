@@ -1,13 +1,13 @@
 import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from '$env/static/public';
 import { browser } from '$app/environment';
-import type { Project } from '@stratiqai/types-simple';
+import type { Project } from '@agnathan/types-simple';
 import {
 	Q_GET_PROJECT,
 	Q_LIST_PROJECTS,
 	S_ON_CREATE_PROJECT,
 	S_ON_DELETE_PROJECT,
 	S_ON_UPDATE_PROJECT
-} from '@stratiqai/types-simple';
+} from '@agnathan/types-simple';
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 import {
 	getAppSyncWsClient,

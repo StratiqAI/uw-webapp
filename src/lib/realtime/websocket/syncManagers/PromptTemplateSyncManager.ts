@@ -1,13 +1,13 @@
 import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from '$env/static/public';
 import { browser } from '$app/environment';
-import type { PromptTemplate } from '@stratiqai/types-simple';
+import type { PromptTemplate } from '@agnathan/types-simple';
 import {
 	Q_GET_PROMPT_TEMPLATE,
 	Q_LIST_PROMPT_TEMPLATES,
 	S_ON_CREATE_PROMPT_TEMPLATE,
 	S_ON_UPDATE_PROMPT_TEMPLATE,
 	S_ON_DELETE_PROMPT_TEMPLATE
-} from '@stratiqai/types-simple';
+} from '@agnathan/types-simple';
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 import {
 	getAppSyncWsClient,

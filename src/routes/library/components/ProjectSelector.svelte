@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Project } from '@stratiqai/types-simple';
+	import type { Project } from '@agnathan/types-simple';
 
 	const {
 		projects = [],

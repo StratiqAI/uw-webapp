@@ -1,9 +1,9 @@
 import { gql } from "$lib/realtime/graphql/requestHandler";
 import { print } from 'graphql';
 
-// Re-export operations from @stratiqai/types-simple for backward compatibility
-// New code should import directly from '@stratiqai/types-simple'
-export { M_CREATE_PROJECT, M_UPDATE_PROJECT, M_DELETE_PROJECT } from '@stratiqai/types-simple';
+// Re-export operations from @agnathan/types-simple for backward compatibility
+// New code should import directly from '@agnathan/types-simple'
+export { M_CREATE_PROJECT, M_UPDATE_PROJECT, M_DELETE_PROJECT } from '@agnathan/types-simple';
 
 // Legacy operations that don't exist in types-simple (ProjectDetail, ProjectDocument, etc.)
 // These are kept for backward compatibility but should be migrated or removed
@@ -36,7 +36,7 @@ export const M_SHARE_PROJECT = `
     }
 `;
 
-// M_DELETE_PROJECT is now exported from @stratiqai/types-simple above
+// M_DELETE_PROJECT is now exported from @agnathan/types-simple above
 
 
 // Mutation for creating ProjectDetail
@@ -167,7 +167,7 @@ export const M_DELETE_PROJECT_DOCUMENT_LINK = `
 `;
 
 // import { print } from 'graphql';
-// import type { Project } from '@stratiqai/types-simple';
+// import type { Project } from '@agnathan/types-simple';
 
 // export async function updateProject(project: Project, idToken: string) {
 //     // Extract only the fields that can be updated according to UpdateProjectInput
