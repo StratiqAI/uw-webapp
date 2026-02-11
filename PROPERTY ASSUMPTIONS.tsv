@@ -1,0 +1,49 @@
+PROPERTY ASSUMPTIONS	
+	Property Name
+	Property Type
+	Location
+	Net Rentable Area (SF)
+	Purchase Price
+	Price per SF
+	Closing Costs (% of Price)
+	Capital Improvements (Year 0)
+	
+REVENUE ASSUMPTIONS	
+	Base Rent (Year 1, $/SF)
+	Annual Rent Escalation
+	Occupancy Rate (Year 1)
+	Occupancy Stabilization
+	Other Income (% of EGI)
+	
+OPERATING EXPENSE ASSUMPTIONS	
+	Operating Expenses (Year 1, $/SF)
+	OpEx Annual Escalation
+	Management Fee (% of EGI)
+	Replacement Reserves ($/SF)
+	Leasing Commissions (% on new)
+	Tenant Improvements ($/SF)
+	
+FINANCING ASSUMPTIONS	
+	Loan-to-Value (LTV)
+	Loan Amount
+	Interest Rate
+	Loan Term
+	Amortization Period
+	Annual Debt Service
+	Equity Required
+	
+EXIT / REVERSION ASSUMPTIONS	
+	Exit Cap Rate
+	Selling Costs (% of Sale Price)
+	Year 6 NOI (Exit Year)
+	
+TAX ASSUMPTIONS	
+	Ordinary Income Tax Rate
+	Capital Gains Tax Rate
+	Depreciation Recapture Rate
+	Building Value (% of Purchase)
+	Depreciable Life
+	
+DISCOUNT RATE / RETURN TARGETS	
+	Unlevered Discount Rate
+	Levered Discount Rate

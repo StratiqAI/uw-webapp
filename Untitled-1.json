@@ -1,0 +1,213 @@
+{
+  "Property Name": "Stratiq Office Tower",
+  "Property Type": "Class A Office",
+  "Location": "Austin, TX",
+  "Net Rentable Area (SF)": 50000,
+  "Purchase Price": 15000000,
+  "Price per SF": 300,
+  "Closing Costs (% of Price)": 2.0,
+  "Capital Improvements (Year 0)": 500000
+}
+
+
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Property",
+  "type": "object",
+  "properties": {
+    "Property Name": {
+      "type": "object",
+      "description": "The property's name and supporting extraction metadata.",
+      "properties": {
+        "value": {
+          "type": "string",
+          "description": "Name of the property."
+        },
+        "documentSource": {
+          "type": "string",
+          "description": "The source document from which the data was extracted."
+        },
+        "pageNum": {
+          "type": "integer",
+          "description": "The page number within the source document."
+        },
+        "quote": {
+          "type": "string",
+          "description": "The direct quote used for extraction."
+        }
+      },
+      "required": ["value", "documentSource", "pageNum", "quote"]
+    },
+    "Property Type": {
+      "type": "object",
+      "description": "The property's classification and supporting extraction metadata.",
+      "properties": {
+        "value": {
+          "type": "string",
+          "description": "Type/classification of the property."
+        },
+        "documentSource": {
+          "type": "string",
+          "description": "The source document from which the data was extracted."
+        },
+        "pageNum": {
+          "type": "integer",
+          "description": "The page number within the source document."
+        },
+        "quote": {
+          "type": "string",
+          "description": "The direct quote used for extraction."
+        }
+      },
+      "required": ["value", "documentSource", "pageNum", "quote"]
+    },
+    "Location": {
+      "type": "object",
+      "description": "The property's location and supporting extraction metadata.",
+      "properties": {
+        "value": {
+          "type": "string",
+          "description": "Geographic location of the property."
+        },
+        "documentSource": {
+          "type": "string",
+          "description": "The source document from which the data was extracted."
+        },
+        "pageNum": {
+          "type": "integer",
+          "description": "The page number within the source document."
+        },
+        "quote": {
+          "type": "string",
+          "description": "The direct quote used for extraction."
+        }
+      },
+      "required": ["value", "documentSource", "pageNum", "quote"]
+    },
+    "Net Rentable Area (SF)": {
+      "type": "object",
+      "description": "The property's net rentable area and supporting extraction metadata.",
+      "properties": {
+        "value": {
+          "type": "number",
+          "description": "Net rentable area in square feet."
+        },
+        "documentSource": {
+          "type": "string",
+          "description": "The source document from which the data was extracted."
+        },
+        "pageNum": {
+          "type": "integer",
+          "description": "The page number within the source document."
+        },
+        "quote": {
+          "type": "string",
+          "description": "The direct quote used for extraction."
+        }
+      },
+      "required": ["value", "documentSource", "pageNum", "quote"]
+    },
+    "Purchase Price": {
+      "type": "object",
+      "description": "The property's purchase price and supporting extraction metadata.",
+      "properties": {
+        "value": {
+          "type": "number",
+          "description": "Total purchase price of the property."
+        },
+        "documentSource": {
+          "type": "string",
+          "description": "The source document from which the data was extracted."
+        },
+        "pageNum": {
+          "type": "integer",
+          "description": "The page number within the source document."
+        },
+        "quote": {
+          "type": "string",
+          "description": "The direct quote used for extraction."
+        }
+      },
+      "required": ["value", "documentSource", "pageNum", "quote"]
+    },
+    "Price per SF": {
+      "type": "object",
+      "description": "The property's price per square foot and supporting extraction metadata.",
+      "properties": {
+        "value": {
+          "type": "number",
+          "description": "Price per square foot."
+        },
+        "documentSource": {
+          "type": "string",
+          "description": "The source document from which the data was extracted."
+        },
+        "pageNum": {
+          "type": "integer",
+          "description": "The page number within the source document."
+        },
+        "quote": {
+          "type": "string",
+          "description": "The direct quote used for extraction."
+        }
+      },
+      "required": ["value", "documentSource", "pageNum", "quote"]
+    },
+    "Closing Costs (% of Price)": {
+      "type": "object",
+      "description": "The percentage of closing costs and supporting extraction metadata.",
+      "properties": {
+        "value": {
+          "type": "number",
+          "description": "Closing costs as a percentage of the purchase price."
+        },
+        "documentSource": {
+          "type": "string",
+          "description": "The source document from which the data was extracted."
+        },
+        "pageNum": {
+          "type": "integer",
+          "description": "The page number within the source document."
+        },
+        "quote": {
+          "type": "string",
+          "description": "The direct quote used for extraction."
+        }
+      },
+      "required": ["value", "documentSource", "pageNum", "quote"]
+    },
+    "Capital Improvements (Year 0)": {
+      "type": "object",
+      "description": "Year 0 capital improvements and supporting extraction metadata.",
+      "properties": {
+        "value": {
+          "type": "number",
+          "description": "Capital improvements spent in year 0."
+        },
+        "documentSource": {
+          "type": "string",
+          "description": "The source document from which the data was extracted."
+        },
+        "pageNum": {
+          "type": "integer",
+          "description": "The page number within the source document."
+        },
+        "quote": {
+          "type": "string",
+          "description": "The direct quote used for extraction."
+        }
+      },
+      "required": ["value", "documentSource", "pageNum", "quote"]
+    }
+  },
+  "required": [
+    "Property Name",
+    "Property Type",
+    "Location",
+    "Net Rentable Area (SF)",
+    "Purchase Price",
+    "Price per SF",
+    "Closing Costs (% of Price)",
+    "Capital Improvements (Year 0)"
+  ]
+}
