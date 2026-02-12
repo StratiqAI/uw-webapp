@@ -3,11 +3,12 @@
 	import type { DocumentListItem } from './types';
 	import UploadListItem from './UploadListItem.svelte';
 
-	const { items, onRemove, onRetry, onClick } = $props<{
+	const { items, onRemove, onRetry, onClick, removingDoclinkId } = $props<{
 		items: DocumentListItem[];
 		onRemove?: (event: { item: DocumentListItem }) => void;
 		onRetry?: (event: { item: DocumentListItem }) => void;
 		onClick?: (event: { item: DocumentListItem }) => void;
+		removingDoclinkId?: string | null;
 	}>();
 
 	const statusCounts = $derived.by(() => {
@@ -58,7 +59,7 @@
 			</thead>
 			<tbody>
 				{#each items as item (item.id)}
-					<UploadListItem {item} {onRemove} {onRetry} {onClick} />
+					<UploadListItem {item} {onRemove} {onRetry} {onClick} removingDoclinkId={removingDoclinkId ?? null} />
 				{/each}
 			</tbody>
 		</table>

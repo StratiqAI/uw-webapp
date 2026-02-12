@@ -3,11 +3,12 @@
 	import type { DocumentListItem, UploadStatus } from './types';
 	import { TrashBinOutline } from 'flowbite-svelte-icons';
 
-	const { item, onRemove, onRetry, onClick } = $props<{
+	const { item, onRemove, onRetry, onClick, removingDoclinkId = null } = $props<{
 		item: DocumentListItem;
 		onRemove?: (event: { item: DocumentListItem }) => void;
 		onRetry?: (event: { item: DocumentListItem }) => void;
 		onClick?: (event: { item: DocumentListItem }) => void;
+		removingDoclinkId?: string | null;
 	}>();
 
 	const statusText = (status: UploadStatus) => {
@@ -25,6 +26,9 @@
 	const fileSize = $derived(item.size);
 	const isUploading = $derived(item.status === 'upload' && item.uploadFile && ['hashing', 'uploading', 'pending'].includes(item.uploadFile.status));
 	const canRemove = $derived(item.status === 'upload' && item.uploadFile && !['uploading', 'hashing'].includes(item.uploadFile.status));
+	const canRemoveExisting = $derived(item.status === 'existing');
+	const showRemoveButton = $derived(canRemove || canRemoveExisting);
+	const isRemoving = $derived(canRemoveExisting && removingDoclinkId === item.id);
 	const progress = $derived(item.status === 'upload' && item.uploadFile ? item.uploadFile.progress : undefined);
 	const uploadStatus = $derived(item.status === 'upload' && item.uploadFile ? item.uploadFile.status : undefined);
 	const canClick = $derived(item.status === 'existing' || (item.status === 'upload' && uploadStatus === 'success'));
@@ -56,12 +60,12 @@
 	title={canClick ? 'Click to view extraction details' : undefined}
 >
 	<td class="px-4 py-2 text-center">
-		{#if canRemove}
+		{#if showRemoveButton}
 			<button
 				type="button"
 				class="text-red-500 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-				aria-label="Remove {displayName}"
-				disabled={!canRemove}
+				aria-label={canRemoveExisting ? `Remove ${displayName} from project` : `Remove ${displayName}`}
+				disabled={(canRemoveExisting ? false : !canRemove) || isRemoving}
 				onclick={(e) => {
 					e.stopPropagation();
 					onRemove?.({ item });
@@ -69,9 +73,6 @@
 			>
 				<TrashBinOutline class="h-5 w-5" />
 			</button>
-		{:else if item.status === 'existing'}
-			<!-- Existing documents don't have remove button for now -->
-			<span class="text-gray-400 dark:text-slate-500">—</span>
 		{/if}
 	</td>
 	<td class="px-4 py-2">

@@ -6,15 +6,19 @@
 	import UploadList from './UploadList.svelte';
 	import DocumentProcessingModal from '../DocumentProcessing/DocumentProcessingModal.svelte';
 	import { store } from '$lib/realtime/websocket/projectSync';
+	import { gql } from '$lib/realtime/graphql/requestHandler';
+	import { print } from 'graphql';
+	import { M_DELETE_DOCLINK } from '@agnathan/types-simple';
 	import type { Project, Doclink } from '@agnathan/types-simple';
 	import type { DocumentListItem } from './types';
 
 	import { SUPPORTED_FILE_TYPES, MAX_FILE_SIZE } from './constants';
 
-	const { idToken, projectId, metadata } = $props<{
+	const { idToken, projectId, metadata, onDoclinkRemoved } = $props<{
 		idToken: string | null;
 		projectId: string | null;
 		metadata?: import('./types').FileMetadata | null;
+		onDoclinkRemoved?: (projectId: string) => void | Promise<void>;
 	}>();
 
 	// The uploader store manages all state and logic
@@ -162,6 +166,39 @@
 	function handleModalClose() {
 		selectedDocument = null;
 	}
+
+	// State for removing existing doclink (loading + error)
+	let removingDoclinkId = $state<string | null>(null);
+	let removeError = $state<string | null>(null);
+
+	async function handleRemove(event: { item: DocumentListItem }) {
+		const item = event.item;
+		if (item.status === 'upload' && item.uploadFile) {
+			uploader.remove(item.uploadFile.id);
+			return;
+		}
+		if (item.status === 'existing' && item.documentLink && projectId && idToken) {
+			removeError = null;
+			removingDoclinkId = item.documentLink.id;
+			try {
+				await gql(
+					print(M_DELETE_DOCLINK),
+					{
+						key: {
+							id: item.documentLink.id,
+							parentId: item.documentLink.parentId
+						}
+					},
+					idToken
+				);
+				await onDoclinkRemoved?.(projectId);
+			} catch (err) {
+				removeError = err instanceof Error ? err.message : 'Could not remove document';
+			} finally {
+				removingDoclinkId = null;
+			}
+		}
+	}
 </script>
 
 <UploadDropZone 
@@ -177,15 +214,13 @@
 	{/if}
 </UploadDropZone>
 
+{#if removeError}
+	<p class="mt-2 text-sm text-red-600 dark:text-red-400" role="alert">{removeError}</p>
+{/if}
 <UploadList
 	items={documentList}
-	onRemove={(e) => {
-		if (e.item.status === 'upload' && e.item.uploadFile) {
-			uploader.remove(e.item.uploadFile.id);
-		}
-		// Note: Removing existing doclinks would require a mutation
-		// For now, we'll only allow removing upload files
-	}}
+	onRemove={handleRemove}
+	removingDoclinkId={removingDoclinkId}
 	onRetry={(e) => {
 		if (e.item.status === 'upload' && e.item.uploadFile) {
 			uploader.retry(e.item.uploadFile.id);

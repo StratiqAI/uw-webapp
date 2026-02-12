@@ -85,7 +85,7 @@
 				if (aborted || !projectSyncManager.isReady) return;
 
 				// Sync the single project (this will include doclinks from the query)
-				if (!projectFromServer) {
+				if (!projectFromServer && projectId) {
 					await projectSyncManager.syncOne(projectId, {
 						setupSubscriptions: true
 					});
@@ -202,7 +202,16 @@
 		<!-- Upload Section -->
 		<div class="{darkMode ? 'bg-gradient-to-br from-slate-800 via-slate-800 to-indigo-900/20 border-indigo-500/30' : 'bg-gradient-to-br from-white via-indigo-50/50 to-white border-indigo-200'} rounded-lg border-2 shadow-lg hover:shadow-xl transition-shadow">
 			<div class="p-6">
-				<DocumentUpload idToken={cognitoIdToken} projectId={projectId} metadata={fileMetadata} />
+				<DocumentUpload
+					idToken={cognitoIdToken}
+					projectId={projectId}
+					metadata={fileMetadata}
+					onDoclinkRemoved={async () => {
+						if (projectId && projectSyncManager.isReady) {
+							await projectSyncManager.syncOne(projectId, {});
+						}
+					}}
+				/>
 			</div>
 		</div>
 
