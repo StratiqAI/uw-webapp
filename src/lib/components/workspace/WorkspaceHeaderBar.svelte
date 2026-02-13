@@ -130,6 +130,8 @@
 	const pageTitle = $derived.by(() => {
 		if (currentPath.includes('get-started')) return 'Get Started';
 		if (currentPath.includes('document-analysis')) return 'Document Analysis';
+		if (currentPath.includes('deal-room')) return 'Deal Room';
+		if (currentPath.includes('financial-analysis')) return 'Financial Analysis';
 		if (currentPath.includes('investment-analysis')) return 'Investment Analysis';
 		return 'Workspace';
 	});
@@ -137,13 +139,17 @@
 	// Tab navigation items
 	const tabs = [
 		{ href: 'get-started', label: 'Get Started' },
-		{ href: 'document-analysis', label: 'Document Analysis' }
+		{ href: 'document-analysis', label: 'Document Analysis' },
+		{ href: 'deal-room', label: 'Deal Room' },
+		{ href: 'financial-analysis', label: 'Financial Analysis' }
 	];
 
 	// Check if a tab is active
 	const isActive = (href: string) => {
-		return currentPath === `${workspaceBasePath}/${href}` || 
-		       (href === 'get-started' && currentPath === workspaceBasePath);
+		return currentPath === `${workspaceBasePath}/${href}` ||
+		       (href === 'get-started' && currentPath === workspaceBasePath) ||
+		       (href === 'deal-room' && currentPath.startsWith(`${workspaceBasePath}/deal-room`)) ||
+		       (href === 'financial-analysis' && currentPath.startsWith(`${workspaceBasePath}/financial-analysis`));
 	};
 
 	// Get current active tab for dropdown

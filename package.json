@@ -31,7 +31,7 @@
 		"@types/node": "^22.15.17",
 		"@types/topojson-client": "^3.1.5",
 		"@types/uuid": "^10.0.0",
-		"@vitest/ui" : "^4.0.17",
+		"@vitest/ui": "^4.0.17",
 		"amplify-adapter": "^1.1.0",
 		"cross-env": "^10.1.0",
 		"dotenv": "^16.5.0",
@@ -54,7 +54,6 @@
 	},
 	"dependencies": {
 		"@agnathan/types-simple": "^1.0.39",
-		"@flowbite-svelte-plugins/chart": "^0.2.4",
 		"@ai-sdk/google": "^3.0.13",
 		"@aws-sdk/client-cognito-identity-provider": "^3.806.0",
 		"@aws-sdk/client-s3": "^3.931.0",
@@ -64,6 +63,7 @@
 		"@aws-sdk/lib-storage": "^3.850.0",
 		"@aws-sdk/s3-request-presigner": "^3.931.0",
 		"@aws-sdk/util-dynamodb": "^3.806.0",
+		"@flowbite-svelte-plugins/chart": "^0.2.4",
 		"@google/generative-ai": "^0.24.1",
 		"@turf/turf": "^7.2.0",
 		"ai": "^6.0.48",
@@ -86,6 +86,7 @@
 		"topojson-client": "^3.1.0",
 		"uuid": "^13.0.0",
 		"world-atlas": "^2.0.2",
+		"xlsx": "^0.18.5",
 		"zod": "^3.24.4",
 		"zod-to-json-schema": "^3.24.6"
 	}
