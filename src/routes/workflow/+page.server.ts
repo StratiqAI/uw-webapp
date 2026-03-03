@@ -2,8 +2,8 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { gql } from '$lib/realtime/graphql/requestHandler';
-import { Q_LIST_PROJECTS } from '@agnathan/types-simple';
-import type { Project } from '@agnathan/types-simple';
+import { Q_LIST_PROJECTS } from '@stratiqai/types-simple';
+import type { Project } from '@stratiqai/types-simple';
 
 export const load: PageServerLoad = async ({ cookies }) => {
 	const idToken = cookies.get('id_token');

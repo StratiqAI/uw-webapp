@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { GridElement, AIQueryData } from '../../types';
 
-	import type { PromptTemplate } from "@agnathan/types-simple"
+	import type { PromptTemplate } from "@stratiqai/types-simple"
 	const {
 		element = null,
 		darkMode = false,

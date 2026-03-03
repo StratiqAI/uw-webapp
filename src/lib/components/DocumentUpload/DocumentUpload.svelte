@@ -8,8 +8,8 @@
 	import { store } from '$lib/realtime/websocket/projectSync';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
 	import { print } from 'graphql';
-	import { M_DELETE_DOCLINK } from '@agnathan/types-simple';
-	import type { Project, Doclink } from '@agnathan/types-simple';
+	import { M_DELETE_DOCLINK } from '@stratiqai/types-simple';
+	import type { Project, Doclink } from '@stratiqai/types-simple';
 	import type { DocumentListItem } from './types';
 
 	import { SUPPORTED_FILE_TYPES, MAX_FILE_SIZE } from './constants';
@@ -78,12 +78,24 @@
 		return (links.items || []) as Doclink[];
 	});
 
+	// One row per documentId (doclinks can include NONE, TEXT_EMBEDDINGS, IMAGE_EMBEDDINGS per document)
+	type DoclinkWithLinkType = Doclink & { linkType?: string };
+	const doclinksByDocument = $derived.by(() => {
+		const byDoc = new Map<string, Doclink>();
+		for (const link of doclinks as DoclinkWithLinkType[]) {
+			if (!link.documentId) continue;
+			const existing = byDoc.get(link.documentId);
+			if (!existing || link.linkType === 'NONE') byDoc.set(link.documentId, link);
+		}
+		return Array.from(byDoc.values());
+	});
+
 	// Combine upload files and existing doclinks into a unified list
 	const documentList = $derived.by(() => {
 		const items: DocumentListItem[] = [];
 		
-		// Add existing doclinks
-		for (const link of doclinks) {
+		// Add existing doclinks (one per document)
+		for (const link of doclinksByDocument) {
 			items.push({
 				id: link.id,
 				filename: link.filename,
@@ -115,7 +127,7 @@
 		// Prevent adding files that are already in the list (check both uploads and existing links)
 		const existingFileNames = new Set([
 			...uploadFiles.map((f) => f.file.name),
-			...doclinks.map((link: Doclink) => link.filename)
+			...doclinksByDocument.map((link: Doclink) => link.filename)
 		]);
 		const newFiles = event.validFiles.filter(
 			(file) => !existingFileNames.has(file.name)

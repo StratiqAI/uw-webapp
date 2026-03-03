@@ -2,7 +2,7 @@
 	import { Button, Input, Label, Modal, Textarea, Checkbox, Select } from 'flowbite-svelte';
 	import type { UserModalProps } from '../../../../uw-ai-plane/types';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
-	import { M_CREATE_PROJECT, M_UPDATE_PROJECT } from '@agnathan/types-simple';
+	import { M_CREATE_PROJECT, M_UPDATE_PROJECT } from '@stratiqai/types-simple';
 	import { print } from 'graphql';
 	import { goto } from '$app/navigation';
 

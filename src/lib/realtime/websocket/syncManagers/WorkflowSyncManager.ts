@@ -1,6 +1,6 @@
 import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from '$env/static/public';
 import { browser } from '$app/environment';
-import type { Workflow, WorkflowExecution, WorkflowNodeExecution } from '@agnathan/types-simple';
+import type { Workflow, WorkflowExecution, WorkflowNodeExecution } from '@stratiqai/types-simple';
 import {
 	Q_GET_WORKFLOW,
 	Q_LIST_WORKFLOWS,
@@ -17,7 +17,7 @@ import {
 	S_ON_CREATE_WORKFLOW_NODE_EXECUTION,
 	S_ON_UPDATE_WORKFLOW_NODE_EXECUTION,
 	S_ON_WORKFLOW_NODE_EXECUTION_STATUS_CHANGE
-} from '@agnathan/types-simple';
+} from '@stratiqai/types-simple';
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 import {
 	getAppSyncWsClient,

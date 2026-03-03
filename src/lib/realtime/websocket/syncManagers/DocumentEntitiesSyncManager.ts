@@ -7,7 +7,7 @@
  */
 
 import { browser } from '$app/environment';
-import type { Text, Table, Image } from '@agnathan/types-simple';
+import type { Text, Table, Image } from '@stratiqai/types-simple';
 import { gql } from '$lib/realtime/graphql/requestHandler';
 import {
 	addProjectText,

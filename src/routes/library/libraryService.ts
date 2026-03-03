@@ -6,13 +6,13 @@
  * the PromptTemplate.template JSON field.
  */
 
-import type { PromptTemplate, Project } from '@agnathan/types-simple';
+import type { PromptTemplate, Project } from '@stratiqai/types-simple';
 import {
 	M_CREATE_PROMPT_TEMPLATE,
 	M_UPDATE_PROMPT_TEMPLATE,
 	M_DELETE_PROMPT_TEMPLATE,
 	Q_GET_PROJECT_WITH_PROMPT_TEMPLATES
-} from '@agnathan/types-simple';
+} from '@stratiqai/types-simple';
 import type { IGraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
 
 /**

@@ -1,5 +1,5 @@
 import { writable, get, type Writable } from 'svelte/store';
-import type { Project, Document, Doclink } from '@agnathan/types-simple';
+import type { Project, Document, Doclink } from '@stratiqai/types-simple';
 import type { ProjectDocumentLinkConnection, ProjectDocumentLink } from '$lib/types/cloud/app';
 
 /**

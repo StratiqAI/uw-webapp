@@ -1,13 +1,12 @@
 import { error } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types';
-import { print } from 'graphql';
 
 // External types
-import type { Project } from '@agnathan/types-simple';
-import { Q_GET_PROJECT } from '@agnathan/types-simple';
+import type { Project } from '@stratiqai/types-simple';
 
-// Internal imports
+// Internal imports: use local Q_GET_PROJECT (doclinks use status + linkType)
 import { gql } from '$lib/realtime/graphql/requestHandler';
+import { Q_GET_PROJECT } from '$lib/realtime/graphql/queries/Project';
 
 // Type to describe the shape of GraphQL response for "getProject"
 type GraphQLProjectResponse = {
@@ -53,7 +52,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, url, parent }) =
 	// ---------------------------------------------------------
 	try {
 		const response = await gql<GraphQLProjectResponse>(
-			print(Q_GET_PROJECT),
+			Q_GET_PROJECT,
 			{ id: projectId },
 			idToken
 		);
@@ -64,7 +63,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, url, parent }) =
 		}
 
 		// Note: Data validation is currently handled by TypeScript types from
-		// @agnathan/types-simple. If runtime validation (e.g., Zod) is needed in the future,
+		// @stratiqai/types-simple. If runtime validation (e.g., Zod) is needed in the future,
 		// add it here before returning.
 
 		return {

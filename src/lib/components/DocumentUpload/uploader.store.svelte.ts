@@ -13,9 +13,9 @@ import {
 } from './constants';
 import type { UploadFile, PresignedUrlResponse, FileMetadata } from './types';
 import { addSubscription, ensureConnection, removeSubscription } from '$lib/stores/appSyncClientStore';
-import { S_ON_CREATE_TEXT, S_ON_CREATE_TABLE, S_ON_CREATE_IMAGE } from '@agnathan/types-simple';
+import { S_ON_CREATE_TEXT, S_ON_CREATE_TABLE, S_ON_CREATE_IMAGE } from '@stratiqai/types-simple';
 import { print } from 'graphql';
-import type { Text, Table, Image } from '@agnathan/types-simple';
+import type { Text, Table, Image } from '@stratiqai/types-simple';
 import type { SubscriptionSpec } from '$lib/realtime/websocket/types';
 import { logger } from '$lib/logging/debug';
 import { authStore } from '$lib/stores/auth.svelte';

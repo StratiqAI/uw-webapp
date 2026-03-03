@@ -24,6 +24,7 @@
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	import ProjectEntitiesDisplay from '$lib/components/ProjectEntities/ProjectEntitiesDisplay.svelte';
 	import PDFViewer from '$lib/components/PDFViewer/PDFViewer.svelte';
+	import CREStructuredOutputSidebar from '../../../../workflow/components/layout/CREStructuredOutputSidebar.svelte';
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Initialize the state variables for this component
@@ -162,7 +163,8 @@
 	});
 </script>
 
-<div class="w-full">
+<div class="flex h-full w-full overflow-hidden">
+	<div class="flex-1 overflow-y-auto">
 	<div class="mx-auto max-w-7xl px-6 py-8">
 		<!-- Header -->
 		<div class="mb-8">
@@ -287,4 +289,8 @@
 			</div>
 		{/if}
 	</div>
+	</div>
+
+	<!-- CRE Structured Output sidebar (right) -->
+	<CREStructuredOutputSidebar {darkMode} />
 </div>

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Project } from '@agnathan/types-simple';
+	import type { Project } from '@stratiqai/types-simple';
 	import ProjectSwitcher from '$lib/dashboard/components/ProjectSwitcher.svelte';
 	import WorkflowSwitcher from '$lib/dashboard/components/WorkflowSwitcher.svelte';
 	

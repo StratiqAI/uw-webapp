@@ -6,9 +6,9 @@
 	import { goto } from '$app/navigation';
 	import TabButton from '$lib/components/ui/TabButton.svelte';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
-	import { M_UPDATE_PROJECT } from '@agnathan/types-simple';
+	import { M_UPDATE_PROJECT } from '@stratiqai/types-simple';
 	import { print } from 'graphql';
-	import type { Project } from '@agnathan/types-simple';
+	import type { Project } from '@stratiqai/types-simple';
 	import { setProject } from '$lib/stores/appStateStore';
 
 	import NotificationBellComponent from '$lib/components/Notifications/NotificationBell.svelte';

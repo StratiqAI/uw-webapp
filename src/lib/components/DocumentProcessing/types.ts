@@ -6,7 +6,7 @@ import type {
 	Table,
 	Image,
 	Scan
-} from '@agnathan/types-simple';
+} from '@stratiqai/types-simple';
 
 /** Processing status for the overall document */
 export type DocumentProcessingStatus =

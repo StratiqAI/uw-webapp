@@ -8,7 +8,10 @@
 	import { DocumentEntitiesSyncManager } from '$lib/realtime/websocket/syncManagers/DocumentEntitiesSyncManager';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
-	import type { Project, Doclink } from '@agnathan/types-simple';
+	import type { Project, Doclink } from '@stratiqai/types-simple';
+
+	/** Doclink as returned by API (status + linkType). Used when resolved types omit them. */
+	type DoclinkFromApi = Doclink & { status: string; linkType: string };
 
 	let { data } = $props();
 
@@ -49,15 +52,48 @@
 		return (links.items || []) as Doclink[];
 	});
 
-	// Convert doclinks to ProjectDocument format for ProjectEntitiesDisplay
-	// The id should be the documentId (SHA256 hash) which is used in the S3 URL path
+	// Group doclinks by documentId (one document can have NONE, TEXT_EMBEDDINGS, IMAGE_EMBEDDINGS by linkType)
+	type DoclinkRow = {
+		documentId: string;
+		filename: string;
+		textEmbeddingStatus: string;
+		imageEmbeddingStatus: string;
+	};
+	const doclinksByDocument = $derived.by((): DoclinkRow[] => {
+		const linksFromApi = doclinks as DoclinkFromApi[];
+		const byDoc = new Map<string, DoclinkFromApi[]>();
+		for (const link of linksFromApi) {
+			if (!link.documentId) continue;
+			const list = byDoc.get(link.documentId) ?? [];
+			list.push(link);
+			byDoc.set(link.documentId, list);
+		}
+		return Array.from(byDoc.entries()).map(([documentId, links]) => {
+			const noneOrFirst = links.find((l) => l.linkType === 'NONE') ?? links[0];
+			const filename = noneOrFirst?.filename ?? 'Untitled Document';
+			const textLink = links.find((l) => l.linkType === 'TEXT_EMBEDDINGS');
+			const imageLink = links.find((l) => l.linkType === 'IMAGE_EMBEDDINGS');
+			return {
+				documentId,
+				filename,
+				textEmbeddingStatus: textLink?.status ?? 'N/A',
+				imageEmbeddingStatus: imageLink?.status ?? 'N/A'
+			};
+		});
+	});
+
+	// Convert doclinks to ProjectDocument format for ProjectEntitiesDisplay (one per documentId)
 	const documents = $derived.by(() => {
-		return doclinks
-			.filter((link) => link.documentId && link.filename)
-			.map((link) => ({
-				id: link.documentId!, // This is the SHA256 hash used in S3 path: {hash}/document.pdf
-				filename: link.filename
-			}));
+		const byDoc = new Map<string, { id: string; filename: string }>();
+		const linksFromApi = doclinks as DoclinkFromApi[];
+		for (const link of linksFromApi) {
+			if (!link.documentId) continue;
+			const existing = byDoc.get(link.documentId);
+			// Prefer filename from NONE link, else first seen
+			if (!existing || link.linkType === 'NONE')
+				byDoc.set(link.documentId, { id: link.documentId, filename: link.filename || 'Untitled Document' });
+		}
+		return Array.from(byDoc.values());
 	});
 
 	// Dark mode support
@@ -258,8 +294,8 @@
 			</div>
 		{/if}
 
-		<!-- Doclinks Display -->
-		<!-- {#if projectId && doclinks.length > 0}
+		<!-- Doclinks Display (grouped by documentId, status from linkType) -->
+		{#if projectId && doclinksByDocument.length > 0}
 			<div class="mt-8 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg border shadow-sm">
 				<div class="p-6">
 					<div class="flex items-center gap-3 mb-4">
@@ -268,38 +304,34 @@
 							Document Links
 						</h3>
 						<span class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'}">
-							({doclinks.length})
+							({doclinksByDocument.length})
 						</span>
 					</div>
 					<div class="space-y-2">
-						{#each doclinks as doclink (doclink.id)}
+						{#each doclinksByDocument as row (row.documentId)}
 							<div class="p-3 {darkMode ? 'bg-slate-700/50 border-slate-600' : 'bg-slate-50 border-slate-200'} rounded-lg border">
 								<div class="flex items-center justify-between">
 									<div class="flex-1 min-w-0">
 										<div class="font-medium {darkMode ? 'text-slate-200' : 'text-slate-900'} truncate">
-											{doclink.filename || 'Untitled Document'}
+											{row.filename}
 										</div>
-										{#if doclink.status}
-											<div class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1">
-												Status: {doclink.status}
-											</div>
-										{/if}
+										<div class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1">
+											Text: {row.textEmbeddingStatus} | Images: {row.imageEmbeddingStatus}
+										</div>
 									</div>
-									{#if doclink.documentId}
-										<a 
-											href="/projects/workspace/{projectId}/document-analysis?documentId={doclink.documentId}"
-											class="ml-4 text-sm {darkMode ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-700'} font-medium hover:underline transition-colors"
-										>
-											View
-										</a>
-									{/if}
+									<a 
+										href="/projects/workspace/{projectId}/document-analysis?documentId={row.documentId}"
+										class="ml-4 text-sm {darkMode ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-700'} font-medium hover:underline transition-colors"
+									>
+										View
+									</a>
 								</div>
 							</div>
 						{/each}
 					</div>
 				</div>
 			</div>
-		{/if} -->
+		{/if}
 
 		<!-- Help Link -->
 		<div class="mt-6 text-center">

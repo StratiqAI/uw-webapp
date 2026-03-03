@@ -3,8 +3,8 @@
  * Provides a centralized store for managing notifications across the application
  */
 
-import type { Notification } from '@agnathan/types-simple';
-import { S_ON_CREATE_NOTIFICATION } from '@agnathan/types-simple';
+import type { Notification } from '@stratiqai/types-simple';
+import { S_ON_CREATE_NOTIFICATION } from '@stratiqai/types-simple';
 
 // Re-export for convenience
 export type { Notification };

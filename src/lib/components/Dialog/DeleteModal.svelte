@@ -12,7 +12,7 @@
 	import { Button, Modal } from 'flowbite-svelte';
 	import { ExclamationCircleOutline } from 'flowbite-svelte-icons';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
-	import type { Project } from '@agnathan/types-simple';
+	import type { Project } from '@stratiqai/types-simple';
 	let {
 		open = $bindable(true),
 		title = 'Are you sure you want to delete this?',

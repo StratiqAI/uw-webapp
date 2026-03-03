@@ -31,6 +31,7 @@
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import { generateId } from '../../utils/idGenerator';
 	import WorkflowSidebar from '../../components/layout/WorkflowSidebar.svelte';
+	import CREStructuredOutputSidebar from '../../components/layout/CREStructuredOutputSidebar.svelte';
 	import WorkflowToolbar from '../../components/layout/WorkflowToolbar.svelte';
 	import WorkflowCanvas from '../../components/canvas/WorkflowCanvas.svelte';
 	import WorkflowBottomPanel from '../../components/layout/WorkflowBottomPanel.svelte';
@@ -62,7 +63,6 @@
 	import { gql } from '$lib/realtime/graphql/requestHandler';
 	import WorkflowSwitcher from '$lib/dashboard/components/WorkflowSwitcher.svelte';
 	import {
-		Q_GET_PROJECT,
 		M_CREATE_WORKFLOW,
 		M_UPDATE_WORKFLOW,
 		M_DELETE_WORKFLOW,
@@ -70,8 +70,9 @@
 		type CreateWorkflowMutation,
 		type UpdateWorkflowMutation,
 		type DeleteWorkflowMutation
-	} from '@agnathan/types-simple';
-	import { S_ON_WORKFLOW_EXECUTION_STATUS_CHANGE } from '@agnathan/types-simple';
+	} from '@stratiqai/types-simple';
+	import { Q_GET_PROJECT } from '$lib/realtime/graphql/queries/Project';
+	import { S_ON_WORKFLOW_EXECUTION_STATUS_CHANGE } from '@stratiqai/types-simple';
 	import { fetchWorkflowExecutions } from '../../services/backend/workflowExecutionService';
 	import type { WorkflowExecutionListItem } from '../../services/backend/workflowExecutionService';
 	import { getAppSyncWsClient, initAppSyncWsClient } from '$lib/realtime/websocket/wsClient';
@@ -79,7 +80,7 @@
 	import type { ElementType, GridElement, Connection } from '../../types';
 	import { isExecutableNode } from '../../types/node';
 	import type { PageData } from './$types';
-	import type { Project, Workflow, WorkflowExecution, WorkflowNodeExecution } from '@agnathan/types-simple';
+	import type { Project, Workflow, WorkflowExecution, WorkflowNodeExecution } from '@stratiqai/types-simple';
 	import { WorkflowSyncManager } from '$lib/realtime/websocket/syncManagers/WorkflowSyncManager';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import { toTopicPath } from '$lib/realtime/store/TopicMapper';
@@ -1405,6 +1406,9 @@
 			{darkMode}
 		/>
 	</div>
+
+	<!-- CRE Structured Output sidebar (right) -->
+	<CREStructuredOutputSidebar {darkMode} />
 
 	<!-- Property Data Gallery Modal -->
 	{#if showingInputGallery}

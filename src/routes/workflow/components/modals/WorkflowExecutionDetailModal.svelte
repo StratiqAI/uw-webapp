@@ -5,9 +5,9 @@
 	import {
 		S_ON_UPDATE_WORKFLOW_EXECUTION,
 		S_ON_WORKFLOW_NODE_EXECUTION_STATUS_CHANGE
-	} from '@agnathan/types-simple';
+	} from '@stratiqai/types-simple';
 	import { fetchWorkflowExecutionDetail } from '../../services/backend/workflowExecutionService';
-	import type { WorkflowExecution, WorkflowNodeExecution } from '@agnathan/types-simple';
+	import type { WorkflowExecution, WorkflowNodeExecution } from '@stratiqai/types-simple';
 
 	const { executionId, workflowId, idToken, projectId, darkMode = false, onClose }: {
 		executionId: string;

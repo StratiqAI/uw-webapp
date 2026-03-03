@@ -6,7 +6,7 @@ import type {
 	Table,
 	Image,
 	Scan
-} from '@agnathan/types-simple';
+} from '@stratiqai/types-simple';
 import type { DocumentProcessingState } from './types';
 
 /**
