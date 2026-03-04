@@ -24,7 +24,9 @@
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	import ProjectEntitiesDisplay from '$lib/components/ProjectEntities/ProjectEntitiesDisplay.svelte';
 	import PDFViewer from '$lib/components/PDFViewer/PDFViewer.svelte';
-	import CREStructuredOutputSidebar from '../../../../workflow/components/layout/CREStructuredOutputSidebar.svelte';
+	import CREStructuredOutputSidebar, { type CREStructuredTemplate } from '../../../../workflow/components/layout/CREStructuredOutputSidebar.svelte';
+	import { gql } from '$lib/realtime/graphql/requestHandler';
+	import { Q_DOCUMENT_VISION_QUERY } from '$lib/realtime/graphql/queries/DocumentVisionQuery';
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Initialize the state variables for this component
@@ -48,6 +50,17 @@
 	
 	// Track which document IDs we've already fetched to prevent re-fetching
 	let lastFetchedDocIds = $state<string>('');
+
+	// Vision query (CRE structured output sidebar): state and result
+	interface VisionQueryResult {
+		answer: string;
+		structuredOutput?: unknown;
+		matchCount: number;
+	}
+	let visionQueryResult = $state<VisionQueryResult | null>(null);
+	let visionQueryLoading = $state(false);
+	let visionQueryError = $state<string | null>(null);
+	let lastSelectedTemplate = $state<CREStructuredTemplate | null>(null);
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Component Variables that are Derived from the Stores
@@ -161,6 +174,34 @@
 			}
 		};
 	});
+
+	// Run vision query when user selects a CRE template (document IDs from project doclinks)
+	async function handleSelectTemplate(template: CREStructuredTemplate) {
+		const docIds = documents.map((d) => d.id);
+		if (!idToken || docIds.length === 0) return;
+		visionQueryLoading = true;
+		visionQueryError = null;
+		lastSelectedTemplate = template;
+		try {
+			const data = await gql<{ documentVisionQuery: VisionQueryResult }>(
+				Q_DOCUMENT_VISION_QUERY,
+				{
+					input: {
+						documentIds: docIds,
+						question: template.question,
+						topK: 5
+					}
+				},
+				idToken
+			);
+			visionQueryResult = data.documentVisionQuery;
+		} catch (err) {
+			visionQueryError = err instanceof Error ? err.message : 'Vision query failed';
+			visionQueryResult = null;
+		} finally {
+			visionQueryLoading = false;
+		}
+	}
 </script>
 
 <div class="flex h-full w-full overflow-hidden">
@@ -178,6 +219,65 @@
 				View discovered text, tables, and images from your uploaded documents.
 			</p>
 		</div>
+
+		<!-- Structured query result (CRE sidebar vision query) -->
+		{#if visionQueryLoading}
+			<div class="mb-8 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg border shadow-sm p-6">
+				<div class="flex items-center gap-3">
+					<svg class="animate-spin h-5 w-5 {darkMode ? 'text-indigo-400' : 'text-indigo-600'}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+					</svg>
+					<span class="{darkMode ? 'text-slate-300' : 'text-slate-600'}">Running structured query...</span>
+				</div>
+			</div>
+		{:else if visionQueryError}
+			<div class="mb-8 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg border shadow-sm p-6">
+				<div class="flex items-center justify-between gap-4">
+					<div class="flex items-center gap-2 {darkMode ? 'text-red-400' : 'text-red-600'}">
+						<svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+						</svg>
+						<span class="font-medium">Query failed</span>
+					</div>
+					<button
+						type="button"
+						onclick={() => { visionQueryError = null; }}
+						class="rounded border px-2 py-1 text-sm {darkMode ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-700 hover:bg-slate-100'}"
+					>Dismiss</button>
+				</div>
+				<p class="mt-2 text-sm {darkMode ? 'text-slate-400' : 'text-slate-600'}">{visionQueryError}</p>
+			</div>
+		{:else if visionQueryResult != null}
+			<div class="mb-8 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg border shadow-sm">
+				<div class="flex items-center justify-between gap-4 p-4 border-b {darkMode ? 'border-slate-700' : 'border-slate-200'}">
+					<h3 class="text-lg font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">
+						Structured query result
+						{#if lastSelectedTemplate}
+							<span class="text-sm font-normal {darkMode ? 'text-slate-400' : 'text-slate-500'}"> — {lastSelectedTemplate.title}</span>
+						{/if}
+					</h3>
+					<button
+						type="button"
+						onclick={() => { visionQueryResult = null; lastSelectedTemplate = null; }}
+						class="rounded border px-2 py-1 text-sm {darkMode ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-700 hover:bg-slate-100'}"
+					>Clear</button>
+				</div>
+				<div class="p-6 space-y-4">
+					<div>
+						<p class="text-sm font-medium {darkMode ? 'text-slate-400' : 'text-slate-500'} mb-1">Answer</p>
+						<p class="whitespace-pre-wrap {darkMode ? 'text-slate-200' : 'text-slate-800'}">{visionQueryResult.answer}</p>
+					</div>
+					{#if visionQueryResult.structuredOutput != null && typeof visionQueryResult.structuredOutput === 'object'}
+						<div>
+							<p class="text-sm font-medium {darkMode ? 'text-slate-400' : 'text-slate-500'} mb-1">Structured output</p>
+							<pre class="text-xs overflow-x-auto p-3 rounded {darkMode ? 'bg-slate-900 text-slate-300' : 'bg-slate-100 text-slate-700'}">{JSON.stringify(visionQueryResult.structuredOutput, null, 2)}</pre>
+						</div>
+					{/if}
+					<p class="text-xs {darkMode ? 'text-slate-500' : 'text-slate-500'}">Based on {visionQueryResult.matchCount} image(s)</p>
+				</div>
+			</div>
+		{/if}
 
 		<!-- PDF Viewer -->
 		{#if documents.length > 0 && selectedDocId}
@@ -292,5 +392,9 @@
 	</div>
 
 	<!-- CRE Structured Output sidebar (right) -->
-	<CREStructuredOutputSidebar {darkMode} />
+	<CREStructuredOutputSidebar
+		{darkMode}
+		onSelectTemplate={handleSelectTemplate}
+		isLoading={visionQueryLoading}
+	/>
 </div>

@@ -1,42 +1,43 @@
 <script lang="ts">
 	/**
 	 * Sidebar for commercial real estate structured output templates.
-	 * UI-only: matches "Create Structured Output" style with CRE-specific fields.
+	 * Each template has a question sent to the vision query (Pinecone + Gemini).
 	 */
 
-	interface CREStructuredTemplate {
+	export interface CREStructuredTemplate {
 		id: string;
 		title: string;
 		description: string;
+		question: string;
 		dataType: 'string' | 'number' | 'boolean' | 'integer' | 'object' | 'array';
 		icon: 'document' | 'building' | 'calendar' | 'currency' | 'ruler' | 'map' | 'users' | 'chart' | 'list';
 	}
 
 	const CRE_TEMPLATES: CREStructuredTemplate[] = [
-		{ id: 'property-address', title: 'Property Address', description: 'Full street address of the property', dataType: 'string', icon: 'map' },
-		{ id: 'lease-term', title: 'Lease Term', description: 'Duration of the lease (e.g. 5 years, 10 years)', dataType: 'string', icon: 'calendar' },
-		{ id: 'square-footage', title: 'Square Footage', description: 'Total rentable or leasable area in sq ft', dataType: 'number', icon: 'ruler' },
-		{ id: 'zoning-type', title: 'Zoning Type', description: 'Zoning classification (e.g. commercial, mixed-use)', dataType: 'string', icon: 'document' },
-		{ id: 'cap-rate', title: 'Cap Rate', description: 'Capitalization rate as a percentage', dataType: 'number', icon: 'chart' },
-		{ id: 'noi', title: 'NOI', description: 'Net operating income amount', dataType: 'number', icon: 'currency' },
-		{ id: 'tenant-name', title: 'Tenant Name', description: 'Name of the tenant or lessee', dataType: 'string', icon: 'users' },
-		{ id: 'lease-start', title: 'Lease Start Date', description: 'Effective start date of the lease', dataType: 'string', icon: 'calendar' },
-		{ id: 'lease-end', title: 'Lease End Date', description: 'Expiration or end date of the lease', dataType: 'string', icon: 'calendar' },
-		{ id: 'rentable-area', title: 'Rentable Area', description: 'Rentable square footage per suite or unit', dataType: 'number', icon: 'ruler' },
-		{ id: 'building-class', title: 'Building Class', description: 'Class A, B, or C classification', dataType: 'string', icon: 'building' },
-		{ id: 'year-built', title: 'Year Built', description: 'Year the building was constructed', dataType: 'integer', icon: 'building' },
-		{ id: 'occupancy-rate', title: 'Occupancy Rate', description: 'Current occupancy as a percentage', dataType: 'number', icon: 'chart' },
-		{ id: 'base-rent', title: 'Base Rent', description: 'Base rent amount per period', dataType: 'number', icon: 'currency' },
-		{ id: 'triple-net', title: 'Triple Net Lease', description: 'Whether lease is NNN', dataType: 'boolean', icon: 'document' },
-		{ id: 'vacancy-rate', title: 'Vacancy Rate', description: 'Current or projected vacancy percentage', dataType: 'number', icon: 'chart' },
-		{ id: 'tenant-improvements', title: 'Tenant Improvement Allowance', description: 'TI allowance amount or description', dataType: 'string', icon: 'currency' },
-		{ id: 'expense-stop', title: 'Expense Stop', description: 'Expense stop amount or type', dataType: 'string', icon: 'document' },
-		{ id: 'renewal-option', title: 'Renewal Option', description: 'Whether tenant has renewal option', dataType: 'boolean', icon: 'calendar' },
-		{ id: 'purchase-price', title: 'Purchase Price', description: 'Acquisition or asking price', dataType: 'number', icon: 'currency' },
-		{ id: 'debt-service', title: 'Annual Debt Service', description: 'Annual debt service amount', dataType: 'number', icon: 'currency' },
-		{ id: 'dscr', title: 'DSCR', description: 'Debt service coverage ratio', dataType: 'number', icon: 'chart' },
-		{ id: 'tenant-list', title: 'Tenant Roster', description: 'List of tenants and suite info', dataType: 'array', icon: 'list' },
-		{ id: 'lease-summary', title: 'Lease Summary', description: 'Structured lease terms and dates', dataType: 'object', icon: 'document' }
+		{ id: 'property-address', title: 'Property Address', description: 'Full street address of the property', question: 'What is the full street address or property address shown in the document?', dataType: 'string', icon: 'map' },
+		{ id: 'lease-term', title: 'Lease Term', description: 'Duration of the lease (e.g. 5 years, 10 years)', question: 'What is the lease term or duration (e.g. 5 years, 10 years)?', dataType: 'string', icon: 'calendar' },
+		{ id: 'square-footage', title: 'Square Footage', description: 'Total rentable or leasable area in sq ft', question: 'What is the total rentable or leasable square footage mentioned?', dataType: 'number', icon: 'ruler' },
+		{ id: 'zoning-type', title: 'Zoning Type', description: 'Zoning classification (e.g. commercial, mixed-use)', question: 'What is the zoning type or classification (e.g. commercial, mixed-use)?', dataType: 'string', icon: 'document' },
+		{ id: 'cap-rate', title: 'Cap Rate', description: 'Capitalization rate as a percentage', question: 'What is the cap rate or capitalization rate mentioned? Reply with only the number or percentage if present, otherwise state that it was not found.', dataType: 'number', icon: 'chart' },
+		{ id: 'noi', title: 'NOI', description: 'Net operating income amount', question: 'What is the net operating income (NOI) amount stated in the document?', dataType: 'number', icon: 'currency' },
+		{ id: 'tenant-name', title: 'Tenant Name', description: 'Name of the tenant or lessee', question: 'What is the name of the tenant or lessee?', dataType: 'string', icon: 'users' },
+		{ id: 'lease-start', title: 'Lease Start Date', description: 'Effective start date of the lease', question: 'What is the lease start date or effective date?', dataType: 'string', icon: 'calendar' },
+		{ id: 'lease-end', title: 'Lease End Date', description: 'Expiration or end date of the lease', question: 'What is the lease expiration or end date?', dataType: 'string', icon: 'calendar' },
+		{ id: 'rentable-area', title: 'Rentable Area', description: 'Rentable square footage per suite or unit', question: 'What is the rentable area or square footage per suite or unit?', dataType: 'number', icon: 'ruler' },
+		{ id: 'building-class', title: 'Building Class', description: 'Class A, B, or C classification', question: 'What is the building class (Class A, B, or C)?', dataType: 'string', icon: 'building' },
+		{ id: 'year-built', title: 'Year Built', description: 'Year the building was constructed', question: 'What year was the building constructed or built?', dataType: 'integer', icon: 'building' },
+		{ id: 'occupancy-rate', title: 'Occupancy Rate', description: 'Current occupancy as a percentage', question: 'What is the current or stated occupancy rate (as a percentage)?', dataType: 'number', icon: 'chart' },
+		{ id: 'base-rent', title: 'Base Rent', description: 'Base rent amount per period', question: 'What is the base rent amount or rate stated?', dataType: 'number', icon: 'currency' },
+		{ id: 'triple-net', title: 'Triple Net Lease', description: 'Whether lease is NNN', question: 'Is this a triple net (NNN) lease? Answer yes or no based on the document.', dataType: 'boolean', icon: 'document' },
+		{ id: 'vacancy-rate', title: 'Vacancy Rate', description: 'Current or projected vacancy percentage', question: 'What is the current or projected vacancy rate (percentage)?', dataType: 'number', icon: 'chart' },
+		{ id: 'tenant-improvements', title: 'Tenant Improvement Allowance', description: 'TI allowance amount or description', question: 'What is the tenant improvement (TI) allowance amount or description?', dataType: 'string', icon: 'currency' },
+		{ id: 'expense-stop', title: 'Expense Stop', description: 'Expense stop amount or type', question: 'What is the expense stop amount or type mentioned?', dataType: 'string', icon: 'document' },
+		{ id: 'renewal-option', title: 'Renewal Option', description: 'Whether tenant has renewal option', question: 'Does the tenant have a renewal option? Answer yes or no based on the document.', dataType: 'boolean', icon: 'calendar' },
+		{ id: 'purchase-price', title: 'Purchase Price', description: 'Acquisition or asking price', question: 'What is the purchase price, acquisition price, or asking price?', dataType: 'number', icon: 'currency' },
+		{ id: 'debt-service', title: 'Annual Debt Service', description: 'Annual debt service amount', question: 'What is the annual debt service amount?', dataType: 'number', icon: 'currency' },
+		{ id: 'dscr', title: 'DSCR', description: 'Debt service coverage ratio', question: 'What is the debt service coverage ratio (DSCR) mentioned?', dataType: 'number', icon: 'chart' },
+		{ id: 'tenant-list', title: 'Tenant Roster', description: 'List of tenants and suite info', question: 'List the tenants and their suite or unit information mentioned in the document.', dataType: 'array', icon: 'list' },
+		{ id: 'lease-summary', title: 'Lease Summary', description: 'Structured lease terms and dates', question: 'Summarize the key lease terms and dates (start, end, rent, options) from the document.', dataType: 'object', icon: 'document' }
 	];
 
 	function dataTypeTagClass(dataType: CREStructuredTemplate['dataType'], darkMode: boolean): string {
@@ -69,9 +70,11 @@
 
 	interface Props {
 		darkMode?: boolean;
+		onSelectTemplate?: (template: CREStructuredTemplate) => void;
+		isLoading?: boolean;
 	}
 
-	let { darkMode = true }: Props = $props();
+	let { darkMode = true, onSelectTemplate, isLoading = false }: Props = $props();
 
 	let searchQuery = $state('');
 	let isOpen = $state(true);
@@ -162,7 +165,9 @@
 					{#each filteredTemplates as template (template.id)}
 						<button
 							type="button"
-							class="flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-colors {darkMode ? 'border-slate-700 bg-slate-800/40 hover:bg-slate-800 hover:border-slate-600' : 'border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300'}"
+							disabled={isLoading}
+							onclick={() => onSelectTemplate?.(template)}
+							class="flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-colors {darkMode ? 'border-slate-700 bg-slate-800/40 hover:bg-slate-800 hover:border-slate-600' : 'border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300'} disabled:opacity-60 disabled:cursor-not-allowed"
 						>
 							<div
 								class="flex h-8 w-8 shrink-0 items-center justify-center rounded {darkMode ? 'bg-slate-700' : 'bg-slate-100'}"
