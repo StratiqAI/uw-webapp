@@ -2,11 +2,11 @@ import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from '$env/static/public';
 import { browser } from '$app/environment';
 import type { PromptTemplate } from '@stratiqai/types-simple';
 import {
-	Q_GET_PROMPT_TEMPLATE,
-	Q_LIST_PROMPT_TEMPLATES,
-	S_ON_CREATE_PROMPT_TEMPLATE,
-	S_ON_UPDATE_PROMPT_TEMPLATE,
-	S_ON_DELETE_PROMPT_TEMPLATE
+	Q_GET_PROMPT,
+	Q_LIST_PROMPTS,
+	S_ON_CREATE_PROMPT,
+	S_ON_UPDATE_PROMPT,
+	S_ON_DELETE_PROMPT
 } from '@stratiqai/types-simple';
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 import {
@@ -36,11 +36,11 @@ if (browser && typeof window !== 'undefined') {
  * Configuration for synchronizing PromptTemplate entities.
  */
 const promptTemplateSyncConfig = createPromptTemplateSyncConfig(
-	Q_LIST_PROMPT_TEMPLATES,
-	Q_GET_PROMPT_TEMPLATE,
-	S_ON_UPDATE_PROMPT_TEMPLATE,
-	S_ON_DELETE_PROMPT_TEMPLATE,
-	S_ON_CREATE_PROMPT_TEMPLATE
+	Q_LIST_PROMPTS,
+	Q_GET_PROMPT,
+	S_ON_UPDATE_PROMPT,
+	S_ON_DELETE_PROMPT,
+	S_ON_CREATE_PROMPT
 );
 
 export type PromptTemplateManagerOptions = {

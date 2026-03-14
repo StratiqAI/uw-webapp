@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import type { PromptTemplate, Project } from '@stratiqai/types-simple';
+	import type { Prompt, Project } from '@stratiqai/types-simple';
+	/** Prompt type alias for library (API formerly used PromptTemplate) */
+	type PromptTemplate = Prompt;
 	import { PromptTemplateSyncManager } from '$lib/realtime/websocket/syncManagers/PromptTemplateSyncManager';
 	import { ProjectSyncManager } from '$lib/realtime/websocket/syncManagers/ProjectSyncManager';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
@@ -57,9 +59,11 @@
 	let filteredTemplates = $derived.by(() => {
 		let templates = allTemplates;
 
-		// Filter by project if selected
+		// Filter by project if selected (prompts are no longer project-scoped; show all when parentId is absent)
 		if (selectedProjectId) {
-			templates = templates.filter((t) => t.parentId === selectedProjectId);
+			templates = templates.filter(
+				(t) => (t as { parentId?: string }).parentId == null || (t as { parentId?: string }).parentId === selectedProjectId
+			);
 		}
 
 		// Filter by search
@@ -105,8 +109,9 @@
 
 			// If we have projects, select the first one and load its templates
 			if (data.projects.length > 0) {
-				selectedProjectId = data.projects[0].id;
-				await loadTemplatesForProject(selectedProjectId);
+				const firstProjectId = data.projects[0].id;
+				selectedProjectId = firstProjectId;
+				await loadTemplatesForProject(firstProjectId);
 			}
 		} catch (err) {
 			console.error('Failed to initialize:', err);
@@ -250,7 +255,8 @@
 
 	// Get display info for a template
 	function getTemplateDisplayInfo(template: PromptTemplate) {
-		const aiData = parseTemplateToAIQueryData(template.template);
+		const templateStr = 'templateText' in template ? template.templateText : (template as { template?: string }).template;
+		const aiData = parseTemplateToAIQueryData(templateStr ?? '');
 		return {
 			prompt: aiData.prompt,
 			model: aiData.model,

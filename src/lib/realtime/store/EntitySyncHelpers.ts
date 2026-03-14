@@ -51,11 +51,11 @@ export function createPromptTemplateSyncConfig(
 		createSubscription,
 		updateSubscription,
 		deleteSubscription,
-		listResponsePath: 'listPromptTemplates.items',
-		getResponsePath: 'getPromptTemplate',
-		createSubscriptionPath: 'onCreatePromptTemplate',
-		updateSubscriptionPath: 'onUpdatePromptTemplate',
-		deleteSubscriptionPath: 'onDeletePromptTemplate',
+		listResponsePath: 'listPrompts.items',
+		getResponsePath: 'getPrompt',
+		createSubscriptionPath: 'onCreatePrompt',
+		updateSubscriptionPath: 'onUpdatePrompt',
+		deleteSubscriptionPath: 'onDeletePrompt',
 		getEntityId: (promptTemplate: any) => promptTemplate.id
 	};
 }

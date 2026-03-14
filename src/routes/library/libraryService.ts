@@ -1,17 +1,22 @@
 /**
  * Library Service Module
  *
- * Provides utilities for managing PromptTemplate entities in the library,
+ * Provides utilities for managing Prompt entities (formerly PromptTemplate) in the library,
  * including CRUD operations and data transformation between AIQueryData and
- * the PromptTemplate.template JSON field.
+ * the Prompt.templateText field (JSON string).
  */
 
-import type { PromptTemplate, Project } from '@stratiqai/types-simple';
+import type { Prompt, Project } from '@stratiqai/types-simple';
+
+/** Prompt type alias (API formerly PromptTemplate) */
+type PromptTemplate = Prompt;
 import {
-	M_CREATE_PROMPT_TEMPLATE,
-	M_UPDATE_PROMPT_TEMPLATE,
-	M_DELETE_PROMPT_TEMPLATE,
-	Q_GET_PROJECT_WITH_PROMPT_TEMPLATES
+	M_CREATE_PROMPT,
+	M_UPDATE_PROMPT,
+	M_DELETE_PROMPT,
+	Q_GET_PROJECT_WITH_PROMPTS,
+	Q_LIST_PROMPTS,
+	Q_LIST_STRUCTURED_OUTPUT_SCHEMAS
 } from '@stratiqai/types-simple';
 import type { IGraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
 
@@ -99,126 +104,141 @@ export function serializeAIQueryDataToTemplate(data: AIQueryData): string {
 }
 
 /**
- * Response type for project with prompt templates
- */
-export interface ProjectWithPromptTemplates extends Project {
-	prompttemplates?: {
-		items: PromptTemplate[];
-		nextToken?: string | null;
-	};
-}
-
-/**
- * Fetch a project with its prompt templates
- * This uses the nested query approach to get templates through the project entity
+ * Fetch a project and owned prompts (prompts are no longer nested under project)
  */
 export async function fetchProjectWithPromptTemplates(
 	queryClient: IGraphQLQueryClient,
 	projectId: string
 ): Promise<{ project: Project; promptTemplates: PromptTemplate[] }> {
-	const response = await queryClient.query<{
-		getProject: ProjectWithPromptTemplates | null;
-	}>(Q_GET_PROJECT_WITH_PROMPT_TEMPLATES, { id: projectId });
+	const [projectResponse, promptsResponse] = await Promise.all([
+		queryClient.query<{ getProject: Project | null }>(Q_GET_PROJECT_WITH_PROMPTS, {
+			id: projectId
+		}),
+		queryClient.query<{ listPrompts: { items: PromptTemplate[] } }>(Q_LIST_PROMPTS, {
+			scope: 'OWNED_BY_ME',
+			limit: 200
+		})
+	]);
 
-	if (!response?.getProject) {
+	if (!projectResponse?.getProject) {
 		throw new Error(`Project not found: ${projectId}`);
 	}
 
-	const project = response.getProject;
-	const promptTemplates = project.prompttemplates?.items || [];
+	const project = projectResponse.getProject;
+	const promptTemplates = promptsResponse?.listPrompts?.items ?? [];
 
 	return { project, promptTemplates };
 }
 
 /**
- * Create a new prompt template
+ * Resolve a default outputSchemaId by fetching the first structured output schema (required for createPrompt).
+ */
+async function getDefaultOutputSchemaId(
+	queryClient: IGraphQLQueryClient
+): Promise<string> {
+	const response = await queryClient.query<{
+		listStructuredOutputSchemas: { items: Array<{ id: string }> };
+	}>(Q_LIST_STRUCTURED_OUTPUT_SCHEMAS, { limit: 1 });
+
+	const items = response?.listStructuredOutputSchemas?.items ?? [];
+	if (items.length === 0) {
+		throw new Error(
+			'No structured output schema found. Create one in AI Studio before creating prompts.'
+		);
+	}
+	return items[0].id;
+}
+
+/**
+ * Create a new prompt (formerly prompt template)
  */
 export async function createPromptTemplate(
 	queryClient: IGraphQLQueryClient,
-	parentId: string,
+	_parentId: string,
 	name: string,
 	aiQueryData: AIQueryData,
 	description?: string
 ): Promise<PromptTemplate> {
-	const template = serializeAIQueryDataToTemplate(aiQueryData);
+	const templateText = serializeAIQueryDataToTemplate(aiQueryData);
+	const outputSchemaId = await getDefaultOutputSchemaId(queryClient);
 
 	const response = await queryClient.query<{
-		createPromptTemplate: PromptTemplate;
-	}>(M_CREATE_PROMPT_TEMPLATE, {
+		createPrompt: PromptTemplate;
+	}>(M_CREATE_PROMPT, {
 		input: {
-			parentId,
 			name,
-			template,
 			description: description || undefined,
+			templateText,
+			outputSchemaId,
 			sharingMode: 'PRIVATE'
 		}
 	});
 
-	if (!response?.createPromptTemplate) {
-		throw new Error('Failed to create prompt template');
+	if (!response?.createPrompt) {
+		throw new Error('Failed to create prompt');
 	}
 
-	return response.createPromptTemplate;
+	return response.createPrompt;
 }
 
 /**
- * Update an existing prompt template
+ * Update an existing prompt (parentId kept for API compatibility but not used)
  */
 export async function updatePromptTemplate(
 	queryClient: IGraphQLQueryClient,
 	id: string,
-	parentId: string,
+	_parentId?: string,
 	updates: {
 		name?: string;
 		aiQueryData?: AIQueryData;
 		description?: string;
 	}
 ): Promise<PromptTemplate> {
-	const input: Record<string, any> = {};
+	const input: Record<string, unknown> = {};
 
 	if (updates.name !== undefined) {
 		input.name = updates.name;
 	}
 	if (updates.aiQueryData !== undefined) {
-		input.template = serializeAIQueryDataToTemplate(updates.aiQueryData);
+		input.templateText = serializeAIQueryDataToTemplate(updates.aiQueryData);
 	}
 	if (updates.description !== undefined) {
 		input.description = updates.description;
 	}
 
 	const response = await queryClient.query<{
-		updatePromptTemplate: PromptTemplate;
-	}>(M_UPDATE_PROMPT_TEMPLATE, {
-		key: { id, parentId },
+		updatePrompt: PromptTemplate;
+	}>(M_UPDATE_PROMPT, {
+		id,
 		input
 	});
 
-	if (!response?.updatePromptTemplate) {
-		throw new Error('Failed to update prompt template');
+	if (!response?.updatePrompt) {
+		throw new Error('Failed to update prompt');
 	}
 
-	return response.updatePromptTemplate;
+	return response.updatePrompt;
 }
 
 /**
- * Delete a prompt template
+ * Delete a prompt (parentId kept for API compatibility but not used)
  */
 export async function deletePromptTemplate(
 	queryClient: IGraphQLQueryClient,
 	id: string,
-	parentId: string
+	_parentId?: string
 ): Promise<PromptTemplate> {
 	const response = await queryClient.query<{
-		deletePromptTemplate: PromptTemplate;
-	}>(M_DELETE_PROMPT_TEMPLATE, {
-		key: { id, parentId }
+		deletePrompt: PromptTemplate;
+	}>(M_DELETE_PROMPT, {
+		id
 	});
 
-	if (!response?.deletePromptTemplate) {
-		throw new Error('Failed to delete prompt template');
+	if (!response?.deletePrompt) {
+		throw new Error('Failed to delete prompt');
 	}
 
-	return response.deletePromptTemplate;
+	return response.deletePrompt;
 }
 
 /**

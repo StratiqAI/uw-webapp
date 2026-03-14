@@ -1,6 +1,9 @@
 <script lang="ts">
-	import type { PromptTemplate } from '@stratiqai/types-simple';
+	import type { Prompt } from '@stratiqai/types-simple';
 	import { parseTemplateToAIQueryData, type AIQueryData } from '../libraryService';
+
+	/** Prompt type (API formerly PromptTemplate) */
+	type PromptTemplate = Prompt;
 
 	let {
 		darkMode = false,
@@ -59,7 +62,8 @@
 			templateName = template.name || '';
 			templateDescription = template.description || '';
 
-			const data = parseTemplateToAIQueryData(template.template);
+			const templateStr = 'templateText' in template ? template.templateText : (template as { template?: string }).template ?? '';
+			const data = parseTemplateToAIQueryData(templateStr);
 
 			aiQueryPrompt = data.prompt || '';
 			aiQueryModel = data.model || 'gemini-3-flash-preview';
