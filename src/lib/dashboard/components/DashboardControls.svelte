@@ -8,9 +8,11 @@
 
 	interface Props {
 		darkMode?: boolean;
+		/** Default widget layout to restore when user resets to default */
+		defaultWidgets?: Widget[];
 	}
 
-	let { darkMode = false }: Props = $props();
+	let { darkMode = false, defaultWidgets }: Props = $props();
 
 	let showExportDialog = $state(false);
 	let showImportDialog = $state(false);
@@ -37,9 +39,9 @@
 
 	function handleReset() {
 		if (
-			confirm('Are you sure you want to reset to the default layout? This will clear all widgets.')
+			confirm('Are you sure you want to reset to the default layout? This will replace the current layout with the default.')
 		) {
-			dashboard.resetToDefault();
+			dashboard.resetToDefault(defaultWidgets);
 		}
 	}
 

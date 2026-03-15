@@ -1,6 +1,6 @@
 import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from '$env/static/public';
 import { browser } from '$app/environment';
-import type { PromptTemplate } from '@stratiqai/types-simple';
+import type { Prompt } from '@stratiqai/types-simple';
 import {
 	Q_GET_PROMPT,
 	Q_LIST_PROMPTS,
@@ -18,7 +18,7 @@ import {
 import { GraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
 import { EntitySyncManager } from '$lib/realtime/store/EntitySyncManager';
 import type { EntitySyncOptions, EntitySyncResult } from '$lib/realtime/store/EntitySyncConfig';
-import { createPromptTemplateSyncConfig } from '$lib/realtime/store/EntitySyncHelpers';
+import { createPromptSyncConfig } from '$lib/realtime/store/EntitySyncHelpers';
 import { toTopicPath } from '$lib/realtime/store/TopicMapper';
 
 // Re-export the specific store used by this manager
@@ -33,9 +33,9 @@ if (browser && typeof window !== 'undefined') {
 }
 
 /**
- * Configuration for synchronizing PromptTemplate entities.
+ * Configuration for synchronizing Prompt entities.
  */
-const promptTemplateSyncConfig = createPromptTemplateSyncConfig(
+const promptSyncConfig = createPromptSyncConfig(
 	Q_LIST_PROMPTS,
 	Q_GET_PROMPT,
 	S_ON_UPDATE_PROMPT,
@@ -43,24 +43,24 @@ const promptTemplateSyncConfig = createPromptTemplateSyncConfig(
 	S_ON_CREATE_PROMPT
 );
 
-export type PromptTemplateManagerOptions = {
+export type PromptSyncManagerOptions = {
 	/** The user's authentication token required for GraphQL requests. */
 	idToken?: string;
-	/** Optional list of prompt templates to seed the store with immediately. */
-	initialItems?: PromptTemplate[];
+	/** Optional list of prompts to seed the store with immediately. */
+	initialItems?: Prompt[];
 	/** Whether to automatically setup GraphQL subscriptions for the initialItems. Defaults to false. */
 	setupSubscriptions?: boolean;
-	/** Whether to clear existing PromptTemplate data from the store on initialization. Defaults to false. */
+	/** Whether to clear existing Prompt data from the store on initialization. Defaults to false. */
 	clearExisting?: boolean;
 };
 
 type ManagerStatus = 'inactive' | 'initializing' | 'ready' | 'error';
 
-export class PromptTemplateSyncManager {
+export class PromptSyncManager {
 	// --- Internal Clients ---
 	private queryClient: GraphQLQueryClient | null = null;
 	private subscriptionClient: AppSyncWsClient | null = null;
-	private entitySyncManager: EntitySyncManager<PromptTemplate> | null = null;
+	private entitySyncManager: EntitySyncManager<Prompt> | null = null;
 	private ownsWsClient = false;
 
 	// --- Operational State ---
@@ -75,16 +75,16 @@ export class PromptTemplateSyncManager {
 	 * Creates an instance of the manager without initializing it.
 	 * Call `initialize()` later to set it up.
 	 */
-	static createInactive(): PromptTemplateSyncManager {
-		return new PromptTemplateSyncManager();
+	static createInactive(): PromptSyncManager {
+		return new PromptSyncManager();
 	}
 
 	/**
 	 * Creates and initializes an instance of the manager.
 	 * @param options Configuration options for initialization.
 	 */
-	static async create(options: PromptTemplateManagerOptions): Promise<PromptTemplateSyncManager> {
-		const manager = new PromptTemplateSyncManager();
+	static async create(options: PromptSyncManagerOptions): Promise<PromptSyncManager> {
+		const manager = new PromptSyncManager();
 		await manager.initialize(options);
 		return manager;
 	}
@@ -99,7 +99,7 @@ export class PromptTemplateSyncManager {
 		initialItems = [],
 		setupSubscriptions = false,
 		clearExisting = false
-	}: PromptTemplateManagerOptions): Promise<void> {
+	}: PromptSyncManagerOptions): Promise<void> {
 		// Prevent concurrent initializations
 		if (this.initializationPromise) {
 			return this.initializationPromise;
@@ -113,7 +113,7 @@ export class PromptTemplateSyncManager {
 
 		this.initializationPromise = this.#runWithStatus(async () => {
 			if (!idToken) {
-				throw new Error('PromptTemplateSyncManager requires an idToken to initialize.');
+				throw new Error('PromptSyncManager requires an idToken to initialize.');
 			}
 
 			const queryClient = new GraphQLQueryClient(idToken);
@@ -131,11 +131,11 @@ export class PromptTemplateSyncManager {
 			// Ensure the socket is ready before proceeding
 			await subscriptionClient.ready();
 
-			const entitySyncManager = new EntitySyncManager<PromptTemplate>({
+			const entitySyncManager = new EntitySyncManager<Prompt>({
 				queryClient,
 				subscriptionClient,
 				store,
-				config: promptTemplateSyncConfig
+				config: promptSyncConfig
 			});
 
 			// Assign references only after successful creation
@@ -145,15 +145,15 @@ export class PromptTemplateSyncManager {
 			this.ownsWsClient = ownsWsClient;
 
 			if (clearExisting) {
-				store.clearAllAt(promptTemplateSyncConfig.entityType);
+				store.clearAllAt(promptSyncConfig.entityType);
 			}
 
 			// Seed initial data into the store
 			if (initialItems.length > 0) {
 				for (const item of initialItems) {
-					const id = promptTemplateSyncConfig.getEntityId(item);
+					const id = promptSyncConfig.getEntityId(item);
 					if (id) {
-						store.publish(toTopicPath(promptTemplateSyncConfig.entityType, id), item);
+						store.publish(toTopicPath(promptSyncConfig.entityType, id), item);
 					}
 				}
 
@@ -166,7 +166,7 @@ export class PromptTemplateSyncManager {
 			}
 
 			this._status = 'ready';
-		}, 'Failed to initialize prompt template sync').finally(() => {
+		}, 'Failed to initialize prompt sync').finally(() => {
 			this.initializationPromise = null;
 			if (this._error) {
 				this._status = 'error';
@@ -177,26 +177,26 @@ export class PromptTemplateSyncManager {
 	}
 
 	/**
-	 * Fetches a list of prompt templates from the API and syncs them to the store.
+	 * Fetches a list of prompts from the API and syncs them to the store.
 	 * @throws Error if the manager is not ready.
 	 */
-	async syncList(options?: EntitySyncOptions): Promise<EntitySyncResult<PromptTemplate>> {
+	async syncList(options?: EntitySyncOptions): Promise<EntitySyncResult<Prompt>> {
 		this.#ensureReady();
 		return this.#runWithStatus(
 			() => this.entitySyncManager!.syncList(options),
-			'Failed to sync prompt template list'
+			'Failed to sync prompt list'
 		);
 	}
 
 	/**
-	 * Fetches a single prompt template by ID from the API and syncs it to the store.
+	 * Fetches a single prompt by ID from the API and syncs it to the store.
 	 * @throws Error if the manager is not ready.
 	 */
-	async syncOne(id: string, options?: EntitySyncOptions): Promise<PromptTemplate | null> {
+	async syncOne(id: string, options?: EntitySyncOptions): Promise<Prompt | null> {
 		this.#ensureReady();
 		return this.#runWithStatus(
 			() => this.entitySyncManager!.syncOne(id, options),
-			`Failed to sync prompt template ${id}`
+			`Failed to sync prompt ${id}`
 		);
 	}
 
@@ -247,7 +247,7 @@ export class PromptTemplateSyncManager {
 
 	#ensureReady() {
 		if (this._status !== 'ready' || !this.entitySyncManager) {
-			throw new Error(`PromptTemplateSyncManager is not ready. Current status: ${this._status}`);
+			throw new Error(`PromptSyncManager is not ready. Current status: ${this._status}`);
 		}
 	}
 

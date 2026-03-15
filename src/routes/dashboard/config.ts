@@ -190,6 +190,17 @@ export const dashboardWidgets: Widget[] = [
 		data: {} as any // Data is published via ValidatedTopicStore
 	},
 	{
+		id: 'widget-linechart-1',
+		type: 'lineChart',
+		gridColumn: 7,
+		gridRow: 10,
+		colSpan: 6,
+		rowSpan: 3,
+		minWidth: 3,
+		minHeight: 2,
+		data: {} as any // Data is published via ValidatedTopicStore
+	},
+	{
 		id: 'widget-barchart-1',
 		type: 'barChart',
 		gridColumn: 1,

@@ -38,9 +38,9 @@ export const DEFAULT_WIDGET_DATA: Record<WidgetType, Record<string, unknown>> = 
 		objectFit: 'cover'
 	},
 	lineChart: {
-		labels: ['A', 'B', 'C'],
+		labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
 		datasets: [
-			{ label: 'Series 1', data: [10, 20, 15], color: '#3b82f6' }
+			{ label: 'Series 1', data: [28, 35, 42, 38, 45, 52], color: '#3b82f6' }
 		],
 		options: { responsive: true, maintainAspectRatio: false }
 	},

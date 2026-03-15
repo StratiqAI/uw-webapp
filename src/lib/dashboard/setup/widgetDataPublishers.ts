@@ -155,6 +155,14 @@ const widgetInitialData: Record<string, unknown> = {
 		change: 12.5,
 		changeType: 'increase'
 	},
+	'widget-linechart-1': {
+		labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+		datasets: [
+			{ label: 'Revenue', data: [28, 35, 42, 38, 45, 52], color: '#3b82f6' },
+			{ label: 'Costs', data: [22, 28, 32, 30, 34, 40], color: '#ef4444' }
+		],
+		options: { responsive: true, maintainAspectRatio: false }
+	},
 	'widget-barchart-1': {
 		labels: ['Manufacturing', 'Business Services', 'Government', 'Hospitality', 'Financial', 'Utilities'],
 		datasets: [

@@ -50,6 +50,7 @@ interface DashboardEvents {
 	'widget:updated': { id: string; updates: WidgetUpdate };
 	'dashboard:saved': void;
 	'dashboard:loaded': void;
+	'dashboard:reset': void;
 	'grid:expanded': { rows: number; columns: number };
 }
 
@@ -384,19 +385,29 @@ class DashboardStore {
 	}
 	
 	// Data management
-	resetToDefault(): void {
+	resetToDefault(defaultWidgets?: Widget[]): void {
 		console.log('🔄 Resetting to default layout...');
-		
+
 		this.#widgets = [];
 		this.#widgetZIndexMap.clear();
 		this.#nextZIndex = 1;
 		this.#config = structuredClone(DEFAULT_CONFIG);
 		this.#hasUnsavedChanges = false;
-		
+
 		validatedTopicStore.clearAllAt('widgets');
 		this.clearSavedDashboard();
-		
-		console.log('✅ Reset complete');
+
+		if (defaultWidgets && defaultWidgets.length > 0) {
+			defaultWidgets.forEach((widget) => {
+				this.addWidget(structuredClone(widget));
+			});
+			this.ensureGridCapacity();
+			this.#hasUnsavedChanges = false;
+			this.#emit('dashboard:reset', undefined);
+			console.log(`✅ Reset complete: loaded default layout (${defaultWidgets.length} widgets)`);
+		} else {
+			console.log('✅ Reset complete (no default widgets)');
+		}
 	}
 	
 	clearSavedDashboard(): boolean {

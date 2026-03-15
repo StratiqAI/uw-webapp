@@ -1,9 +1,41 @@
 <script lang="ts">
 	import type { Prompt } from '@stratiqai/types-simple';
-	import { parseTemplateToAIQueryData, type AIQueryData } from '../libraryService';
+	import type { AiModel } from '@stratiqai/types-simple';
+	import { getTemplateStrForEditor, parseTemplateToAIQueryData, type AIQueryData } from '../libraryService';
 
-	/** Prompt type (API formerly PromptTemplate) */
-	type PromptTemplate = Prompt;
+	/** All valid AIModel enum values (schema) — used so 3.1 and all models pass VALID_AI_MODELS.has() */
+	const AIMODEL_VALUES: readonly string[] = [
+		'GEMINI_3_1_PRO_PREVIEW',
+		'GEMINI_3_1_FLASH_PREVIEW',
+		'GEMINI_3_PRO_PREVIEW',
+		'GEMINI_3_FLASH_PREVIEW',
+		'GEMINI_2_5_PRO',
+		'GEMINI_2_5_FLASH',
+		'GEMINI_2_5_FLASH_LITE'
+	];
+
+	const VALID_AI_MODELS = new Set<string>(AIMODEL_VALUES);
+
+	/** AI models from GraphQL schema (AIModel enum) — value is sent to API, label is shown in UI */
+	const AI_MODEL_OPTIONS: { value: AiModel; label: string }[] = [
+		{ value: 'GEMINI_3_1_PRO_PREVIEW' as AiModel, label: 'Gemini 3.1 Pro Preview' },
+		{ value: 'GEMINI_3_1_FLASH_PREVIEW' as AiModel, label: 'Gemini 3.1 Flash Preview' },
+		{ value: 'GEMINI_3_PRO_PREVIEW', label: 'Gemini 3 Pro Preview' },
+		{ value: 'GEMINI_3_FLASH_PREVIEW', label: 'Gemini 3 Flash Preview' },
+		{ value: 'GEMINI_2_5_PRO', label: 'Gemini 2.5 Pro' },
+		{ value: 'GEMINI_2_5_FLASH', label: 'Gemini 2.5 Flash' },
+		{ value: 'GEMINI_2_5_FLASH_LITE', label: 'Gemini 2.5 Flash Lite' }
+	];
+
+	function normalizeToAIModel(value: string | undefined): AiModel {
+		if (value && VALID_AI_MODELS.has(value)) return value as AiModel;
+		// Legacy editor values
+		if (value === 'gemini-3.1-pro-preview') return 'GEMINI_3_1_PRO_PREVIEW' as AiModel;
+		if (value === 'gemini-3.1-flash-preview') return 'GEMINI_3_1_FLASH_PREVIEW' as AiModel;
+		if (value === 'gemini-3-flash-preview') return 'GEMINI_3_FLASH_PREVIEW';
+		if (value === 'gemini-3-pro-preview') return 'GEMINI_3_PRO_PREVIEW';
+		return 'GEMINI_2_5_FLASH';
+	}
 
 	let {
 		darkMode = false,
@@ -13,18 +45,20 @@
 		onCancel
 	}: {
 		darkMode?: boolean;
-		template?: PromptTemplate | null;
+		template?: Prompt | null;
 		isCreating?: boolean;
-		onSave?: (data: { name: string; description: string; aiQueryData: AIQueryData }) => void;
+		onSave?: (data: { name: string; description: string; aiQueryData: AIQueryData }) => void | Promise<void>;
 		onCancel?: () => void;
 	} = $props();
+
+	let saving = $state(false);
 
 	// Template metadata fields
 	let templateName = $state('');
 	let templateDescription = $state('');
 
 	// Basic AI query fields
-	let aiQueryModel = $state('gemini-3-flash-preview');
+	let aiQueryModel = $state<AiModel>('GEMINI_2_5_FLASH');
 	let aiQuerySystemPrompt = $state('');
 	let aiQueryPrompt = $state('');
 
@@ -37,14 +71,13 @@
 	let stopSequences = $state<string>('');
 
 	// Advanced fields - Response Format
-	let responseFormatType = $state<'text' | 'json_object' | 'json_schema'>('text');
+	let responseFormatType = $state<'text' | 'json_object' | 'json_schema'>('json_schema');
 	let jsonSchemaText = $state('');
 
 	// Schema Builder State
 	let schemaProperties = $state<Record<string, any>>({});
 	let schemaRequired = $state<string[]>([]);
 	let fieldOrder = $state<string[]>([]);
-	let useSchemaBuilder = $state(false);
 
 	// Advanced fields - Options
 	let stream = $state(false);
@@ -56,17 +89,45 @@
 	// UI state
 	let showAdvanced = $state(false);
 
+	// Extract input variables from prompt text: {{name}} and {name} (single-brace for e.g. {input})
+	function extractPromptVariables(text: string): { name: string; syntax: string }[] {
+		if (!text?.trim()) return [];
+		const seen = new Set<string>();
+		const result: { name: string; syntax: string }[] = [];
+		// Match {{variable}} first, then {variable} (avoid double-counting {{x}} as {x})
+		const doubleRegex = /\{\{([^}]+)\}\}/g;
+		const singleRegex = /\{([^{}]+)\}/g;
+		let m: RegExpExecArray | null;
+		while ((m = doubleRegex.exec(text)) !== null) {
+			const name = m[1].trim();
+			if (name && !seen.has(name)) {
+				seen.add(name);
+				result.push({ name, syntax: `{{${name}}}` });
+			}
+		}
+		while ((m = singleRegex.exec(text)) !== null) {
+			const name = m[1].trim();
+			if (name && !seen.has(name)) {
+				seen.add(name);
+				result.push({ name, syntax: `{${name}}` });
+			}
+		}
+		return result;
+	}
+
+	let promptInputVariables = $derived(extractPromptVariables(aiQueryPrompt));
+
 	// Initialize form from template or defaults
 	$effect(() => {
 		if (template) {
 			templateName = template.name || '';
 			templateDescription = template.description || '';
 
-			const templateStr = 'templateText' in template ? template.templateText : (template as { template?: string }).template ?? '';
+			const templateStr = getTemplateStrForEditor(template);
 			const data = parseTemplateToAIQueryData(templateStr);
 
 			aiQueryPrompt = data.prompt || '';
-			aiQueryModel = data.model || 'gemini-3-flash-preview';
+			aiQueryModel = normalizeToAIModel((template as { model?: string }).model ?? data.model);
 			aiQuerySystemPrompt = data.systemPrompt || '';
 
 			temperature = data.temperature;
@@ -87,15 +148,14 @@
 						schemaProperties = { ...schema.properties };
 						schemaRequired = schema.required ? [...schema.required] : [];
 						fieldOrder = Object.keys(schema.properties);
-						useSchemaBuilder = true;
 					}
 				}
 			} else {
-				responseFormatType = 'text';
+				// Default to Structured form when no format is saved (e.g. legacy prompts or create)
+				responseFormatType = 'json_schema';
 				schemaProperties = {};
 				schemaRequired = [];
 				fieldOrder = [];
-				useSchemaBuilder = false;
 			}
 
 			stream = data.stream ?? false;
@@ -122,7 +182,7 @@
 			templateName = '';
 			templateDescription = '';
 			aiQueryPrompt = 'Analyze the following data and provide insights: {input}';
-			aiQueryModel = 'gemini-3-flash-preview';
+			aiQueryModel = 'GEMINI_2_5_FLASH';
 			aiQuerySystemPrompt = 'You are a helpful AI assistant.';
 			temperature = undefined;
 			maxTokens = undefined;
@@ -130,12 +190,11 @@
 			frequencyPenalty = undefined;
 			presencePenalty = undefined;
 			stopSequences = '';
-			responseFormatType = 'text';
+			responseFormatType = 'json_schema';
 			jsonSchemaText = '';
 			schemaProperties = {};
 			schemaRequired = [];
 			fieldOrder = [];
-			useSchemaBuilder = false;
 			stream = false;
 			user = '';
 			seed = undefined;
@@ -268,14 +327,21 @@
 		schemaProperties = { ...schemaProperties };
 	}
 
-	function handleSave() {
+	async function handleSave() {
 		if (!templateName.trim()) {
 			alert('Please enter a template name');
 			return;
 		}
+		if (!onSave) {
+			alert('Save handler is not available. Please refresh the page.');
+			return;
+		}
+		if (saving) return;
 
+		// Ensure model is sent as a string (GraphQL enum value); avoids issues with 3.1 or other enum values
+		const modelValue = typeof aiQueryModel === 'string' ? aiQueryModel : String(aiQueryModel);
 		const aiQueryData: AIQueryData = {
-			model: aiQueryModel,
+			model: modelValue,
 			prompt: aiQueryPrompt
 		};
 
@@ -294,7 +360,7 @@
 			if (responseFormatType === 'json_object') {
 				aiQueryData.responseFormat = { type: 'json_object' };
 			} else if (responseFormatType === 'json_schema') {
-				if (useSchemaBuilder && Object.keys(schemaProperties).length > 0) {
+				if (Object.keys(schemaProperties).length > 0) {
 					aiQueryData.responseFormat = { type: 'json_schema', schema: schemaPreview };
 				} else if (jsonSchemaText.trim()) {
 					try {
@@ -325,11 +391,23 @@
 			}
 		}
 
-		onSave?.({
-			name: templateName.trim(),
-			description: templateDescription.trim(),
-			aiQueryData
-		});
+		saving = true;
+		try {
+			await onSave({
+				name: templateName.trim(),
+				description: templateDescription.trim(),
+				aiQueryData
+			});
+		} catch (err) {
+			console.error('Save failed:', err);
+			const message = err instanceof Error ? err.message : 'Failed to save';
+			const hint = message.includes('enum') || message.includes('AIModel')
+				? ' The selected AI model may not be in the deployed API schema yet—try redeploying or pick another model.'
+				: '';
+			alert(message + hint);
+		} finally {
+			saving = false;
+		}
 	}
 
 	function handleCancel() {
@@ -367,9 +445,9 @@
 					</div>
 					<div>
 						<h2 id="modal-title" class="text-xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">
-							{isCreating ? 'Create New Query' : 'Edit Query'}
+							{isCreating ? 'Create new prompt' : 'Edit prompt'}
 						</h2>
-						<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-0.5">Configure your AI analysis query</p>
+						<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-0.5">Describe what you want the AI to do and how you want the answer</p>
 					</div>
 				</div>
 
@@ -377,13 +455,13 @@
 					<!-- Template Name -->
 					<div>
 						<label for="template-name" class="block text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'} mb-2">
-							Query Name <span class="text-red-500">*</span>
+						Name <span class="text-red-500">*</span>
 						</label>
 						<input
 							id="template-name"
 							type="text"
 							bind:value={templateName}
-							placeholder="e.g., Property Analysis, Market Research"
+							placeholder="e.g. Property summary, Market overview"
 							class="w-full px-3 py-2.5 {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
 						/>
 					</div>
@@ -391,13 +469,13 @@
 					<!-- Template Description -->
 					<div>
 						<label for="template-description" class="block text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'} mb-2">
-							Description <span class="{darkMode ? 'text-slate-500' : 'text-slate-400'} font-normal">(Optional)</span>
+							Description
 						</label>
 						<input
 							id="template-description"
 							type="text"
 							bind:value={templateDescription}
-							placeholder="Brief description of what this query does"
+							placeholder="Short description of what this prompt does"
 							class="w-full px-3 py-2.5 {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
 						/>
 					</div>
@@ -407,98 +485,120 @@
 					<!-- AI Model -->
 					<div>
 						<label for="ai-model-select" class="block text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'} mb-2">
-							AI Model
+							Which AI should answer?
 						</label>
 						<select
 							id="ai-model-select"
 							bind:value={aiQueryModel}
 							class="w-full px-3 py-2.5 {darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
 						>
-							<option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
-							<option value="gemini-3-pro-preview">Gemini 3 Pro Preview</option>
+							{#each AI_MODEL_OPTIONS as opt}
+								<option value={opt.value}>{opt.label}</option>
+							{/each}
 						</select>
 					</div>
 
 					<!-- System Prompt -->
 					<div>
 						<label for="ai-system-prompt" class="block text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'} mb-2">
-							Context Instructions <span class="{darkMode ? 'text-slate-500' : 'text-slate-400'} font-normal">(Optional)</span>
+							How should the AI behave? <span class="{darkMode ? 'text-slate-500' : 'text-slate-400'} font-normal">(optional)</span>
 						</label>
 						<textarea
 							id="ai-system-prompt"
 							bind:value={aiQuerySystemPrompt}
-							placeholder="You are an expert commercial real estate analyst..."
+							placeholder="e.g. You are an expert analyst. Be concise and focus on key points."
 							class="w-full px-3 py-2.5 {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none text-sm"
 							rows="3"
 						></textarea>
-						<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1.5">Provide context about the AI's role and expertise</p>
+						<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1.5">Describe the AI’s role or style so answers match what you need</p>
 					</div>
 
 					<!-- User Prompt -->
 					<div>
 						<label for="ai-user-prompt" class="block text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'} mb-2">
-							Analysis Prompt
+							What to ask
 						</label>
+
+						<!-- Input variables: show what placeholders this prompt expects -->
+						{#if promptInputVariables.length > 0}
+							<div
+								class="mb-3 rounded-lg border p-3 {darkMode ? 'border-amber-500/40 bg-amber-950/20' : 'border-amber-300 bg-amber-50/80'}"
+								role="region"
+								aria-label="Spots to fill in when you run this prompt"
+							>
+								<p class="text-xs font-medium uppercase tracking-wider mb-2 {darkMode ? 'text-amber-400/90' : 'text-amber-700'}">
+									Spots to fill in later
+									<span class="ml-1.5 font-normal normal-case {darkMode ? 'text-amber-500/70' : 'text-amber-600'}">({promptInputVariables.length})</span>
+								</p>
+								<div class="flex flex-wrap gap-2">
+									{#each promptInputVariables as { name, syntax }}
+										<div
+											class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium {darkMode ? 'bg-slate-700/80 text-amber-200 border border-slate-600' : 'bg-white text-amber-900 border border-amber-200 shadow-sm'}"
+											title="Used as {syntax} in your prompt"
+										>
+											<svg class="size-3.5 shrink-0 {darkMode ? 'text-amber-500' : 'text-amber-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+											</svg>
+											<span class="font-mono text-xs">{syntax}</span>
+										</div>
+									{/each}
+								</div>
+								<p class="text-xs mt-2 {darkMode ? 'text-slate-400' : 'text-slate-500'}">
+									These will be filled in when you run this. In your text below, use {'{{'}name{'}}'} or {'{'}name{'}'} for each one.
+								</p>
+							</div>
+						{/if}
+
 						<textarea
 							id="ai-user-prompt"
 							bind:value={aiQueryPrompt}
-							placeholder="Analyze the following property data: {'{input}'}"
+							placeholder="e.g. Summarize the key points from: {'{input}'}"
 							class="w-full px-3 py-2.5 {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none text-sm"
 							rows="5"
 						></textarea>
-						<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1.5">Use {'{input}'} to insert data from connected nodes</p>
+						<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1.5">Use {'{input}'} or {'{{'}name{'}}'} to plug in data when you run this</p>
 					</div>
 
 					<!-- Response Format -->
 					<div>
 						<h3 class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-wide mb-3">
-							Response Format
+							How should the AI answer?
 						</h3>
 						<div>
 							<label for="response-format" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-1.5">
-								Format Type
+								Answer format
 							</label>
 							<select
 								id="response-format"
 								bind:value={responseFormatType}
 								class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
 							>
-								<option value="text">Text (Default)</option>
-								<option value="json_object">JSON Object</option>
-								<option value="json_schema">JSON Schema</option>
+								<option value="json_schema">Structured form (define fields) — default</option>
+								<option value="text">Plain text</option>
+								<option value="json_object">Structured list</option>
 							</select>
 						</div>
 						{#if responseFormatType === 'json_schema'}
 							<div class="mt-3 space-y-3">
-								<div class="flex items-center gap-3">
-									<label class="flex items-center gap-2 cursor-pointer">
-										<input type="checkbox" bind:checked={useSchemaBuilder} class="cursor-pointer" />
-										<span class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-700'}">
-											Use Visual Schema Builder
-										</span>
-									</label>
-								</div>
-
-								{#if useSchemaBuilder}
 									<div class="rounded-md border {darkMode ? 'border-teal-600 bg-teal-900/30' : 'border-teal-300 bg-teal-50'} p-4">
 										<div class="mb-4">
 											<div class="mb-2 flex items-center justify-between">
-												<div class="block text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'}">Schema Properties:</div>
+												<div class="block text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'}">Fields to get back</div>
 												<div class="flex gap-2">
 													<button
 														type="button"
 														onclick={() => addSchemaField(true)}
 														class="rounded bg-amber-600 px-3 py-1 text-xs text-white hover:bg-amber-700"
-														title="Add reasoning field (best practice for AI)"
+														title="Add a field for the AI to explain its reasoning (recommended)"
 													>
-														+ Reasoning
+														+ Add reasoning
 													</button>
 													<button
 														type="button"
 														onclick={() => addSchemaField(false)}
 														class="rounded bg-teal-600 px-3 py-1 text-xs text-white hover:bg-teal-700"
 													>
-														+ Add Field
+														+ Add field
 													</button>
 												</div>
 											</div>
@@ -522,7 +622,7 @@
 																		if (e.key === 'Enter') e.currentTarget.blur();
 																	}}
 																	class="flex-1 rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-sm font-medium"
-																	placeholder="Field name"
+																	placeholder="e.g. summary, price_range"
 																/>
 															{/key}
 															<select
@@ -556,12 +656,13 @@
 														</div>
 														<div class="mb-2">
 															<div class="mb-1 block text-xs font-medium {darkMode ? 'text-slate-300' : 'text-gray-700'}">
-																Description <span class="text-red-500">*</span>
+																Extraction Description <span class="text-red-500">*</span>
 															</div>
 															<textarea
 																value={fieldSchema.description || ''}
 																oninput={(e) => updateSchemaField(fieldName, { description: e.currentTarget.value })}
-																placeholder="Clear instruction explaining what this field represents..."
+																placeholder="Describe this Property's purpose and expected values... 
+This will be used by the LLM to extract this property"
 																class="w-full rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-xs"
 																rows="2"
 															></textarea>
@@ -569,7 +670,7 @@
 														{#if fieldSchema.type === 'string'}
 															<div class="mb-2">
 																<div class="mb-1 block text-xs font-medium {darkMode ? 'text-slate-300' : 'text-gray-700'}">
-																	Enum Values (comma-separated)
+																	Allowed values (comma-separated, optional)
 																</div>
 																<input
 																	type="text"
@@ -622,7 +723,7 @@
 												{/each}
 												{#if Object.keys(schemaProperties).length === 0}
 													<p class="text-sm {darkMode ? 'text-gray-400' : 'text-gray-500'}">
-														No properties yet. Click "+ Reasoning" or "+ Add Field" to get started.
+														No fields yet. Click “+ Add reasoning” or “+ Add field” above to define what the AI should return.
 													</p>
 												{/if}
 											</div>
@@ -632,20 +733,6 @@
 											<pre class="max-h-48 overflow-auto text-xs {darkMode ? 'text-slate-200' : 'text-slate-700'}">{JSON.stringify(schemaPreview, null, 2)}</pre>
 										</div>
 									</div>
-								{:else}
-									<div>
-										<label for="json-schema" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-1.5">
-											JSON Schema
-										</label>
-										<textarea
-											id="json-schema"
-											bind:value={jsonSchemaText}
-											placeholder="JSON schema object"
-											class="w-full px-3 py-2 font-mono text-xs {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
-											rows="6"
-										></textarea>
-									</div>
-								{/if}
 							</div>
 						{/if}
 					</div>
@@ -658,7 +745,7 @@
 						onclick={() => (showAdvanced = !showAdvanced)}
 						class="w-full flex items-center justify-between text-left py-2 {darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-700 hover:text-slate-900'} transition-colors"
 					>
-						<span class="text-sm font-semibold">Advanced Options</span>
+						<span class="text-sm font-semibold">More options</span>
 						<svg
 							class="w-5 h-5 transition-transform {showAdvanced ? 'rotate-180' : ''}"
 							fill="none"
@@ -673,12 +760,12 @@
 						<div class="mt-4 space-y-5">
 							<div>
 								<h3 class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-wide mb-3">
-									Model Parameters
+									Answer behavior
 								</h3>
 								<div class="grid grid-cols-2 gap-4">
 									<div>
 										<label for="temperature" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-1.5">
-											Temperature <span class="text-xs font-normal">(0-2)</span>
+											Creativity <span class="text-xs font-normal">(0–2, higher = more varied)</span>
 										</label>
 										<input
 											type="number"
@@ -706,7 +793,7 @@
 									</div>
 									<div>
 										<label for="top-p" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-1.5">
-											Top P <span class="text-xs font-normal">(0-1)</span>
+											Diversity <span class="text-xs font-normal">(0–1)</span>
 										</label>
 										<input
 											type="number"
@@ -737,13 +824,13 @@
 								</div>
 								<div class="mt-4">
 									<label for="stop-sequences" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-1.5">
-										Stop Sequences <span class="text-xs font-normal">(comma-separated)</span>
+										Stop at these phrases <span class="text-xs font-normal">(comma-separated)</span>
 									</label>
 									<input
 										type="text"
 										id="stop-sequences"
 										bind:value={stopSequences}
-										placeholder="Stop, END, [END]"
+										placeholder="e.g. END, [DONE]"
 										class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
 									/>
 								</div>
@@ -755,12 +842,15 @@
 				<!-- Footer -->
 				<div class="flex gap-3 mt-8 pt-6 {darkMode ? 'border-slate-700' : 'border-slate-200'} border-t">
 					<button
+						type="button"
 						onclick={handleSave}
-						class="flex-1 px-4 py-2.5 {darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-900 hover:bg-slate-800'} text-white rounded-md transition-colors font-semibold text-sm shadow-sm hover:shadow"
+						disabled={saving}
+						class="flex-1 px-4 py-2.5 {darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-900 hover:bg-slate-800'} text-white rounded-md transition-colors font-semibold text-sm shadow-sm hover:shadow disabled:opacity-60 disabled:cursor-not-allowed"
 					>
-						{isCreating ? 'Create Query' : 'Save Changes'}
+						{saving ? 'Saving…' : (isCreating ? 'Create prompt' : 'Save changes')}
 					</button>
 					<button
+						type="button"
 						onclick={handleCancel}
 						class="flex-1 px-4 py-2.5 {darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-200 border-slate-600' : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300'} rounded-md transition-colors font-semibold text-sm border"
 					>

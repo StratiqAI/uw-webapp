@@ -66,11 +66,12 @@
 
 	onMount(() => {
 		console.log('🚀 Dashboard onMount started');
-		
+		let unsubReset: (() => void) | undefined;
+
 		// Set loading to false immediately - widgets will render with their default/empty state
 		// and then update reactively when data is published
 		isLoading = false;
-		
+
 		// Handle responsive grid adjustment
 		function updateGridSize() {
 			try {
@@ -158,6 +159,15 @@
 			updateGridSize();
 			window.addEventListener('resize', updateGridSize);
 
+			// When user resets to default, publish widget data for the new default layout
+			unsubReset = dashboard.on('dashboard:reset', () => {
+				try {
+					publishWidgetData(dashboard.widgets);
+				} catch (e) {
+					console.error('Error publishing widget data after reset:', e);
+				}
+			});
+
 			// Save dashboard before page unload if there are unsaved changes
 			window.addEventListener('beforeunload', (e) => {
 				try {
@@ -175,6 +185,7 @@
 		}
 
 		return () => {
+			unsubReset?.();
 			window.removeEventListener('resize', updateGridSize);
 			// Save any pending changes
 			try {
@@ -240,7 +251,7 @@
 			</div>
 		</div>
 
-		<DashboardControls {darkMode} />
+		<DashboardControls {darkMode} defaultWidgets={dashboardWidgets} />
 
 
 	<!-- AI Job → Paragraph Widget Example -->

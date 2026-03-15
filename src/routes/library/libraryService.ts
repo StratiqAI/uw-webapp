@@ -1,15 +1,12 @@
 /**
  * Library Service Module
  *
- * Provides utilities for managing Prompt entities (formerly PromptTemplate) in the library,
+ * Provides utilities for managing Prompt entities in the library,
  * including CRUD operations and data transformation between AIQueryData and
- * the Prompt.templateText field (JSON string).
+ * Prompt.content (body, systemInstruction).
  */
 
 import type { Prompt, Project } from '@stratiqai/types-simple';
-
-/** Prompt type alias (API formerly PromptTemplate) */
-type PromptTemplate = Prompt;
 import {
 	M_CREATE_PROMPT,
 	M_UPDATE_PROMPT,
@@ -45,6 +42,17 @@ export interface AIQueryData {
 }
 
 /**
+ * Get a string from a Prompt suitable for the editor (parseable by parseTemplateToAIQueryData).
+ * Uses content.body and content.systemInstruction; compatible with legacy JSON template shape.
+ */
+export function getTemplateStrForEditor(prompt: Prompt): string {
+	const body = prompt.content?.body ?? '';
+	const systemInstruction = prompt.content?.systemInstruction ?? '';
+	const model = (prompt as { model?: string }).model ?? 'GEMINI_2_5_FLASH';
+	return serializeAIQueryDataToTemplate({ prompt: body, systemPrompt: systemInstruction, model });
+}
+
+/**
  * Parse the template JSON string to AIQueryData
  */
 export function parseTemplateToAIQueryData(template: string): AIQueryData {
@@ -52,7 +60,7 @@ export function parseTemplateToAIQueryData(template: string): AIQueryData {
 		const parsed = JSON.parse(template);
 		return {
 			prompt: parsed.prompt || '',
-			model: parsed.model || 'gpt-4o',
+			model: parsed.model || 'GEMINI_2_5_FLASH',
 			systemPrompt: parsed.systemPrompt,
 			temperature: parsed.temperature,
 			maxTokens: parsed.maxTokens,
@@ -71,7 +79,7 @@ export function parseTemplateToAIQueryData(template: string): AIQueryData {
 		// Return default if parsing fails
 		return {
 			prompt: template || '',
-			model: 'gpt-4o'
+			model: 'GEMINI_2_5_FLASH'
 		};
 	}
 }
@@ -109,12 +117,12 @@ export function serializeAIQueryDataToTemplate(data: AIQueryData): string {
 export async function fetchProjectWithPromptTemplates(
 	queryClient: IGraphQLQueryClient,
 	projectId: string
-): Promise<{ project: Project; promptTemplates: PromptTemplate[] }> {
+): Promise<{ project: Project; promptTemplates: Prompt[] }> {
 	const [projectResponse, promptsResponse] = await Promise.all([
 		queryClient.query<{ getProject: Project | null }>(Q_GET_PROJECT_WITH_PROMPTS, {
 			id: projectId
 		}),
-		queryClient.query<{ listPrompts: { items: PromptTemplate[] } }>(Q_LIST_PROMPTS, {
+		queryClient.query<{ listPrompts: { items: Prompt[] } }>(Q_LIST_PROMPTS, {
 			scope: 'OWNED_BY_ME',
 			limit: 200
 		})
@@ -150,7 +158,7 @@ async function getDefaultOutputSchemaId(
 }
 
 /**
- * Create a new prompt (formerly prompt template)
+ * Create a new prompt
  */
 export async function createPromptTemplate(
 	queryClient: IGraphQLQueryClient,
@@ -158,18 +166,24 @@ export async function createPromptTemplate(
 	name: string,
 	aiQueryData: AIQueryData,
 	description?: string
-): Promise<PromptTemplate> {
-	const templateText = serializeAIQueryDataToTemplate(aiQueryData);
+): Promise<Prompt> {
+	const variableNames = extractPromptVariableNames(aiQueryData.prompt);
+	const content = {
+		body: aiQueryData.prompt,
+		systemInstruction: aiQueryData.systemPrompt ?? undefined,
+		...(variableNames.length > 0 && { inputVariables: variableNames })
+	};
 	const outputSchemaId = await getDefaultOutputSchemaId(queryClient);
 
 	const response = await queryClient.query<{
-		createPrompt: PromptTemplate;
+		createPrompt: Prompt;
 	}>(M_CREATE_PROMPT, {
 		input: {
 			name,
 			description: description || undefined,
-			templateText,
-			outputSchemaId,
+			content,
+			model: aiQueryData.model || 'GEMINI_2_5_FLASH',
+			...(outputSchemaId && { outputSchemaId }),
 			sharingMode: 'PRIVATE'
 		}
 	});
@@ -179,6 +193,34 @@ export async function createPromptTemplate(
 	}
 
 	return response.createPrompt;
+}
+
+/**
+ * Extract unique variable names from prompt text in order of first occurrence.
+ * Supports {{name}} and {name} (single-brace) placeholders.
+ */
+export function extractPromptVariableNames(text: string): string[] {
+	if (!text?.trim()) return [];
+	const seen = new Set<string>();
+	const result: string[] = [];
+	const doubleRegex = /\{\{([^}]+)\}\}/g;
+	const singleRegex = /\{([^{}]+)\}/g;
+	let m: RegExpExecArray | null;
+	while ((m = doubleRegex.exec(text)) !== null) {
+		const name = m[1].trim();
+		if (name && !seen.has(name)) {
+			seen.add(name);
+			result.push(name);
+		}
+	}
+	while ((m = singleRegex.exec(text)) !== null) {
+		const name = m[1].trim();
+		if (name && !seen.has(name)) {
+			seen.add(name);
+			result.push(name);
+		}
+	}
+	return result;
 }
 
 /**
@@ -193,21 +235,30 @@ export async function updatePromptTemplate(
 		aiQueryData?: AIQueryData;
 		description?: string;
 	}
-): Promise<PromptTemplate> {
+): Promise<Prompt> {
 	const input: Record<string, unknown> = {};
 
 	if (updates.name !== undefined) {
 		input.name = updates.name;
 	}
 	if (updates.aiQueryData !== undefined) {
-		input.templateText = serializeAIQueryDataToTemplate(updates.aiQueryData);
+		const variableNames = extractPromptVariableNames(updates.aiQueryData.prompt);
+		input.content = {
+			body: updates.aiQueryData.prompt,
+			systemInstruction: updates.aiQueryData.systemPrompt ?? undefined,
+			...(variableNames.length > 0 && { inputVariables: variableNames })
+		};
 	}
 	if (updates.description !== undefined) {
 		input.description = updates.description;
 	}
+	if (updates.aiQueryData?.model !== undefined) {
+		// Send as string so GraphQL receives the enum value (e.g. GEMINI_3_1_PRO_PREVIEW)
+		input.model = typeof updates.aiQueryData.model === 'string' ? updates.aiQueryData.model : String(updates.aiQueryData.model);
+	}
 
 	const response = await queryClient.query<{
-		updatePrompt: PromptTemplate;
+		updatePrompt: Prompt;
 	}>(M_UPDATE_PROMPT, {
 		id,
 		input
@@ -227,9 +278,9 @@ export async function deletePromptTemplate(
 	queryClient: IGraphQLQueryClient,
 	id: string,
 	_parentId?: string
-): Promise<PromptTemplate> {
+): Promise<Prompt> {
 	const response = await queryClient.query<{
-		deletePrompt: PromptTemplate;
+		deletePrompt: Prompt;
 	}>(M_DELETE_PROMPT, {
 		id
 	});

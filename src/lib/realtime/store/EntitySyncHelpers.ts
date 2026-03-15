@@ -35,9 +35,9 @@ export function createProjectSyncConfig(
 }
 
 /**
- * Create a standard entity sync configuration for PromptTemplates
+ * Create a standard entity sync configuration for Prompts
  */
-export function createPromptTemplateSyncConfig(
+export function createPromptSyncConfig(
 	listQuery: string | any,
 	getQuery: string | any,
 	updateSubscription: string | any,
@@ -45,7 +45,7 @@ export function createPromptTemplateSyncConfig(
 	createSubscription?: string | any
 ): EntitySyncConfig {
 	return {
-		entityType: 'promptTemplates',
+		entityType: 'prompts',
 		listQuery,
 		getQuery,
 		createSubscription,
@@ -56,7 +56,7 @@ export function createPromptTemplateSyncConfig(
 		createSubscriptionPath: 'onCreatePrompt',
 		updateSubscriptionPath: 'onUpdatePrompt',
 		deleteSubscriptionPath: 'onDeletePrompt',
-		getEntityId: (promptTemplate: any) => promptTemplate.id
+		getEntityId: (prompt: any) => prompt.id
 	};
 }
 

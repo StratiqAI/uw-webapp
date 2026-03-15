@@ -22,9 +22,13 @@
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Import Application Defined Components
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+	import type { Prompt } from '@stratiqai/types-simple';
 	import ProjectEntitiesDisplay from '$lib/components/ProjectEntities/ProjectEntitiesDisplay.svelte';
 	import PDFViewer from '$lib/components/PDFViewer/PDFViewer.svelte';
-	import CREStructuredOutputSidebar, { type CREStructuredTemplate } from '../../../../workflow/components/layout/CREStructuredOutputSidebar.svelte';
+	import DocumentAnalysisPromptsSidebar from './components/DocumentAnalysisPromptsSidebar.svelte';
+	import PromptEditModal from '../../../../library/components/PromptEditModal.svelte';
+	import { updatePromptTemplate, createPromptTemplate, type AIQueryData } from '../../../../library/libraryService';
+	import { GraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
 	import { Q_DOCUMENT_VISION_QUERY } from '$lib/realtime/graphql/queries/DocumentVisionQuery';
 
@@ -60,7 +64,13 @@
 	let visionQueryResult = $state<VisionQueryResult | null>(null);
 	let visionQueryLoading = $state(false);
 	let visionQueryError = $state<string | null>(null);
-	let lastSelectedTemplate = $state<CREStructuredTemplate | null>(null);
+	let lastSelectedPrompt = $state<Prompt | null>(null);
+
+	// Prompt edit modal: edit existing (click in sidebar) or create new
+	let editingPrompt = $state<Prompt | null>(null);
+	let isCreatingPrompt = $state(false);
+	let promptSaveLoading = $state(false);
+	let promptsRefreshTrigger = $state(0);
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Component Variables that are Derived from the Stores
@@ -175,20 +185,32 @@
 		};
 	});
 
-	// Run vision query when user selects a CRE template (document IDs from project doclinks)
-	async function handleSelectTemplate(template: CREStructuredTemplate) {
+	// When user clicks a prompt in the sidebar: open the same edit dialog as the library
+	function handleSelectPrompt(prompt: Prompt) {
+		editingPrompt = prompt;
+		isCreatingPrompt = false;
+	}
+
+	function handleCreatePrompt() {
+		editingPrompt = null;
+		isCreatingPrompt = true;
+	}
+
+	// Run vision query with a prompt (e.g. from a "Run on documents" action)
+	async function runVisionQueryWithPrompt(prompt: Prompt) {
 		const docIds = documents.map((d) => d.id);
 		if (!idToken || docIds.length === 0) return;
+		const question = prompt.content?.body?.trim() || prompt.name || 'Answer based on the document.';
 		visionQueryLoading = true;
 		visionQueryError = null;
-		lastSelectedTemplate = template;
+		lastSelectedPrompt = prompt;
 		try {
 			const data = await gql<{ documentVisionQuery: VisionQueryResult }>(
 				Q_DOCUMENT_VISION_QUERY,
 				{
 					input: {
 						documentIds: docIds,
-						question: template.question,
+						question,
 						topK: 5
 					}
 				},
@@ -201,6 +223,58 @@
 		} finally {
 			visionQueryLoading = false;
 		}
+	}
+
+	async function handleSavePrompt(saveData: {
+		name: string;
+		description: string;
+		aiQueryData: AIQueryData;
+	}) {
+		if (!idToken) {
+			alert('Unable to save: session missing. Please refresh and try again.');
+			return;
+		}
+		promptSaveLoading = true;
+		try {
+			const queryClient = new GraphQLQueryClient(idToken);
+			if (isCreatingPrompt) {
+				if (!projectId) {
+					alert('Unable to create prompt: no project selected. Open a project first.');
+					return;
+				}
+				await createPromptTemplate(
+					queryClient,
+					projectId,
+					saveData.name,
+					saveData.aiQueryData,
+					saveData.description || undefined
+				);
+				isCreatingPrompt = false;
+				promptsRefreshTrigger += 1;
+			} else if (editingPrompt) {
+				await updatePromptTemplate(
+					queryClient,
+					editingPrompt.id,
+					(editingPrompt as { parentId?: string }).parentId,
+					{
+						name: saveData.name,
+						description: saveData.description,
+						aiQueryData: saveData.aiQueryData
+					}
+				);
+				editingPrompt = null;
+			}
+		} catch (err) {
+			console.error('Failed to save prompt:', err);
+			throw err;
+		} finally {
+			promptSaveLoading = false;
+		}
+	}
+
+	function handleCancelPrompt() {
+		editingPrompt = null;
+		isCreatingPrompt = false;
 	}
 </script>
 
@@ -252,14 +326,14 @@
 			<div class="mb-8 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg border shadow-sm">
 				<div class="flex items-center justify-between gap-4 p-4 border-b {darkMode ? 'border-slate-700' : 'border-slate-200'}">
 					<h3 class="text-lg font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">
-						Structured query result
-						{#if lastSelectedTemplate}
-							<span class="text-sm font-normal {darkMode ? 'text-slate-400' : 'text-slate-500'}"> — {lastSelectedTemplate.title}</span>
+						Query result
+						{#if lastSelectedPrompt}
+							<span class="text-sm font-normal {darkMode ? 'text-slate-400' : 'text-slate-500'}"> — {lastSelectedPrompt.name}</span>
 						{/if}
 					</h3>
 					<button
 						type="button"
-						onclick={() => { visionQueryResult = null; lastSelectedTemplate = null; }}
+						onclick={() => { visionQueryResult = null; lastSelectedPrompt = null; }}
 						class="rounded border px-2 py-1 text-sm {darkMode ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-700 hover:bg-slate-100'}"
 					>Clear</button>
 				</div>
@@ -391,10 +465,24 @@
 	</div>
 	</div>
 
-	<!-- CRE Structured Output sidebar (right) -->
-	<CREStructuredOutputSidebar
+	<!-- Prompts sidebar (right) - same prompts as library -->
+	<DocumentAnalysisPromptsSidebar
+		{idToken}
 		{darkMode}
-		onSelectTemplate={handleSelectTemplate}
 		isLoading={visionQueryLoading}
+		refreshTrigger={promptsRefreshTrigger}
+		onSelectPrompt={handleSelectPrompt}
+		onCreatePrompt={handleCreatePrompt}
 	/>
+
+	<!-- Same edit dialog as Prompt library: open when editing or creating a prompt -->
+	{#if editingPrompt || isCreatingPrompt}
+		<PromptEditModal
+			{darkMode}
+			template={editingPrompt}
+			isCreating={isCreatingPrompt}
+			onSave={handleSavePrompt}
+			onCancel={handleCancelPrompt}
+		/>
+	{/if}
 </div>

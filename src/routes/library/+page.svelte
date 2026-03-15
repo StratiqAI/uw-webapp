@@ -1,9 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import type { Prompt, Project } from '@stratiqai/types-simple';
-	/** Prompt type alias for library (API formerly used PromptTemplate) */
-	type PromptTemplate = Prompt;
-	import { PromptTemplateSyncManager } from '$lib/realtime/websocket/syncManagers/PromptTemplateSyncManager';
+	import { PromptSyncManager } from '$lib/realtime/websocket/syncManagers/PromptSyncManager';
 	import { ProjectSyncManager } from '$lib/realtime/websocket/syncManagers/ProjectSyncManager';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import { GraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
@@ -12,7 +10,7 @@
 
 	// Components
 	import ProjectSelector from './components/ProjectSelector.svelte';
-	import PromptTemplateEditModal from './components/PromptTemplateEditModal.svelte';
+	import PromptEditModal from './components/PromptEditModal.svelte';
 
 	// Services
 	import {
@@ -20,6 +18,7 @@
 		createPromptTemplate,
 		updatePromptTemplate,
 		deletePromptTemplate,
+		getTemplateStrForEditor,
 		parseTemplateToAIQueryData,
 		type AIQueryData
 	} from './libraryService';
@@ -32,13 +31,13 @@
 	let toggleDarkMode = darkModeStore.toggle;
 
 	// Sync managers
-	let promptTemplateSyncManager: PromptTemplateSyncManager | null = null;
+	let promptSyncManager: PromptSyncManager | null = null;
 	let projectSyncManager: ProjectSyncManager | null = null;
 	let queryClient: GraphQLQueryClient | null = null;
 
 	// UI State
 	let selectedProjectId = $state<string | null>(null);
-	let editingTemplate = $state<PromptTemplate | null>(null);
+	let editingTemplate = $state<Prompt | null>(null);
 	let isCreating = $state(false);
 	let searchFilter = $state('');
 	let isLoading = $state(false);
@@ -52,7 +51,7 @@
 
 	// Get all templates from store
 	let allTemplates = $derived.by(() => {
-		return validatedTopicStore.getAllAtArray<PromptTemplate>('promptTemplates');
+		return validatedTopicStore.getAllAtArray<Prompt>('prompts');
 	});
 
 	// Filter templates by selected project and search
@@ -101,8 +100,8 @@
 			});
 
 			// Initialize prompt template sync manager
-			promptTemplateSyncManager = PromptTemplateSyncManager.createInactive();
-			await promptTemplateSyncManager.initialize({
+			promptSyncManager = PromptSyncManager.createInactive();
+			await promptSyncManager.initialize({
 				idToken: data.idToken,
 				setupSubscriptions: true
 			});
@@ -138,7 +137,7 @@
 
 			// Publish each template to store
 			for (const template of promptTemplates) {
-				validatedTopicStore.publish(toTopicPath('promptTemplates', template.id), template);
+				validatedTopicStore.publish(toTopicPath('prompts', template.id), template);
 			}
 		} catch (err) {
 			console.error('Failed to load templates:', err);
@@ -167,7 +166,7 @@
 	}
 
 	// Handle edit template
-	function handleEditTemplate(template: PromptTemplate) {
+	function handleEditTemplate(template: Prompt) {
 		editingTemplate = template;
 		isCreating = false;
 	}
@@ -178,7 +177,10 @@
 		description: string;
 		aiQueryData: AIQueryData;
 	}) {
-		if (!queryClient) return;
+		if (!queryClient) {
+			alert('Unable to save: not connected. Please refresh the page and try again.');
+			return;
+		}
 
 		isLoading = true;
 		try {
@@ -193,7 +195,7 @@
 				);
 
 				// Publish to store
-				validatedTopicStore.publish(toTopicPath('promptTemplates', newTemplate.id), newTemplate);
+				validatedTopicStore.publish(toTopicPath('prompts', newTemplate.id), newTemplate);
 			} else if (editingTemplate) {
 				// Update existing template
 				const updatedTemplate = await updatePromptTemplate(
@@ -209,7 +211,7 @@
 
 				// Update in store
 				validatedTopicStore.publish(
-					toTopicPath('promptTemplates', updatedTemplate.id),
+					toTopicPath('prompts', updatedTemplate.id),
 					updatedTemplate
 				);
 			}
@@ -219,7 +221,8 @@
 			isCreating = false;
 		} catch (err) {
 			console.error('Failed to save template:', err);
-			alert(err instanceof Error ? err.message : 'Failed to save template');
+			// Rethrow so the modal can show the error and reset saving state
+			throw err;
 		} finally {
 			isLoading = false;
 		}
@@ -232,7 +235,7 @@
 	}
 
 	// Handle delete template
-	async function handleDeleteTemplate(template: PromptTemplate) {
+	async function handleDeleteTemplate(template: Prompt) {
 		if (!queryClient) return;
 
 		if (!confirm(`Are you sure you want to delete "${template.name}"?`)) {
@@ -244,7 +247,7 @@
 			await deletePromptTemplate(queryClient, template.id, template.parentId);
 
 			// Remove from store
-			validatedTopicStore.delete(toTopicPath('promptTemplates', template.id));
+			validatedTopicStore.delete(toTopicPath('prompts', template.id));
 		} catch (err) {
 			console.error('Failed to delete template:', err);
 			alert(err instanceof Error ? err.message : 'Failed to delete template');
@@ -254,8 +257,8 @@
 	}
 
 	// Get display info for a template
-	function getTemplateDisplayInfo(template: PromptTemplate) {
-		const templateStr = 'templateText' in template ? template.templateText : (template as { template?: string }).template;
+	function getTemplateDisplayInfo(template: Prompt) {
+		const templateStr = getTemplateStrForEditor(template);
 		const aiData = parseTemplateToAIQueryData(templateStr ?? '');
 		return {
 			prompt: aiData.prompt,
@@ -269,7 +272,7 @@
 	});
 
 	onDestroy(() => {
-		promptTemplateSyncManager?.cleanup();
+		promptSyncManager?.cleanup();
 		projectSyncManager?.cleanup();
 	});
 </script>
@@ -590,7 +593,7 @@
 </div>
 
 <!-- Edit/Create Modal -->
-<PromptTemplateEditModal
+<PromptEditModal
 	{darkMode}
 	template={editingTemplate}
 	{isCreating}

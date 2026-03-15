@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { GridElement, AIQueryData } from '../../types';
 
-	import type { PromptTemplate } from "@stratiqai/types-simple"
+	import type { Prompt } from "@stratiqai/types-simple"
 	const {
 		element = null,
 		darkMode = false,
@@ -270,7 +270,7 @@
 							class="w-full px-3 py-2.5 {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none text-sm"
 							rows="3"
 						></textarea>
-						<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1.5">Provide context about the AI's role and expertise</p>
+						<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1.5">Povide context about the AI's role and expertise</p>
 					</div>
 
 					<div>
