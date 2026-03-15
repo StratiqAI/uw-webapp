@@ -7,6 +7,12 @@ export type WidgetType =
 	| 'image'
 	| 'lineChart'
 	| 'barChart'
+	| 'donutChart'
+	| 'areaChart'
+	| 'gauge'
+	| 'sparkline'
+	| 'heatmap'
+	| 'divergingBarChart'
 	| 'metric'
 	| 'map'
 	| 'schema';
@@ -120,6 +126,68 @@ export interface BarChartWidget extends BaseWidget {
 	};
 }
 
+export interface DonutChartWidget extends BaseWidget {
+	type: 'donutChart';
+	data: {
+		labels: string[];
+		values: number[];
+		colors?: string[];
+		centerLabel?: string;
+	};
+}
+
+export interface AreaChartWidget extends BaseWidget {
+	type: 'areaChart';
+	data: {
+		labels: string[];
+		datasets: Array<{
+			label: string;
+			data: number[];
+			color?: string;
+		}>;
+	};
+}
+
+export interface GaugeWidget extends BaseWidget {
+	type: 'gauge';
+	data: {
+		value: number;
+		min?: number;
+		max?: number;
+		label?: string;
+		unit?: string;
+		color?: string;
+	};
+}
+
+export interface SparklineWidget extends BaseWidget {
+	type: 'sparkline';
+	data: {
+		values: number[];
+		label?: string;
+		color?: string;
+	};
+}
+
+export interface HeatmapWidget extends BaseWidget {
+	type: 'heatmap';
+	data: {
+		rows: string[];
+		cols: string[];
+		values: number[][];
+	};
+}
+
+export interface DivergingBarChartWidget extends BaseWidget {
+	type: 'divergingBarChart';
+	data: {
+		labels: string[];
+		values: number[]; // can be negative (left) or positive (right) from center
+		positiveColor?: string;
+		negativeColor?: string;
+	};
+}
+
 export interface MapWidget extends BaseWidget {
 	type: 'map';
 	data: {
@@ -159,6 +227,12 @@ export type Widget =
 	| ImageWidget
 	| LineChartWidget
 	| BarChartWidget
+	| DonutChartWidget
+	| AreaChartWidget
+	| GaugeWidget
+	| SparklineWidget
+	| HeatmapWidget
+	| DivergingBarChartWidget
 	| MetricWidget
 	| MapWidget
 	| SchemaWidget;

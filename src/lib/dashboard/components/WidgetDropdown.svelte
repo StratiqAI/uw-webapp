@@ -159,7 +159,7 @@
 		items.push({ divider: true } as any);
 
 		// Widget-specific items
-		if (widget.type === 'table' || widget.type === 'lineChart' || widget.type === 'barChart') {
+		if (widget.type === 'table' || widget.type === 'lineChart' || widget.type === 'barChart' || widget.type === 'donutChart' || widget.type === 'areaChart' || widget.type === 'gauge' || widget.type === 'sparkline' || widget.type === 'heatmap' || widget.type === 'divergingBarChart') {
 			items.push({
 				action: 'exportData' as WidgetAction,
 				label: 'Export Data',

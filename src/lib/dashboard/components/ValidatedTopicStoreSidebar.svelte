@@ -21,6 +21,12 @@
 		map: 'Map',
 		lineChart: 'Line Chart',
 		barChart: 'Bar Chart',
+		donutChart: 'Donut Chart',
+		areaChart: 'Area Chart',
+		gauge: 'Gauge',
+		sparkline: 'Sparkline',
+		heatmap: 'Heatmap',
+		divergingBarChart: 'Diverging Bar Chart',
 		schema: 'Schema'
 	};
 

@@ -12,6 +12,12 @@
 	import ImageWidget from '$lib/dashboard/components/widgets/ImageWidget.svelte';
 	import LineChartWidget from '$lib/dashboard/components/widgets/LineChartWidget.svelte';
 	import BarChartWidget from '$lib/dashboard/components/widgets/BarChartWidget.svelte';
+	import DonutChartWidget from '$lib/dashboard/components/widgets/DonutChartWidget.svelte';
+	import AreaChartWidget from '$lib/dashboard/components/widgets/AreaChartWidget.svelte';
+	import GaugeWidget from '$lib/dashboard/components/widgets/GaugeWidget.svelte';
+	import SparklineWidget from '$lib/dashboard/components/widgets/SparklineWidget.svelte';
+	import HeatmapWidget from '$lib/dashboard/components/widgets/HeatmapWidget.svelte';
+	import DivergingBarChartWidget from '$lib/dashboard/components/widgets/DivergingBarChartWidget.svelte';
 	import MetricWidget from '$lib/dashboard/components/widgets/MetricWidget.svelte';
 	import MapWidget from '$lib/dashboard/components/widgets/MapWidget.svelte';
 	import SchemaWidget from '$lib/dashboard/components/widgets/SchemaWidget.svelte';
@@ -192,6 +198,18 @@
 				<LineChartWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
 			{:else if widget.type === 'barChart'}
 				<BarChartWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
+			{:else if widget.type === 'donutChart'}
+				<DonutChartWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
+			{:else if widget.type === 'areaChart'}
+				<AreaChartWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
+			{:else if widget.type === 'gauge'}
+				<GaugeWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
+			{:else if widget.type === 'sparkline'}
+				<SparklineWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
+			{:else if widget.type === 'heatmap'}
+				<HeatmapWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
+			{:else if widget.type === 'divergingBarChart'}
+				<DivergingBarChartWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
 			{:else if widget.type === 'metric'}
 				<MetricWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
 			{:else if widget.type === 'map'}

@@ -67,6 +67,52 @@ export const BarChartWidgetDataSchema = z.object({
 	orientation: z.enum(['vertical', 'horizontal']).nullable().optional()
 });
 
+export const DonutChartWidgetDataSchema = z.object({
+	labels: z.array(z.string()),
+	values: z.array(z.number()),
+	colors: z.array(z.string()).nullable().optional(),
+	centerLabel: z.string().nullable().optional()
+});
+
+export const AreaChartWidgetDataSchema = z.object({
+	labels: z.array(z.string()),
+	datasets: z.array(
+		z.object({
+			label: z.string(),
+			data: z.array(z.number()),
+			color: z.string().nullable().optional()
+		})
+	)
+});
+
+export const GaugeWidgetDataSchema = z.object({
+	value: z.number(),
+	min: z.number().nullable().optional(),
+	max: z.number().nullable().optional(),
+	label: z.string().nullable().optional(),
+	unit: z.string().nullable().optional(),
+	color: z.string().nullable().optional()
+});
+
+export const SparklineWidgetDataSchema = z.object({
+	values: z.array(z.number()),
+	label: z.string().nullable().optional(),
+	color: z.string().nullable().optional()
+});
+
+export const HeatmapWidgetDataSchema = z.object({
+	rows: z.array(z.string()),
+	cols: z.array(z.string()),
+	values: z.array(z.array(z.number()))
+});
+
+export const DivergingBarChartWidgetDataSchema = z.object({
+	labels: z.array(z.string()),
+	values: z.array(z.number()),
+	positiveColor: z.string().nullable().optional(),
+	negativeColor: z.string().nullable().optional()
+});
+
 export const MetricWidgetDataSchema = z.object({
 	label: z.string(),
 	value: z.union([z.string(), z.number()]),
@@ -99,6 +145,12 @@ export const WidgetDataSchemas = {
 	image: ImageWidgetDataSchema,
 	lineChart: LineChartWidgetDataSchema,
 	barChart: BarChartWidgetDataSchema,
+	donutChart: DonutChartWidgetDataSchema,
+	areaChart: AreaChartWidgetDataSchema,
+	gauge: GaugeWidgetDataSchema,
+	sparkline: SparklineWidgetDataSchema,
+	heatmap: HeatmapWidgetDataSchema,
+	divergingBarChart: DivergingBarChartWidgetDataSchema,
 	metric: MetricWidgetDataSchema,
 	map: MapWidgetDataSchema,
 	schema: SchemaWidgetDataSchema
@@ -112,6 +164,12 @@ export type TitleWidgetData = z.infer<typeof TitleWidgetDataSchema>;
 export type ImageWidgetData = z.infer<typeof ImageWidgetDataSchema>;
 export type LineChartWidgetData = z.infer<typeof LineChartWidgetDataSchema>;
 export type BarChartWidgetData = z.infer<typeof BarChartWidgetDataSchema>;
+export type DonutChartWidgetData = z.infer<typeof DonutChartWidgetDataSchema>;
+export type AreaChartWidgetData = z.infer<typeof AreaChartWidgetDataSchema>;
+export type GaugeWidgetData = z.infer<typeof GaugeWidgetDataSchema>;
+export type SparklineWidgetData = z.infer<typeof SparklineWidgetDataSchema>;
+export type HeatmapWidgetData = z.infer<typeof HeatmapWidgetDataSchema>;
+export type DivergingBarChartWidgetData = z.infer<typeof DivergingBarChartWidgetDataSchema>;
 export type MetricWidgetData = z.infer<typeof MetricWidgetDataSchema>;
 export type MapWidgetData = z.infer<typeof MapWidgetDataSchema>;
 export type SchemaWidgetData = z.infer<typeof SchemaWidgetDataSchema>;
@@ -124,6 +182,12 @@ export type WidgetData =
 	| ImageWidgetData
 	| LineChartWidgetData
 	| BarChartWidgetData
+	| DonutChartWidgetData
+	| AreaChartWidgetData
+	| GaugeWidgetData
+	| SparklineWidgetData
+	| HeatmapWidgetData
+	| DivergingBarChartWidgetData
 	| MetricWidgetData
 	| MapWidgetData
 	| SchemaWidgetData;
@@ -137,6 +201,12 @@ export interface WidgetDataTypeMap {
 	image: ImageWidgetData;
 	lineChart: LineChartWidgetData;
 	barChart: BarChartWidgetData;
+	donutChart: DonutChartWidgetData;
+	areaChart: AreaChartWidgetData;
+	gauge: GaugeWidgetData;
+	sparkline: SparklineWidgetData;
+	heatmap: HeatmapWidgetData;
+	divergingBarChart: DivergingBarChartWidgetData;
 	metric: MetricWidgetData;
 	map: MapWidgetData;
 	schema: SchemaWidgetData;
@@ -474,6 +544,48 @@ export const WidgetChannels = {
 		widgetType: 'barChart',
 		schema: BarChartWidgetDataSchema,
 		description: description || `Bar chart channel: ${channelId}`
+	}),
+
+	donutChart: (channelId: string, description?: string): WidgetChannelConfig<'donutChart'> => ({
+		channelId,
+		widgetType: 'donutChart',
+		schema: DonutChartWidgetDataSchema,
+		description: description || `Donut chart channel: ${channelId}`
+	}),
+
+	areaChart: (channelId: string, description?: string): WidgetChannelConfig<'areaChart'> => ({
+		channelId,
+		widgetType: 'areaChart',
+		schema: AreaChartWidgetDataSchema,
+		description: description || `Area chart channel: ${channelId}`
+	}),
+
+	gauge: (channelId: string, description?: string): WidgetChannelConfig<'gauge'> => ({
+		channelId,
+		widgetType: 'gauge',
+		schema: GaugeWidgetDataSchema,
+		description: description || `Gauge channel: ${channelId}`
+	}),
+
+	sparkline: (channelId: string, description?: string): WidgetChannelConfig<'sparkline'> => ({
+		channelId,
+		widgetType: 'sparkline',
+		schema: SparklineWidgetDataSchema,
+		description: description || `Sparkline channel: ${channelId}`
+	}),
+
+	heatmap: (channelId: string, description?: string): WidgetChannelConfig<'heatmap'> => ({
+		channelId,
+		widgetType: 'heatmap',
+		schema: HeatmapWidgetDataSchema,
+		description: description || `Heatmap channel: ${channelId}`
+	}),
+
+	divergingBarChart: (channelId: string, description?: string): WidgetChannelConfig<'divergingBarChart'> => ({
+		channelId,
+		widgetType: 'divergingBarChart',
+		schema: DivergingBarChartWidgetDataSchema,
+		description: description || `Diverging bar chart channel: ${channelId}`
 	}),
 
 	/**

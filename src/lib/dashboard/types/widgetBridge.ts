@@ -502,6 +502,24 @@ export const Publishers = {
 	barChart: (channelId: string, publisherId: string) =>
 		createWidgetPublisher(WidgetChannels.barChart(channelId), publisherId),
 
+	donutChart: (channelId: string, publisherId: string) =>
+		createWidgetPublisher(WidgetChannels.donutChart(channelId), publisherId),
+
+	areaChart: (channelId: string, publisherId: string) =>
+		createWidgetPublisher(WidgetChannels.areaChart(channelId), publisherId),
+
+	gauge: (channelId: string, publisherId: string) =>
+		createWidgetPublisher(WidgetChannels.gauge(channelId), publisherId),
+
+	sparkline: (channelId: string, publisherId: string) =>
+		createWidgetPublisher(WidgetChannels.sparkline(channelId), publisherId),
+
+	heatmap: (channelId: string, publisherId: string) =>
+		createWidgetPublisher(WidgetChannels.heatmap(channelId), publisherId),
+
+	divergingBarChart: (channelId: string, publisherId: string) =>
+		createWidgetPublisher(WidgetChannels.divergingBarChart(channelId), publisherId),
+
 	title: (channelId: string, publisherId: string) =>
 		createWidgetPublisher(WidgetChannels.title(channelId), publisherId),
 
@@ -532,6 +550,24 @@ export const Consumers = {
 	barChart: (channelId: string, consumerId: string) =>
 		createWidgetConsumer(WidgetChannels.barChart(channelId), consumerId),
 
+	donutChart: (channelId: string, consumerId: string) =>
+		createWidgetConsumer(WidgetChannels.donutChart(channelId), consumerId),
+
+	areaChart: (channelId: string, consumerId: string) =>
+		createWidgetConsumer(WidgetChannels.areaChart(channelId), consumerId),
+
+	gauge: (channelId: string, consumerId: string) =>
+		createWidgetConsumer(WidgetChannels.gauge(channelId), consumerId),
+
+	sparkline: (channelId: string, consumerId: string) =>
+		createWidgetConsumer(WidgetChannels.sparkline(channelId), consumerId),
+
+	heatmap: (channelId: string, consumerId: string) =>
+		createWidgetConsumer(WidgetChannels.heatmap(channelId), consumerId),
+
+	divergingBarChart: (channelId: string, consumerId: string) =>
+		createWidgetConsumer(WidgetChannels.divergingBarChart(channelId), consumerId),
+
 	title: (channelId: string, consumerId: string) =>
 		createWidgetConsumer(WidgetChannels.title(channelId), consumerId),
 
@@ -561,6 +597,24 @@ export const WidgetStores = {
 
 	barChart: (channelId: string, widgetId: string) =>
 		createReactiveWidgetConsumer(WidgetChannels.barChart(channelId), widgetId),
+
+	donutChart: (channelId: string, widgetId: string) =>
+		createReactiveWidgetConsumer(WidgetChannels.donutChart(channelId), widgetId),
+
+	areaChart: (channelId: string, widgetId: string) =>
+		createReactiveWidgetConsumer(WidgetChannels.areaChart(channelId), widgetId),
+
+	gauge: (channelId: string, widgetId: string) =>
+		createReactiveWidgetConsumer(WidgetChannels.gauge(channelId), widgetId),
+
+	sparkline: (channelId: string, widgetId: string) =>
+		createReactiveWidgetConsumer(WidgetChannels.sparkline(channelId), widgetId),
+
+	heatmap: (channelId: string, widgetId: string) =>
+		createReactiveWidgetConsumer(WidgetChannels.heatmap(channelId), widgetId),
+
+	divergingBarChart: (channelId: string, widgetId: string) =>
+		createReactiveWidgetConsumer(WidgetChannels.divergingBarChart(channelId), widgetId),
 
 	title: (channelId: string, widgetId: string) =>
 		createReactiveWidgetConsumer(WidgetChannels.title(channelId), widgetId),

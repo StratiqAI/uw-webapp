@@ -45,7 +45,18 @@ function isEffectivelyEmpty(data: unknown, widgetType: WidgetType): boolean {
 			return (d.apiKey === '' || d.apiKey == null) && (d.lat == null || d.lon == null);
 		case 'lineChart':
 		case 'barChart':
+		case 'areaChart':
 			return !Array.isArray(d.labels) || d.labels.length === 0;
+		case 'donutChart':
+			return !Array.isArray(d.labels) || d.labels.length === 0 || !Array.isArray(d.values) || d.values.length === 0;
+		case 'gauge':
+			return d.value == null && d.label == null;
+		case 'sparkline':
+			return !Array.isArray(d.values) || d.values.length === 0;
+		case 'heatmap':
+			return !Array.isArray(d.rows) || d.rows.length === 0 || !Array.isArray(d.cols) || d.cols.length === 0 || !Array.isArray(d.values);
+		case 'divergingBarChart':
+			return !Array.isArray(d.labels) || d.labels.length === 0 || !Array.isArray(d.values) || d.values.length === 0;
 		case 'schema':
 			return !d.schemaId;
 		default:
@@ -173,6 +184,43 @@ const widgetInitialData: Record<string, unknown> = {
 			}
 		],
 		orientation: 'vertical'
+	},
+	'widget-donut-1': {
+		labels: ['Revenue', 'Costs', 'Ops', 'Other'],
+		values: [42, 28, 18, 12],
+		colors: ['#6366f1', '#8b5cf6', '#a855f7', '#c084fc'],
+		centerLabel: 'Total'
+	},
+	'widget-area-1': {
+		labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+		datasets: [
+			{ label: 'Revenue', data: [24, 32, 38, 42, 48, 55], color: '#06b6d4' },
+			{ label: 'Costs', data: [14, 20, 24, 26, 30, 34], color: '#8b5cf6' }
+		]
+	},
+	'widget-gauge-1': {
+		value: 78,
+		min: 0,
+		max: 100,
+		label: 'Performance',
+		unit: '%',
+		color: '#22c55e'
+	},
+	'widget-sparkline-1': {
+		values: [12, 19, 15, 25, 22, 30, 28, 35, 32, 40, 38, 45],
+		label: 'Weekly trend',
+		color: '#3b82f6'
+	},
+	'widget-heatmap-1': {
+		rows: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+		cols: ['AM', 'PM'],
+		values: [
+			[4, 6],
+			[3, 5],
+			[5, 7],
+			[2, 4],
+			[6, 8]
+		]
 	}
 };
 

@@ -77,7 +77,7 @@
 			try {
 				const width = window.innerWidth;
 				let gridColumns: number;
-				let minRows = 12; // Minimum rows to accommodate bar chart at row 10-12
+				let minRows = 19; // Minimum rows to accommodate charts + gauge/sparkline/heatmap (row 16-18)
 				
 				if (width < 640) {
 					gridColumns = 4;

@@ -16,7 +16,7 @@
 	<h2 class="mb-4 text-lg font-medium">{title}</h2>
 
 	<div class="relative h-24 w-48 ">
-		<svg width="200" height="100" viewBox="0 0 200 100" class="block">
+		<svg width="200" height="100" viewBox="0 0 200 100" class="block" style="transform: rotate(180deg);">
 			<defs>
 				<linearGradient id="gaugeGradient" x1="0" y1="0" x2="1" y2="0">
 					<stop offset="0%" stop-color="#F87171" />

@@ -155,6 +155,12 @@
 			map: { colSpan: 8, rowSpan: 4 },
 			lineChart: { colSpan: 6, rowSpan: 3 },
 			barChart: { colSpan: 6, rowSpan: 3 },
+			donutChart: { colSpan: 4, rowSpan: 3 },
+			areaChart: { colSpan: 6, rowSpan: 3 },
+			gauge: { colSpan: 3, rowSpan: 2 },
+			sparkline: { colSpan: 4, rowSpan: 1 },
+			heatmap: { colSpan: 6, rowSpan: 4 },
+			divergingBarChart: { colSpan: 6, rowSpan: 3 },
 			schema: { colSpan: 6, rowSpan: 3 }
 		};
 
@@ -297,6 +303,78 @@
 					}
 				} as Widget;
 
+			case 'donutChart':
+				return {
+					...baseWidget,
+					type: 'donutChart',
+					data: {
+						labels: ['A', 'B', 'C', 'D'],
+						values: [28, 22, 35, 15],
+						colors: ['#6366f1', '#8b5cf6', '#a855f7', '#c084fc'],
+						centerLabel: 'Total'
+					}
+				} as Widget;
+
+			case 'areaChart':
+				return {
+					...baseWidget,
+					type: 'areaChart',
+					data: {
+						labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+						datasets: [
+							{ label: 'Series 1', data: [20, 35, 45, 40, 55, 60], color: '#06b6d4' },
+							{ label: 'Series 2', data: [10, 25, 30, 35, 40, 50], color: '#8b5cf6' }
+						]
+					}
+				} as Widget;
+
+			case 'gauge':
+				return {
+					...baseWidget,
+					type: 'gauge',
+					data: { value: 65, min: 0, max: 100, label: 'Score', unit: '%', color: '#22c55e' }
+				} as Widget;
+
+			case 'sparkline':
+				return {
+					...baseWidget,
+					type: 'sparkline',
+					data: {
+						values: [12, 19, 15, 25, 22, 30, 28, 35],
+						label: 'Trend',
+						color: '#3b82f6'
+					}
+				} as Widget;
+
+			case 'heatmap':
+				return {
+					...baseWidget,
+					type: 'heatmap',
+					data: {
+						rows: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+						cols: ['AM', 'PM'],
+						values: [
+							[4, 6],
+							[3, 5],
+							[5, 7],
+							[2, 4],
+							[6, 8]
+						]
+					}
+				} as Widget;
+
+			case 'divergingBarChart':
+				return {
+					...baseWidget,
+					type: 'divergingBarChart',
+					data: {
+						labels: ['Strongly disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly agree'],
+						values: [-24, -18, 12, 32, 42],
+						positiveColor: '#3b82f6',
+						negativeColor: '#ef4444'
+					}
+				} as Widget;
+
 			case 'schema':
 				return {
 					...baseWidget,
@@ -333,6 +411,12 @@
 		{ type: 'map', label: 'Map', icon: '🗺️' },
 		{ type: 'lineChart', label: 'Line Chart', icon: '📈' },
 		{ type: 'barChart', label: 'Bar Chart', icon: '📊' },
+		{ type: 'donutChart', label: 'Donut Chart', icon: '🍩' },
+		{ type: 'areaChart', label: 'Area Chart', icon: '📉' },
+		{ type: 'gauge', label: 'Gauge', icon: '⏱️' },
+		{ type: 'sparkline', label: 'Sparkline', icon: '〰️' },
+		{ type: 'heatmap', label: 'Heatmap', icon: '🔥' },
+		{ type: 'divergingBarChart', label: 'Diverging Bar Chart', icon: '↔️' },
 		{ type: 'schema', label: 'Schema Widget', icon: '📋' }
 	];
 </script>

@@ -210,5 +210,60 @@ export const dashboardWidgets: Widget[] = [
 		minWidth: 3,
 		minHeight: 2,
 		data: {} as any // Data is published via ValidatedTopicStore
+	},
+	{
+		id: 'widget-donut-1',
+		type: 'donutChart',
+		gridColumn: 1,
+		gridRow: 13,
+		colSpan: 4,
+		rowSpan: 3,
+		minWidth: 2,
+		minHeight: 2,
+		data: {} as any
+	},
+	{
+		id: 'widget-area-1',
+		type: 'areaChart',
+		gridColumn: 5,
+		gridRow: 13,
+		colSpan: 8,
+		rowSpan: 3,
+		minWidth: 3,
+		minHeight: 2,
+		data: {} as any
+	},
+	{
+		id: 'widget-gauge-1',
+		type: 'gauge',
+		gridColumn: 1,
+		gridRow: 16,
+		colSpan: 3,
+		rowSpan: 2,
+		minWidth: 2,
+		minHeight: 1,
+		data: {} as any
+	},
+	{
+		id: 'widget-sparkline-1',
+		type: 'sparkline',
+		gridColumn: 4,
+		gridRow: 16,
+		colSpan: 4,
+		rowSpan: 1,
+		minWidth: 2,
+		minHeight: 1,
+		data: {} as any
+	},
+	{
+		id: 'widget-heatmap-1',
+		type: 'heatmap',
+		gridColumn: 8,
+		gridRow: 16,
+		colSpan: 5,
+		rowSpan: 3,
+		minWidth: 3,
+		minHeight: 2,
+		data: {} as any
 	}
 ];
