@@ -65,7 +65,7 @@
 		"@flowbite-svelte-plugins/chart": "^0.2.4",
 		"@google/generative-ai": "^0.24.1",
 		"@stratiqai/aws-utils": "^1.0.37",
-		"@stratiqai/types-simple": "^1.0.53",
+		"@stratiqai/types-simple": "^1.0.54",
 		"@turf/turf": "^7.2.0",
 		"ai": "^6.0.48",
 		"ajv": "^8.17.1",

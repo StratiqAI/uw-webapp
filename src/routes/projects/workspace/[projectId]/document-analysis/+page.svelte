@@ -27,7 +27,7 @@
 	import PDFViewer from '$lib/components/PDFViewer/PDFViewer.svelte';
 	import DocumentAnalysisPromptsSidebar from './components/DocumentAnalysisPromptsSidebar.svelte';
 	import PromptEditModal from '../../../../library/components/PromptEditModal.svelte';
-	import { updatePromptTemplate, createPromptTemplate, type AIQueryData } from '../../../../library/libraryService';
+	import { updatePromptTemplate, createPromptTemplate, type AIQueryData } from '../../../../library/PromptService';
 	import { GraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
 	import { Q_DOCUMENT_VISION_QUERY } from '$lib/realtime/graphql/queries/DocumentVisionQuery';
@@ -229,6 +229,7 @@
 		name: string;
 		description: string;
 		aiQueryData: AIQueryData;
+		outputSchema?: { name: string; description?: string; schemaDefinition: unknown };
 	}) {
 		if (!idToken) {
 			alert('Unable to save: session missing. Please refresh and try again.');
@@ -247,7 +248,8 @@
 					projectId,
 					saveData.name,
 					saveData.aiQueryData,
-					saveData.description || undefined
+					saveData.description || undefined,
+					saveData.outputSchema
 				);
 				isCreatingPrompt = false;
 				promptsRefreshTrigger += 1;
@@ -255,12 +257,13 @@
 				await updatePromptTemplate(
 					queryClient,
 					editingPrompt.id,
-					(editingPrompt as { parentId?: string }).parentId,
 					{
 						name: saveData.name,
 						description: saveData.description,
-						aiQueryData: saveData.aiQueryData
-					}
+						aiQueryData: saveData.aiQueryData,
+						...(saveData.outputSchema && { outputSchema: saveData.outputSchema })
+					},
+					(editingPrompt as { parentId?: string }).parentId
 				);
 				editingPrompt = null;
 			}

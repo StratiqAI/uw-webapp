@@ -1,21 +1,45 @@
 /**
- * Library Service Module
+ * Prompt Service Module
  *
  * Provides utilities for managing Prompt entities in the library,
  * including CRUD operations and data transformation between AIQueryData and
- * Prompt.content (body, systemInstruction).
+ * Prompt.content (body, systemInstruction). Uses inline outputSchema (PromptOutputSchema).
  */
 
-import type { Prompt, Project } from '@stratiqai/types-simple';
+import type { Prompt, Project, PromptOutputSchemaInput } from '@stratiqai/types-simple';
 import {
 	M_CREATE_PROMPT,
 	M_UPDATE_PROMPT,
 	M_DELETE_PROMPT,
 	Q_GET_PROJECT_WITH_PROMPTS,
-	Q_LIST_PROMPTS,
-	Q_LIST_STRUCTURED_OUTPUT_SCHEMAS
+	Q_LIST_PROMPTS
 } from '@stratiqai/types-simple';
 import type { IGraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
+
+/** Default inline output schema when creating a prompt without a user-provided schema */
+const DEFAULT_OUTPUT_SCHEMA: PromptOutputSchemaInput = {
+	name: 'Default',
+	description: undefined,
+	schemaDefinition: { type: 'object', properties: {} }
+};
+
+/**
+ * AppSync AWSJSON expects JSON as a string. Normalize outputSchema for API (create/update).
+ */
+function outputSchemaForApi(schema: PromptOutputSchemaInput): {
+	name: string;
+	description?: string;
+	schemaDefinition: string;
+} {
+	return {
+		name: schema.name ?? 'Structured output',
+		description: schema.description ?? undefined,
+		schemaDefinition:
+			typeof schema.schemaDefinition === 'string'
+				? schema.schemaDefinition
+				: JSON.stringify(schema.schemaDefinition ?? { type: 'object', properties: {} })
+	};
+}
 
 /**
  * AIQueryData interface - matches the workflow editor's data structure
@@ -139,25 +163,6 @@ export async function fetchProjectWithPromptTemplates(
 }
 
 /**
- * Resolve a default outputSchemaId by fetching the first structured output schema (required for createPrompt).
- */
-async function getDefaultOutputSchemaId(
-	queryClient: IGraphQLQueryClient
-): Promise<string> {
-	const response = await queryClient.query<{
-		listStructuredOutputSchemas: { items: Array<{ id: string }> };
-	}>(Q_LIST_STRUCTURED_OUTPUT_SCHEMAS, { limit: 1 });
-
-	const items = response?.listStructuredOutputSchemas?.items ?? [];
-	if (items.length === 0) {
-		throw new Error(
-			'No structured output schema found. Create one in AI Studio before creating prompts.'
-		);
-	}
-	return items[0].id;
-}
-
-/**
  * Create a new prompt
  */
 export async function createPromptTemplate(
@@ -165,7 +170,8 @@ export async function createPromptTemplate(
 	_parentId: string,
 	name: string,
 	aiQueryData: AIQueryData,
-	description?: string
+	description?: string,
+	outputSchema?: PromptOutputSchemaInput
 ): Promise<Prompt> {
 	const variableNames = extractPromptVariableNames(aiQueryData.prompt);
 	const content = {
@@ -173,7 +179,7 @@ export async function createPromptTemplate(
 		systemInstruction: aiQueryData.systemPrompt ?? undefined,
 		...(variableNames.length > 0 && { inputVariables: variableNames })
 	};
-	const outputSchemaId = await getDefaultOutputSchemaId(queryClient);
+	const schema = outputSchema ?? DEFAULT_OUTPUT_SCHEMA;
 
 	const response = await queryClient.query<{
 		createPrompt: Prompt;
@@ -183,7 +189,7 @@ export async function createPromptTemplate(
 			description: description || undefined,
 			content,
 			model: aiQueryData.model || 'GEMINI_2_5_FLASH',
-			...(outputSchemaId && { outputSchemaId }),
+			outputSchema: outputSchemaForApi(schema),
 			sharingMode: 'PRIVATE'
 		}
 	});
@@ -229,12 +235,13 @@ export function extractPromptVariableNames(text: string): string[] {
 export async function updatePromptTemplate(
 	queryClient: IGraphQLQueryClient,
 	id: string,
-	_parentId?: string,
 	updates: {
 		name?: string;
 		aiQueryData?: AIQueryData;
 		description?: string;
-	}
+		outputSchema?: PromptOutputSchemaInput;
+	},
+	_parentId?: string
 ): Promise<Prompt> {
 	const input: Record<string, unknown> = {};
 
@@ -255,6 +262,9 @@ export async function updatePromptTemplate(
 	if (updates.aiQueryData?.model !== undefined) {
 		// Send as string so GraphQL receives the enum value (e.g. GEMINI_3_1_PRO_PREVIEW)
 		input.model = typeof updates.aiQueryData.model === 'string' ? updates.aiQueryData.model : String(updates.aiQueryData.model);
+	}
+	if (updates.outputSchema !== undefined) {
+		input.outputSchema = outputSchemaForApi(updates.outputSchema);
 	}
 
 	const response = await queryClient.query<{

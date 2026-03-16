@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Prompt } from '@stratiqai/types-simple';
 	import type { AiModel } from '@stratiqai/types-simple';
-	import { getTemplateStrForEditor, parseTemplateToAIQueryData, type AIQueryData } from '../libraryService';
+	import { getTemplateStrForEditor, parseTemplateToAIQueryData, type AIQueryData } from '../PromptService';
 
 	/** All valid AIModel enum values (schema) — used so 3.1 and all models pass VALID_AI_MODELS.has() */
 	const AIMODEL_VALUES: readonly string[] = [
@@ -47,7 +47,12 @@
 		darkMode?: boolean;
 		template?: Prompt | null;
 		isCreating?: boolean;
-		onSave?: (data: { name: string; description: string; aiQueryData: AIQueryData }) => void | Promise<void>;
+		onSave?: (data: {
+			name: string;
+			description: string;
+			aiQueryData: AIQueryData;
+			outputSchema?: { name: string; description?: string; schemaDefinition: unknown };
+		}) => void | Promise<void>;
 		onCancel?: () => void;
 	} = $props();
 
@@ -139,7 +144,22 @@
 				? data.stop.join(', ')
 				: data.stop ?? '';
 
-			if (data.responseFormat) {
+			// Prefer inline outputSchema from Prompt when present; else legacy template-str responseFormat
+			if (template.outputSchema?.schemaDefinition != null) {
+				responseFormatType = 'json_schema';
+				const def = template.outputSchema.schemaDefinition;
+				const schema = typeof def === 'string' ? (() => { try { return JSON.parse(def); } catch { return {}; } })() : (def as Record<string, unknown>);
+				jsonSchemaText = typeof def === 'string' ? def : JSON.stringify(schema, null, 2);
+				if (schema && typeof schema === 'object' && schema.properties) {
+					schemaProperties = { ...(schema.properties as Record<string, any>) };
+					schemaRequired = Array.isArray(schema.required) ? [...(schema.required as string[])] : [];
+					fieldOrder = Object.keys(schema.properties as Record<string, unknown>);
+				} else {
+					schemaProperties = {};
+					schemaRequired = [];
+					fieldOrder = [];
+				}
+			} else if (data.responseFormat) {
 				responseFormatType = data.responseFormat.type;
 				if (data.responseFormat.type === 'json_schema' && data.responseFormat.schema) {
 					const schema = data.responseFormat.schema as any;
@@ -391,12 +411,35 @@
 			}
 		}
 
+		let outputSchema: { name: string; description?: string; schemaDefinition: unknown } | undefined;
+		if (responseFormatType === 'json_schema') {
+			if (Object.keys(schemaProperties).length > 0) {
+				outputSchema = {
+					name: templateName.trim() || 'Structured output',
+					description: templateDescription.trim() || undefined,
+					schemaDefinition: schemaPreview
+				};
+			} else if (jsonSchemaText.trim()) {
+				try {
+					const parsed = JSON.parse(jsonSchemaText);
+					outputSchema = {
+						name: templateName.trim() || 'Structured output',
+						description: templateDescription.trim() || undefined,
+						schemaDefinition: parsed
+					};
+				} catch {
+					// invalid JSON schema; omit outputSchema
+				}
+			}
+		}
+
 		saving = true;
 		try {
 			await onSave({
 				name: templateName.trim(),
 				description: templateDescription.trim(),
-				aiQueryData
+				aiQueryData,
+				...(outputSchema && { outputSchema })
 			});
 		} catch (err) {
 			console.error('Save failed:', err);

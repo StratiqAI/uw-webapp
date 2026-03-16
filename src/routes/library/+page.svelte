@@ -21,7 +21,7 @@
 		getTemplateStrForEditor,
 		parseTemplateToAIQueryData,
 		type AIQueryData
-	} from './libraryService';
+	} from './PromptService';
 
 	// Page data from server
 	let { data } = $props<{ data: { idToken: string; projects: Project[] } }>();
@@ -176,6 +176,7 @@
 		name: string;
 		description: string;
 		aiQueryData: AIQueryData;
+		outputSchema?: { name: string; description?: string; schemaDefinition: unknown };
 	}) {
 		if (!queryClient) {
 			alert('Unable to save: not connected. Please refresh the page and try again.');
@@ -191,7 +192,8 @@
 					selectedProjectId,
 					saveData.name,
 					saveData.aiQueryData,
-					saveData.description || undefined
+					saveData.description || undefined,
+					saveData.outputSchema
 				);
 
 				// Publish to store
@@ -201,11 +203,11 @@
 				const updatedTemplate = await updatePromptTemplate(
 					queryClient,
 					editingTemplate.id,
-					editingTemplate.parentId,
 					{
 						name: saveData.name,
 						aiQueryData: saveData.aiQueryData,
-						description: saveData.description || undefined
+						description: saveData.description || undefined,
+						...(saveData.outputSchema && { outputSchema: saveData.outputSchema })
 					}
 				);
 
@@ -244,7 +246,7 @@
 
 		isLoading = true;
 		try {
-			await deletePromptTemplate(queryClient, template.id, template.parentId);
+			await deletePromptTemplate(queryClient, template.id, undefined);
 
 			// Remove from store
 			validatedTopicStore.delete(toTopicPath('prompts', template.id));
