@@ -78,7 +78,7 @@
 		return (links.items || []) as Doclink[];
 	});
 
-	// One row per documentId (doclinks can include NONE, TEXT_EMBEDDINGS, IMAGE_EMBEDDINGS per document)
+	// One row per documentId (prefer primary Doclink with linkType NONE)
 	type DoclinkWithLinkType = Doclink & { linkType?: string };
 	const doclinksByDocument = $derived.by(() => {
 		const byDoc = new Map<string, Doclink>();

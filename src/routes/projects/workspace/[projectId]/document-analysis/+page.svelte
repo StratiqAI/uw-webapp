@@ -4,6 +4,11 @@
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	import type { Project, Doclink } from '$lib/types/cloud/app';
 	import { browser } from '$app/environment';
+	import { onDestroy } from 'svelte';
+	import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from '$env/static/public';
+	import { getAppSyncWsClient, initAppSyncWsClient } from '$lib/realtime/websocket/wsClient';
+	import { computeExecutionIdForSubmitInput } from '$lib/ai-query/calculateExecutionId';
+	import { parseJavaMapLikeString } from '$lib/ai-query/parseJavaMapLikeString';
 	
 	// ProjectDocument type for PDFViewer (id and filename)
 	interface ProjectDocument {
@@ -30,7 +35,7 @@
 	import { updatePromptTemplate, createPromptTemplate, type AIQueryData } from '../../../../library/PromptService';
 	import { GraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
-	import { M_SUBMIT_AI_QUERY, Q_GET_AI_QUERY_EXECUTION } from '@stratiqai/types-simple';
+	import { M_SUBMIT_AI_QUERY, S_ON_UPDATE_AI_QUERY_EXECUTION_BY_EXECUTION_ID } from '@stratiqai/types-simple';
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Initialize the state variables for this component
@@ -71,6 +76,21 @@
 	let isCreatingPrompt = $state(false);
 	let promptSaveLoading = $state(false);
 	let promptsRefreshTrigger = $state(0);
+
+	/** AppSync subscription cleanup for AI query execution (by deterministic executionId hash). */
+	let aiQueryExecutionUnsub: (() => void) | null = null;
+	let aiQueryExecutionTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+	function cleanupAiQueryExecutionSubscription() {
+		if (aiQueryExecutionTimeoutId != null) {
+			clearTimeout(aiQueryExecutionTimeoutId);
+			aiQueryExecutionTimeoutId = null;
+		}
+		aiQueryExecutionUnsub?.();
+		aiQueryExecutionUnsub = null;
+	}
+
+	onDestroy(() => cleanupAiQueryExecutionSubscription());
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Component Variables that are Derived from the Stores
@@ -196,74 +216,142 @@
 		isCreatingPrompt = true;
 	}
 
-	// Run vision query via AIQueryExecution: submit then poll until SUCCESS/ERROR
+	type AIQueryExecPayload = {
+		status: string;
+		rawOutput?: string | null;
+		errorMessage?: string | null;
+	};
+
+	/**
+	 * Subscribe by deterministic executionId (SHA-256 hash), then submit.
+	 * documentIds must match selected PDF only so the hash aligns with submitAIQuery on the server.
+	 */
 	async function runVisionQueryWithPrompt(prompt: Prompt) {
-		const docIds = documents.map((d) => d.id);
-		if (!idToken || docIds.length === 0 || !projectId) return;
-		const question = prompt.prompt?.trim() || prompt.name || 'Answer based on the document.';
+		cleanupAiQueryExecutionSubscription();
+
+		if (!idToken || !projectId) {
+			visionQueryError = 'Missing session or project.';
+			return;
+		}
+		if (!selectedDocId) {
+			visionQueryError = 'Select a document in the viewer to run this prompt.';
+			return;
+		}
+
+		const documentIds = [selectedDocId];
+		/** AppSync `AWSJSON` must be sent as a JSON string; Lambda keeps it as "{}" for hashing. */
+		const inputValues = '{}';
+
 		visionQueryLoading = true;
 		visionQueryError = null;
+		visionQueryResult = null;
 		lastSelectedPrompt = prompt;
+
+		let settled = false;
+		const finishLoading = () => {
+			visionQueryLoading = false;
+		};
+
+		const applyExecutionResult = (exec: AIQueryExecPayload) => {
+			if (settled) return;
+			if (exec.status === 'SUCCESS') {
+				settled = true;
+				cleanupAiQueryExecutionSubscription();
+				let structuredOutput: unknown = undefined;
+				if (exec.rawOutput) {
+					try {
+						const parsed = JSON.parse(exec.rawOutput);
+						structuredOutput = typeof parsed === 'object' && parsed !== null ? parsed : undefined;
+					} catch {
+						/* rawOutput is plain text */
+					}
+				}
+				visionQueryResult = {
+					answer: exec.rawOutput ?? '',
+					structuredOutput,
+					matchCount: documentIds.length
+				};
+				finishLoading();
+			} else if (exec.status === 'ERROR') {
+				settled = true;
+				cleanupAiQueryExecutionSubscription();
+				visionQueryError = exec.errorMessage ?? 'Execution failed';
+				visionQueryResult = null;
+				finishLoading();
+			}
+		};
+
 		try {
-			const submitRes = await gql<{ submitAIQuery: { id: string; status: string } }>(
+			const executionIdHash = await computeExecutionIdForSubmitInput({
+				projectId,
+				promptId: prompt.id,
+				inputValues,
+				documentIds
+			});
+
+			const client = getAppSyncWsClient() ?? initAppSyncWsClient({
+				graphqlHttpUrl: PUBLIC_GRAPHQL_HTTP_ENDPOINT,
+				auth: { mode: 'cognito', idToken }
+			});
+
+			const subHandle = client.subscribe({
+				query: S_ON_UPDATE_AI_QUERY_EXECUTION_BY_EXECUTION_ID,
+				variables: { executionId: executionIdHash },
+				next: (payload: unknown) => {
+					const data = payload as {
+						onUpdateAIQueryExecutionByExecutionId?: AIQueryExecPayload | null;
+					};
+					const exec = data?.onUpdateAIQueryExecutionByExecutionId;
+					if (exec) applyExecutionResult(exec);
+				},
+				error: (e: unknown) => {
+					console.error('[document-analysis] onUpdateAIQueryExecutionByExecutionId', e);
+					if (!settled) {
+						settled = true;
+						cleanupAiQueryExecutionSubscription();
+						visionQueryError = 'Lost connection to live updates; try again.';
+						visionQueryResult = null;
+						finishLoading();
+					}
+				}
+			});
+			aiQueryExecutionUnsub = () => subHandle.unsubscribe();
+
+			aiQueryExecutionTimeoutId = setTimeout(() => {
+				if (!settled) {
+					settled = true;
+					cleanupAiQueryExecutionSubscription();
+					visionQueryError = 'Timed out waiting for result.';
+					visionQueryResult = null;
+					finishLoading();
+				}
+			}, 120_000);
+
+			const submitRes = await gql<{ submitAIQuery: AIQueryExecPayload & { id: string } }>(
 				M_SUBMIT_AI_QUERY,
 				{
 					input: {
 						projectId,
 						promptId: prompt.id,
-						executionId: crypto.randomUUID(),
-						inputValues: { question },
-						documentIds: docIds,
+						executionId: executionIdHash,
+						inputValues,
+						documentIds,
 						topK: 5
 					}
 				},
 				idToken
 			);
-			const executionId = submitRes.submitAIQuery.id;
-			const pollIntervalMs = 1500;
-			const maxAttempts = 60; // ~90s
-			let attempts = 0;
-			while (attempts < maxAttempts) {
-				const pollRes = await gql<{ getAIQueryExecution: { status: string; rawOutput?: string | null; errorMessage?: string | null } }>(
-					Q_GET_AI_QUERY_EXECUTION,
-					{ id: executionId },
-					idToken
-				);
-				const exec = pollRes.getAIQueryExecution;
-				if (exec.status === 'SUCCESS') {
-					let structuredOutput: unknown = undefined;
-					if (exec.rawOutput) {
-						try {
-							const parsed = JSON.parse(exec.rawOutput);
-							structuredOutput = typeof parsed === 'object' && parsed !== null ? parsed : undefined;
-						} catch {
-							// rawOutput is plain text
-						}
-					}
-					visionQueryResult = {
-						answer: exec.rawOutput ?? '',
-						structuredOutput,
-						matchCount: docIds.length
-					};
-					break;
-				}
-				if (exec.status === 'ERROR') {
-					visionQueryError = exec.errorMessage ?? 'Execution failed';
-					visionQueryResult = null;
-					break;
-				}
-				await new Promise((r) => setTimeout(r, pollIntervalMs));
-				attempts += 1;
-			}
-			if (attempts >= maxAttempts) {
-				visionQueryError = 'Query timed out waiting for result';
-				visionQueryResult = null;
+
+			const immediate = submitRes.submitAIQuery;
+			if (immediate && (immediate.status === 'SUCCESS' || immediate.status === 'ERROR')) {
+				applyExecutionResult(immediate);
 			}
 		} catch (err) {
+			settled = true;
+			cleanupAiQueryExecutionSubscription();
 			visionQueryError = err instanceof Error ? err.message : 'Vision query failed';
 			visionQueryResult = null;
-		} finally {
-			visionQueryLoading = false;
+			finishLoading();
 		}
 	}
 
@@ -321,6 +409,35 @@
 		editingPrompt = null;
 		isCreatingPrompt = false;
 	}
+
+	type QueryResultDisplay = { mode: 'json'; body: string } | { mode: 'text'; body: string };
+
+	/** Pretty-print JSON when `answer` is JSON, Java map-style text, or `structuredOutput` is structured. */
+	function formatQueryResultDisplay(answer: string, structured: unknown | undefined): QueryResultDisplay {
+		if (structured !== undefined && structured !== null && typeof structured === 'object') {
+			return { mode: 'json', body: JSON.stringify(structured, null, 2) };
+		}
+		const raw = (answer ?? '').trim();
+		if (!raw) return { mode: 'text', body: '' };
+		try {
+			const parsed = JSON.parse(raw);
+			return { mode: 'json', body: JSON.stringify(parsed, null, 2) };
+		} catch {
+			/* e.g. `{brokers=[{phone=..., name=...}]}` from model / Java toString */
+			try {
+				const loose = parseJavaMapLikeString(raw);
+				return { mode: 'json', body: JSON.stringify(loose, null, 2) };
+			} catch {
+				return { mode: 'text', body: answer };
+			}
+		}
+	}
+
+	const queryResultDisplay = $derived.by((): QueryResultDisplay | null => {
+		const r = visionQueryResult;
+		if (r == null) return null;
+		return formatQueryResultDisplay(r.answer, r.structuredOutput);
+	});
 </script>
 
 <div class="flex h-full w-full overflow-hidden">
@@ -383,14 +500,16 @@
 					>Clear</button>
 				</div>
 				<div class="p-6 space-y-4">
-					<div>
-						<p class="text-sm font-medium {darkMode ? 'text-slate-400' : 'text-slate-500'} mb-1">Answer</p>
-						<p class="whitespace-pre-wrap {darkMode ? 'text-slate-200' : 'text-slate-800'}">{visionQueryResult.answer}</p>
-					</div>
-					{#if visionQueryResult.structuredOutput != null && typeof visionQueryResult.structuredOutput === 'object'}
+					{#if queryResultDisplay}
 						<div>
-							<p class="text-sm font-medium {darkMode ? 'text-slate-400' : 'text-slate-500'} mb-1">Structured output</p>
-							<pre class="text-xs overflow-x-auto p-3 rounded {darkMode ? 'bg-slate-900 text-slate-300' : 'bg-slate-100 text-slate-700'}">{JSON.stringify(visionQueryResult.structuredOutput, null, 2)}</pre>
+							<p class="text-sm font-medium {darkMode ? 'text-slate-400' : 'text-slate-500'} mb-1">Result</p>
+							{#if queryResultDisplay.mode === 'json'}
+								<pre
+									class="max-h-[min(70vh,32rem)] overflow-auto text-xs leading-relaxed font-mono p-3 rounded border {darkMode ? 'bg-slate-950 text-slate-200 border-slate-700' : 'bg-slate-50 text-slate-800 border-slate-200'}"
+								>{queryResultDisplay.body}</pre>
+							{:else}
+								<p class="whitespace-pre-wrap text-sm {darkMode ? 'text-slate-200' : 'text-slate-800'}">{queryResultDisplay.body}</p>
+							{/if}
 						</div>
 					{/if}
 					<p class="text-xs {darkMode ? 'text-slate-500' : 'text-slate-500'}">Based on {visionQueryResult.matchCount} image(s)</p>
@@ -515,8 +634,10 @@
 		{idToken}
 		{darkMode}
 		isLoading={visionQueryLoading}
+		canRunPrompt={!!selectedDocId}
 		refreshTrigger={promptsRefreshTrigger}
 		onSelectPrompt={handleSelectPrompt}
+		onRunPrompt={runVisionQueryWithPrompt}
 		onCreatePrompt={handleCreatePrompt}
 	/>
 

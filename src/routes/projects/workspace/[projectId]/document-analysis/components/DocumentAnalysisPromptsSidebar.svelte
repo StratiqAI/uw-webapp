@@ -1,8 +1,7 @@
 <script lang="ts">
 	/**
-	 * Sidebar listing prompts loaded the same way as the Prompt library page.
-	 * Uses listPrompts(scope: OWNED_BY_ME) via GraphQL. Selecting a prompt runs the parent's
-	 * vision query using the prompt's main `prompt` text as the question.
+	 * Sidebar listing prompts (same source as the Prompt library).
+	 * Edit opens the parent modal; Run triggers onRunPrompt for the selected document only.
 	 */
 	import type { Prompt } from '@stratiqai/types-simple';
 	import { Q_LIST_PROMPTS } from '$lib/graphql/promptOperations';
@@ -12,13 +11,26 @@
 		idToken: string | undefined;
 		darkMode?: boolean;
 		isLoading?: boolean;
+		/** When false, Run is disabled (e.g. no document selected for analysis). */
+		canRunPrompt?: boolean;
 		/** When this number changes, the sidebar refetches the prompt list (e.g. after creating a new prompt). */
 		refreshTrigger?: number;
 		onSelectPrompt?: (prompt: Prompt) => void;
+		/** Run structured query with this prompt; does not open the edit modal. */
+		onRunPrompt?: (prompt: Prompt) => void;
 		onCreatePrompt?: () => void;
 	}
 
-	let { idToken, darkMode = true, isLoading = false, refreshTrigger = 0, onSelectPrompt, onCreatePrompt }: Props = $props();
+	let {
+		idToken,
+		darkMode = true,
+		isLoading = false,
+		canRunPrompt = true,
+		refreshTrigger = 0,
+		onSelectPrompt,
+		onRunPrompt,
+		onCreatePrompt
+	}: Props = $props();
 
 	let prompts = $state<Prompt[]>([]);
 	let promptsLoading = $state(false);
@@ -181,36 +193,55 @@
 				{:else}
 					<div class="grid grid-cols-1 gap-2">
 						{#each filteredPrompts as prompt (prompt.id)}
-							<button
-								type="button"
-								disabled={isLoading}
-								onclick={() => onSelectPrompt?.(prompt)}
-								class="flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-colors {darkMode ? 'border-slate-700 bg-slate-800/40 hover:bg-slate-800 hover:border-slate-600' : 'border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300'} disabled:opacity-60 disabled:cursor-not-allowed"
+							<div
+								class="flex w-full items-stretch gap-1 rounded-lg border transition-colors {darkMode ? 'border-slate-700 bg-slate-800/40 hover:border-slate-600' : 'border-slate-200 bg-white hover:border-slate-300'}"
 							>
-								<div
-									class="flex h-8 w-8 shrink-0 items-center justify-center rounded {darkMode ? 'bg-slate-700' : 'bg-slate-100'}"
+								<button
+									type="button"
+									disabled={isLoading}
+									onclick={() => onSelectPrompt?.(prompt)}
+									class="flex min-w-0 flex-1 items-start gap-3 rounded-l-lg p-3 text-left transition-colors {darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'} disabled:cursor-not-allowed disabled:opacity-60"
 								>
-									<svg
-										class="h-4 w-4 {darkMode ? 'text-slate-300' : 'text-slate-600'}"
-										fill="none"
-										stroke="currentColor"
-										viewBox="0 0 24 24"
+									<div
+										class="flex h-8 w-8 shrink-0 items-center justify-center rounded {darkMode ? 'bg-slate-700' : 'bg-slate-100'}"
 									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-										/>
+										<svg
+											class="h-4 w-4 {darkMode ? 'text-slate-300' : 'text-slate-600'}"
+											fill="none"
+											stroke="currentColor"
+											viewBox="0 0 24 24"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+											/>
+										</svg>
+									</div>
+									<div class="min-w-0 flex-1">
+										<p class="font-medium {darkMode ? 'text-white' : 'text-slate-900'}">{prompt.name}</p>
+										<p class="mt-0.5 line-clamp-2 text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'}">
+											{prompt.description || getBodySnippet(prompt)}
+										</p>
+										<p class="mt-1 text-[10px] uppercase tracking-wide {darkMode ? 'text-slate-500' : 'text-slate-400'}">
+											Edit
+										</p>
+									</div>
+								</button>
+								<button
+									type="button"
+									disabled={isLoading || !onRunPrompt || !canRunPrompt}
+									onclick={() => onRunPrompt?.(prompt)}
+									title={!canRunPrompt ? 'Select a document in the viewer to run' : 'Run prompt on selected document'}
+									class="flex w-11 shrink-0 flex-col items-center justify-center rounded-r-lg border-l text-xs font-medium transition-colors {darkMode ? 'border-slate-700 text-indigo-300 hover:bg-slate-800' : 'border-slate-200 text-indigo-700 hover:bg-slate-50'} disabled:cursor-not-allowed disabled:opacity-50"
+								>
+									<svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+										<path d="M8 5v14l11-7z" />
 									</svg>
-								</div>
-								<div class="min-w-0 flex-1">
-									<p class="font-medium {darkMode ? 'text-white' : 'text-slate-900'}">{prompt.name}</p>
-									<p class="mt-0.5 line-clamp-2 text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'}">
-										{prompt.description || getBodySnippet(prompt)}
-									</p>
-								</div>
-							</button>
+									<span class="mt-0.5">Run</span>
+								</button>
+							</div>
 						{/each}
 					</div>
 				{/if}

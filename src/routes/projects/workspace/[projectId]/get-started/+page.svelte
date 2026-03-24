@@ -52,12 +52,11 @@
 		return (links.items || []) as Doclink[];
 	});
 
-	// Group doclinks by documentId (one document can have NONE, TEXT_EMBEDDINGS, IMAGE_EMBEDDINGS by linkType)
+	// One primary Doclink per documentId (linkType NONE); legacy TEXT_/IMAGE_EMBEDDINGS rows may still exist in old data
 	type DoclinkRow = {
 		documentId: string;
 		filename: string;
-		textEmbeddingStatus: string;
-		imageEmbeddingStatus: string;
+		status: string;
 	};
 	const doclinksByDocument = $derived.by((): DoclinkRow[] => {
 		const linksFromApi = doclinks as DoclinkFromApi[];
@@ -69,16 +68,10 @@
 			byDoc.set(link.documentId, list);
 		}
 		return Array.from(byDoc.entries()).map(([documentId, links]) => {
-			const noneOrFirst = links.find((l) => l.linkType === 'NONE') ?? links[0];
-			const filename = noneOrFirst?.filename ?? 'Untitled Document';
-			const textLink = links.find((l) => l.linkType === 'TEXT_EMBEDDINGS');
-			const imageLink = links.find((l) => l.linkType === 'IMAGE_EMBEDDINGS');
-			return {
-				documentId,
-				filename,
-				textEmbeddingStatus: textLink?.status ?? 'N/A',
-				imageEmbeddingStatus: imageLink?.status ?? 'N/A'
-			};
+			const primary = links.find((l) => l.linkType === 'NONE') ?? links[0];
+			const filename = primary?.filename ?? 'Untitled Document';
+			const status = primary?.status ?? 'N/A';
+			return { documentId, filename, status };
 		});
 	});
 
@@ -294,7 +287,7 @@
 			</div>
 		{/if}
 
-		<!-- Doclinks Display (grouped by documentId, status from linkType) -->
+		<!-- Doclinks Display (one primary row per documentId) -->
 		{#if projectId && doclinksByDocument.length > 0}
 			<div class="mt-8 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg border shadow-sm">
 				<div class="p-6">
@@ -316,7 +309,7 @@
 											{row.filename}
 										</div>
 										<div class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1">
-											Text: {row.textEmbeddingStatus} | Images: {row.imageEmbeddingStatus}
+											Status: {row.status}
 										</div>
 									</div>
 									<a 
