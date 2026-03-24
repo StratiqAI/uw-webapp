@@ -1,6 +1,12 @@
 <script lang="ts">
 	import type { Prompt } from '@stratiqai/types-simple';
 	import type { AiModel } from '@stratiqai/types-simple';
+	import type {
+		NestedItemSchema,
+		NestedSchemaNodeType,
+		NestedSchemaPropertyNode
+	} from '$lib/schema/promptSchemaTreeTypes';
+	import SchemaNodesEditor from './SchemaNodesEditor.svelte';
 	import { getTemplateStrForEditor, parseTemplateToAIQueryData, type AIQueryData } from '../PromptService';
 
 	/** All valid AIModel enum values (schema) — used so 3.1 and all models pass VALID_AI_MODELS.has() */
@@ -72,38 +78,12 @@
 	let stopSequences = $state<string>('');
 
 	// Advanced fields - Response Format
-	let responseFormatType = $state<'text' | 'json_object' | 'json_schema' | 'json_schema_nested'>('json_schema');
+	let responseFormatType = $state<'text' | 'json_object' | 'json_schema'>('json_schema');
 	let jsonSchemaText = $state('');
 
-	// --- Nested schema editor (improved: root type, arrays, nested objects) ---
-	type NestedSchemaNodeType = 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array';
-	interface NestedItemSchema {
-		type: NestedSchemaNodeType;
-		description?: string;
-		enum?: string[];
-		minimum?: number;
-		maximum?: number;
-		properties?: NestedSchemaPropertyNode[];
-		items?: NestedItemSchema;
-	}
-	interface NestedSchemaPropertyNode {
-		id: string;
-		name: string;
-		type: NestedSchemaNodeType;
-		required: boolean;
-		description: string;
-		enum?: string[];
-		minimum?: number;
-		maximum?: number;
-		children?: NestedSchemaPropertyNode[];
-		itemSchema?: NestedItemSchema;
-	}
 	function newNestedId(): string {
 		return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `nested_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 	}
-	let nestedRootType = $state<'object' | 'array' | 'string' | 'number' | 'boolean'>('object');
-	let nestedRootProperties = $state<NestedSchemaPropertyNode[]>([]);
-	let nestedRootItems = $state<NestedItemSchema>({ type: 'string' });
 
 	// Schema Builder State
 	let schemaProperties = $state<Record<string, any>>({});
@@ -176,39 +156,40 @@
 				const schema = typeof def === 'string' ? (() => { try { return JSON.parse(def); } catch { return {}; } })() : (def as Record<string, unknown>);
 				jsonSchemaText = typeof def === 'string' ? def : JSON.stringify(schema, null, 2);
 
-				function isNestedSchema(s: Record<string, unknown>): boolean {
-					const t = s.type as string | undefined;
-					if (t === 'array') return true;
-					if (t === 'object' && s.properties && typeof s.properties === 'object') {
-						for (const v of Object.values(s.properties as Record<string, Record<string, unknown>>)) {
-							if (v && typeof v === 'object' && (v.properties != null || v.items != null)) return true;
-						}
+				responseFormatType = 'json_schema';
+				if (schema && typeof schema === 'object' && schema.properties) {
+					const props = schema.properties as Record<string, Record<string, unknown>>;
+					const next: Record<string, any> = {};
+					for (const [key, def] of Object.entries(props)) {
+						next[key] = flatFieldFromJsonSchemaFragment(def);
 					}
-					return false;
-				}
-
-				if (schema && typeof schema === 'object' && isNestedSchema(schema)) {
-					responseFormatType = 'json_schema_nested';
-					jsonSchemaToNestedTree(schema);
+					schemaProperties = next;
+					schemaRequired = Array.isArray(schema.required) ? [...(schema.required as string[])] : [];
+					fieldOrder = Object.keys(props);
 				} else {
-					responseFormatType = 'json_schema';
-					if (schema && typeof schema === 'object' && schema.properties) {
-						schemaProperties = { ...(schema.properties as Record<string, any>) };
-						schemaRequired = Array.isArray(schema.required) ? [...(schema.required as string[])] : [];
-						fieldOrder = Object.keys(schema.properties as Record<string, unknown>);
-					} else {
-						schemaProperties = {};
-						schemaRequired = [];
-						fieldOrder = [];
-					}
+					schemaProperties = {};
+					schemaRequired = [];
+					fieldOrder = [];
 				}
 			} else if (data.responseFormat) {
-				responseFormatType = data.responseFormat.type;
-				if (data.responseFormat.type === 'json_schema' && data.responseFormat.schema) {
-					const schema = data.responseFormat.schema as any;
+				const rf = data.responseFormat;
+				const rfType = (rf as { type: string }).type;
+				responseFormatType = (rfType === 'json_schema_nested' ? 'json_schema' : rfType) as
+					| 'text'
+					| 'json_object'
+					| 'json_schema';
+				if (
+					(rfType === 'json_schema' || rfType === 'json_schema_nested') &&
+					(rf as { schema?: unknown }).schema
+				) {
+					const schema = (rf as { schema: any }).schema;
 					jsonSchemaText = JSON.stringify(schema, null, 2);
 					if (schema.properties) {
-						schemaProperties = { ...schema.properties };
+						const next: Record<string, any> = {};
+						for (const [key, def] of Object.entries(schema.properties as Record<string, Record<string, unknown>>)) {
+							next[key] = flatFieldFromJsonSchemaFragment(def);
+						}
+						schemaProperties = next;
 						schemaRequired = schema.required ? [...schema.required] : [];
 						fieldOrder = Object.keys(schema.properties);
 					}
@@ -283,16 +264,6 @@
 		return entries;
 	});
 
-	let schemaPreview = $derived.by(() => {
-		return {
-			type: 'object',
-			properties: schemaProperties,
-			required: schemaRequired,
-			additionalProperties: false,
-			$schema: 'http://json-schema.org/draft-07/schema#'
-		};
-	});
-
 	function addSchemaField(isReasoning: boolean = false) {
 		const fieldName = isReasoning
 			? 'reasoning'
@@ -343,19 +314,30 @@
 	}
 
 	function updateSchemaFieldType(fieldName: string, type: string) {
-		if (schemaProperties[fieldName]) {
-			const current = schemaProperties[fieldName];
-			const updated: any = { type, ...current };
-			if (type !== 'string') {
-				delete updated.enum;
-				delete updated.pattern;
-			}
-			if (type !== 'number' && type !== 'integer') {
-				delete updated.minimum;
-				delete updated.maximum;
-			}
-			updateSchemaField(fieldName, updated);
+		if (!schemaProperties[fieldName]) return;
+		const current = schemaProperties[fieldName];
+		const updated: Record<string, unknown> = { ...current, type };
+		if (type !== 'string') {
+			delete updated.enum;
+			delete updated.pattern;
 		}
+		if (type !== 'number' && type !== 'integer') {
+			delete updated.minimum;
+			delete updated.maximum;
+		}
+		const t = type as NestedSchemaNodeType;
+		if (t === 'object') {
+			updated.objectChildren = (current.objectChildren as NestedSchemaPropertyNode[] | undefined) ?? [];
+			delete updated.itemSchema;
+		} else if (t === 'array') {
+			updated.itemSchema =
+				(current.itemSchema as NestedItemSchema | undefined) ?? ({ type: 'string' } satisfies NestedItemSchema);
+			delete updated.objectChildren;
+		} else {
+			delete updated.objectChildren;
+			delete updated.itemSchema;
+		}
+		updateSchemaField(fieldName, updated);
 	}
 
 	function toggleSchemaFieldRequired(fieldName: string) {
@@ -399,10 +381,10 @@
 			...(node.minimum !== undefined && { minimum: node.minimum }),
 			...(node.maximum !== undefined && { maximum: node.maximum })
 		};
-		if (node.type === 'object' && node.children && node.children.length > 0) {
+		if (node.type === 'object') {
 			const properties: Record<string, unknown> = {};
 			const required: string[] = [];
-			for (const child of node.children) {
+			for (const child of node.children ?? []) {
 				if (child.name.trim()) {
 					properties[child.name.trim()] = nestedNodeToJsonSchema(child);
 					if (child.required) required.push(child.name.trim());
@@ -425,10 +407,10 @@
 			...(item.minimum !== undefined && { minimum: item.minimum }),
 			...(item.maximum !== undefined && { maximum: item.maximum })
 		};
-		if (item.type === 'object' && item.properties && item.properties.length > 0) {
+		if (item.type === 'object') {
 			const properties: Record<string, unknown> = {};
 			const required: string[] = [];
-			for (const child of item.properties) {
+			for (const child of item.properties ?? []) {
 				if (child.name.trim()) {
 					properties[child.name.trim()] = nestedNodeToJsonSchema(child);
 					if (child.required) required.push(child.name.trim());
@@ -443,61 +425,67 @@
 		return base;
 	}
 
-	function nestedTreeToJsonSchemaRoot(): Record<string, unknown> {
-		if (nestedRootType === 'object') {
+	function topLevelFieldToJsonSchema(field: Record<string, unknown>): Record<string, unknown> {
+		const t = (field.type as string) || 'string';
+		const description = field.description as string | undefined;
+		const common = description ? { description } : {};
+		if (t === 'object') {
+			const nodes = (field.objectChildren as NestedSchemaPropertyNode[] | undefined) ?? [];
 			const properties: Record<string, unknown> = {};
 			const required: string[] = [];
-			for (const node of nestedRootProperties) {
-				if (node.name.trim()) {
-					properties[node.name.trim()] = nestedNodeToJsonSchema(node);
-					if (node.required) required.push(node.name.trim());
+			for (const child of nodes) {
+				if (child.name?.trim()) {
+					const nm = child.name.trim();
+					properties[nm] = nestedNodeToJsonSchema(child);
+					if (child.required) required.push(nm);
 				}
 			}
 			return {
-				$schema: 'http://json-schema.org/draft-07/schema#',
 				type: 'object',
+				...common,
 				properties,
-				...(required.length > 0 && { required }),
+				...(required.length > 0 ? { required } : {}),
 				additionalProperties: false
 			};
 		}
-		if (nestedRootType === 'array') {
-			return {
-				$schema: 'http://json-schema.org/draft-07/schema#',
-				type: 'array',
-				items: nestedItemSchemaToJsonSchema(nestedRootItems)
-			};
+		if (t === 'array') {
+			const items = field.itemSchema
+				? nestedItemSchemaToJsonSchema(field.itemSchema as NestedItemSchema)
+				: { type: 'string' };
+			return { type: 'array', ...common, items };
 		}
-		return {
-			$schema: 'http://json-schema.org/draft-07/schema#',
-			type: nestedRootType
-		};
+		if (t === 'string') {
+			const out: Record<string, unknown> = { type: 'string', ...common };
+			const en = field.enum as string[] | undefined;
+			if (en?.length) out.enum = en;
+			if (field.pattern) out.pattern = field.pattern;
+			return out;
+		}
+		if (t === 'number' || t === 'integer') {
+			const out: Record<string, unknown> = { type: t, ...common };
+			if (field.minimum !== undefined) out.minimum = field.minimum;
+			if (field.maximum !== undefined) out.maximum = field.maximum;
+			return out;
+		}
+		if (t === 'boolean') {
+			return { type: 'boolean', ...common };
+		}
+		return { type: 'string', ...common };
 	}
 
-	function jsonSchemaToNestedTree(schema: Record<string, unknown>): boolean {
-		const type = schema.type as string | undefined;
-		if (type === 'array') {
-			nestedRootType = 'array';
-			const items = schema.items as Record<string, unknown> | undefined;
-			nestedRootItems = items ? jsonSchemaToItemSchema(items) : { type: 'string' };
-			return true;
+	let schemaPreview = $derived.by(() => {
+		const properties: Record<string, unknown> = {};
+		for (const [key, field] of Object.entries(schemaProperties)) {
+			properties[key] = topLevelFieldToJsonSchema(field);
 		}
-		if (type === 'object') {
-			nestedRootType = 'object';
-			const props = schema.properties as Record<string, Record<string, unknown>> | undefined;
-			const required = (schema.required as string[]) || [];
-			nestedRootProperties = props
-				? Object.entries(props).map(([name, def]) => jsonSchemaToPropertyNode(newNestedId(), name, def, required.includes(name)))
-				: [];
-			return true;
-		}
-		if (type === 'string' || type === 'number' || type === 'integer' || type === 'boolean') {
-			nestedRootType = type === 'integer' ? 'number' : (type as 'string' | 'number' | 'boolean');
-			nestedRootProperties = [];
-			return true;
-		}
-		return false;
-	}
+		return {
+			type: 'object',
+			properties,
+			required: schemaRequired,
+			additionalProperties: false,
+			$schema: 'http://json-schema.org/draft-07/schema#'
+		};
+	});
 
 	function jsonSchemaToPropertyNode(
 		id: string,
@@ -547,99 +535,23 @@
 		return item;
 	}
 
-	let nestedSchemaPreview = $derived(nestedTreeToJsonSchemaRoot());
-
-	function updateNestedNodeById(nodeId: string, patch: Partial<NestedSchemaPropertyNode>): void {
-		function updateIn(list: NestedSchemaPropertyNode[]): boolean {
-			for (let i = 0; i < list.length; i++) {
-				if (list[i].id === nodeId) {
-					list[i] = { ...list[i], ...patch };
-					return true;
-				}
-				const children = list[i].children;
-				if (children != null && updateIn(children)) return true;
-			}
-			return false;
-		}
-		updateIn(nestedRootProperties);
-		nestedRootProperties = [...nestedRootProperties];
-	}
-
-	function addNestedChildTo(parentId: string | null): void {
-		const newNode: NestedSchemaPropertyNode = {
-			id: newNestedId(),
-			name: '',
-			type: 'string',
-			required: false,
-			description: ''
+	/** Map a JSON Schema property definition into flat "structured form" field state (objectChildren / itemSchema). */
+	function flatFieldFromJsonSchemaFragment(def: Record<string, unknown>): Record<string, unknown> {
+		const node = jsonSchemaToPropertyNode(newNestedId(), '_', def, false);
+		const base: Record<string, unknown> = {
+			type: node.type,
+			description: node.description || '',
+			...(node.enum?.length ? { enum: node.enum } : {}),
+			...(node.minimum !== undefined ? { minimum: node.minimum } : {}),
+			...(node.maximum !== undefined ? { maximum: node.maximum } : {})
 		};
-		if (parentId === null) {
-			nestedRootProperties = [...nestedRootProperties, newNode];
-			return;
+		if (node.type === 'object') {
+			base.objectChildren = node.children ?? [];
 		}
-		function addIn(list: NestedSchemaPropertyNode[]): boolean {
-			for (let i = 0; i < list.length; i++) {
-				if (list[i].id === parentId) {
-					list[i].children = [...(list[i].children ?? []), newNode];
-					return true;
-				}
-				const children = list[i].children;
-				if (children != null && addIn(children)) return true;
-			}
-			return false;
+		if (node.type === 'array' && node.itemSchema) {
+			base.itemSchema = node.itemSchema;
 		}
-		addIn(nestedRootProperties);
-		nestedRootProperties = [...nestedRootProperties];
-	}
-
-	function removeNestedNodeById(nodeId: string): void {
-		function removeFrom(list: NestedSchemaPropertyNode[]): boolean {
-			for (let i = 0; i < list.length; i++) {
-				if (list[i].id === nodeId) {
-					list.splice(i, 1);
-					return true;
-				}
-				const children = list[i].children;
-				if (children != null && removeFrom(children)) return true;
-			}
-			return false;
-		}
-		removeFrom(nestedRootProperties);
-		nestedRootProperties = [...nestedRootProperties];
-	}
-
-	function setNestedRootItemsType(type: NestedSchemaNodeType): void {
-		if (type === 'object') {
-			nestedRootItems = { type: 'object', properties: [] };
-		} else if (type === 'array') {
-			nestedRootItems = { type: 'array', items: { type: 'string' } };
-		} else {
-			nestedRootItems = { type, description: nestedRootItems.description };
-		}
-	}
-
-	function addNestedRootItemProperty(): void {
-		if (nestedRootItems.type !== 'object') return;
-		const list = nestedRootItems.properties || [];
-		nestedRootItems = {
-			...nestedRootItems,
-			properties: [...list, { id: newNestedId(), name: '', type: 'string', required: false, description: '' }]
-		};
-	}
-
-	function updateNestedRootItemProperty(id: string, patch: Partial<NestedSchemaPropertyNode>): void {
-		if (nestedRootItems.type !== 'object' || !nestedRootItems.properties) return;
-		const props = nestedRootItems.properties.map((p) => (p.id === id ? { ...p, ...patch } : p));
-		nestedRootItems = { ...nestedRootItems, properties: props };
-	}
-
-	function removeNestedRootItemProperty(id: string): void {
-		if (nestedRootItems.type !== 'object' || !nestedRootItems.properties) return;
-		nestedRootItems = { ...nestedRootItems, properties: nestedRootItems.properties.filter((p) => p.id !== id) };
-	}
-
-	function updateNestedItemSchemaItems(items: NestedItemSchema): void {
-		nestedRootItems = { ...nestedRootItems, items };
+		return base;
 	}
 
 	async function handleSave() {
@@ -726,12 +638,6 @@
 					// invalid JSON schema; omit outputSchema
 				}
 			}
-		} else if (responseFormatType === 'json_schema_nested') {
-			outputSchema = {
-				name: templateName.trim() || 'Structured output',
-				description: templateDescription.trim() || undefined,
-				schemaDefinition: nestedTreeToJsonSchemaRoot()
-			};
 		}
 
 		saving = true;
@@ -887,211 +793,13 @@
 								class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
 							>
 								<option value="json_schema">Structured form (define fields) — default</option>
-								<option value="json_schema_nested">Structured form (nested)</option>
 								<option value="text">Plain text</option>
 								<option value="json_object">Structured list</option>
 							</select>
 						</div>
-						{#if responseFormatType === 'json_schema' || responseFormatType === 'json_schema_nested'}
+						{#if responseFormatType === 'json_schema'}
 							<div class="mt-3 space-y-3">
-								{#if responseFormatType === 'json_schema_nested'}
-									<div class="rounded-md border {darkMode ? 'border-teal-600 bg-teal-900/30' : 'border-teal-300 bg-teal-50'} p-4">
-										<div class="mb-4">
-											<label for="nested-root-type" class="mb-2 block text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'}">Type of Output</label>
-											<select
-												id="nested-root-type"
-												bind:value={nestedRootType}
-												class="w-full rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1.5 text-sm"
-											>
-												<option value="object">Object</option>
-												<option value="array">Array</option>
-												<option value="string">String</option>
-												<option value="number">Number</option>
-												<option value="boolean">Boolean</option>
-											</select>
-										</div>
-										{#if nestedRootType === 'object'}
-											<div class="mb-4">
-												<div class="mb-2 flex items-center justify-between">
-													<span class="block text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'}">Properties</span>
-													<button
-														type="button"
-														onclick={() => addNestedChildTo(null)} class="rounded bg-teal-600 px-3 py-1 text-xs text-white hover:bg-teal-700"
-													>
-														+ Add Property
-													</button>
-												</div>
-												<div class="space-y-3">
-													{#each nestedRootProperties as node (node.id)}
-														{@const isObject = node.type === 'object'}
-														{@const isArray = node.type === 'array'}
-														<div class="rounded border {darkMode ? 'border-gray-600 bg-slate-800' : 'border-gray-300 bg-white'} p-3">
-															<div class="mb-2 flex flex-wrap items-center gap-2">
-																<input
-																	type="text"
-																	value={node.name}
-																	oninput={(e) => updateNestedNodeById(node.id, { name: e.currentTarget.value })}
-																	class="flex-1 min-w-24 rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-sm"
-																	placeholder="Property name"
-																/>
-																<select
-																	value={node.type}
-																	onchange={(e) => {
-																		const v = e.currentTarget.value as NestedSchemaNodeType;
-																		updateNestedNodeById(node.id, {
-																			type: v,
-																			children: v === 'object' ? [] : undefined,
-																			itemSchema: v === 'array' ? { type: 'string' } : undefined
-																		});
-																	}}
-																	class="rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-sm"
-																>
-																	<option value="string">String</option>
-																	<option value="number">Number</option>
-																	<option value="integer">Integer</option>
-																	<option value="boolean">Boolean</option>
-																	<option value="object">Object</option>
-																	<option value="array">Array</option>
-																</select>
-																<label class="flex cursor-pointer items-center gap-1 text-sm {darkMode ? 'text-slate-200' : 'text-slate-700'}">
-																	<input
-																		type="checkbox"
-																		checked={node.required}
-																		onchange={(e) => updateNestedNodeById(node.id, { required: e.currentTarget.checked })}
-																		class="cursor-pointer"
-																	/>
-																	Required
-																</label>
-																<button
-																	type="button"
-																	onclick={() => removeNestedNodeById(node.id)} class="rounded bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
-																>
-																	Remove
-																</button>
-															</div>
-															<div class="mb-2">
-																<div class="mb-1 block text-xs font-medium {darkMode ? 'text-slate-300' : 'text-gray-700'}">Extraction Description</div>
-																<textarea
-																	value={node.description}
-																	oninput={(e) => updateNestedNodeById(node.id, { description: e.currentTarget.value })}
-																	placeholder="Describe this property..."
-																	class="w-full rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-xs"
-																	rows="2"
-																></textarea>
-															</div>
-															{#if isObject}
-																<div class="ml-4 mt-2 rounded border {darkMode ? 'border-gray-600' : 'border-gray-300'} border-dashed p-2">
-																	<div class="mb-2 flex items-center justify-between">
-																		<span class="text-xs font-medium {darkMode ? 'text-slate-400' : 'text-slate-600'}">Nested properties</span>
-																		<button type="button" onclick={() => addNestedChildTo(node.id)} class="rounded bg-teal-600 px-2 py-1 text-xs text-white hover:bg-teal-700">+ Add Property</button>
-																	</div>
-																	{#each node.children || [] as child (child.id)}
-																		<div class="mb-2 rounded border {darkMode ? 'border-gray-600 bg-slate-800' : 'border-gray-200 bg-white'} p-2">
-																			<div class="mb-1 flex flex-wrap items-center gap-2">
-																				<input type="text" value={child.name} oninput={(e) => updateNestedNodeById(child.id, { name: e.currentTarget.value })} class="min-w-20 rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-xs" placeholder="Name" />
-																				<select value={child.type} onchange={(e) => { const v = e.currentTarget.value as NestedSchemaNodeType; updateNestedNodeById(child.id, { type: v, children: v === 'object' ? [] : undefined, itemSchema: v === 'array' ? { type: 'string' } : undefined }); }} class="rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-xs">
-																					<option value="string">String</option><option value="number">Number</option><option value="integer">Integer</option><option value="boolean">Boolean</option><option value="object">Object</option><option value="array">Array</option>
-																				</select>
-																				<label class="flex items-center gap-1 text-xs {darkMode ? 'text-slate-300' : 'text-slate-600'}"><input type="checkbox" checked={child.required} onchange={(e) => updateNestedNodeById(child.id, { required: e.currentTarget.checked })} class="cursor-pointer" />Required</label>
-																				<button type="button" onclick={() => removeNestedNodeById(child.id)} class="rounded bg-red-500 px-2 py-0.5 text-xs text-white hover:bg-red-600">Remove</button>
-																			</div>
-																			<textarea value={child.description} oninput={(e) => updateNestedNodeById(child.id, { description: e.currentTarget.value })} placeholder="Description" class="w-full rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-xs" rows="1"></textarea>
-																			{#if child.type === 'object' && (child.children?.length ?? 0) > 0}
-																				<div class="ml-2 mt-1 border-l-2 {darkMode ? 'border-teal-700' : 'border-teal-300'} pl-2">
-																					{#each child.children as sub (sub.id)}
-																						<div class="mb-1 flex items-center gap-2 text-xs">
-																							<input type="text" value={sub.name} oninput={(e) => updateNestedNodeById(sub.id, { name: e.currentTarget.value })} class="rounded border px-2 py-0.5 w-24" placeholder="Name" />
-																							<select value={sub.type} onchange={(e) => { const v = e.currentTarget.value as NestedSchemaNodeType; updateNestedNodeById(sub.id, { type: v, children: v === 'object' ? [] : undefined, itemSchema: v === 'array' ? { type: 'string' } : undefined }); }} class="rounded border px-2 py-0.5"><option value="string">String</option><option value="number">Number</option><option value="integer">Integer</option><option value="boolean">Boolean</option><option value="object">Object</option><option value="array">Array</option></select>
-																							<button type="button" onclick={() => removeNestedNodeById(sub.id)} class="text-red-500 hover:underline">Remove</button>
-																						</div>
-																					{/each}
-																					<button type="button" onclick={() => addNestedChildTo(child.id)} class="text-xs text-teal-600 hover:underline">+ Add</button>
-																				</div>
-																			{/if}
-																		</div>
-																	{/each}
-																</div>
-															{/if}
-															{#if isArray && node.itemSchema}
-																<div class="ml-4 mt-2 rounded border {darkMode ? 'border-gray-600' : 'border-gray-300'} border-dashed p-2">
-																	<span class="mb-1 block text-xs font-medium {darkMode ? 'text-slate-400' : 'text-slate-600'}">Item type</span>
-																	<select
-																		value={node.itemSchema.type}
-																		onchange={(e) => {
-																			const v = e.currentTarget.value as NestedSchemaNodeType;
-																			updateNestedNodeById(node.id, { itemSchema: v === 'object' ? { type: 'object', properties: [] } : v === 'array' ? { type: 'array', items: { type: 'string' } } : { type: v } });
-																		}}
-																		class="rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-xs"
-																	>
-																		<option value="string">String</option><option value="number">Number</option><option value="integer">Integer</option><option value="boolean">Boolean</option><option value="object">Object</option><option value="array">Array</option>
-																	</select>
-																	{#if node.itemSchema.type === 'object' && node.itemSchema.properties}
-																		<div class="mt-2">
-																			<button type="button" onclick={() => { const list = node.itemSchema!.properties || []; updateNestedNodeById(node.id, { itemSchema: { ...node.itemSchema!, properties: [...list, { id: newNestedId(), name: '', type: 'string', required: false, description: '' }] } }); }} class="rounded bg-teal-600 px-2 py-1 text-xs text-white hover:bg-teal-700">+ Add item property</button>
-																			{#each node.itemSchema.properties as ip (ip.id)}
-																				<div class="mt-1 flex items-center gap-2 text-xs">
-																					<input type="text" value={ip.name} oninput={(e) => { const list = node.itemSchema!.properties || []; const next = list.map(p => p.id === ip.id ? { ...p, name: e.currentTarget.value } : p); updateNestedNodeById(node.id, { itemSchema: { ...node.itemSchema!, properties: next } }); }} class="rounded border px-2 py-0.5 w-24" placeholder="Name" />
-																					<select value={ip.type} onchange={(e) => { const v = e.currentTarget.value as NestedSchemaNodeType; const list = node.itemSchema!.properties || []; const next = list.map(p => p.id === ip.id ? { ...p, type: v, children: v === 'object' ? [] : undefined, itemSchema: v === 'array' ? ({ type: 'string' } as NestedItemSchema) : undefined } : p); updateNestedNodeById(node.id, { itemSchema: { ...node.itemSchema!, properties: next } }); }} class="rounded border px-2 py-0.5"><option value="string">String</option><option value="number">Number</option><option value="integer">Integer</option><option value="boolean">Boolean</option><option value="object">Object</option><option value="array">Array</option></select>
-																					<button type="button" onclick={() => { const list = (node.itemSchema!.properties || []).filter(p => p.id !== ip.id); updateNestedNodeById(node.id, { itemSchema: { ...node.itemSchema!, properties: list } }); }} class="text-red-500 hover:underline">Remove</button>
-																				</div>
-																			{/each}
-																		</div>
-																	{/if}
-																</div>
-															{/if}
-														</div>
-													{/each}
-													{#if nestedRootProperties.length === 0}
-														<p class="text-sm {darkMode ? 'text-gray-400' : 'text-gray-500'}">No properties. Click “+ Add Property” to define the output shape.</p>
-													{/if}
-												</div>
-											</div>
-										{:else if nestedRootType === 'array'}
-											<div class="mb-4">
-												<label for="nested-root-items-type" class="mb-2 block text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'}">Item type</label>
-												<select
-													id="nested-root-items-type"
-													value={nestedRootItems.type}
-													onchange={(e) => setNestedRootItemsType(e.currentTarget.value as NestedSchemaNodeType)}
-													class="w-full rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1.5 text-sm"
-												>
-													<option value="string">String</option>
-													<option value="number">Number</option>
-													<option value="integer">Integer</option>
-													<option value="boolean">Boolean</option>
-													<option value="object">Object</option>
-													<option value="array">Array</option>
-												</select>
-												{#if nestedRootItems.type === 'object'}
-													<div class="mt-3">
-														<div class="mb-2 flex items-center justify-between">
-															<span class="text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'}">Item properties</span>
-															<button type="button" onclick={addNestedRootItemProperty} class="rounded bg-teal-600 px-3 py-1 text-xs text-white hover:bg-teal-700">+ Add Property</button>
-														</div>
-														{#each nestedRootItems.properties || [] as ip (ip.id)}
-															<div class="mb-2 rounded border {darkMode ? 'border-gray-600 bg-slate-800' : 'border-gray-200 bg-white'} p-2">
-																<div class="mb-1 flex flex-wrap items-center gap-2">
-																	<input type="text" value={ip.name} oninput={(e) => updateNestedRootItemProperty(ip.id, { name: e.currentTarget.value })} class="min-w-20 rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-sm" placeholder="Name" />
-																	<select value={ip.type} onchange={(e) => { const v = e.currentTarget.value as NestedSchemaNodeType; updateNestedRootItemProperty(ip.id, { type: v, children: v === 'object' ? [] : undefined, itemSchema: v === 'array' ? { type: 'string' } : undefined }); }} class="rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-sm">
-																		<option value="string">String</option><option value="number">Number</option><option value="integer">Integer</option><option value="boolean">Boolean</option><option value="object">Object</option><option value="array">Array</option>
-																	</select>
-																	<label class="flex items-center gap-1 text-sm {darkMode ? 'text-slate-200' : 'text-slate-700'}"><input type="checkbox" checked={ip.required} onchange={(e) => updateNestedRootItemProperty(ip.id, { required: e.currentTarget.checked })} class="cursor-pointer" />Required</label>
-																	<button type="button" onclick={() => removeNestedRootItemProperty(ip.id)} class="rounded bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600">Remove</button>
-																</div>
-																<textarea value={ip.description} oninput={(e) => updateNestedRootItemProperty(ip.id, { description: e.currentTarget.value })} placeholder="Extraction description" class="w-full rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-xs" rows="1"></textarea>
-															</div>
-														{/each}
-													</div>
-												{/if}
-											</div>
-										{/if}
-										<div class="rounded-md border {darkMode ? 'border-teal-700 bg-teal-900/30' : 'border-teal-200 bg-teal-100'} p-3">
-											<strong class="mb-2 block text-sm {darkMode ? 'text-teal-200' : 'text-slate-900'}">Schema Preview:</strong>
-											<pre class="max-h-48 overflow-auto text-xs {darkMode ? 'text-slate-200' : 'text-slate-700'}">{JSON.stringify(nestedSchemaPreview, null, 2)}</pre>
-										</div>
-									</div>
-								{:else}
-									<div class="rounded-md border {darkMode ? 'border-teal-600 bg-teal-900/30' : 'border-teal-300 bg-teal-50'} p-4">
+								<div class="rounded-md border {darkMode ? 'border-teal-600 bg-teal-900/30' : 'border-teal-300 bg-teal-50'} p-4">
 										<div class="mb-4">
 											<div class="mb-2 flex items-center justify-between">
 												<div class="block text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'}">Fields to get back</div>
@@ -1230,6 +938,184 @@ This will be used by the LLM to extract this property"
 																</div>
 															</div>
 														{/if}
+														{#if fieldSchema.type === 'object'}
+															<div class="mt-2 border-l-2 {darkMode ? 'border-teal-600' : 'border-teal-500'} pl-3">
+																<SchemaNodesEditor
+																	nodes={fieldSchema.objectChildren ?? []}
+																	{darkMode}
+																	{newNestedId}
+																	sectionTitle="Nested properties"
+																	addButtonLabel="+ Add property"
+																	onNodesChange={(ch) => updateSchemaField(fieldName, { objectChildren: ch })}
+																/>
+															</div>
+														{/if}
+														{#if fieldSchema.type === 'array'}
+															{@const item = fieldSchema.itemSchema ?? { type: 'string' }}
+															<div class="mt-2 space-y-2 border-l-2 {darkMode ? 'border-teal-600' : 'border-teal-500'} pl-3">
+																<div class="text-xs font-medium {darkMode ? 'text-slate-300' : 'text-slate-600'}">
+																	Each array element is a
+																</div>
+																<select
+																	value={item.type}
+																	onchange={(e) => {
+																		const v = e.currentTarget.value as NestedSchemaNodeType;
+																		const next: NestedItemSchema =
+																			v === 'object'
+																				? { type: 'object', properties: [] }
+																				: v === 'array'
+																					? { type: 'array', items: { type: 'string' } }
+																					: { type: v };
+																		updateSchemaField(fieldName, { itemSchema: next });
+																	}}
+																	class="rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-sm"
+																>
+																	<option value="string">string</option>
+																	<option value="number">number</option>
+																	<option value="integer">integer</option>
+																	<option value="boolean">boolean</option>
+																	<option value="object">object</option>
+																	<option value="array">array</option>
+																</select>
+																{#if item.type === 'object'}
+																	<div class="mb-2">
+																		<div
+																			class="mb-1 block text-xs font-medium {darkMode ? 'text-slate-300' : 'text-gray-700'}"
+																		>
+																			Description of each array element (optional)
+																		</div>
+																		<textarea
+																			value={item.description ?? ''}
+																			oninput={(e) => {
+																				const cur = schemaProperties[fieldName];
+																				const it = (cur?.itemSchema ?? {
+																					type: 'object',
+																					properties: []
+																				}) as NestedItemSchema;
+																				updateSchemaField(fieldName, {
+																					itemSchema: {
+																						...it,
+																						type: 'object',
+																						description: e.currentTarget.value
+																					}
+																				});
+																			}}
+																			placeholder="e.g. An object containing detailed information about a broker."
+																			class="w-full rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-xs"
+																			rows="2"
+																		></textarea>
+																	</div>
+																	<SchemaNodesEditor
+																		nodes={item.properties ?? []}
+																		{darkMode}
+																		{newNestedId}
+																		sectionTitle="Fields on each array item"
+																		addButtonLabel="+ Add item field"
+																		onNodesChange={(props) => {
+																			const cur = schemaProperties[fieldName];
+																			const it = (cur?.itemSchema ?? {
+																				type: 'object',
+																				properties: []
+																			}) as NestedItemSchema;
+																			updateSchemaField(fieldName, {
+																				itemSchema: { ...it, type: 'object', properties: props }
+																			});
+																		}}
+																	/>
+																{:else if item.type === 'array'}
+																	{@const inner = item.items ?? { type: 'string' }}
+																	<div class="text-xs font-medium {darkMode ? 'text-slate-300' : 'text-slate-600'}">
+																		Inner element type
+																	</div>
+																	<select
+																		value={inner.type}
+																		onchange={(e) => {
+																			const v = e.currentTarget.value as NestedSchemaNodeType;
+																			const nextInner: NestedItemSchema =
+																				v === 'object'
+																					? { type: 'object', properties: [] }
+																					: v === 'array'
+																						? { type: 'array', items: { type: 'string' } }
+																						: { type: v };
+																			updateSchemaField(fieldName, {
+																				itemSchema: { ...item, type: 'array', items: nextInner }
+																			});
+																		}}
+																		class="rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-sm"
+																	>
+																		<option value="string">string</option>
+																		<option value="number">number</option>
+																		<option value="integer">integer</option>
+																		<option value="boolean">boolean</option>
+																		<option value="object">object</option>
+																		<option value="array">array</option>
+																	</select>
+																	{#if inner.type === 'object'}
+																		<div class="mb-2">
+																			<div
+																				class="mb-1 block text-xs font-medium {darkMode ? 'text-slate-300' : 'text-gray-700'}"
+																			>
+																				Description of each inner element (optional)
+																			</div>
+																			<textarea
+																				value={inner.description ?? ''}
+																				oninput={(e) => {
+																					const cur = schemaProperties[fieldName];
+																					const it = (cur?.itemSchema ?? {
+																						type: 'array',
+																						items: inner
+																					}) as NestedItemSchema;
+																					const inn = (it.items ?? inner) as NestedItemSchema;
+																					updateSchemaField(fieldName, {
+																						itemSchema: {
+																							...it,
+																							type: 'array',
+																							items: {
+																								...inn,
+																								type: 'object',
+																								description: e.currentTarget.value
+																							}
+																						}
+																					});
+																				}}
+																				class="w-full rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-xs"
+																				rows="2"
+																			></textarea>
+																		</div>
+																		<SchemaNodesEditor
+																			nodes={inner.properties ?? []}
+																			{darkMode}
+																			{newNestedId}
+																			sectionTitle="Fields on each inner item"
+																			addButtonLabel="+ Add field"
+																			onNodesChange={(props) => {
+																				const cur = schemaProperties[fieldName];
+																				const it = (cur?.itemSchema ?? {
+																					type: 'array',
+																					items: inner
+																				}) as NestedItemSchema;
+																				const inn = (it.items ?? inner) as NestedItemSchema;
+																				updateSchemaField(fieldName, {
+																					itemSchema: {
+																						...it,
+																						type: 'array',
+																						items: {
+																							...inn,
+																							type: 'object',
+																							properties: props
+																						}
+																					}
+																				});
+																			}}
+																		/>
+																	{:else if inner.type === 'array'}
+																		<div class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'}">
+																			Deepest level uses string elements; add an object field above with its own array for deeper nesting.
+																		</div>
+																	{/if}
+																{/if}
+															</div>
+														{/if}
 													</div>
 												{/each}
 												{#if Object.keys(schemaProperties).length === 0}
@@ -1241,10 +1127,9 @@ This will be used by the LLM to extract this property"
 										</div>
 										<div class="rounded-md border {darkMode ? 'border-teal-700 bg-teal-900/30' : 'border-teal-200 bg-teal-100'} p-3">
 											<strong class="mb-2 block text-sm {darkMode ? 'text-teal-200' : 'text-slate-900'}">Schema Preview:</strong>
-											<pre class="max-h-48 overflow-auto text-xs {darkMode ? 'text-slate-200' : 'text-slate-700'}">{JSON.stringify(schemaPreview, null, 2)}</pre>
+											<pre class="max-h-72 overflow-auto text-xs {darkMode ? 'text-slate-200' : 'text-slate-700'}">{JSON.stringify(schemaPreview, null, 2)}</pre>
 										</div>
 									</div>
-								{/if}
 							</div>
 						{/if}
 					</div>

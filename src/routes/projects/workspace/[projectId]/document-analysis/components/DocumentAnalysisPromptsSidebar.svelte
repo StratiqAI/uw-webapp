@@ -2,10 +2,10 @@
 	/**
 	 * Sidebar listing prompts loaded the same way as the Prompt library page.
 	 * Uses listPrompts(scope: OWNED_BY_ME) via GraphQL. Selecting a prompt runs the parent's
-	 * vision query using the prompt's content.body as the question.
+	 * vision query using the prompt's main `prompt` text as the question.
 	 */
 	import type { Prompt } from '@stratiqai/types-simple';
-	import { Q_LIST_PROMPTS } from '@stratiqai/types-simple';
+	import { Q_LIST_PROMPTS } from '$lib/graphql/promptOperations';
 	import { GraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
 
 	interface Props {
@@ -32,7 +32,7 @@
 					(p) =>
 						p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
 						(p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
-						(p.content?.body && p.content.body.toLowerCase().includes(searchQuery.toLowerCase()))
+						(p.prompt && p.prompt.toLowerCase().includes(searchQuery.toLowerCase()))
 				)
 			: prompts
 	);
@@ -75,7 +75,7 @@
 	});
 
 	function getBodySnippet(prompt: Prompt): string {
-		const body = prompt.content?.body ?? '';
+		const body = prompt.prompt ?? '';
 		return body.length > 80 ? body.slice(0, 80) + '...' : body;
 	}
 </script>

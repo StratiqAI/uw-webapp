@@ -30,7 +30,7 @@
 	import { updatePromptTemplate, createPromptTemplate, type AIQueryData } from '../../../../library/PromptService';
 	import { GraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
-	import { Q_DOCUMENT_VISION_QUERY } from '$lib/realtime/graphql/queries/DocumentVisionQuery';
+	import { M_SUBMIT_AI_QUERY, Q_GET_AI_QUERY_EXECUTION } from '@stratiqai/types-simple';
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Initialize the state variables for this component
@@ -196,27 +196,69 @@
 		isCreatingPrompt = true;
 	}
 
-	// Run vision query with a prompt (e.g. from a "Run on documents" action)
+	// Run vision query via AIQueryExecution: submit then poll until SUCCESS/ERROR
 	async function runVisionQueryWithPrompt(prompt: Prompt) {
 		const docIds = documents.map((d) => d.id);
-		if (!idToken || docIds.length === 0) return;
-		const question = prompt.content?.body?.trim() || prompt.name || 'Answer based on the document.';
+		if (!idToken || docIds.length === 0 || !projectId) return;
+		const question = prompt.prompt?.trim() || prompt.name || 'Answer based on the document.';
 		visionQueryLoading = true;
 		visionQueryError = null;
 		lastSelectedPrompt = prompt;
 		try {
-			const data = await gql<{ documentVisionQuery: VisionQueryResult }>(
-				Q_DOCUMENT_VISION_QUERY,
+			const submitRes = await gql<{ submitAIQuery: { id: string; status: string } }>(
+				M_SUBMIT_AI_QUERY,
 				{
 					input: {
+						projectId,
+						promptId: prompt.id,
+						executionId: crypto.randomUUID(),
+						inputValues: { question },
 						documentIds: docIds,
-						question,
 						topK: 5
 					}
 				},
 				idToken
 			);
-			visionQueryResult = data.documentVisionQuery;
+			const executionId = submitRes.submitAIQuery.id;
+			const pollIntervalMs = 1500;
+			const maxAttempts = 60; // ~90s
+			let attempts = 0;
+			while (attempts < maxAttempts) {
+				const pollRes = await gql<{ getAIQueryExecution: { status: string; rawOutput?: string | null; errorMessage?: string | null } }>(
+					Q_GET_AI_QUERY_EXECUTION,
+					{ id: executionId },
+					idToken
+				);
+				const exec = pollRes.getAIQueryExecution;
+				if (exec.status === 'SUCCESS') {
+					let structuredOutput: unknown = undefined;
+					if (exec.rawOutput) {
+						try {
+							const parsed = JSON.parse(exec.rawOutput);
+							structuredOutput = typeof parsed === 'object' && parsed !== null ? parsed : undefined;
+						} catch {
+							// rawOutput is plain text
+						}
+					}
+					visionQueryResult = {
+						answer: exec.rawOutput ?? '',
+						structuredOutput,
+						matchCount: docIds.length
+					};
+					break;
+				}
+				if (exec.status === 'ERROR') {
+					visionQueryError = exec.errorMessage ?? 'Execution failed';
+					visionQueryResult = null;
+					break;
+				}
+				await new Promise((r) => setTimeout(r, pollIntervalMs));
+				attempts += 1;
+			}
+			if (attempts >= maxAttempts) {
+				visionQueryError = 'Query timed out waiting for result';
+				visionQueryResult = null;
+			}
 		} catch (err) {
 			visionQueryError = err instanceof Error ? err.message : 'Vision query failed';
 			visionQueryResult = null;

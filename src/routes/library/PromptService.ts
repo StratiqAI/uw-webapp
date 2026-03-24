@@ -3,41 +3,34 @@
  *
  * Provides utilities for managing Prompt entities in the library,
  * including CRUD operations and data transformation between AIQueryData and
- * Prompt.content (body, systemInstruction). Uses inline outputSchema (PromptOutputSchema).
+ * Prompt uses flat `prompt` / `systemInstruction` (API); inline outputSchema with `schemaDefinition` only on output.
  */
 
 import type { Prompt, Project, PromptOutputSchemaInput } from '@stratiqai/types-simple';
+import { Q_GET_PROJECT_WITH_PROMPTS } from '@stratiqai/types-simple';
 import {
 	M_CREATE_PROMPT,
-	M_UPDATE_PROMPT,
 	M_DELETE_PROMPT,
-	Q_GET_PROJECT_WITH_PROMPTS,
+	M_UPDATE_PROMPT,
 	Q_LIST_PROMPTS
-} from '@stratiqai/types-simple';
+} from '$lib/graphql/promptOperations';
 import type { IGraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
 
 /** Default inline output schema when creating a prompt without a user-provided schema */
 const DEFAULT_OUTPUT_SCHEMA: PromptOutputSchemaInput = {
-	name: 'Default',
-	description: undefined,
 	schemaDefinition: { type: 'object', properties: {} }
 };
 
 /**
- * AppSync AWSJSON expects JSON as a string. Normalize outputSchema for API (create/update).
+ * AppSync AWSJSON expects JSON as a string. `PromptOutputSchemaInput` is `schemaDefinition` only on the wire.
  */
-function outputSchemaForApi(schema: PromptOutputSchemaInput): {
-	name: string;
-	description?: string;
-	schemaDefinition: string;
-} {
+function outputSchemaForApi(schema: PromptOutputSchemaInput): { schemaDefinition: string } {
+	const def = schema.schemaDefinition;
 	return {
-		name: schema.name ?? 'Structured output',
-		description: schema.description ?? undefined,
 		schemaDefinition:
-			typeof schema.schemaDefinition === 'string'
-				? schema.schemaDefinition
-				: JSON.stringify(schema.schemaDefinition ?? { type: 'object', properties: {} })
+			typeof def === 'string'
+				? def
+				: JSON.stringify(def ?? { type: 'object', properties: {} })
 	};
 }
 
@@ -70,9 +63,9 @@ export interface AIQueryData {
  * Uses content.body and content.systemInstruction; compatible with legacy JSON template shape.
  */
 export function getTemplateStrForEditor(prompt: Prompt): string {
-	const body = prompt.content?.body ?? '';
-	const systemInstruction = prompt.content?.systemInstruction ?? '';
-	const model = (prompt as { model?: string }).model ?? 'GEMINI_2_5_FLASH';
+	const body = prompt.prompt ?? '';
+	const systemInstruction = prompt.systemInstruction ?? '';
+	const model = prompt.model ?? 'GEMINI_2_5_FLASH';
 	return serializeAIQueryDataToTemplate({ prompt: body, systemPrompt: systemInstruction, model });
 }
 
@@ -174,11 +167,6 @@ export async function createPromptTemplate(
 	outputSchema?: PromptOutputSchemaInput
 ): Promise<Prompt> {
 	const variableNames = extractPromptVariableNames(aiQueryData.prompt);
-	const content = {
-		body: aiQueryData.prompt,
-		systemInstruction: aiQueryData.systemPrompt ?? undefined,
-		...(variableNames.length > 0 && { inputVariables: variableNames })
-	};
 	const schema = outputSchema ?? DEFAULT_OUTPUT_SCHEMA;
 
 	const response = await queryClient.query<{
@@ -187,7 +175,9 @@ export async function createPromptTemplate(
 		input: {
 			name,
 			description: description || undefined,
-			content,
+			prompt: aiQueryData.prompt,
+			systemInstruction: aiQueryData.systemPrompt ?? undefined,
+			...(variableNames.length > 0 && { inputVariables: variableNames }),
 			model: aiQueryData.model || 'GEMINI_2_5_FLASH',
 			outputSchema: outputSchemaForApi(schema),
 			sharingMode: 'PRIVATE'
@@ -250,11 +240,11 @@ export async function updatePromptTemplate(
 	}
 	if (updates.aiQueryData !== undefined) {
 		const variableNames = extractPromptVariableNames(updates.aiQueryData.prompt);
-		input.content = {
-			body: updates.aiQueryData.prompt,
-			systemInstruction: updates.aiQueryData.systemPrompt ?? undefined,
-			...(variableNames.length > 0 && { inputVariables: variableNames })
-		};
+		input.prompt = updates.aiQueryData.prompt;
+		input.systemInstruction = updates.aiQueryData.systemPrompt ?? undefined;
+		if (variableNames.length > 0) {
+			input.inputVariables = variableNames;
+		}
 	}
 	if (updates.description !== undefined) {
 		input.description = updates.description;

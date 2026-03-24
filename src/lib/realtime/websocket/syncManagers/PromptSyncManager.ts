@@ -5,9 +5,9 @@ import {
 	Q_GET_PROMPT,
 	Q_LIST_PROMPTS,
 	S_ON_CREATE_PROMPT,
-	S_ON_UPDATE_PROMPT,
-	S_ON_DELETE_PROMPT
-} from '@stratiqai/types-simple';
+	S_ON_DELETE_PROMPT,
+	S_ON_UPDATE_PROMPT
+} from '$lib/graphql/promptOperations';
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 import {
 	getAppSyncWsClient,
