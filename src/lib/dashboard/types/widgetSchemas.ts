@@ -136,6 +136,16 @@ export const SchemaWidgetDataSchema = z.object({
 	data: z.unknown().optional()
 });
 
+export const LocationQuotientWidgetDataSchema = z.object({
+	areaFips: z.string().min(1),
+	year: z.number().int().min(2025).max(2100),
+	regionLabel: z.string().min(1),
+	sortOrder: z.enum(['lq_desc', 'lq_asc', 'name_asc']),
+	exportBaseThreshold: z.number().positive(),
+	localBandLow: z.number().positive().optional(),
+	localBandHigh: z.number().positive().optional()
+});
+
 // ===== Schema Registry =====
 
 export const WidgetDataSchemas = {
@@ -153,7 +163,8 @@ export const WidgetDataSchemas = {
 	divergingBarChart: DivergingBarChartWidgetDataSchema,
 	metric: MetricWidgetDataSchema,
 	map: MapWidgetDataSchema,
-	schema: SchemaWidgetDataSchema
+	schema: SchemaWidgetDataSchema,
+	locationQuotient: LocationQuotientWidgetDataSchema
 } as const;
 
 // ===== Inferred Types from Schemas =====
@@ -173,6 +184,7 @@ export type DivergingBarChartWidgetData = z.infer<typeof DivergingBarChartWidget
 export type MetricWidgetData = z.infer<typeof MetricWidgetDataSchema>;
 export type MapWidgetData = z.infer<typeof MapWidgetDataSchema>;
 export type SchemaWidgetData = z.infer<typeof SchemaWidgetDataSchema>;
+export type LocationQuotientWidgetData = z.infer<typeof LocationQuotientWidgetDataSchema>;
 
 // Union type of all widget data
 export type WidgetData =
@@ -190,7 +202,8 @@ export type WidgetData =
 	| DivergingBarChartWidgetData
 	| MetricWidgetData
 	| MapWidgetData
-	| SchemaWidgetData;
+	| SchemaWidgetData
+	| LocationQuotientWidgetData;
 
 // ===== Type-safe Widget Data Mapping =====
 
@@ -210,6 +223,7 @@ export interface WidgetDataTypeMap {
 	metric: MetricWidgetData;
 	map: MapWidgetData;
 	schema: SchemaWidgetData;
+	locationQuotient: LocationQuotientWidgetData;
 }
 
 // ===== Widget Channel Configuration =====
@@ -610,6 +624,13 @@ export const WidgetChannels = {
 		widgetType: 'map',
 		schema: MapWidgetDataSchema,
 		description: description || `Map channel: ${channelId}`
+	}),
+
+	locationQuotient: (channelId: string, description?: string): WidgetChannelConfig<'locationQuotient'> => ({
+		channelId,
+		widgetType: 'locationQuotient',
+		schema: LocationQuotientWidgetDataSchema,
+		description: description || `Location quotient channel: ${channelId}`
 	})
 } as const;
 

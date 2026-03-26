@@ -59,6 +59,8 @@ function isEffectivelyEmpty(data: unknown, widgetType: WidgetType): boolean {
 			return !Array.isArray(d.labels) || d.labels.length === 0 || !Array.isArray(d.values) || d.values.length === 0;
 		case 'schema':
 			return !d.schemaId;
+		case 'locationQuotient':
+			return !d.areaFips || d.year == null;
 		default:
 			return false;
 	}

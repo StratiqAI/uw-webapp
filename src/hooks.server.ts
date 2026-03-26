@@ -1,5 +1,6 @@
 // src/hooks.server.ts
 import { type CurrentUser } from '$lib/types/auth';
+import { createSupabaseServerClient } from '$lib/supabase/server';
 import type { Handle } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
@@ -51,6 +52,7 @@ function claimsToCurrentUser(payload: JWTPayload) {
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
+	event.locals.supabase = createSupabaseServerClient(event.cookies);
 	// console.log("*******************************************************************************")
 	// console.log("event", event);
 	// console.log("*******************************************************************************")

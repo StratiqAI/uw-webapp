@@ -527,7 +527,10 @@ export const Publishers = {
 		createWidgetPublisher(WidgetChannels.image(channelId), publisherId),
 
 	map: (channelId: string, publisherId: string) =>
-		createWidgetPublisher(WidgetChannels.map(channelId), publisherId)
+		createWidgetPublisher(WidgetChannels.map(channelId), publisherId),
+
+	locationQuotient: (channelId: string, publisherId: string) =>
+		createWidgetPublisher(WidgetChannels.locationQuotient(channelId), publisherId)
 } as const;
 
 /**
@@ -575,7 +578,10 @@ export const Consumers = {
 		createWidgetConsumer(WidgetChannels.image(channelId), consumerId),
 
 	map: (channelId: string, consumerId: string) =>
-		createWidgetConsumer(WidgetChannels.map(channelId), consumerId)
+		createWidgetConsumer(WidgetChannels.map(channelId), consumerId),
+
+	locationQuotient: (channelId: string, consumerId: string) =>
+		createWidgetConsumer(WidgetChannels.locationQuotient(channelId), consumerId)
 } as const;
 
 /**
@@ -623,5 +629,8 @@ export const WidgetStores = {
 		createReactiveWidgetConsumer(WidgetChannels.image(channelId), widgetId),
 
 	map: (channelId: string, widgetId: string) =>
-		createReactiveWidgetConsumer(WidgetChannels.map(channelId), widgetId)
+		createReactiveWidgetConsumer(WidgetChannels.map(channelId), widgetId),
+
+	locationQuotient: (channelId: string, widgetId: string) =>
+		createReactiveWidgetConsumer(WidgetChannels.locationQuotient(channelId), widgetId)
 } as const;

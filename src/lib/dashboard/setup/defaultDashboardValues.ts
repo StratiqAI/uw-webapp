@@ -110,6 +110,17 @@ export const DEFAULT_WIDGET_DATA: Record<WidgetType, Record<string, unknown>> = 
 	schema: {
 		schemaId: 'example-schema',
 		data: {}
+	},
+	locationQuotient: {
+		// FIPS must match `qcew_quarterly_data.area_fips` (QCEW quarterly codes differ from annual).
+		// Portland–Vancouver–Hillsboro MSA; Supabase extract is 2025 Q1–Q3.
+		areaFips: 'C3980',
+		year: 2025,
+		regionLabel: 'Portland-Vancouver-Hillsboro, OR-WA',
+		sortOrder: 'lq_desc',
+		exportBaseThreshold: 1.25,
+		localBandLow: 0.92,
+		localBandHigh: 1.08
 	}
 };
 
@@ -132,7 +143,8 @@ export const DEFAULT_WIDGET_SIZES: Record<WidgetType, { colSpan: number; rowSpan
 	sparkline: { colSpan: 4, rowSpan: 1 },
 	heatmap: { colSpan: 6, rowSpan: 4 },
 	divergingBarChart: { colSpan: 6, rowSpan: 3 },
-	schema: { colSpan: 6, rowSpan: 3 }
+	schema: { colSpan: 6, rowSpan: 3 },
+	locationQuotient: { colSpan: 12, rowSpan: 4 }
 };
 
 /**

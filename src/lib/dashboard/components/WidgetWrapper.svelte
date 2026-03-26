@@ -21,6 +21,9 @@
 	import MetricWidget from '$lib/dashboard/components/widgets/MetricWidget.svelte';
 	import MapWidget from '$lib/dashboard/components/widgets/MapWidget.svelte';
 	import SchemaWidget from '$lib/dashboard/components/widgets/SchemaWidget.svelte';
+	import LocationQuotientWidget from '$lib/dashboard/components/widgets/LocationQuotientWidget.svelte';
+
+	const DEFAULT_LQ_MENU_SIGNALS = { refresh: 0, exportRequest: 0 };
 
 	interface Props {
 		widget: Widget;
@@ -34,6 +37,8 @@
 	let showEditDialog = $state(false);
 	let widgetAIGenerateFn: ((prompt: string) => Promise<void>) | null = null;
 	let widgetFlipFn: (() => void) | null = null;
+	let widgetConfigureFlipFn: (() => void) | null = null;
+	let lqMenuSignals = $state<Record<string, { refresh: number; exportRequest: number }>>({});
 	let selectedTopic = $state<string>('');
 	let previewData = $state<unknown>(null);
 
@@ -82,9 +87,30 @@
 		widgetFlipFn = flipFn;
 	}
 
+	function handleConfigureFlipReady(flipFn: () => void) {
+		widgetConfigureFlipFn = flipFn;
+	}
+
+	function bumpLqRefresh(id: string) {
+		const cur = lqMenuSignals[id] ?? { refresh: 0, exportRequest: 0 };
+		lqMenuSignals = { ...lqMenuSignals, [id]: { ...cur, refresh: cur.refresh + 1 } };
+	}
+
+	function bumpLqExport(id: string) {
+		const cur = lqMenuSignals[id] ?? { refresh: 0, exportRequest: 0 };
+		lqMenuSignals = { ...lqMenuSignals, [id]: { ...cur, exportRequest: cur.exportRequest + 1 } };
+	}
+
 	function handleWidgetAction(action: WidgetAction) {
 		switch (action) {
 			case 'configure':
+				if (widget.type === 'locationQuotient') {
+					widgetConfigureFlipFn?.();
+					break;
+				}
+				selectedTopic = currentTopic;
+				showEditDialog = true;
+				break;
 			case 'edit':
 			case 'settings':
 				selectedTopic = currentTopic;
@@ -112,6 +138,9 @@
 				break;
 
 			case 'refresh':
+				if (widget.type === 'locationQuotient') {
+					bumpLqRefresh(widget.id);
+				}
 				refreshWidgetData();
 				break;
 
@@ -124,6 +153,10 @@
 	}
 
 	function exportWidgetData() {
+		if (widget.type === 'locationQuotient') {
+			bumpLqExport(widget.id);
+			return;
+		}
 		const blob = new Blob([JSON.stringify(widget.data, null, 2)], { type: 'application/json' });
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
@@ -216,6 +249,16 @@
 				<MapWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
 			{:else if widget.type === 'schema'}
 				<SchemaWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
+			{:else if widget.type === 'locationQuotient'}
+				<LocationQuotientWidget
+					data={widget.data}
+					widgetId={widget.id}
+					topicOverride={widget.topicOverride}
+					{darkMode}
+					onConfigureFlipReady={handleConfigureFlipReady}
+					onUpdateData={(d) => dashboard.updateWidget(widget.id, { data: d })}
+					lqSignals={lqMenuSignals[widget.id] ?? DEFAULT_LQ_MENU_SIGNALS}
+				/>
 			{/if}
 		</div>
 

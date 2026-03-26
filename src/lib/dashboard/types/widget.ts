@@ -15,7 +15,8 @@ export type WidgetType =
 	| 'divergingBarChart'
 	| 'metric'
 	| 'map'
-	| 'schema';
+	| 'schema'
+	| 'locationQuotient';
 
 export interface Position {
 	gridColumn: number;
@@ -220,6 +221,19 @@ export interface MetricWidget extends BaseWidget {
 	};
 }
 
+export interface LocationQuotientWidget extends BaseWidget {
+	type: 'locationQuotient';
+	data: {
+		areaFips: string;
+		year: number;
+		regionLabel: string;
+		sortOrder: 'lq_desc' | 'lq_asc' | 'name_asc';
+		exportBaseThreshold: number;
+		localBandLow?: number;
+		localBandHigh?: number;
+	};
+}
+
 export type Widget =
 	| TableWidget
 	| TitleWidget
@@ -235,7 +249,8 @@ export type Widget =
 	| DivergingBarChartWidget
 	| MetricWidget
 	| MapWidget
-	| SchemaWidget;
+	| SchemaWidget
+	| LocationQuotientWidget;
 
 export interface DashboardConfig {
 	gridColumns: number;

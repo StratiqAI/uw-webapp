@@ -32,7 +32,8 @@ const WIDGET_NAMES: Record<WidgetType, string> = {
 	divergingBarChart: 'Diverging Bar Chart Widget',
 	metric: 'Metric Widget',
 	map: 'Map Widget',
-	schema: 'Schema Widget'
+	schema: 'Schema Widget',
+	locationQuotient: 'Location Quotient Widget'
 };
 
 /**
@@ -53,7 +54,8 @@ export const WIDGET_TYPES: WidgetType[] = [
 	'divergingBarChart',
 	'metric',
 	'map',
-	'schema'
+	'schema',
+	'locationQuotient'
 ];
 
 // Track if schemas have been registered

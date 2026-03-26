@@ -27,7 +27,8 @@
 		sparkline: 'Sparkline',
 		heatmap: 'Heatmap',
 		divergingBarChart: 'Diverging Bar Chart',
-		schema: 'Schema'
+		schema: 'Schema',
+		locationQuotient: 'Location Quotient'
 	};
 
 	function getTopicLabel(data: unknown, id: string): string {

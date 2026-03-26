@@ -161,7 +161,8 @@
 			sparkline: { colSpan: 4, rowSpan: 1 },
 			heatmap: { colSpan: 6, rowSpan: 4 },
 			divergingBarChart: { colSpan: 6, rowSpan: 3 },
-			schema: { colSpan: 6, rowSpan: 3 }
+			schema: { colSpan: 6, rowSpan: 3 },
+			locationQuotient: { colSpan: 12, rowSpan: 4 }
 		};
 
 		const { colSpan, rowSpan } = defaultSizes[type];
@@ -385,6 +386,21 @@
 					}
 				} as Widget;
 
+			case 'locationQuotient':
+				return {
+					...baseWidget,
+					type: 'locationQuotient',
+					data: {
+						areaFips: 'C3980',
+						year: 2025,
+						regionLabel: 'Portland-Vancouver-Hillsboro, OR-WA',
+						sortOrder: 'lq_desc',
+						exportBaseThreshold: 1.25,
+						localBandLow: 0.92,
+						localBandHigh: 1.08
+					}
+				} as Widget;
+
 			default:
 				return null;
 		}
@@ -417,7 +433,8 @@
 		{ type: 'sparkline', label: 'Sparkline', icon: '〰️' },
 		{ type: 'heatmap', label: 'Heatmap', icon: '🔥' },
 		{ type: 'divergingBarChart', label: 'Diverging Bar Chart', icon: '↔️' },
-		{ type: 'schema', label: 'Schema Widget', icon: '📋' }
+		{ type: 'schema', label: 'Schema Widget', icon: '📋' },
+		{ type: 'locationQuotient', label: 'Location Quotient', icon: '📍' }
 	];
 </script>
 

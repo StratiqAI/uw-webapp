@@ -9,9 +9,12 @@
 	import { dashboardWidgets } from './config';
 	import { publishWidgetData } from '$lib/dashboard/setup/widgetDataPublishers';
 
+	import { dev } from '$app/environment';
 	import { onMount, setContext } from 'svelte';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import type { Project } from '@stratiqai/types-simple';
+	import { createSupabaseBrowserClient } from '$lib/supabase/browser';
+	import { logSupabaseRpcSmokeTest } from '$lib/supabase/supabaseRpcSmokeTest';
 
 	interface Props {
 		data: PageData;
@@ -71,6 +74,22 @@
 		// Set loading to false immediately - widgets will render with their default/empty state
 		// and then update reactively when data is published
 		isLoading = false;
+
+
+		const supabase = createSupabaseBrowserClient();
+		console.log('000000000000000000000000000000000000000000000000000000000000000000000')
+		if (supabase) {
+		
+		console.log('111111111111111111111111111111111111111111111111111111111111111111111')
+			void logSupabaseRpcSmokeTest(supabase);
+			console.log('222222222222222222222222222222222222222222222222222222222222222222222')
+		} else {
+			console.log('333333333333333333333333333333333333333333333333333333333333333333333')
+			console.warn(
+				'[Supabase RPC smoke test] skipped — set PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY'
+			);
+		}
+	
 
 		// Handle responsive grid adjustment
 		function updateGridSize() {
