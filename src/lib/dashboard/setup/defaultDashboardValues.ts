@@ -114,11 +114,11 @@ export const DEFAULT_WIDGET_DATA: Record<WidgetType, Record<string, unknown>> = 
 	locationQuotient: {
 		// FIPS must match `qcew_quarterly_data.area_fips` (QCEW quarterly codes differ from annual).
 		// Portland–Vancouver–Hillsboro MSA; Supabase extract is 2025 Q1–Q3.
-		areaFips: 'C3980',
+		areaFips: 'C3890',
 		year: 2025,
 		regionLabel: 'Portland-Vancouver-Hillsboro, OR-WA',
 		sortOrder: 'lq_desc',
-		exportBaseThreshold: 1.25,
+		exportBaseThreshold: 1.08,
 		localBandLow: 0.92,
 		localBandHigh: 1.08
 	}

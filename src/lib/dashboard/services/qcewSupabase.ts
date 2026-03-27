@@ -55,6 +55,7 @@ export async function loadLocationQuotientData(
 ): Promise<{ sectors: QcewSectorAggregate[]; totalAvgMonthlyEmp: number }> {
 	const p_year = String(query.year);
 	const p_own_code = query.ownCode ?? '5';
+	/** Must match `lq_location_quotient_sectors` default: MSA NAICS sector (not 80 = all-industry). */
 	const p_agglvl_code = query.agglvlCode ?? '44';
 	const p_size_code = query.sizeCode ?? '0';
 
@@ -73,10 +74,44 @@ export async function loadLocationQuotientData(
 		p_size_code
 	};
 
+
+
+// 	SELECT
+// 	area_fips,
+// 	area_title,
+// 	year,
+// 	ROUND(
+// 	  AVG((month1_emplvl + month2_emplvl + month3_emplvl) / 3.0),
+// 	  0
+// 	) AS avg_monthly_emp
+//   FROM qcew_quarterly_data
+//   WHERE
+// 	area_fips    = 'C3890'
+// 	AND own_code = '5'
+// 	AND year     = '2025'
+// 	AND qtr      IN ('1', '2', '3')
+// 	AND agglvl_code = '41'
+// 	AND size_code   = '0'
+//   GROUP BY area_fips, area_title, year;
+  
+
+
+// {
+//     "p_area_fips": "C3980",
+//     "p_year": "2025",
+//     "p_own_code": "5",
+//     "p_agglvl_code": "44",
+//     "p_size_code": "0"
+// }
+	console.log('[loadLocationQuotientData] rpcSectorsArgs', rpcSectorsArgs);
+	console.log('[loadLocationQuotientData] rpcTotalArgs', rpcTotalArgs);
 	const [sectorsRes, totalRes] = await Promise.all([
 		supabase.rpc(LQ_RPC_SECTORS, rpcSectorsArgs),
 		supabase.rpc(LQ_RPC_TOTAL_AVG_MONTHLY_EMP, rpcTotalArgs)
 	]);
+
+	console.log('[loadLocationQuotientData] sectorsRes', sectorsRes);
+	console.log('[loadLocationQuotientData] totalRes', totalRes);
 
 	if (sectorsRes.error) {
 		throw new Error(`QCEW sectors RPC failed: ${sectorsRes.error.message}`);
@@ -86,7 +121,8 @@ export async function loadLocationQuotientData(
 	}
 
 	const raw = sectorsRes.data;
-	console.log('raw', raw);
+	console.log('[loadLocationQuotientData] raw', raw);
+	console.log('[loadLocationQuotientData] raw', raw);
 	const rows = Array.isArray(raw)
 		? (raw as Record<string, unknown>[]).map(mapRpcSectorRow)
 		: [];

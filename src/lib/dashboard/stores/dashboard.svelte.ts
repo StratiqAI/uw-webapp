@@ -83,6 +83,7 @@ class DashboardStore {
 	get hasUnsavedChanges() { return this.#hasUnsavedChanges; }
 	get isInitialized() { return this.#initialized; }
 	get autoSaveEnabled() { return this.#autoSaveEnabled; }
+	get devMode() { return this.#devMode; }
 	get projectId() { return this.#projectId; }
 	
 	// Derived state with memoization

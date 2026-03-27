@@ -391,11 +391,11 @@
 					...baseWidget,
 					type: 'locationQuotient',
 					data: {
-						areaFips: 'C3980',
+						areaFips: 'C3890',
 						year: 2025,
 						regionLabel: 'Portland-Vancouver-Hillsboro, OR-WA',
 						sortOrder: 'lq_desc',
-						exportBaseThreshold: 1.25,
+						exportBaseThreshold: 1.08,
 						localBandLow: 0.92,
 						localBandHigh: 1.08
 					}

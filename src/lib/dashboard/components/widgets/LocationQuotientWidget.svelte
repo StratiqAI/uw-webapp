@@ -1,70 +1,157 @@
 <script lang="ts">
-	import type { LocationQuotientWidget as LQW } from '$lib/dashboard/types/widget';
-	import { useReactiveValidatedTopic } from '$lib/hooks/validatedTopicStoreRunes.svelte';
-	import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import type {
+		LocationQuotientRpcInput,
+		LocationQuotientSortOrder,
+		LocationQuotientWidgetConfig
+	} from '$lib/dashboard/types/widget';
 	import {
 		loadLocationQuotientData,
 		type QcewSectorAggregate
 	} from '$lib/dashboard/services/qcewSupabase';
-	import { createSupabaseBrowserClient } from '$lib/supabase/browser';
+	import { SupabaseWidgetBase } from './SupabaseWidgetBase.svelte';
 
-	interface Props {
-		data: LQW['data'];
-		widgetId?: string;
-		topicOverride?: string;
-		darkMode?: boolean;
-		onConfigureFlipReady?: (toggleFlip: () => void) => void;
-		onUpdateData: (data: LQW['data']) => void;
-		/** Bumped from WidgetWrapper for menu actions */
-		lqSignals?: { refresh: number; exportRequest: number };
-	}
-
-	let {
-		data,
-		widgetId = 'lq-widget-default',
-		topicOverride,
-		darkMode = true,
-		onConfigureFlipReady,
-		onUpdateData,
-		lqSignals = { refresh: 0, exportRequest: 0 }
-	}: Props = $props();
-
-	const topic = $derived(getWidgetTopic('locationQuotient', widgetId, topicOverride));
-	const dataStream = useReactiveValidatedTopic<LQW['data']>(() => topic);
-
-	const widgetData = $derived<LQW['data']>({
-		areaFips: dataStream.current?.areaFips ?? data.areaFips,
-		year: dataStream.current?.year ?? data.year,
-		regionLabel: dataStream.current?.regionLabel ?? data.regionLabel,
-		sortOrder: dataStream.current?.sortOrder ?? data.sortOrder,
-		exportBaseThreshold: dataStream.current?.exportBaseThreshold ?? data.exportBaseThreshold ?? 1.25,
-		localBandLow: dataStream.current?.localBandLow ?? data.localBandLow ?? 0.92,
-		localBandHigh: dataStream.current?.localBandHigh ?? data.localBandHigh ?? 1.08
-	});
+	// --- defaults & constants (widget config, UI, QCEW copy) ---
+	const DEFAULT_WIDGET_ID = 'lq-widget-default';
+	const DEFAULT_DARK_MODE = true;
+	const DEFAULT_LQ_SIGNALS = { refresh: 0, exportRequest: 0 };
+	/** Same default as `DEFAULT_LOCAL_BAND_HIGH` so base-industry stats match chart “Export base” coloring. */
+	const DEFAULT_EXPORT_BASE_THRESHOLD = 1.08;
+	const DEFAULT_LOCAL_BAND_LOW = 0.92;
+	const DEFAULT_LOCAL_BAND_HIGH = 1.08;
+	const DEFAULT_YEAR = 2025;
+	const DEFAULT_SORT_ORDER = 'lq_desc' satisfies LocationQuotientSortOrder;
+	const BAR_SCALE_MIN_ABS = 0.35;
+	const YEAR_INPUT_MIN = 2025;
+	const YEAR_INPUT_MAX = 2100;
+	const FORM_STEP_EXPORT_THRESH = '0.05';
+	const FORM_STEP_BAND = '0.01';
+	const SUPABASE_MISSING_CLIENT_MESSAGE =
+		'Set PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY to load QCEW data.';
 
 	/** `fips` values aligned with `qcew_quarterly_data` (not the same as all annual QCEW MSA codes). */
 	const REGION_PRESETS = [
-		{ label: 'Portland-Vancouver-Hillsboro, OR-WA', fips: 'C3980' },
+		{ label: 'Portland-Vancouver-Hillsboro, OR-WA', fips: 'C3890' },
 		{ label: 'Seattle-Tacoma-Bellevue, WA', fips: 'C4266' },
 		{ label: 'Austin-Round Rock-San Marcos, TX', fips: 'C1242' },
 		{ label: 'Nashville-Davidson--Murfreesboro--Franklin, TN', fips: 'C3498' },
 		{ label: 'Phoenix-Mesa-Chandler, AZ', fips: 'C3806' }
 	] as const;
 
+	const CUSTOM_AREA_FIPS_PLACEHOLDER = REGION_PRESETS[0].fips;
+
+	// /** Demo / Storybook / offline: skip Supabase and show fixed sector rows. */
+	// const SAMPLE_LQ_SECTORS: QcewSectorAggregate[] = [
+	// 	{
+	// 		industry_code: '81',
+	// 		industry_title: 'NAICS 81 Other services (except public administration)',
+	// 		lq_avg: 1.2,
+	// 		avg_monthly_emp: 43650
+	// 	},
+	// 	{
+	// 		industry_code: '31-33',
+	// 		industry_title: 'NAICS 31-33 Manufacturing',
+	// 		lq_avg: 1.19,
+	// 		avg_monthly_emp: 116666
+	// 	},
+	// 	{
+	// 		industry_code: '42',
+	// 		industry_title: 'NAICS 42 Wholesale trade',
+	// 		lq_avg: 1.14,
+	// 		avg_monthly_emp: 53820
+	// 	},
+	// 	{
+	// 		industry_code: '54',
+	// 		industry_title: 'NAICS 54 Professional, scientific, and technical services',
+	// 		lq_avg: 0.96,
+	// 		avg_monthly_emp: 80643
+	// 	},
+	// 	{
+	// 		industry_code: '71',
+	// 		industry_title: 'NAICS 71 Arts, entertainment, and recreation',
+	// 		lq_avg: 0.93,
+	// 		avg_monthly_emp: 18889
+	// 	},
+	// 	{
+	// 		industry_code: '44-45',
+	// 		industry_title: 'NAICS 44-45 Retail trade',
+	// 		lq_avg: 0.93,
+	// 		avg_monthly_emp: 110936
+	// 	},
+	// 	{
+	// 		industry_code: '72',
+	// 		industry_title: 'NAICS 72 Accommodation and food services',
+	// 		lq_avg: 0.91,
+	// 		avg_monthly_emp: 99373
+	// 	},
+	// 	{
+	// 		industry_code: '52',
+	// 		industry_title: 'NAICS 52 Finance and insurance',
+	// 		lq_avg: 0.76,
+	// 		avg_monthly_emp: 37223
+	// 	},
+	// 	{
+	// 		industry_code: '99',
+	// 		industry_title: 'NAICS 99 Unclassified',
+	// 		lq_avg: 0.1,
+	// 		avg_monthly_emp: 167
+	// 	}
+	// ];
+	// /** Illustrative total (sum of sample sector avg monthly emp). */
+	// const SAMPLE_TOTAL_AVG_MONTHLY_EMP = 561_367;
+
+	interface Props {
+		/** Configure-panel + dashboard state; drives UI and (via subset) Supabase RPC. */
+		data: LocationQuotientWidgetConfig;
+		widgetId?: string;
+		topicOverride?: string;
+		darkMode?: boolean;
+		onConfigureFlipReady?: (toggleFlip: () => void) => void;
+		onUpdateData: (data: LocationQuotientWidgetConfig) => void;
+		/** Bumped from WidgetWrapper for menu actions */
+		lqSignals?: { refresh: number; exportRequest: number };
+	}
+
+	let {
+		data,
+		widgetId = DEFAULT_WIDGET_ID,
+		topicOverride: _topicOverride,
+		darkMode = DEFAULT_DARK_MODE,
+		onConfigureFlipReady,
+		onUpdateData,
+		lqSignals = DEFAULT_LQ_SIGNALS
+	}: Props = $props();
+
+	function toRpcQueryInput(config: LocationQuotientWidgetConfig): LocationQuotientRpcInput {
+		return { areaFips: config.areaFips, year: config.year };
+	}
+
+	/** Full configuration from `data` (reactive). `areaFips` / `year` are the RPC keys; other fields drive client-side UI only. */
+	const widgetData = $derived<LocationQuotientWidgetConfig>({
+		areaFips: data.areaFips,
+		year: data.year,
+		regionLabel: data.regionLabel,
+		sortOrder: data.sortOrder,
+		exportBaseThreshold: data.exportBaseThreshold ?? DEFAULT_EXPORT_BASE_THRESHOLD,
+		localBandLow: data.localBandLow ?? DEFAULT_LOCAL_BAND_LOW,
+		localBandHigh: data.localBandHigh ?? DEFAULT_LOCAL_BAND_HIGH
+	});
+
+	const supabase = new SupabaseWidgetBase({
+		missingClientMessage: SUPABASE_MISSING_CLIENT_MESSAGE
+	});
+
 	let isFlipped = $state(false);
-	let isLoading = $state(false);
-	let error = $state<string | null>(null);
 	let sectors = $state<QcewSectorAggregate[]>([]);
 	let totalAvgMonthlyEmp = $state(0);
 
 	// Config form draft (back face)
 	let draftAreaFips = $state('');
-	let draftYear = $state(2025);
+	let draftYear = $state(DEFAULT_YEAR);
 	let draftRegionLabel = $state('');
-	let draftSortOrder = $state<LQW['data']['sortOrder']>('lq_desc');
-	let draftExportThresh = $state(1.25);
-	let draftBandLow = $state(0.92);
-	let draftBandHigh = $state(1.08);
+	let draftSortOrder = $state<LocationQuotientSortOrder>(DEFAULT_SORT_ORDER);
+	let draftExportThresh = $state(DEFAULT_EXPORT_BASE_THRESHOLD);
+	let draftBandLow = $state(DEFAULT_LOCAL_BAND_LOW);
+	let draftBandHigh = $state(DEFAULT_LOCAL_BAND_HIGH);
 
 	function syncDraftFromData() {
 		draftAreaFips = widgetData.areaFips;
@@ -72,8 +159,8 @@
 		draftRegionLabel = widgetData.regionLabel;
 		draftSortOrder = widgetData.sortOrder;
 		draftExportThresh = widgetData.exportBaseThreshold;
-		draftBandLow = widgetData.localBandLow ?? 0.92;
-		draftBandHigh = widgetData.localBandHigh ?? 1.08;
+		draftBandLow = widgetData.localBandLow ?? DEFAULT_LOCAL_BAND_LOW;
+		draftBandHigh = widgetData.localBandHigh ?? DEFAULT_LOCAL_BAND_HIGH;
 	}
 
 	function toggleFlip() {
@@ -115,7 +202,7 @@
 	});
 
 	const barScale = $derived.by(() => {
-		let maxAbs = 0.35;
+		let maxAbs = BAR_SCALE_MIN_ABS;
 		for (const s of sortedSectors) {
 			maxAbs = Math.max(maxAbs, Math.abs(s.lq_avg - 1));
 		}
@@ -123,8 +210,8 @@
 	});
 
 	function sectorStyle(lq: number): { kind: 'export' | 'local' | 'import'; label: string } {
-		const lo = widgetData.localBandLow ?? 0.92;
-		const hi = widgetData.localBandHigh ?? 1.08;
+		const lo = widgetData.localBandLow ?? DEFAULT_LOCAL_BAND_LOW;
+		const hi = widgetData.localBandHigh ?? DEFAULT_LOCAL_BAND_HIGH;
 		if (lq > hi) return { kind: 'export', label: 'Export base' };
 		if (lq >= lo) return { kind: 'local', label: 'Meets local' };
 		return { kind: 'import', label: 'Import dep.' };
@@ -137,32 +224,29 @@
 	}
 
 	async function loadData() {
-		const supabase = createSupabaseBrowserClient();
-		if (!supabase) {
-			error = 'Set PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY to load QCEW data.';
-			return;
-		}
-		error = null;
-		isLoading = true;
-		try {
-			const result = await loadLocationQuotientData(supabase, {
-				areaFips: widgetData.areaFips,
-				year: widgetData.year
-			});
+		const rpcInput = toRpcQueryInput(widgetData);
+		const result = await supabase.runLoad((client) =>
+			loadLocationQuotientData(client, rpcInput)
+		);
+
+		if (result !== undefined) {
 			sectors = result.sectors;
 			totalAvgMonthlyEmp = result.totalAvgMonthlyEmp;
 			if (result.sectors.length === 0) {
-				error = `No sector rows for area ${widgetData.areaFips}, year ${widgetData.year}. Verify area_fips and year 2025 in qcew_quarterly_data (2025 Q1–Q3 only).`;
+				supabase.setError(
+					`No sector rows for area ${widgetData.areaFips}, year ${widgetData.year}. Verify area_fips and year ${DEFAULT_YEAR} in qcew_quarterly_data (${DEFAULT_YEAR} Q1–Q3 only).`
+				);
 			}
-		} catch (e) {
+			return;
+		}
+
+		if (supabase.error !== supabase.missingClientMessage) {
 			sectors = [];
 			totalAvgMonthlyEmp = 0;
-			error = e instanceof Error ? e.message : 'Failed to load data';
-		} finally {
-			isLoading = false;
 		}
 	}
 
+	/** Refetch when {@link LocationQuotientRpcInput} changes. */
 	$effect(() => {
 		const { areaFips, year } = widgetData;
 		void areaFips;
@@ -200,7 +284,7 @@
 		}
 	});
 
-	function patchData(p: Partial<LQW['data']>) {
+	function patchData(p: Partial<LocationQuotientWidgetConfig>) {
 		onUpdateData({ ...widgetData, ...p });
 	}
 
@@ -236,6 +320,32 @@
 	);
 	const muted = $derived(darkMode ? 'text-slate-400' : 'text-slate-500');
 	const card = $derived(darkMode ? 'bg-slate-800/80 border-slate-600' : 'bg-slate-50 border-slate-200');
+
+	/** Back-face: shared form control styles (single configuration area). */
+	const cfgLabelClass = $derived(`block text-xs font-medium ${muted}`);
+	const cfgFieldClass = $derived(
+		darkMode
+			? 'mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100'
+			: 'mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm'
+	);
+	const cfgFieldCompactClass = $derived(
+		darkMode
+			? 'mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-100'
+			: 'mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm'
+	);
+	const cfgPanelClass = $derived(
+		darkMode
+			? 'rounded-xl border border-slate-600 bg-slate-900/90 p-4 shadow-sm'
+			: 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm'
+	);
+	const cfgBtnSecondaryClass = $derived(
+		darkMode
+			? 'rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800'
+			: 'rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100'
+	);
+	const CONFIGURE_TITLE = 'Configure location quotient';
+	const CONFIGURE_BLURB =
+		`Supabase RPC over quarterly QCEW: qtr 1–3, MSA sector agglvl 44, own_code 5; total employment uses agglvl 80 / industry 10. Current table: year ${DEFAULT_YEAR}, Q1–Q3 only.`;
 </script>
 
 <div class="flip-container h-full min-h-[320px]" class:flipped={isFlipped}>
@@ -272,7 +382,7 @@
 							: 'border-slate-300 bg-white'}"
 						value={widgetData.sortOrder}
 						onchange={(e) =>
-							patchData({ sortOrder: e.currentTarget.value as LQW['data']['sortOrder'] })}
+							patchData({ sortOrder: e.currentTarget.value as LocationQuotientSortOrder })}
 					>
 						<option value="lq_desc">Sort: LQ high-low</option>
 						<option value="lq_asc">Sort: LQ low-high</option>
@@ -281,9 +391,9 @@
 				</div>
 			</div>
 
-			{#if error}
+			{#if supabase.error}
 				<div class="mx-4 mt-3 rounded-md border border-amber-600/50 bg-amber-950/40 px-3 py-2 text-sm text-amber-100">
-					{error}
+					{supabase.error}
 				</div>
 			{/if}
 
@@ -312,7 +422,7 @@
 
 			<div class="mx-4 mb-4 flex min-h-0 flex-1 flex-col rounded-xl border p-3 {card}">
 				<h3 class="mb-3 text-sm font-semibold">Location quotient by NAICS sector</h3>
-				{#if isLoading && sectors.length === 0}
+				{#if supabase.isLoading && sectors.length === 0}
 					<div class="flex flex-1 items-center justify-center py-16 text-sm {muted}">Loading…</div>
 				{:else if sortedSectors.length === 0}
 					<div class="flex flex-1 items-center justify-center py-16 text-sm {muted}">No data</div>
@@ -375,156 +485,133 @@
 				</div>
 				<p class="mt-2 text-[10px] leading-relaxed {muted}">
 					LQ = (local industry emp ÷ total local emp) ÷ (national industry emp ÷ national emp). Source:
-					quarterly QCEW in Supabase (RPC aggregates months within each quarter; qtr 1–3 for 2025).
+					quarterly QCEW in Supabase (RPC aggregates months within each quarter; qtr 1–3 for {DEFAULT_YEAR}).
 				</p>
 			</div>
 		</div>
 
-		<!-- BACK (configure) -->
+		<!-- BACK (configure): header + single centered configuration panel -->
 		<div
 			class="flip-card-back absolute h-full w-full overflow-auto rounded-lg border {darkMode
 				? 'border-slate-600 bg-slate-900'
 				: 'border-slate-200 bg-slate-50'} shadow-sm"
 		>
-			<div class="flex h-full flex-col p-5">
-				<h3 class="text-lg font-bold {darkMode ? 'text-slate-100' : 'text-slate-900'}">
-					Configure location quotient
-				</h3>
-				<p class="mt-1 text-sm {muted}">
-					Supabase RPC over quarterly QCEW: qtr 1–3, MSA sector agglvl 44, own_code 5; total employment
-					uses agglvl 80 / industry 10. Current table: year 2025, Q1–Q3 only.
-				</p>
-				<form
-					class="mt-4 flex flex-1 flex-col gap-3"
-					onsubmit={(e) => {
-						e.preventDefault();
-						applyConfig();
-					}}
-				>
-					<label class="block">
-						<span class="text-xs font-medium {muted}">Preset MSA</span>
-						<select
-							class="mt-1 w-full rounded-lg border px-3 py-2 text-sm {darkMode
-								? 'border-slate-600 bg-slate-800 text-slate-100'
-								: 'border-slate-300 bg-white'}"
-							value={draftAreaFips}
-							onchange={(e) => {
-								const fips = e.currentTarget.value;
-								draftAreaFips = fips;
-								const p = REGION_PRESETS.find((r) => r.fips === fips);
-								if (p) draftRegionLabel = p.label;
+			<div class="flex min-h-full flex-col items-center px-4 py-5 sm:px-6">
+				<div class="flex w-full max-w-lg flex-1 flex-col">
+					<header class="mb-4 shrink-0 text-center sm:text-left">
+						<h3 class="text-lg font-bold {darkMode ? 'text-slate-100' : 'text-slate-900'}">
+							{CONFIGURE_TITLE}
+						</h3>
+						<p class="mt-1 text-sm {muted}">
+							{CONFIGURE_BLURB}
+						</p>
+					</header>
+
+					<section class={cfgPanelClass} aria-label="Widget configuration">
+						<form
+							class="flex flex-col gap-3"
+							onsubmit={(e) => {
+								e.preventDefault();
+								applyConfig();
 							}}
 						>
-							{#if !REGION_PRESETS.some((r) => r.fips === draftAreaFips)}
-								<option value={draftAreaFips}>Custom ({draftAreaFips})</option>
-							{/if}
-							{#each REGION_PRESETS as r}
-								<option value={r.fips}>{r.label} ({r.fips})</option>
-							{/each}
-						</select>
-					</label>
-					<label class="block">
-						<span class="text-xs font-medium {muted}">area_fips (custom)</span>
-						<input
-							type="text"
-							bind:value={draftAreaFips}
-							class="mt-1 w-full rounded-lg border px-3 py-2 font-mono text-sm {darkMode
-								? 'border-slate-600 bg-slate-800 text-slate-100'
-								: 'border-slate-300 bg-white'}"
-							placeholder="C3980"
-						/>
-					</label>
-					<label class="block">
-						<span class="text-xs font-medium {muted}">Year</span>
-						<input
-							type="number"
-							bind:value={draftYear}
-							min="2025"
-							max="2100"
-							class="mt-1 w-full rounded-lg border px-3 py-2 text-sm {darkMode
-								? 'border-slate-600 bg-slate-800 text-slate-100'
-								: 'border-slate-300 bg-white'}"
-						/>
-						<p class="mt-1 text-[11px] leading-snug {muted}">
-							Default year 2025; quarters 1–3 only in the current extract.
-						</p>
-					</label>
-					<label class="block">
-						<span class="text-xs font-medium {muted}">Region display label</span>
-						<input
-							type="text"
-							bind:value={draftRegionLabel}
-							class="mt-1 w-full rounded-lg border px-3 py-2 text-sm {darkMode
-								? 'border-slate-600 bg-slate-800 text-slate-100'
-								: 'border-slate-300 bg-white'}"
-						/>
-					</label>
-					<label class="block">
-						<span class="text-xs font-medium {muted}">Default sort</span>
-						<select
-							bind:value={draftSortOrder}
-							class="mt-1 w-full rounded-lg border px-3 py-2 text-sm {darkMode
-								? 'border-slate-600 bg-slate-800 text-slate-100'
-								: 'border-slate-300 bg-white'}"
-						>
-							<option value="lq_desc">LQ high → low</option>
-							<option value="lq_asc">LQ low → high</option>
-							<option value="name_asc">Sector A → Z</option>
-						</select>
-					</label>
-					<div class="grid grid-cols-3 gap-2">
-						<label class="block">
-							<span class="text-xs font-medium {muted}">Export base &gt;</span>
-							<input
-								type="number"
-								step="0.05"
-								bind:value={draftExportThresh}
-								class="mt-1 w-full rounded-lg border px-2 py-2 text-sm {darkMode
-									? 'border-slate-600 bg-slate-800'
-									: 'border-slate-300 bg-white'}"
-							/>
-						</label>
-						<label class="block">
-							<span class="text-xs font-medium {muted}">Local band low</span>
-							<input
-								type="number"
-								step="0.01"
-								bind:value={draftBandLow}
-								class="mt-1 w-full rounded-lg border px-2 py-2 text-sm {darkMode
-									? 'border-slate-600 bg-slate-800'
-									: 'border-slate-300 bg-white'}"
-							/>
-						</label>
-						<label class="block">
-							<span class="text-xs font-medium {muted}">Local band high</span>
-							<input
-								type="number"
-								step="0.01"
-								bind:value={draftBandHigh}
-								class="mt-1 w-full rounded-lg border px-2 py-2 text-sm {darkMode
-									? 'border-slate-600 bg-slate-800'
-									: 'border-slate-300 bg-white'}"
-							/>
-						</label>
-					</div>
-					<div class="mt-auto flex justify-end gap-2 pt-4">
-						<button
-							type="button"
-							class="rounded-lg border px-4 py-2 text-sm font-medium {darkMode
-								? 'border-slate-600 text-slate-200 hover:bg-slate-800'
-								: 'border-slate-300 hover:bg-slate-100'}"
-							onclick={cancelConfig}
-						>
-							Cancel
-						</button>
-						<button
-							type="submit"
-							class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
-						>
-							Apply
-						</button>
-					</div>
-				</form>
+							<label class="block">
+								<span class={cfgLabelClass}>Preset MSA</span>
+								<select
+									class={cfgFieldClass}
+									value={draftAreaFips}
+									onchange={(e) => {
+										const fips = e.currentTarget.value;
+										draftAreaFips = fips;
+										const p = REGION_PRESETS.find((r) => r.fips === fips);
+										if (p) draftRegionLabel = p.label;
+									}}
+								>
+									{#if !REGION_PRESETS.some((r) => r.fips === draftAreaFips)}
+										<option value={draftAreaFips}>Custom ({draftAreaFips})</option>
+									{/if}
+									{#each REGION_PRESETS as r}
+										<option value={r.fips}>{r.label} ({r.fips})</option>
+									{/each}
+								</select>
+							</label>
+							<label class="block">
+								<span class={cfgLabelClass}>area_fips (custom)</span>
+								<input
+									type="text"
+									bind:value={draftAreaFips}
+									class="{cfgFieldClass} font-mono"
+									placeholder={CUSTOM_AREA_FIPS_PLACEHOLDER}
+								/>
+							</label>
+							<label class="block">
+								<span class={cfgLabelClass}>Year</span>
+								<input
+									type="number"
+									bind:value={draftYear}
+									min={String(YEAR_INPUT_MIN)}
+									max={String(YEAR_INPUT_MAX)}
+									class={cfgFieldClass}
+								/>
+								<p class="mt-1 text-[11px] leading-snug {muted}">
+									Default year {DEFAULT_YEAR}; quarters 1–3 only in the current extract.
+								</p>
+							</label>
+							<label class="block">
+								<span class={cfgLabelClass}>Region display label</span>
+								<input type="text" bind:value={draftRegionLabel} class={cfgFieldClass} />
+							</label>
+							<label class="block">
+								<span class={cfgLabelClass}>Default sort</span>
+								<select bind:value={draftSortOrder} class={cfgFieldClass}>
+									<option value="lq_desc">LQ high → low</option>
+									<option value="lq_asc">LQ low → high</option>
+									<option value="name_asc">Sector A → Z</option>
+								</select>
+							</label>
+							<div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+								<label class="block">
+									<span class={cfgLabelClass}>Export base &gt;</span>
+									<input
+										type="number"
+										step={FORM_STEP_EXPORT_THRESH}
+										bind:value={draftExportThresh}
+										class={cfgFieldCompactClass}
+									/>
+								</label>
+								<label class="block">
+									<span class={cfgLabelClass}>Local band low</span>
+									<input
+										type="number"
+										step={FORM_STEP_BAND}
+										bind:value={draftBandLow}
+										class={cfgFieldCompactClass}
+									/>
+								</label>
+								<label class="block">
+									<span class={cfgLabelClass}>Local band high</span>
+									<input
+										type="number"
+										step={FORM_STEP_BAND}
+										bind:value={draftBandHigh}
+										class={cfgFieldCompactClass}
+									/>
+								</label>
+							</div>
+							<div class="flex justify-end gap-2 border-t pt-4 {darkMode ? 'border-slate-600' : 'border-slate-200'}">
+								<button type="button" class={cfgBtnSecondaryClass} onclick={cancelConfig}>
+									Cancel
+								</button>
+								<button
+									type="submit"
+									class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+								>
+									Apply
+								</button>
+							</div>
+						</form>
+					</section>
+				</div>
 			</div>
 		</div>
 	</div>

@@ -221,17 +221,32 @@ export interface MetricWidget extends BaseWidget {
 	};
 }
 
+/** Sort mode for the sector list (UI only; does not change the RPC). */
+export type LocationQuotientSortOrder = 'lq_desc' | 'lq_asc' | 'name_asc';
+
+/**
+ * Persisted configuration for {@link LocationQuotientWidget}: configure-panel inputs and dashboard `data`.
+ * Drives reactive UI (labels, sort, LQ bands). A subset {@link LocationQuotientRpcInput} triggers Supabase RPC refetch.
+ */
+export interface LocationQuotientWidgetConfig {
+	areaFips: string;
+	year: number;
+	regionLabel: string;
+	sortOrder: LocationQuotientSortOrder;
+	exportBaseThreshold: number;
+	localBandLow?: number;
+	localBandHigh?: number;
+}
+
+/**
+ * Arguments passed to `loadLocationQuotientData` / QCEW Supabase RPC.
+ * When `areaFips` or `year` change in {@link LocationQuotientWidgetConfig}, the widget should refetch.
+ */
+export type LocationQuotientRpcInput = Pick<LocationQuotientWidgetConfig, 'areaFips' | 'year'>;
+
 export interface LocationQuotientWidget extends BaseWidget {
 	type: 'locationQuotient';
-	data: {
-		areaFips: string;
-		year: number;
-		regionLabel: string;
-		sortOrder: 'lq_desc' | 'lq_asc' | 'name_asc';
-		exportBaseThreshold: number;
-		localBandLow?: number;
-		localBandHigh?: number;
-	};
+	data: LocationQuotientWidgetConfig;
 }
 
 export type Widget =

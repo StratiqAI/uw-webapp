@@ -136,6 +136,7 @@ export const SchemaWidgetDataSchema = z.object({
 	data: z.unknown().optional()
 });
 
+/** Must stay aligned with `LocationQuotientWidgetConfig` in `./widget.ts`. */
 export const LocationQuotientWidgetDataSchema = z.object({
 	areaFips: z.string().min(1),
 	year: z.number().int().min(2025).max(2100),
