@@ -19,7 +19,8 @@ import {
 } from '$lib/dashboard/types/dashboardTabs';
 import { DASHBOARD_STORAGE_VERSION } from '$lib/dashboard/utils/storage';
 import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
-import { isValidPosition, findAvailablePosition } from '$lib/dashboard/utils/grid';
+import { isValidPosition, findAvailablePosition, resolveCollisions } from '$lib/dashboard/utils/grid';
+import type { WidgetRect } from '$lib/dashboard/utils/grid';
 import { DashboardStorage } from '$lib/dashboard/utils/storage';
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 
@@ -81,6 +82,7 @@ class DashboardStore {
 	#dragState = $state<DragState>(structuredClone(DEFAULT_DRAG_STATE));
 	#resizeState = $state<ResizeState>(structuredClone(DEFAULT_RESIZE_STATE));
 	#fullscreenWidgetId = $state<string | null>(null);
+	#displacementPreview = $state<Record<string, Position>>({});
 	
 	// Settings
 	#autoSaveEnabled = $state(true);
@@ -114,6 +116,7 @@ class DashboardStore {
 	activeTabId = $derived(this.#activeTabId);
 	tabOrder = $derived(this.#tabOrder);
 	fullscreenWidgetId = $derived(this.#fullscreenWidgetId);
+	displacementPreview = $derived(this.#displacementPreview);
 	get tabIds(): DashboardTabId[] { return this.#tabOrder.map(t => t.id); }
 	get isInitialized() { return this.#initialized; }
 	
@@ -512,10 +515,112 @@ class DashboardStore {
 	resetInteractionStates(): void {
 		this.#dragState = structuredClone(DEFAULT_DRAG_STATE);
 		this.#resizeState = structuredClone(DEFAULT_RESIZE_STATE);
+		this.#displacementPreview = {};
 	}
 
 	setFullscreenWidget(id: string | null): void {
 		this.#fullscreenWidgetId = id;
+	}
+
+	/**
+	 * Checks whether the widget fits within the column bounds of the grid
+	 * (rows can always auto-expand, so only columns matter for validity).
+	 */
+	fitsInColumns(colSpan: number, gridColumn: number): boolean {
+		return gridColumn >= 1 && gridColumn + colSpan - 1 <= this.#config.gridColumns;
+	}
+
+	/**
+	 * Compute and store a live preview of where other widgets would be displaced
+	 * if `movingWidgetId` were dropped at `targetPosition`.
+	 */
+	setDisplacementPreview(movingWidgetId: string, targetPosition: Position): void {
+		const widget = this.#widgets.find((w) => w.id === movingWidgetId);
+		if (!widget) {
+			this.#displacementPreview = {};
+			return;
+		}
+
+		const placed: WidgetRect = {
+			id: widget.id,
+			gridColumn: targetPosition.gridColumn,
+			gridRow: targetPosition.gridRow,
+			colSpan: widget.colSpan,
+			rowSpan: widget.rowSpan
+		};
+
+		const others: WidgetRect[] = this.#widgets
+			.filter((w) => w.id !== movingWidgetId)
+			.map((w) => ({
+				id: w.id,
+				gridColumn: w.gridColumn,
+				gridRow: w.gridRow,
+				colSpan: w.colSpan,
+				rowSpan: w.rowSpan
+			}));
+
+		const displaced = resolveCollisions(placed, others);
+		this.#displacementPreview = Object.fromEntries(displaced);
+	}
+
+	clearDisplacementPreview(): void {
+		this.#displacementPreview = {};
+	}
+
+	/**
+	 * Move a widget to a new position, pushing overlapping widgets downward.
+	 * Auto-expands the grid rows as needed.
+	 */
+	moveWidgetWithDisplacement(id: string, position: Position): boolean {
+		const widget = this.#widgets.find((w) => w.id === id);
+		if (!widget) return false;
+
+		if (!this.fitsInColumns(widget.colSpan, position.gridColumn)) {
+			return false;
+		}
+
+		const placed: WidgetRect = {
+			id: widget.id,
+			gridColumn: position.gridColumn,
+			gridRow: position.gridRow,
+			colSpan: widget.colSpan,
+			rowSpan: widget.rowSpan
+		};
+
+		const others: WidgetRect[] = this.#widgets
+			.filter((w) => w.id !== id)
+			.map((w) => ({
+				id: w.id,
+				gridColumn: w.gridColumn,
+				gridRow: w.gridRow,
+				colSpan: w.colSpan,
+				rowSpan: w.rowSpan
+			}));
+
+		const displaced = resolveCollisions(placed, others);
+
+		const newWidgets = this.#widgets.map((w) => {
+			if (w.id === id) {
+				return { ...w, ...position } as Widget;
+			}
+			const newPos = displaced.get(w.id);
+			return newPos ? ({ ...w, ...newPos } as Widget) : w;
+		});
+
+		let maxRow = 0;
+		for (const w of newWidgets) {
+			const bottom = w.gridRow + w.rowSpan - 1;
+			if (bottom > maxRow) maxRow = bottom;
+		}
+		if (maxRow > this.#config.gridRows) {
+			this.#config = { ...this.#config, gridRows: maxRow + GRID_BUFFER_ROWS };
+		}
+
+		this.#widgets = newWidgets;
+		this.#displacementPreview = {};
+		this.#scheduleAutoSave();
+		this.#emit('widget:updated', { id, updates: position });
+		return true;
 	}
 	
 	updateGridConfig(config: Partial<DashboardConfig>): void {

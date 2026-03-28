@@ -330,7 +330,7 @@ html, body {
 
 /* ── 3. Sidebar ──────────────────────────────────────────────── */
 [data-theme="warm"] aside {
-  background: linear-gradient(to bottom, #e8e0cc, #dfd7be) !important;
+  background: #e8e0cc !important;
   border-right-color: rgba(180, 150, 90, 0.38) !important;
 }
 

@@ -7,7 +7,7 @@
 		containerEl?: HTMLElement;
 		handleDragOver: (e: DragEvent) => void;
 		handleDrop: (e: DragEvent) => void;
-		handleDragLeave: () => void;
+		handleDragLeave: (e: DragEvent) => void;
 		children?: any;
 	}
 

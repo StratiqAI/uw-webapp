@@ -1,4 +1,7 @@
 <script lang="ts">
+	import ConfirmModal from '$lib/components/Dialog/ConfirmModal.svelte';
+	import { toastStore } from '$lib/stores/toastStore.svelte';
+
 	// Workflow type - defined locally since it may not be exported from types-simple
 	type Workflow = {
 		id: string;
@@ -18,6 +21,8 @@
 
 	let { workflows, selectedWorkflowId, darkMode, onWorkflowChange, onRename, onDelete }: Props = $props();
 	let isOpen = $state(false);
+	let deleteConfirmOpen = $state(false);
+	let deleteConfirmWorkflow = $state<Workflow | null>(null);
 	let editingWorkflowId = $state<string | null>(null);
 	let editingName = $state('');
 	let renameInputRef: HTMLInputElement | null = $state(null);
@@ -85,22 +90,28 @@
 		}
 	}
 
-	async function handleDelete(workflow: Workflow, event: MouseEvent) {
+	function handleDelete(workflow: Workflow, event: MouseEvent) {
 		event.stopPropagation();
-		
-		if (!confirm(`Are you sure you want to delete "${workflow.name || 'Unnamed Workflow'}"? This action cannot be undone.`)) {
-			return;
-		}
+		deleteConfirmWorkflow = workflow;
+		deleteConfirmOpen = true;
+	}
 
-		if (onDelete) {
-			try {
-				await onDelete(workflow.id);
-			} catch (error) {
-				console.error('Failed to delete workflow:', error);
-				alert(`Error deleting workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
-			}
+	async function confirmDeleteWorkflow() {
+		const workflow = deleteConfirmWorkflow;
+		if (!workflow || !onDelete) return;
+		try {
+			await onDelete(workflow.id);
+		} catch (error) {
+			console.error('Failed to delete workflow:', error);
+			toastStore.error(
+				`Error deleting workflow: ${error instanceof Error ? error.message : 'Unknown error'}`
+			);
 		}
 	}
+
+	$effect(() => {
+		if (!deleteConfirmOpen) deleteConfirmWorkflow = null;
+	});
 
 	$effect(() => {
 		if (isOpen) {
@@ -220,3 +231,15 @@
 		</div>
 	{/if}
 </div>
+
+<ConfirmModal
+	bind:open={deleteConfirmOpen}
+	title="Delete workflow?"
+	message={deleteConfirmWorkflow
+		? `Are you sure you want to delete "${deleteConfirmWorkflow.name || 'Unnamed Workflow'}"? This action cannot be undone.`
+		: ''}
+	confirmLabel="Delete"
+	cancelLabel="Cancel"
+	{darkMode}
+	onConfirm={confirmDeleteWorkflow}
+/>

@@ -22,6 +22,7 @@
 	import { getWidgetComponent } from '$lib/dashboard/setup/widgetRegistry';
 	import SchemaWidget from '$lib/dashboard/components/widgets/SchemaWidget.svelte';
 	import LocationQuotientWidget from '$lib/dashboard/components/widgets/LocationQuotientWidget.svelte';
+	import ConfirmModal from '$lib/components/Dialog/ConfirmModal.svelte';
 
 	const DEFAULT_LQ_MENU_SIGNALS = { refresh: 0, exportRequest: 0 };
 
@@ -39,6 +40,7 @@
 	let widgetFlipFn: (() => void) | null = null;
 	let widgetConfigureFlipFn: (() => void) | null = null;
 	let lqMenuSignals = $state<Record<string, { refresh: number; exportRequest: number }>>({});
+	let removeConfirmOpen = $state(false);
 	let selectedTopic = $state<string>('');
 	let previewData = $state<unknown>(null);
 	let lastRefreshedAt = $state<Date | null>(null);
@@ -156,9 +158,7 @@
 				break;
 
 			case 'remove':
-				if (confirm(`Are you sure you want to remove this ${widget.type} widget?`)) {
-					dashboard.removeWidget(widget.id);
-				}
+				removeConfirmOpen = true;
 				break;
 		}
 	}
@@ -193,6 +193,7 @@
 	const isBeingDragged = $derived(
 		dashboard.dragState.isDragging && dashboard.dragState.activeWidgetId === widget.id
 	);
+	const displacedPos = $derived(dashboard.displacementPreview[widget.id]);
 
 	// Dynamic component lookup for package-based widgets (registry-first)
 	const RegisteredComp = $derived(getWidgetComponent(widget.type));
@@ -207,9 +208,9 @@
 	style={isWidgetFullscreen
 		? `position: fixed; inset: 1rem; width: calc(100vw - 2rem); height: calc(100vh - 2rem); z-index: 100050; max-width: none;`
 		: `
-    grid-column: ${widget.gridColumn} / span ${widget.colSpan};
-    grid-row: ${widget.gridRow} / span ${widget.rowSpan};
-    z-index: ${zIndex};
+    grid-column: ${(displacedPos?.gridColumn ?? widget.gridColumn)} / span ${widget.colSpan};
+    grid-row: ${(displacedPos?.gridRow ?? widget.gridRow)} / span ${widget.rowSpan};
+    z-index: ${isBeingDragged ? 0 : zIndex};
   `}
 	draggable={!widget.locked && !isWidgetFullscreen}
 	ondragstart={dragHandlers.handleDragStart}
@@ -321,6 +322,16 @@
 		<ResizeHandles widgetId={widget.id} />
 	{/if}
 </div>
+
+<ConfirmModal
+	bind:open={removeConfirmOpen}
+	title="Remove widget?"
+	message={`Are you sure you want to remove this ${widget.type} widget?`}
+	confirmLabel="Remove"
+	cancelLabel="Cancel"
+	{darkMode}
+	onConfirm={() => dashboard.removeWidget(widget.id)}
+/>
 
 <!-- Configure Dialog -->
 {#if showEditDialog}

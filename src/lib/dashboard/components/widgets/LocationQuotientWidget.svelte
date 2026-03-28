@@ -221,10 +221,32 @@
 		return { kind: 'import', label: 'Import dep.' };
 	}
 
-	function barColors(kind: 'export' | 'local' | 'import') {
-		if (kind === 'export') return { bar: 'bg-emerald-500', badge: 'bg-emerald-500/20 text-emerald-300' };
-		if (kind === 'local') return { bar: 'bg-sky-500', badge: 'bg-sky-500/20 text-sky-200' };
-		return { bar: 'bg-amber-500', badge: 'bg-amber-500/20 text-amber-200' };
+	function barColors(kind: 'export' | 'local' | 'import', dark: boolean) {
+		if (dark) {
+			if (kind === 'export') {
+				return { bar: 'bg-emerald-500', badge: 'bg-emerald-500/20 text-emerald-200' };
+			}
+			if (kind === 'local') {
+				return { bar: 'bg-sky-500', badge: 'bg-sky-500/20 text-sky-200' };
+			}
+			return { bar: 'bg-amber-500', badge: 'bg-amber-500/20 text-amber-200' };
+		}
+		if (kind === 'export') {
+			return {
+				bar: 'bg-emerald-600',
+				badge: 'border border-emerald-300/80 bg-emerald-100 text-emerald-950'
+			};
+		}
+		if (kind === 'local') {
+			return {
+				bar: 'bg-sky-600',
+				badge: 'border border-sky-300/80 bg-sky-100 text-sky-950'
+			};
+		}
+		return {
+			bar: 'bg-amber-600',
+			badge: 'border border-amber-300/80 bg-amber-100 text-amber-950'
+		};
 	}
 
 	async function loadData() {
@@ -322,8 +344,11 @@
 			? 'bg-slate-900 text-slate-100 border-slate-700'
 			: 'bg-white text-slate-900 border-slate-200'
 	);
-	const muted = $derived(darkMode ? 'text-slate-400' : 'text-slate-500');
+	const muted = $derived(darkMode ? 'text-slate-400' : 'text-slate-700');
 	const card = $derived(darkMode ? 'bg-slate-800/80 border-slate-600' : 'bg-slate-50 border-slate-200');
+	const lqValueClass = $derived(darkMode ? 'text-slate-200' : 'text-slate-900');
+	const barMidlineClass = $derived(darkMode ? 'bg-white/90' : 'bg-slate-500/70');
+	const legendMidlineClass = $derived(darkMode ? 'bg-white/80' : 'bg-slate-500');
 
 	/** Back-face: shared form control styles (single configuration area). */
 	const cfgLabelClass = $derived(`block text-xs font-medium ${muted}`);
@@ -396,7 +421,11 @@
 			</div>
 
 			{#if supabase.error}
-				<div class="mx-4 mt-3 rounded-md border border-amber-600/50 bg-amber-950/40 px-3 py-2 text-sm text-amber-100">
+				<div
+					class="mx-4 mt-3 rounded-md border px-3 py-2 text-sm {darkMode
+						? 'border-amber-600/50 bg-amber-950/40 text-amber-100'
+						: 'border-amber-400/70 bg-amber-50 text-amber-950'}"
+				>
 					{supabase.error}
 				</div>
 			{/if}
@@ -434,16 +463,18 @@
 					<div class="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
 						{#each sortedSectors as s}
 							{@const st = sectorStyle(s.lq_avg)}
-							{@const c = barColors(st.kind)}
+							{@const c = barColors(st.kind, darkMode)}
 							{@const delta = s.lq_avg - 1}
 							{@const halfPct = (Math.abs(delta) / barScale) * 50}
 							<div class="grid grid-cols-[minmax(0,1fr)_minmax(120px,2fr)_52px_auto] items-center gap-2 text-sm">
 								<div class="truncate pr-1 text-xs font-medium" title={s.industry_title}>
 									{s.industry_title}
 								</div>
-								<div class="relative h-7 rounded bg-slate-950/40">
+								<div
+									class="relative h-7 rounded {darkMode ? 'bg-slate-950/40' : 'bg-slate-200/90'}"
+								>
 									<div
-										class="pointer-events-none absolute inset-y-0 left-1/2 z-10 w-px bg-white/90"
+										class="pointer-events-none absolute inset-y-0 left-1/2 z-10 w-px {barMidlineClass}"
 										aria-hidden="true"
 									></div>
 									{#if delta >= 0}
@@ -458,7 +489,9 @@
 										></div>
 									{/if}
 								</div>
-								<div class="text-right text-xs font-mono tabular-nums">{s.lq_avg.toFixed(2)}</div>
+								<div class="text-right text-xs font-mono tabular-nums font-semibold {lqValueClass}">
+									{s.lq_avg.toFixed(2)}
+								</div>
 								<span
 									class="whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium {c.badge}"
 								>
@@ -484,7 +517,7 @@
 						<span class="h-2.5 w-2.5 rounded-sm bg-amber-500"></span> Import dependent
 					</span>
 					<span class="inline-flex items-center gap-1.5">
-						<span class="h-3 w-px bg-white/80"></span> National avg (LQ = 1)
+						<span class="h-3 w-px {legendMidlineClass}"></span> National avg (LQ = 1)
 					</span>
 				</div>
 				<p class="mt-2 text-[10px] leading-relaxed {muted}">

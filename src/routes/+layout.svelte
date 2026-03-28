@@ -11,6 +11,7 @@
 	import { initTopicStoreSync } from '$lib/stores/topicStoreSync';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import { DashboardStorage } from '$lib/dashboard/utils/storage';
+	import ToastContainer from '$lib/components/Toast/ToastContainer.svelte';
 
 	// Register package-based widgets before schema initialization
 	registerWidget(metricWidget);
@@ -90,11 +91,12 @@
 
 <div class="app-background-pattern h-full bg-primary-100/40 dark:bg-linear-to-b dark:from-slate-900 dark:via-slate-900 dark:to-slate-950">
 	<aside
-		class={`transition-width fixed inset-y-0 left-0 z-40 flex h-screen flex-col border-r border-primary-200/50 bg-primary-50/60 duration-300 dark:border-primary-800/30 dark:bg-gradient-to-b dark:from-slate-900 dark:via-slate-900 dark:to-primary-950/20 ${isSidebarOpen ? `${sidebarWidthExpanded}` : `${sidebarWidthCollapsed}`} `}
+		class={`transition-width fixed inset-y-0 left-0 z-40 flex h-screen flex-col border-r border-primary-200/50 bg-primary-50/60 duration-300 dark:border-primary-800/30 dark:bg-slate-900 ${isSidebarOpen ? `${sidebarWidthExpanded}` : `${sidebarWidthCollapsed}`} `}
 	>
 		<Sidebar bind:isSidebarOpen onclick={toggleSidebar} currentUser={data.currentUser} />
 	</aside>
 	<main class={`flex-1 overflow-y-auto transition-width duration-300 ${isSidebarOpen ? `${mainMarginLeftExpanded}` : `${mainMarginLeftCollapsed}`} space-y-6 bg-primary-50/30 dark:bg-slate-900/50  `}>
 		{@render children()}
 	</main>
+	<ToastContainer darkMode={themeStore.darkMode} />
 </div>

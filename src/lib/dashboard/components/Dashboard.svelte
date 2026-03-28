@@ -25,6 +25,7 @@
 	let containerEl = $state<HTMLElement>();
 	let topicDropGhost = $state<{ position: { gridColumn: number; gridRow: number }; widgetType: WidgetType; topic: string } | null>(null);
 	let ghostValid = $state(true);
+	let lastDragCell: { col: number; row: number } | null = null;
 
 	function getPositionFromEvent(e: DragEvent): { gridColumn: number; gridRow: number } | null {
 		if (!containerEl) return null;
@@ -65,13 +66,28 @@
 
 			const position = getPositionFromEvent(e);
 			if (!position) return;
+
+			if (
+				lastDragCell &&
+				lastDragCell.col === position.gridColumn &&
+				lastDragCell.row === position.gridRow
+			) {
+				return;
+			}
+			lastDragCell = { col: position.gridColumn, row: position.gridRow };
+
 			if (dashboard.activeWidget) {
-				const canPlace = dashboard.canPlaceWidget(
-					{ ...dashboard.activeWidget, ...position },
-					dashboard.activeWidget.id
+				const fits = dashboard.fitsInColumns(
+					dashboard.activeWidget.colSpan,
+					position.gridColumn
 				);
-				ghostValid = canPlace;
+				ghostValid = fits;
 				dashboard.setDragState({ ghostPosition: position });
+				if (fits) {
+					dashboard.setDisplacementPreview(dashboard.activeWidget.id, position);
+				} else {
+					dashboard.clearDisplacementPreview();
+				}
 			}
 		},
 
@@ -112,16 +128,29 @@
 
 			const position = dashboard.dragState.ghostPosition;
 			if (position && dashboard.dragState.activeWidgetId && ghostValid) {
-				dashboard.moveWidget(dashboard.dragState.activeWidgetId, position);
+				dashboard.moveWidgetWithDisplacement(
+					dashboard.dragState.activeWidgetId,
+					position
+				);
 			}
 			ghostValid = true;
+			lastDragCell = null;
 			dashboard.resetInteractionStates();
 			topicDropGhost = null;
 		},
 
-		onDragLeave: () => {
+		onDragLeave: (e: DragEvent) => {
+			if (
+				containerEl &&
+				e.relatedTarget instanceof Node &&
+				containerEl.contains(e.relatedTarget)
+			) {
+				return;
+			}
 			topicDropGhost = null;
 			ghostValid = true;
+			lastDragCell = null;
+			dashboard.clearDisplacementPreview();
 			dashboard.setDragState({ ghostPosition: null });
 			topicDragStore.set(null);
 		}
@@ -136,6 +165,8 @@
 
 	function handleWidgetDragEnd() {
 		ghostValid = true;
+		lastDragCell = null;
+		dashboard.clearDisplacementPreview();
 		dashboard.resetInteractionStates();
 	}
 </script>

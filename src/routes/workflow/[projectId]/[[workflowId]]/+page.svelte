@@ -44,7 +44,6 @@
 	import WorkflowJsonExportModal from '../../components/modals/WorkflowJsonExportModal.svelte';
 	import WorkflowCreateCustomAIModal from '../../components/modals/WorkflowCreateCustomAIModal.svelte';
 	import WorkflowOutputSchemaModal from '../../components/modals/WorkflowOutputSchemaModal.svelte';
-	import ToastContainer from '$lib/components/Toast/ToastContainer.svelte';
 	import { toastStore } from '$lib/stores/toastStore.svelte';
 	import {
 		loadCustomAINodesFromStorage,
@@ -1321,7 +1320,6 @@
 
 <!-- Layout: sidebar + canvas workspace + modal layers -->
 <div class="flex h-screen w-full overflow-hidden {darkMode ? 'bg-slate-900' : 'bg-slate-50'}">
-	<ToastContainer {darkMode} />
 	<WorkflowSidebar
 		allElementTypes={allElementTypes}
 		darkMode={darkMode}

@@ -25,12 +25,14 @@ The app uses a **singleton** instance:
 
 Patterns use MQTT-like wildcards:
 
-| Token | Meaning |
-|--------|---------|
-| `+` | Exactly one path segment (non-empty, no `/`). |
-| `#` | Multi-level remainder (implementation allows `#` with regex fallbacks; MQTT convention is `#` at end). |
 
-Patterns are converted to anchored regexes. **`+` must not be escaped as a regex metacharacter** (it is a wildcard, not “one or more” in regex).
+| Token | Meaning                                                                                                |
+| ----- | ------------------------------------------------------------------------------------------------------ |
+| `+`   | Exactly one path segment (non-empty, no `/`).                                                          |
+| `#`   | Multi-level remainder (implementation allows `#` with regex fallbacks; MQTT convention is `#` at end). |
+
+
+Patterns are converted to anchored regexes. `**+` must not be escaped as a regex metacharacter** (it is a wildcard, not “one or more” in regex).
 
 ### 1.4 Schema resolution (“best match”)
 
@@ -41,16 +43,18 @@ When multiple patterns match a topic, the store picks the **most specific** patt
 - Validator: **AJV** with `ajv-formats`, options including `allErrors`, `useDefaults`, `coerceTypes`, `strict: false`.
 - If a **matching schema exists** and validation **fails**: the value is **not** written; errors are stored in a reactive map keyed by topic; `publish` returns `false`.
 - If **no schema matches**: the value is **accepted** and stored (no validation).
-- If validation **passes**: value is stored, errors for that topic cleared, subscribers notified, **`onChange` emits `publish`**.
+- If validation **passes**: value is stored, errors for that topic cleared, subscribers notified, `**onChange` emits `publish`**.
 
 ### 1.6 Primary mutations
 
-| API | Behavior | `onChange` |
-|-----|----------|------------|
-| `publish(topic, value): boolean` | Validates when a schema matches; updates tree on success | `{ type: 'publish', topic, value }` on success only |
-| `delete(topic)` | Removes leaf key; clears errors | `{ type: 'delete', topic }` |
-| `clearAllAt(path)` | Deletes all topics equal to `path` or prefixed by `path/` | `{ type: 'clear', path }` (single event for the clear operation) |
-| `registerSchema(...)` | See §2 | `{ type: 'register-schema', registration }` for object form |
+
+| API                              | Behavior                                                  | `onChange`                                                       |
+| -------------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------- |
+| `publish(topic, value): boolean` | Validates when a schema matches; updates tree on success  | `{ type: 'publish', topic, value }` on success only              |
+| `delete(topic)`                  | Removes leaf key; clears errors                           | `{ type: 'delete', topic }`                                      |
+| `clearAllAt(path)`               | Deletes all topics equal to `path` or prefixed by `path/` | `{ type: 'clear', path }` (single event for the clear operation) |
+| `registerSchema(...)`            | See §2                                                    | `{ type: 'register-schema', registration }` for object form      |
+
 
 ### 1.7 Reading and reactivity
 
@@ -89,8 +93,8 @@ interface SchemaRegistration {
 }
 ```
 
-- **`topicPattern` present**: pattern is compiled with AJV; **`publish` for matching topics** is validated against `jsonSchema`. Full registration is kept in an ID catalog and pattern→registration map.
-- **`topicPattern` omitted**: schema is **catalog-only** (metadata / tooling / UI); **does not** validate publishes.
+- `**topicPattern` present**: pattern is compiled with AJV; `**publish` for matching topics** is validated against `jsonSchema`. Full registration is kept in an ID catalog and pattern→registration map.
+- `**topicPattern` omitted**: schema is **catalog-only** (metadata / tooling / UI); **does not** validate publishes.
 
 ### 2.2 Legacy `registerSchema(pattern, jsonSchema)`
 
@@ -102,11 +106,11 @@ Module: `src/lib/dashboard/setup/widgetSchemaRegistration.ts`
 
 - `initializeWidgetSchemas()` runs once (guarded by `schemasRegistered`).
 - For each built-in `WidgetType`, registers e.g.  
-  `id: widget:{type}-v1`, `source: 'code'`,  
-  `topicPattern: widgets/{type}/+`,  
-  JSON Schema derived from Zod via `zod-to-json-schema` (cleaned).
+`id: widget:{type}-v1`, `source: 'code'`,  
+`topicPattern: widgets/{type}/+`,  
+JSON Schema derived from Zod via `zod-to-json-schema` (cleaned).
 - Package widgets: `getRegisteredManifests()` → `widgets/{kind}/+`,  
-  `id: widget:{kind}-{schemaVersion}`, `source: 'code'`.
+`id: widget:{kind}-{schemaVersion}`, `source: 'code'`.
 
 ### 2.4 Widget topic naming
 
@@ -137,12 +141,14 @@ Entry: `initTopicStoreSync(validatedTopicStore)` → returns **cleanup** (unsubs
 
 ### 3.3 Message shapes (all include `sender: string`)
 
-| `kind` | Payload | Local handling |
-|--------|---------|----------------|
-| `publish` | `topic`, `value` | `topicSnapshot.set`; `store.publish(topic, value)`; warn if `false` |
-| `delete` | `topic` | `topicSnapshot.delete`; `store.delete(topic)` |
-| `clear` | `path` | Remove matching keys from snapshot; `store.clearAllAt(path)` |
-| `register-schema` | `registration` | `store.registerSchema(registration)`; persist UI schemas |
+
+| `kind`            | Payload          | Local handling                                                      |
+| ----------------- | ---------------- | ------------------------------------------------------------------- |
+| `publish`         | `topic`, `value` | `topicSnapshot.set`; `store.publish(topic, value)`; warn if `false` |
+| `delete`          | `topic`          | `topicSnapshot.delete`; `store.delete(topic)`                       |
+| `clear`           | `path`           | Remove matching keys from snapshot; `store.clearAllAt(path)`        |
+| `register-schema` | `registration`   | `store.registerSchema(registration)`; persist UI schemas            |
+
 
 **Echo suppression:** each tab generates `sender = crypto.randomUUID()`. Incoming messages where `msg.sender === tabId` are ignored.
 
@@ -150,10 +156,12 @@ Entry: `initTopicStoreSync(validatedTopicStore)` → returns **cleanup** (unsubs
 
 ### 3.4 `localStorage` keys
 
-| Key | Content |
-|-----|---------|
-| `vts:data` | JSON object: **flat** map `{ [topic: string]: value }` for every topic that has been published through the sync layer’s snapshot (see below). |
-| `vts:schemas` | JSON array of `SchemaRegistration` with `source === 'ui'` only. |
+
+| Key           | Content                                                                                                                                       |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `vts:data`    | JSON object: **flat** map `{ [topic: string]: value }` for every topic that has been published through the sync layer’s snapshot (see below). |
+| `vts:schemas` | JSON array of `SchemaRegistration` with `source === 'ui'` only.                                                                               |
+
 
 ### 3.5 In-memory snapshot
 
@@ -165,7 +173,7 @@ Entry: `initTopicStoreSync(validatedTopicStore)` → returns **cleanup** (unsubs
 ### 3.6 Persistence timing
 
 - **Debounced** write to `vts:data` (default **500 ms**) after changes.
-- **`beforeunload`**: flush immediately so a fast reload does not lose the last edits.
+- `**beforeunload`**: flush immediately so a fast reload does not lose the last edits.
 - **Cleanup**: flush once more.
 
 ### 3.7 Restore order
@@ -200,9 +208,9 @@ Not a duplicate of `ValidatedTopicStore`, but **tightly coupled** for widget top
 
 - **File:** `src/lib/dashboard/utils/storage.ts`
 - Saves a **widget data snapshot** (topic → value under `widgets/...`) into dashboard workspace `localStorage` (project-scoped keys).
-- `restoreWidgetDataSnapshot(widgetData, { force? })`: republishes saved widget topics; by default **skips** topics that already exist in the store so **fresh** `vts:data` restore is not overwritten by stale workspace data. Tab switches use **`force: true`** where the dashboard clears topics first.
+- `restoreWidgetDataSnapshot(widgetData, { force? })`: republishes saved widget topics; by default **skips** topics that already exist in the store so **fresh** `vts:data` restore is not overwritten by stale workspace data. Tab switches use `**force: true`** where the dashboard clears topics first.
 
-For **AppSync**, treat `DashboardStorage` as **layout/workspace metadata**; the **topic/value truth** for sync design should align with **`StoreChangeEvent` + `vts:data` semantics** unless you explicitly merge workspace into the cloud model.
+For **AppSync**, treat `DashboardStorage` as **layout/workspace metadata**; the **topic/value truth** for sync design should align with `**StoreChangeEvent` + `vts:data` semantics** unless you explicitly merge workspace into the cloud model.
 
 ---
 
@@ -219,17 +227,19 @@ Minimal faithful mirror of client behavior:
 3. **Ordering / concurrency:** client has **last-write-wins** per topic via `publish`; multi-tab uses BroadcastChannel without vector clocks. Cloud should define **conflict policy** (e.g. per-topic version, `updatedAt`, owner).
 4. **Deletes and clears:** model `delete` (single topic) vs `clear` (prefix wipe) explicitly.
 5. **Schemas:**
-   - **Code schemas** ship with the app; cloud may only need them for **server validation** or **admin tooling**, not necessarily sync per user.
-   - **UI schemas** (`source === 'ui'`) are user-created; today persisted in `vts:schemas` and broadcast; cloud likely needs **per-tenant (or per-user) schema registry** if you want multi-device UI schema authoring.
+  - **Code schemas** ship with the app; cloud may only need them for **server validation** or **admin tooling**, not necessarily sync per user.
+  - **UI schemas** (`source === 'ui'`) are user-created; today persisted in `vts:schemas` and broadcast; cloud likely needs **per-tenant (or per-user) schema registry** if you want multi-device UI schema authoring.
 
 ### 6.2 Suggested mapping from `StoreChangeEvent`
 
-| Event | GraphQL / sync sketch |
-|-------|------------------------|
-| `publish` | Upsert `TopicValue` with `topic`, `value`, `updatedAt`, optional `schemaVersion` / etag |
-| `delete` | Delete or tombstone `TopicValue` |
-| `clear` | Batch delete/tombstone all keys with prefix `path + '/'` and exact `path` if stored as leaf |
-| `register-schema` | Upsert `SchemaRegistration` record (if you sync UI schemas) |
+
+| Event             | GraphQL / sync sketch                                                                       |
+| ----------------- | ------------------------------------------------------------------------------------------- |
+| `publish`         | Upsert `TopicValue` with `topic`, `value`, `updatedAt`, optional `schemaVersion` / etag     |
+| `delete`          | Delete or tombstone `TopicValue`                                                            |
+| `clear`           | Batch delete/tombstone all keys with prefix `path + '/'` and exact `path` if stored as leaf |
+| `register-schema` | Upsert `SchemaRegistration` record (if you sync UI schemas)                                 |
+
 
 ### 6.3 Auth and tenancy
 
@@ -248,28 +258,32 @@ Mirror `restoreTopics`: after network fetch, call `publish` for each topic (or b
 
 ## 7. File index
 
-| Concern | Path |
-|---------|------|
-| Store implementation | `src/lib/stores/validatedTopicStore.svelte.ts` |
-| Public re-exports | `src/lib/stores/validatedTopicStore.ts` |
-| Browser sync | `src/lib/stores/topicStoreSync.ts` |
-| Widget schema registration | `src/lib/dashboard/setup/widgetSchemaRegistration.ts` |
-| App entry (schemas + sync order) | `src/routes/+layout.svelte` |
-| Dashboard storage / widget snapshot | `src/lib/dashboard/utils/storage.ts` |
-| Widget publish helpers | `src/lib/dashboard/utils/widgetPublisher.ts`, `src/lib/dashboard/setup/widgetDataPublishers.ts` |
-| Package widget consumption | `packages/dashboard-widget-sdk/src/lib/hooks.svelte.ts` (`useReactiveValidatedTopic`) |
+
+| Concern                             | Path                                                                                            |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Store implementation                | `src/lib/stores/validatedTopicStore.svelte.ts`                                                  |
+| Public re-exports                   | `src/lib/stores/validatedTopicStore.ts`                                                         |
+| Browser sync                        | `src/lib/stores/topicStoreSync.ts`                                                              |
+| Widget schema registration          | `src/lib/dashboard/setup/widgetSchemaRegistration.ts`                                           |
+| App entry (schemas + sync order)    | `src/routes/+layout.svelte`                                                                     |
+| Dashboard storage / widget snapshot | `src/lib/dashboard/utils/storage.ts`                                                            |
+| Widget publish helpers              | `src/lib/dashboard/utils/widgetPublisher.ts`, `src/lib/dashboard/setup/widgetDataPublishers.ts` |
+| Package widget consumption          | `packages/dashboard-widget-sdk/src/lib/hooks.svelte.ts` (`useReactiveValidatedTopic`)           |
+
 
 ---
 
 ## 8. Glossary
 
-| Term | Meaning |
-|------|---------|
-| **Topic** | Slash-separated path string; key for a value in the store. |
-| **Pattern** | Topic template with `+` / `#` used for schema binding (and imperative subscribe). |
-| **Publish** | Validate (if schema matches) → assign value → emit `onChange`. |
-| **TopicStoreSync** | BroadcastChannel + `localStorage` adapter for the singleton store. |
-| **vts:data / vts:schemas** | Client persistence keys for topic flat map and UI schemas. |
+
+| Term                       | Meaning                                                                           |
+| -------------------------- | --------------------------------------------------------------------------------- |
+| **Topic**                  | Slash-separated path string; key for a value in the store.                        |
+| **Pattern**                | Topic template with `+` / `#` used for schema binding (and imperative subscribe). |
+| **Publish**                | Validate (if schema matches) → assign value → emit `onChange`.                    |
+| **TopicStoreSync**         | BroadcastChannel + `localStorage` adapter for the singleton store.                |
+| **vts:data / vts:schemas** | Client persistence keys for topic flat map and UI schemas.                        |
+
 
 ---
 

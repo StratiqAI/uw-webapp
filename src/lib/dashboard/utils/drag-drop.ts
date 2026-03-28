@@ -38,7 +38,7 @@ export function createDragHandlers(widget: Widget, handlers: DragDropHandlers) {
 export function createDropHandlers(handlers: {
 	onDragOver: (e: DragEvent) => void;
 	onDrop: (e: DragEvent) => void;
-	onDragLeave: () => void;
+	onDragLeave: (e: DragEvent) => void;
 }) {
 	return {
 		handleDragOver: (e: DragEvent) => {
@@ -51,8 +51,8 @@ export function createDropHandlers(handlers: {
 			handlers.onDrop(e);
 		},
 
-		handleDragLeave: () => {
-			handlers.onDragLeave();
+		handleDragLeave: (e: DragEvent) => {
+			handlers.onDragLeave(e);
 		}
 	};
 }

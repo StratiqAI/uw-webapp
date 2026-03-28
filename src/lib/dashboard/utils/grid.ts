@@ -1,5 +1,64 @@
 import type { Widget, Position } from '$lib/dashboard/types/widget';
 
+export interface WidgetRect {
+	id: string;
+	gridColumn: number;
+	gridRow: number;
+	colSpan: number;
+	rowSpan: number;
+}
+
+export function rectsOverlap(a: WidgetRect, b: WidgetRect): boolean {
+	return !(
+		a.gridColumn + a.colSpan <= b.gridColumn ||
+		b.gridColumn + b.colSpan <= a.gridColumn ||
+		a.gridRow + a.rowSpan <= b.gridRow ||
+		b.gridRow + b.rowSpan <= a.gridRow
+	);
+}
+
+/**
+ * Given a widget placed at a target position, push all overlapping widgets
+ * downward and resolve cascading collisions. Returns a map of widgetId → new
+ * position for every widget whose row changed.
+ */
+export function resolveCollisions(
+	placed: WidgetRect,
+	others: WidgetRect[]
+): Map<string, Position> {
+	const items = others.map((w) => ({ ...w }));
+
+	for (const w of items) {
+		if (rectsOverlap(placed, w)) {
+			w.gridRow = placed.gridRow + placed.rowSpan;
+		}
+	}
+
+	let maxIter = items.length * items.length + 1;
+	let changed = true;
+	while (changed && maxIter-- > 0) {
+		changed = false;
+		items.sort((a, b) => a.gridRow - b.gridRow || a.gridColumn - b.gridColumn);
+		for (let i = 0; i < items.length; i++) {
+			for (let j = i + 1; j < items.length; j++) {
+				if (rectsOverlap(items[i], items[j])) {
+					items[j].gridRow = items[i].gridRow + items[i].rowSpan;
+					changed = true;
+				}
+			}
+		}
+	}
+
+	const displaced = new Map<string, Position>();
+	for (const w of items) {
+		const orig = others.find((o) => o.id === w.id)!;
+		if (w.gridRow !== orig.gridRow || w.gridColumn !== orig.gridColumn) {
+			displaced.set(w.id, { gridColumn: w.gridColumn, gridRow: w.gridRow });
+		}
+	}
+	return displaced;
+}
+
 export function isValidPosition(
 	col: number,
 	row: number,
@@ -9,12 +68,10 @@ export function isValidPosition(
 	maxRows: number,
 	widgets: Widget[]
 ): boolean {
-	// Check bounds
 	if (col < 1 || row < 1 || col + colSpan - 1 > maxCols || row + rowSpan - 1 > maxRows) {
 		return false;
 	}
 
-	// Check for collisions with other widgets
 	for (const widget of widgets) {
 		const collision = !(
 			col + colSpan <= widget.gridColumn ||

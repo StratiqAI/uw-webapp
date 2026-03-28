@@ -1,8 +1,7 @@
 <script lang="ts">
 	import UserDropdown from './UserDropdown.svelte';
 	import type { CurrentUser } from '$lib/types/auth';
-	import { getContext } from 'svelte';
-	import { darkModeStore } from '$lib/stores/darkMode.svelte';
+	import { themeStore } from '$lib/stores/themeStore.svelte';
 
 	let active = $state('upload');
 	let {
@@ -16,10 +15,9 @@
 	}>();
 
 	let isCollapsed = $derived(!isSidebarOpen);
-	
-	// Use unified dark mode store
-	let darkMode = $derived.by(() => darkModeStore.darkMode);
-	let toggleDarkMode = darkModeStore.toggle;
+
+	/** Matches app chrome: dark sidebar only when theme is `dark` (light/warm use non-dark branch + CSS tokens). */
+	let isDarkTheme = $derived(themeStore.theme === 'dark');
 
 	const navItems = [
 		{
@@ -79,9 +77,9 @@
 	];
 </script>
 
-<div class="group relative flex h-full w-full flex-col {darkMode ? 'bg-gradient-to-b from-slate-800 via-slate-800 to-primary-950/30 border-primary-800/40' : 'bg-gradient-to-b from-primary-50/80 via-white to-primary-50/60 border-primary-200/60'} border-r shadow-sm overflow-visible">
+<div class="group relative flex h-full w-full flex-col {isDarkTheme ? 'bg-slate-900 border-primary-800/40' : 'bg-white border-primary-200/60'} border-r shadow-sm overflow-visible">
 	<!-- Logo and Header -->
-	<div class="relative {isSidebarOpen ? 'p-5' : 'p-3'} border-b {darkMode ? 'border-primary-700/40 border-b-primary-500/50 bg-gradient-to-r from-slate-800 via-primary-900/20 to-slate-800' : 'border-primary-300/60 bg-gradient-to-r from-primary-100/80 via-primary-50/60 to-white'}">
+	<div class="relative {isSidebarOpen ? 'p-5' : 'p-3'} border-b {isDarkTheme ? 'border-primary-700/40 border-b-primary-500/50 bg-slate-900' : 'border-primary-300/60 bg-white'}">
 		<div class="flex items-center {isSidebarOpen ? 'justify-between' : 'justify-center'}">
 			<div class="flex items-center gap-3">
 				<button
@@ -98,8 +96,8 @@
 				</button>
 				{#if isSidebarOpen}
 					<div>
-						<h1 class="text-xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'} tracking-tight">StratiqAI</h1>
-						<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-0.5 font-medium">Platform</p>
+						<h1 class="text-xl font-semibold {isDarkTheme ? 'text-white' : 'text-slate-900'} tracking-tight">StratiqAI</h1>
+						<p class="text-xs {isDarkTheme ? 'text-slate-400' : 'text-slate-500'} mt-0.5 font-medium">Platform</p>
 					</div>
 				{/if}
 			</div>
@@ -110,7 +108,7 @@
 		<!-- Expand button when collapsed - appears on hover -->
 		<button 
 			onclick={toggleSidebar} 
-			class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full p-2.5 {darkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'} border border-l-0 rounded-r-lg shadow-lg transition-all opacity-0 group-hover:opacity-100 z-50 pointer-events-none group-hover:pointer-events-auto"
+			class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full p-2.5 {isDarkTheme ? 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'} border border-l-0 rounded-r-lg shadow-lg transition-all opacity-0 group-hover:opacity-100 z-50 pointer-events-none group-hover:pointer-events-auto"
 			aria-label="Expand sidebar"
 			title="Expand sidebar"
 		>
@@ -136,7 +134,7 @@
 		<!-- Collapse button when expanded - appears on hover -->
 		<button 
 			onclick={toggleSidebar} 
-			class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full p-2.5 {darkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'} border border-l-0 rounded-r-lg shadow-lg transition-all opacity-0 group-hover:opacity-100 z-50 pointer-events-none group-hover:pointer-events-auto"
+			class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full p-2.5 {isDarkTheme ? 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'} border border-l-0 rounded-r-lg shadow-lg transition-all opacity-0 group-hover:opacity-100 z-50 pointer-events-none group-hover:pointer-events-auto"
 			aria-label="Collapse sidebar"
 			title="Collapse sidebar"
 		>
@@ -169,10 +167,10 @@
 					${isSidebarOpen ? 'items-center gap-3' : 'justify-center items-center'}
 					${
 						active === item.activeKey
-							? darkMode 
+							? isDarkTheme 
 								? 'bg-primary-900/50 text-primary-100 shadow-sm' 
 								: 'bg-primary-100 text-primary-800 shadow-sm'
-							: darkMode
+							: isDarkTheme
 								? 'text-slate-300 hover:bg-primary-900/40 hover:text-primary-200'
 								: 'text-slate-700 hover:bg-primary-100/60 hover:text-primary-900'
 					}
@@ -182,8 +180,8 @@
 				<svg 
 					class={`flex-shrink-0 transition-colors ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6'} ${
 						active === item.activeKey
-							? darkMode ? 'text-primary-100' : 'text-primary-800'
-							: darkMode ? 'text-slate-400 group-hover:text-primary-200' : 'text-slate-500 group-hover:text-primary-700'
+							? isDarkTheme ? 'text-primary-100' : 'text-primary-800'
+							: isDarkTheme ? 'text-slate-400 group-hover:text-primary-200' : 'text-slate-500 group-hover:text-primary-700'
 					}`}
 					aria-hidden="true" 
 					xmlns="http://www.w3.org/2000/svg" 
@@ -197,7 +195,7 @@
 				{#if isSidebarOpen}
 					<span class="flex-1 text-left whitespace-nowrap">{item.label}</span>
 					<svg 
-						class={`w-4 h-4 ${darkMode ? 'text-slate-500' : 'text-slate-400'} opacity-0 group-hover:opacity-100 transition-opacity`}
+						class={`w-4 h-4 ${isDarkTheme ? 'text-slate-500' : 'text-slate-400'} opacity-0 group-hover:opacity-100 transition-opacity`}
 						fill="none" 
 						stroke="currentColor" 
 						viewBox="0 0 24 24"
@@ -210,9 +208,9 @@
 	</nav>
 
 	<!-- Footer -->
-	<div class="{isSidebarOpen ? 'p-4' : 'p-3'} border-t {darkMode ? 'border-primary-800/40 bg-gradient-to-r from-slate-800/80 via-primary-950/20 to-slate-800/80' : 'border-primary-200/60 bg-gradient-to-r from-primary-50/70 via-white/50 to-primary-50/70'} relative z-50 overflow-visible">
+	<div class="{isSidebarOpen ? 'p-4' : 'p-3'} border-t {isDarkTheme ? 'border-primary-800/40 bg-slate-900' : 'border-primary-200/60 bg-white'} relative z-50 overflow-visible">
 		<div class="flex items-center {isSidebarOpen ? 'justify-start gap-3' : 'justify-center'} relative">
-			<UserDropdown {currentUser} {darkMode} {isSidebarOpen} onToggleDarkMode={toggleDarkMode} />
+			<UserDropdown {currentUser} darkMode={isDarkTheme} {isSidebarOpen} onToggleDarkMode={themeStore.toggle} />
 		</div>
 	</div>
 </div>

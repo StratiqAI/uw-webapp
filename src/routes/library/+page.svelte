@@ -11,6 +11,8 @@
 	// Components
 	import ProjectSelector from './components/ProjectSelector.svelte';
 	import PromptEditModal from './components/PromptEditModal.svelte';
+	import ConfirmModal from '$lib/components/Dialog/ConfirmModal.svelte';
+	import { toastStore } from '$lib/stores/toastStore.svelte';
 
 	// Services
 	import {
@@ -42,6 +44,8 @@
 	let searchFilter = $state('');
 	let isLoading = $state(false);
 	let error = $state<string | null>(null);
+	let deleteTemplateConfirm = $state<Prompt | null>(null);
+	let deleteTemplateModalOpen = $state(false);
 
 	// Get projects from store or page data
 	let projects = $derived.by(() => {
@@ -158,7 +162,7 @@
 	// Handle create new template
 	function handleCreateNew() {
 		if (!selectedProjectId) {
-			alert('Please select a project first');
+			toastStore.info('Please select a project first.');
 			return;
 		}
 		isCreating = true;
@@ -179,7 +183,7 @@
 		outputSchema?: { name: string; description?: string; schemaDefinition: unknown };
 	}) {
 		if (!queryClient) {
-			alert('Unable to save: not connected. Please refresh the page and try again.');
+			toastStore.error('Unable to save: not connected. Please refresh the page and try again.');
 			return;
 		}
 
@@ -237,26 +241,31 @@
 	}
 
 	// Handle delete template
-	async function handleDeleteTemplate(template: Prompt) {
-		if (!queryClient) return;
+	function requestDeleteTemplate(template: Prompt) {
+		deleteTemplateConfirm = template;
+		deleteTemplateModalOpen = true;
+	}
 
-		if (!confirm(`Are you sure you want to delete "${template.name}"?`)) {
-			return;
-		}
+	async function confirmDeleteTemplate() {
+		const template = deleteTemplateConfirm;
+		if (!template || !queryClient) return;
 
 		isLoading = true;
 		try {
 			await deletePromptTemplate(queryClient, template.id, undefined);
 
-			// Remove from store
 			validatedTopicStore.delete(toTopicPath('prompts', template.id));
 		} catch (err) {
 			console.error('Failed to delete template:', err);
-			alert(err instanceof Error ? err.message : 'Failed to delete template');
+			toastStore.error(err instanceof Error ? err.message : 'Failed to delete template');
 		} finally {
 			isLoading = false;
 		}
 	}
+
+	$effect(() => {
+		if (!deleteTemplateModalOpen) deleteTemplateConfirm = null;
+	});
 
 	// Get display info for a template
 	function getTemplateDisplayInfo(template: Prompt) {
@@ -524,7 +533,7 @@
 							<button
 								onclick={(e) => {
 									e.stopPropagation();
-									handleDeleteTemplate(template);
+									requestDeleteTemplate(template);
 								}}
 								class="absolute top-2 right-2 p-1 {darkMode
 									? 'text-slate-500 hover:text-red-400 hover:bg-red-900/20'
@@ -593,6 +602,18 @@
 		{/if}
 	</div>
 </div>
+
+<ConfirmModal
+	bind:open={deleteTemplateModalOpen}
+	title="Delete template?"
+	message={deleteTemplateConfirm
+		? `Are you sure you want to delete "${deleteTemplateConfirm.name}"?`
+		: ''}
+	confirmLabel="Delete"
+	cancelLabel="Cancel"
+	darkMode={darkMode}
+	onConfirm={confirmDeleteTemplate}
+/>
 
 <!-- Edit/Create Modal -->
 <PromptEditModal

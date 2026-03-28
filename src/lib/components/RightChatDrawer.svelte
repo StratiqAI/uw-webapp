@@ -69,10 +69,21 @@
 		return marked.parse(content) as string;
 	}
 
+	let quickTaskModalOpen = $state(false);
+	let quickTaskStatus = $state<Task['status']>('todo');
+	let quickTaskTitle = $state('');
+
 	function addQuick(status: Task['status']) {
-		const title = prompt('Task title?');
+		quickTaskStatus = status;
+		quickTaskTitle = '';
+		quickTaskModalOpen = true;
+	}
+
+	function submitQuickTask() {
+		const title = quickTaskTitle.trim();
 		if (!title) return;
-		tasks = [...tasks, { id: uuid(), title, status }];
+		tasks = [...tasks, { id: uuid(), title, status: quickTaskStatus }];
+		quickTaskModalOpen = false;
 	}
 
 	let loading = $state(false);
@@ -313,4 +324,54 @@
 	</div>
 </div>
 
-
+{#if quickTaskModalOpen}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="quick-task-title"
+	>
+		<button
+			type="button"
+			class="absolute inset-0 cursor-default"
+			aria-label="Close"
+			onclick={() => (quickTaskModalOpen = false)}
+		></button>
+		<div
+			class="relative z-10 w-full max-w-sm rounded-xl border border-gray-200 bg-white p-5 shadow-xl dark:border-gray-700 dark:bg-gray-900"
+		>
+			<h2 id="quick-task-title" class="mb-3 text-lg font-semibold text-gray-900 dark:text-gray-100">
+				New task
+			</h2>
+			<input
+				type="text"
+				bind:value={quickTaskTitle}
+				placeholder="Task title"
+				class="mb-4 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-400"
+				onkeydown={(e) => {
+					if (e.key === 'Enter') {
+						e.preventDefault();
+						submitQuickTask();
+					}
+					if (e.key === 'Escape') quickTaskModalOpen = false;
+				}}
+			/>
+			<div class="flex justify-end gap-2">
+				<button
+					type="button"
+					class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+					onclick={() => (quickTaskModalOpen = false)}
+				>
+					Cancel
+				</button>
+				<button
+					type="button"
+					class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+					onclick={submitQuickTask}
+				>
+					Add
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}

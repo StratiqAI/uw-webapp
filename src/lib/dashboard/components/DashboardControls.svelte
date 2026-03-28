@@ -7,6 +7,8 @@
 	import type { Project } from '@stratiqai/types-simple';
 	import type { AppTheme } from '$lib/stores/themeStore.svelte';
 	import ProjectSwitcher from './ProjectSwitcher.svelte';
+	import ConfirmModal from '$lib/components/Dialog/ConfirmModal.svelte';
+	import { toastStore } from '$lib/stores/toastStore.svelte';
 
 	interface Props {
 		darkMode?: boolean;
@@ -41,6 +43,7 @@
 	let renamingTabId = $state<DashboardTabId | null>(null);
 	let renameValue = $state('');
 	let showDeleteConfirm = $state<DashboardTabId | null>(null);
+	let showResetConfirm = $state(false);
 
 	const widgetCount = $derived(dashboard.widgets.length);
 	const allWidgetsLocked = $derived(dashboard.allWidgetsLocked);
@@ -89,20 +92,18 @@
 	function handleSave() {
 		const success = dashboard.save();
 		if (success) {
-			alert('Dashboard saved successfully!');
+			toastStore.success('Dashboard saved successfully.');
 		} else {
-			alert('Failed to save dashboard. Please check browser settings.');
+			toastStore.error('Failed to save dashboard. Please check browser settings.');
 		}
 	}
 
 	function handleReset() {
-		if (
-			confirm(
-				'Are you sure you want to reset to the default layout? This will replace the current layout with the default.'
-			)
-		) {
-			dashboard.resetToDefault(defaultWidgets);
-		}
+		showResetConfirm = true;
+	}
+
+	function confirmResetLayout() {
+		dashboard.resetToDefault(defaultWidgets);
 	}
 
 	function handleExport() {
@@ -111,7 +112,7 @@
 			exportedJson = json;
 			showExportDialog = true;
 		} else {
-			alert('Failed to export dashboard');
+			toastStore.error('Failed to export dashboard.');
 		}
 	}
 
@@ -121,7 +122,7 @@
 		if (success) {
 			showImportDialog = false;
 			importJson = '';
-			alert('Dashboard imported successfully!');
+			toastStore.success('Dashboard imported successfully.');
 		} else {
 			importError = 'Invalid dashboard configuration. Please check the JSON format.';
 		}
@@ -129,7 +130,7 @@
 
 	function copyToClipboard() {
 		navigator.clipboard.writeText(exportedJson).then(() => {
-			alert('Dashboard configuration copied to clipboard!');
+			toastStore.success('Dashboard configuration copied to clipboard.');
 		});
 	}
 
@@ -182,7 +183,9 @@
 		);
 
 		if (!position) {
-			alert('No available space for this widget. Try removing some widgets or expanding the grid.');
+			toastStore.info(
+				'No available space for this widget. Try removing some widgets or expanding the grid.'
+			);
 			return null;
 		}
 
@@ -241,7 +244,7 @@
 			if (success) {
 				showAddWidgetDialog = false;
 			} else {
-				alert('Failed to add widget. Please try again.');
+				toastStore.error('Failed to add widget. Please try again.');
 			}
 		}
 	}
@@ -535,8 +538,9 @@
 					aria-pressed={currentTheme === 'warm'}
 				>
 					<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M12 2C8.5 2 6 5 6 8c0 4.5 6 12 6 12s6-7.5 6-12c0-3-2.5-6-6-6z"/>
-						<circle cx="12" cy="8" r="2" fill="currentColor" stroke="none"/>
+						<path stroke-linecap="round" stroke-linejoin="round" d="M5 9h11v7a3 3 0 01-3 3H8a3 3 0 01-3-3V9z" />
+						<path stroke-linecap="round" stroke-linejoin="round" d="M17 10.5c2.5 0 4.5 1.8 4.5 4s-2 4-4.5 4" />
+						<path stroke-linecap="round" stroke-linejoin="round" d="M8 4v2M11 4v2M14 4v2" />
 					</svg>
 				</button>
 			</div>
@@ -545,6 +549,16 @@
 </header>
 
 <!-- ═══════════════════ DIALOGS ═══════════════════ -->
+
+<ConfirmModal
+	bind:open={showResetConfirm}
+	title="Reset dashboard layout?"
+	message="This will replace the current layout with the default. Widget positions and tabs may change."
+	confirmLabel="Reset"
+	cancelLabel="Cancel"
+	{darkMode}
+	onConfirm={confirmResetLayout}
+/>
 
 <!-- Export Dialog -->
 {#if showExportDialog}
