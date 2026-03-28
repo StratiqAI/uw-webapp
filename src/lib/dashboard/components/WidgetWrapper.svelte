@@ -23,6 +23,7 @@
 	import SchemaWidget from '$lib/dashboard/components/widgets/SchemaWidget.svelte';
 	import LocationQuotientWidget from '$lib/dashboard/components/widgets/LocationQuotientWidget.svelte';
 	import ConfirmModal from '$lib/components/Dialog/ConfirmModal.svelte';
+	import { themeStore } from '$lib/stores/themeStore.svelte';
 
 	const DEFAULT_LQ_MENU_SIGNALS = { refresh: 0, exportRequest: 0 };
 
@@ -34,7 +35,39 @@
 	}
 
 	let { widget, darkMode = false, onDragStart, onDragEnd }: Props = $props();
-	
+
+	/** Configure-dialog chrome: no indigo/purple gradients; align with light / dark / warm. */
+	const configureHeaderBar = $derived.by(() => {
+		if (darkMode) return 'border-slate-700 bg-slate-800';
+		if (themeStore.theme === 'warm') return 'border-[#ddd4c4] bg-[#ebe4d8]';
+		return 'border-slate-200 bg-slate-50';
+	});
+
+	const configurePrimaryBtn = $derived.by(() => {
+		if (darkMode) {
+			return 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-black/25';
+		}
+		if (themeStore.theme === 'warm') {
+			return 'bg-[#5c4436] hover:bg-[#4a3629] text-[#faf7f2] shadow-md shadow-[#2d2010]/20';
+		}
+		return 'bg-slate-800 hover:bg-slate-700 text-white shadow-md shadow-slate-900/10';
+	});
+
+	const topicCountBadge = $derived.by(() => {
+		if (darkMode) return 'bg-slate-700 text-slate-300';
+		if (themeStore.theme === 'warm') return 'bg-[#dfe6d4] text-[#3d4a32]';
+		return 'bg-slate-200 text-slate-700';
+	});
+
+	const configureFooterBar = $derived.by(() => {
+		if (darkMode) return 'border-slate-700 bg-slate-800';
+		if (themeStore.theme === 'warm') return 'border-[#e8dfd2] bg-[#f7f4ef]';
+		return 'border-slate-200 bg-slate-50';
+	});
+
+	/** Native <select> list follows color-scheme; without this, OS dark mode can show an illegible dropdown on a light modal. */
+	const configureColorSchemeClass = $derived(darkMode ? '[color-scheme:dark]' : '[color-scheme:light]');
+
 	let showEditDialog = $state(false);
 	let widgetAIGenerateFn: ((prompt: string) => Promise<void>) | null = null;
 	let widgetFlipFn: (() => void) | null = null;
@@ -213,7 +246,13 @@
     z-index: ${isBeingDragged ? 0 : zIndex};
   `}
 	draggable={!widget.locked && !isWidgetFullscreen}
-	ondragstart={dragHandlers.handleDragStart}
+	ondragstart={(e) => {
+		if (widget.locked || isWidgetFullscreen) {
+			e.preventDefault();
+			return;
+		}
+		dragHandlers.handleDragStart(e);
+	}}
 	ondragend={dragHandlers.handleDragEnd}
 >
 	<div
@@ -349,10 +388,15 @@
 		}}
 	>
 		<div
-			class="w-full max-w-2xl rounded-xl {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border shadow-2xl overflow-hidden"
+			class="configure-widget-dialog w-full max-w-2xl rounded-xl border shadow-2xl overflow-hidden {configureColorSchemeClass} {darkMode
+				? 'bg-slate-800 border-slate-700'
+				: themeStore.theme === 'warm'
+					? 'bg-[#faf8f4] border-[#e5dcc8]'
+					: 'bg-white border-slate-200'}"
+			data-configure-mode={darkMode ? 'dark' : themeStore.theme === 'warm' ? 'warm' : 'light'}
 		>
 			<!-- Header -->
-			<div class="px-6 py-4 border-b {darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-gradient-to-r from-indigo-50 to-purple-50'}">
+			<div class="px-6 py-4 border-b {configureHeaderBar}">
 				<div class="flex items-center justify-between">
 					<div>
 						<h3 id="dialog-title" class="text-xl font-bold {darkMode ? 'text-white' : 'text-slate-900'}">Configure Widget</h3>
@@ -421,7 +465,7 @@
 							>
 								Data Source Topic
 							</label>
-							<span class="text-xs px-2 py-1 rounded-full {darkMode ? 'bg-slate-700 text-slate-300' : 'bg-indigo-100 text-indigo-700'}">
+							<span class="text-xs px-2 py-1 rounded-full {topicCountBadge}">
 								{availableTopics.length} available
 							</span>
 						</div>
@@ -491,7 +535,7 @@
 			</div>
 
 			<!-- Footer -->
-			<div class="px-6 py-4 border-t {darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-slate-50'} flex justify-end gap-3">
+			<div class="px-6 py-4 border-t {configureFooterBar} flex justify-end gap-3">
 				<button
 					onclick={() => (showEditDialog = false)}
 					class="px-5 py-2.5 text-sm font-medium {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200'} rounded-lg transition-colors"
@@ -501,14 +545,14 @@
 				{#if selectedTopic !== currentTopic}
 					<button
 						onclick={applyTopicChange}
-						class="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 rounded-lg transition-all shadow-lg hover:shadow-xl"
+						class="px-5 py-2.5 text-sm font-medium rounded-lg transition-colors {configurePrimaryBtn}"
 					>
 						Apply Changes
 					</button>
 				{:else}
 					<button
 						onclick={() => (showEditDialog = false)}
-						class="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 rounded-lg transition-all shadow-lg hover:shadow-xl"
+						class="px-5 py-2.5 text-sm font-medium rounded-lg transition-colors {configurePrimaryBtn}"
 					>
 						Done
 					</button>
@@ -549,5 +593,19 @@
 	.widget-body {
 		flex: 1;
 		overflow: auto;
+	}
+
+	/* Legible native select lists (Windows/Chrome + OS dark mode often ignore surface colors on <option>) */
+	.configure-widget-dialog[data-configure-mode='light'] :global(select option) {
+		background-color: #ffffff;
+		color: #0f172a;
+	}
+	.configure-widget-dialog[data-configure-mode='warm'] :global(select option) {
+		background-color: #faf8f4;
+		color: #1c1917;
+	}
+	.configure-widget-dialog[data-configure-mode='dark'] :global(select option) {
+		background-color: #1e293b;
+		color: #f1f5f9;
 	}
 </style>

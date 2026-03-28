@@ -416,15 +416,29 @@ class DashboardStore {
 			id: newId,
 			gridColumn: position.gridColumn,
 			gridRow: position.gridRow,
-			title: widget.title ? `${widget.title} (Copy)` : undefined
+			title: widget.title ? `${widget.title} (Copy)` : undefined,
+			topicOverride: undefined
 		};
-		
-		return this.addWidget(newWidget) ? newId : null;
+
+		if (!this.addWidget(newWidget)) return null;
+
+		const sourceTopic = getWidgetTopic(widget.type, widget.id, widget.topicOverride);
+		const sourceData = validatedTopicStore.at(sourceTopic);
+		if (sourceData != null) {
+			const destTopic = getWidgetTopic(newWidget.type, newId);
+			try {
+				validatedTopicStore.publish(destTopic, structuredClone(sourceData));
+			} catch (e) {
+				console.warn(`[duplicateWidget] Failed to copy topic data to ${destTopic}:`, e);
+			}
+		}
+
+		return newId;
 	}
 	
 	moveWidget(id: string, position: Position): boolean {
 		const widget = this.#widgets.find((w) => w.id === id);
-		if (!widget) return false;
+		if (!widget || widget.locked) return false;
 		
 		const testWidget = { ...widget, ...position };
 		
@@ -441,7 +455,7 @@ class DashboardStore {
 	
 	resizeWidget(id: string, colSpan: number, rowSpan: number): boolean {
 		const widget = this.#widgets.find((w) => w.id === id);
-		if (!widget) return false;
+		if (!widget || widget.locked) return false;
 		
 		const newColSpan = this.#clamp(
 			colSpan,
