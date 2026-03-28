@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Agent Action Plan Builder</title>
+    <style>
+        :root {
+            --primary-color: #0052cc;
+            --background-color: #f4f5f7;
+            --card-background: #ffffff;
+            --border-color: #dfe1e6;
+            --text-color: #172b4d;
+            --subtle-text-color: #5e6c84;
+            --success-color: #00875a;
+            --error-color: #de350b;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 2rem;
+            background-color: var(--background-color);
+            color: var(--text-color);
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+        .builder-panel, .json-panel {
+            background-color: var(--card-background);
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+            padding: 1.5rem;
+        }
+        h1, h2 {
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 0.75rem;
+            margin-top: 0;
+        }
+        .action-adder {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        #action-select, button {
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            font-size: 1rem;
+        }
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.2s ease;
+        }
+        button:hover {
+            background-color: #0041a3;
+        }
+        #action-list {
+            min-height: 200px;
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            background-color: var(--background-color);
+        }
+        .action-card {
+            background-color: var(--card-background);
+            border: 1px solid var(--border-color);
+            border-left: 5px solid var(--primary-color);
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            padding: 1rem;
+            cursor: grab;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            position: relative;
+        }
+        .action-card.dragging {
+            opacity: 0.5;
+        }
+        .action-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+        }
+        .action-header span {
+            font-family: 'SF Mono', 'Courier New', monospace;
+            background-color: #e9ecef;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+        }
+        .delete-btn {
+            background: none;
+            border: none;
+            color: var(--subtle-text-color);
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 0.2rem;
+        }
+        .delete-btn:hover {
+            color: var(--error-color);
+        }
+        .form-group {
+            margin-top: 1rem;
+            display: flex;
+            flex-direction: column;
+        }
+        .form-group label {
+            margin-bottom: 0.5rem;
+            color: var(--subtle-text-color);
+            font-weight: 500;
+        }
+        .form-group input, .form-group textarea {
+            padding: 0.5rem;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            font-size: 0.95rem;
+        }
+        #json-output {
+            width: 100%;
+            height: 600px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-family: 'SF Mono', 'Courier New', monospace;
+            font-size: 0.9rem;
+            padding: 1rem;
+            box-sizing: border-box;
+            background-color: #fafafa;
+            white-space: pre;
+            overflow-x: auto;
+        }
+        .json-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #copy-btn {
+            background-color: var(--success-color);
+        }
+        #copy-btn:hover {
+             background-color: #006644;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="builder-panel">
+            <h1>AI Action Plan Builder</h1>
+            <div class="action-adder">
+                <select id="action-select">
+                    <option value="EXTRACT_OM_DATA">Extract Data from OM</option>
+                    <option value="FETCH_MARKET_DATA">Fetch Market Data</option>
+                    <option value="ANALYZE_DEAL_METRICS">Analyze Deal Metrics</option>
+                    <option value="GENERATE_LOI_DRAFT">Generate LOI Draft</option>
+                    <option value="SEND_EMAIL_NOTIFICATION">Send Email Notification</option>
+                </select>
+                <button id="add-action-btn">Add Action Step</button>
+            </div>
+            <div id="action-list"></div>
+        </div>
+        <div class="json-panel">
+            <div class="json-header">
+                <h2>Generated JSON Plan</h2>
+                <button id="copy-btn">Copy to Clipboard</button>
+            </div>
+            <textarea id="json-output" readonly></textarea>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const addActionBtn = document.getElementById('add-action-btn');
+            const actionSelect = document.getElementById('action-select');
+            const actionList = document.getElementById('action-list');
+            const jsonOutput = document.getElementById('json-output');
+            const copyBtn = document.getElementById('copy-btn');
+
+            let actions = [];
+            let goalIdCounter = 0;
+
+            const ACTION_DEFINITIONS = {
+                EXTRACT_OM_DATA: {
+                    name: "Extract Data from OM",
+                    params: [
+                        { name: 'sourceDocumentUrl', type: 'text', label: 'Document URL (S3)', placeholder: 's3://bucket/om.pdf' }
+                    ]
+                },
+                FETCH_MARKET_DATA: {
+                    name: "Fetch Market Data",
+                    params: [
+                        { name: 'city', type: 'text', label: 'City', placeholder: 'Austin' },
+                        { name: 'state', type: 'text', label: 'State', placeholder: 'TX' },
+                        { name: 'propertyType', type: 'text', label: 'Property Type', placeholder: 'Retail' }
+                    ]
+                },
+                ANALYZE_DEAL_METRICS: {
+                    name: "Analyze Deal Metrics",
+                    params: [
+                        { name: 'purchasePrice', type: 'number', label: 'Purchase Price', placeholder: '5000000' },
+                        { name: 'year1_NOI', type: 'number', label: 'Year 1 Net Operating Income', placeholder: '250000' }
+                    ]
+                },
+                GENERATE_LOI_DRAFT: {
+                    name: "Generate LOI Draft",
+                    params: [
+                        { name: 'buyerEntity', type: 'text', label: 'Buyer Entity', placeholder: 'Retail Partners LLC' },
+                        { name: 'sellerEntity', type: 'text', label: 'Seller Entity (from Step 1)', placeholder: 'auto-filled' },
+                        { name: 'purchasePrice', type: 'number', label: 'Purchase Price (from analysis)', placeholder: 'auto-filled' }
+                    ]
+                },
+                SEND_EMAIL_NOTIFICATION: {
+                    name: "Send Email Notification",
+                    params: [
+                        { name: 'recipient', type: 'email', label: 'Recipient Email', placeholder: 'broker@example.com' },
+                        { name: 'subject', type: 'text', label: 'Subject', placeholder: 'LOI Draft Ready for Review' },
+                        { name: 'body', type: 'textarea', label: 'Body', placeholder: 'The draft is attached.' }
+                    ]
+                }
+            };
+
+            const generateUUID = () => crypto.randomUUID();
+
+            const renderActions = () => {
+                actionList.innerHTML = '';
+                actions.forEach((action, index) => {
+                    const actionDef = ACTION_DEFINITIONS[action.actionType];
+                    const card = document.createElement('div');
+                    card.className = 'action-card';
+                    card.dataset.id = action.stepId;
+                    card.draggable = true;
+
+                    let formHtml = actionDef.params.map(param => `
+                        <div class="form-group">
+                            <label for="${action.stepId}-${param.name}">${param.label}</label>
+                            <input type="${param.type}" id="${action.stepId}-${param.name}" data-param="${param.name}" placeholder="${param.placeholder}" value="${action.parameters[param.name] || ''}">
+                        </div>
+                    `).join('');
+
+                    card.innerHTML = `
+                        <div class="action-header">
+                            <span>${action.actionType}</span>
+                            <button class="delete-btn" data-id="${action.stepId}">&times;</button>
+                        </div>
+                        <div class="action-params">
+                            ${formHtml}
+                        </div>
+                    `;
+                    actionList.appendChild(card);
+                });
+                updateJsonOutput();
+            };
+
+            const updateJsonOutput = () => {
+                const goalObject = {
+                    goalId: `goal-${generateUUID()}`,
+                    goalType: "DYNAMICALLY_BUILT_PLAN",
+                    status: "PENDING",
+                    createdAt: new Date().toISOString(),
+                    steps: actions
+                };
+                jsonOutput.value = JSON.stringify(goalObject, null, 2);
+            };
+
+            addActionBtn.addEventListener('click', () => {
+                const actionType = actionSelect.value;
+                const newAction = {
+                    stepId: `step-${generateUUID()}`,
+                    actionType: actionType,
+                    status: "PENDING",
+                    parameters: {}
+                };
+                actions.push(newAction);
+                renderActions();
+            });
+
+            actionList.addEventListener('input', (e) => {
+                if (e.target.matches('input, textarea')) {
+                    const card = e.target.closest('.action-card');
+                    const actionId = card.dataset.id;
+                    const paramName = e.target.dataset.param;
+                    const action = actions.find(a => a.stepId === actionId);
+                    if (action) {
+                        const value = e.target.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value;
+                        action.parameters[paramName] = value;
+                        updateJsonOutput();
+                    }
+                }
+            });
+
+            actionList.addEventListener('click', (e) => {
+                if (e.target.classList.contains('delete-btn')) {
+                    const actionId = e.target.dataset.id;
+                    actions = actions.filter(a => a.stepId !== actionId);
+                    renderActions();
+                }
+            });
+            
+            // Drag and Drop functionality
+            let draggedItem = null;
+            actionList.addEventListener('dragstart', (e) => {
+                draggedItem = e.target.closest('.action-card');
+                setTimeout(() => {
+                    draggedItem.classList.add('dragging');
+                }, 0);
+            });
+
+            actionList.addEventListener('dragend', () => {
+                if (draggedItem) {
+                    draggedItem.classList.remove('dragging');
+                    draggedItem = null;
+
+                    const newOrderIds = [...actionList.querySelectorAll('.action-card')].map(card => card.dataset.id);
+                    actions.sort((a, b) => newOrderIds.indexOf(a.stepId) - newOrderIds.indexOf(b.stepId));
+                    
+                    updateJsonOutput();
+                }
+            });
+
+            actionList.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                const afterElement = getDragAfterElement(actionList, e.clientY);
+                const currentDragged = document.querySelector('.dragging');
+                if (afterElement == null) {
+                    actionList.appendChild(currentDragged);
+                } else {
+                    actionList.insertBefore(currentDragged, afterElement);
+                }
+            });
+
+            function getDragAfterElement(container, y) {
+                const draggableElements = [...container.querySelectorAll('.action-card:not(.dragging)')];
+                return draggableElements.reduce((closest, child) => {
+                    const box = child.getBoundingClientRect();
+                    const offset = y - box.top - box.height / 2;
+                    if (offset < 0 && offset > closest.offset) {
+                        return { offset: offset, element: child };
+                    } else {
+                        return closest;
+                    }
+                }, { offset: Number.NEGATIVE_INFINITY }).element;
+            }
+
+            copyBtn.addEventListener('click', () => {
+                jsonOutput.select();
+                document.execCommand('copy');
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyBtn.textContent = 'Copy to Clipboard';
+                }, 2000);
+            });
+
+            // Initial render
+            updateJsonOutput();
+        });
+    </script>
+</body>
+</html>```

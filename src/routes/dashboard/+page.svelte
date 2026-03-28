@@ -10,7 +10,7 @@
 
 	import { dev } from '$app/environment';
 	import { onMount, setContext } from 'svelte';
-	import { darkModeStore } from '$lib/stores/darkMode.svelte';
+	import { themeStore } from '$lib/stores/themeStore.svelte';
 	import type { Project } from '@stratiqai/types-simple';
 	import { createSupabaseBrowserClient } from '$lib/supabase/browser';
 	import { logSupabaseRpcSmokeTest } from '$lib/supabase/supabaseRpcSmokeTest';
@@ -22,9 +22,9 @@
 	let { data }: Props = $props();
 	let isLoading = $state(true);
 
-	// Use unified dark mode store
-	let darkMode = $derived.by(() => darkModeStore.darkMode);
-	let toggleDarkMode = darkModeStore.toggle;
+	// Use unified theme store
+	let darkMode = $derived.by(() => themeStore.darkMode);
+	let currentTheme = $derived.by(() => themeStore.theme);
 
 	// Project state
 	let projects = $state<Project[]>(data.projects || []);
@@ -33,9 +33,10 @@
 	// Set page data context for child components
 	setContext('pageData', { currentUser: data.currentUser });
 	
-	// Update context when dark mode changes
+	// Update context when theme changes
 	$effect(() => {
 		setContext('darkMode', darkMode);
+		setContext('currentTheme', currentTheme);
 	});
 
 	function handleProjectChange(projectId: string | null) {
@@ -223,11 +224,12 @@
 	<div class="flex-1 flex flex-col overflow-hidden {darkMode ? 'bg-slate-900/80' : 'bg-primary-50/40'}">
 		<DashboardControls
 			{darkMode}
+			{currentTheme}
 			defaultWidgets={dashboardWidgets}
 			{projects}
 			{selectedProjectId}
 			onProjectChange={handleProjectChange}
-			onToggleDarkMode={toggleDarkMode}
+			onThemeChange={themeStore.setTheme}
 		/>
 
 

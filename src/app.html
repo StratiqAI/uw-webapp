@@ -2,47 +2,48 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<!-- Blocking script to prevent dark mode flash - must run before any styles -->
+		<!-- Blocking script to prevent theme flash - must run before any styles -->
 		<script>
 			(function() {
 				try {
-					const saved = localStorage.getItem('darkMode');
-					let isDark = false;
-					
-					if (saved !== null) {
-						isDark = saved === 'true';
-					} else {
-						// Check system preference
-						isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+					var STORAGE_KEY = 'app-theme';
+					var saved = localStorage.getItem(STORAGE_KEY);
+
+					// Migrate old 'darkMode' boolean key to new theme key
+					if (!saved) {
+						var oldDark = localStorage.getItem('darkMode');
+						if (oldDark === 'true') saved = 'dark';
+						else if (oldDark === 'false') saved = 'light';
 					}
-					
-					// Apply dark class immediately
-					if (isDark) {
-						document.documentElement.classList.add('dark');
+
+					var theme = (saved === 'light' || saved === 'dark' || saved === 'warm')
+						? saved
+						: (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+
+					var html = document.documentElement;
+
+					if (theme === 'dark') {
+						html.classList.add('dark');
 					} else {
-						document.documentElement.classList.remove('dark');
+						html.classList.remove('dark');
 					}
-					
-					// Set inline styles immediately to prevent flash - match theme colors
-					const style = document.createElement('style');
-					style.id = 'dark-mode-prevent-flash';
-					style.textContent = isDark 
-						? 'html, body { background-color: #0f172a !important; color: #f1f5f9 !important; }'
-						: 'html, body { background-color: #dbeafe !important; color: #0f172a !important; }';
+					html.setAttribute('data-theme', theme);
+
+					var bg   = { dark: '#0f172a', light: '#dbeafe', warm: '#ece5d3' };
+					var text = { dark: '#f1f5f9', light: '#0f172a', warm: '#3a2e1c' };
+
+					var style = document.createElement('style');
+					style.id = 'theme-prevent-flash';
+					style.textContent = 'html,body{background-color:' + bg[theme] + '!important;color:' + text[theme] + '!important}';
 					document.head.appendChild(style);
-					
-					// Remove the inline style once page loads so CSS can take over
+
 					window.addEventListener('load', function() {
 						setTimeout(function() {
-							const flashPrevent = document.getElementById('dark-mode-prevent-flash');
-							if (flashPrevent) {
-								flashPrevent.remove();
-							}
+							var el = document.getElementById('theme-prevent-flash');
+							if (el) el.remove();
 						}, 100);
 					});
-				} catch (e) {
-					// Silently fail if localStorage is not available
-				}
+				} catch (e) {}
 			})();
 		</script>
 		<link rel="icon" href="%sveltekit.assets%/favicon.png" />

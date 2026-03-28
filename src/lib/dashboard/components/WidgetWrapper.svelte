@@ -137,14 +137,6 @@
 				dashboard.duplicateWidget(widget.id);
 				break;
 
-			case 'lock':
-				dashboard.updateWidget(widget.id, { locked: true });
-				break;
-
-			case 'unlock':
-				dashboard.updateWidget(widget.id, { locked: false });
-				break;
-
 			case 'exportData':
 				exportWidgetData();
 				break;
@@ -206,7 +198,7 @@
 <div
 	role="button"
 	tabindex="0"
-	class="widget-wrapper group relative h-full"
+	class="widget-wrapper animate-fadeIn group relative h-full"
 	class:widget-wrapper--fullscreen={isWidgetFullscreen}
 	style={isWidgetFullscreen
 		? `position: fixed; inset: 1rem; width: calc(100vw - 2rem); height: calc(100vh - 2rem); z-index: 100050; max-width: none;`
@@ -220,12 +212,22 @@
 	ondragend={dragHandlers.handleDragEnd}
 >
 	<div
-		class="widget-content h-full overflow-hidden rounded-lg border {darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'} shadow-md transition-shadow hover:shadow-lg"
+		class="widget-content h-full overflow-hidden rounded-xl border
+		{darkMode
+			? 'border-slate-700/50 bg-linear-to-b from-slate-800 to-slate-900/80 shadow-xl shadow-black/40'
+			: 'border-slate-200/70 bg-white shadow-sm'}
+		transition-all duration-200
+		{darkMode
+			? 'hover:border-slate-600/60 hover:shadow-2xl hover:shadow-black/50 hover:-translate-y-px'
+			: 'hover:border-slate-300/80 hover:shadow-md hover:-translate-y-px'}"
 	>
+		<!-- Gradient accent line at top of card -->
+		<div class="pointer-events-none absolute inset-x-0 top-0 z-10 h-px {darkMode ? 'bg-linear-to-r from-transparent via-primary-400/40 to-transparent' : 'bg-linear-to-r from-transparent via-primary-400/25 to-transparent'}"></div>
+
 		<!-- Widget Header (if title is set) -->
 		{#if widget.title}
-			<div class="widget-header border-b {darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-slate-50'} px-4 py-2">
-				<h3 class="text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'}">{widget.title}</h3>
+			<div class="widget-header border-b {darkMode ? 'border-slate-700/40 bg-linear-to-r from-slate-800/90 to-slate-800/60' : 'border-slate-200/60 bg-linear-to-r from-slate-50 to-white'} px-4 py-3">
+				<h3 class="text-sm font-semibold tracking-wide {darkMode ? 'text-slate-100' : 'text-slate-700'}">{widget.title}</h3>
 				{#if widget.description}
 					<p class="mt-0.5 text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'}">{widget.description}</p>
 				{/if}
@@ -242,7 +244,7 @@
 		/>
 
 		<!-- Widget Body -->
-		<div class="widget-body {darkMode ? 'bg-slate-800' : 'bg-slate-50'} {widget.title ? 'p-4' : 'h-full p-4'}">
+		<div class="widget-body {darkMode ? 'bg-transparent' : 'bg-white/60'} {widget.title ? 'p-4' : 'h-full p-4'}">
 			{#if RegisteredComp}
 				<RegisteredComp
 					data={widget.data} widgetId={widget.id}
@@ -520,6 +522,7 @@
 		height: 100%;
 		display: flex;
 		flex-direction: column;
+		position: relative;
 	}
 
 	.widget-body {

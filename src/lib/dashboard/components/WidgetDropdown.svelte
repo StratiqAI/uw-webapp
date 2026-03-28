@@ -151,8 +151,6 @@
 			'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z',
 		duplicate:
 			'M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z',
-		lock: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z',
-		unlock: 'M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z',
 		export:
 			'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4',
 		delete:
@@ -214,12 +212,6 @@
 			label: 'AI Agent',
 			icon: ICONS.aiAgent
 		});
-
-		if (widget.locked) {
-			items.push({ action: 'unlock', label: 'Unlock', icon: ICONS.unlock });
-		} else {
-			items.push({ action: 'lock', label: 'Lock Position', icon: ICONS.lock });
-		}
 
 		if (hasDataRefresh(widget)) {
 			items.push({

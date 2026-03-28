@@ -6,6 +6,7 @@
 	import type { Widget } from '$lib/dashboard/types/widget';
 	import { onMount, setContext } from 'svelte';
 	import { PUBLIC_GEOAPIFY_API_KEY } from '$env/static/public';
+	import { themeStore } from '$lib/stores/themeStore.svelte';
 
 	interface Props {
 		data: PageData;
@@ -13,6 +14,9 @@
 
 	let { data }: Props = $props();
 	let isLoading = $state(true);
+
+	let darkMode = $derived(themeStore.darkMode);
+	let currentTheme = $derived(themeStore.theme);
 
 	// Set page data context for child components
 	setContext('pageData', { currentUser: data.currentUser });
@@ -334,8 +338,11 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<DashboardControls />
-
+<DashboardControls
+	{darkMode}
+	{currentTheme}
+	onThemeChange={themeStore.setTheme}
+/>
 
 <main class="mx-auto max-w-7xl p-4">
 	{#if isLoading}
@@ -345,7 +352,7 @@
 	{:else}
 		<!-- Removed fixed height constraint to allow grid to extend fully -->
 		<div class="min-h-[800px]">
-			<Dashboard />
+			<Dashboard {darkMode} />
 		</div>
 	{/if}
 </main>

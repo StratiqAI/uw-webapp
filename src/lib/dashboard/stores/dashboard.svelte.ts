@@ -138,6 +138,12 @@ class DashboardStore {
 		};
 	});
 
+	/** True when the active tab has at least one widget and every widget is locked. */
+	allWidgetsLocked = $derived.by(() => {
+		const w = this.#widgets;
+		return w.length > 0 && w.every((x) => x.locked === true);
+	});
+
 	constructor() {
 		// Bind methods to preserve context
 		this.initialize = this.initialize.bind(this);
@@ -359,6 +365,13 @@ class DashboardStore {
 		return true;
 	}
 	
+	/** Lock or unlock every widget on the active tab in one update. */
+	setAllWidgetsLocked(locked: boolean): void {
+		if (this.#widgets.length === 0) return;
+		this.#widgets = this.#widgets.map((w) => ({ ...w, locked }));
+		this.#scheduleAutoSave();
+	}
+
 	updateWidget(id: string, updates: WidgetUpdate): boolean {
 		const index = this.#widgets.findIndex((w) => w.id === id);
 		if (index === -1) return false;

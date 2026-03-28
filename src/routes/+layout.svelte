@@ -2,7 +2,7 @@
 	import Sidebar from '$lib/components/Sidebar/Sidebar.svelte';
 	import '../app.css';
 	import type { LayoutData } from './$types';
-	import { darkModeStore } from '$lib/stores/darkMode.svelte';
+	import { themeStore, darkModeStore } from '$lib/stores/themeStore.svelte';
 	import { setContext, onMount, onDestroy } from 'svelte';
 	import { initializeWidgetSchemas } from '$lib/dashboard/setup/widgetSchemaRegistration';
 	import { registerWidget } from '$lib/dashboard/setup/widgetRegistry';
@@ -57,12 +57,8 @@
 	}
 
 	onMount(() => {
-		if (typeof document !== 'undefined') {
-			const isDark = document.documentElement.classList.contains('dark');
-			darkModeStore.set(isDark);
-		} else {
-			darkModeStore.initialize();
-		}
+		// Sync themeStore with whatever app.html's blocking script already applied
+		themeStore.initialize();
 	});
 
 	onDestroy(() => {
@@ -70,10 +66,11 @@
 		unsubDashboardSync?.();
 	});
 	
-	// Provide dark mode store functions via context
+	// Provide theme store via context for child components
 	setContext('toggleDarkMode', darkModeStore.toggle);
 	setContext('setDarkMode', darkModeStore.set);
 	setContext('darkModeStore', darkModeStore);
+	setContext('themeStore', themeStore);
 
 	if (typeof localStorage !== 'undefined') {
 		const saved = localStorage.getItem('sidebar-open') === 'true';
@@ -91,7 +88,7 @@
 	// console.log("End of file +layout.svelte");
 </script>
 
-<div class="app-background-pattern h-full bg-primary-100/40 dark:bg-gradient-to-br dark:from-slate-900 dark:via-primary-950/30 dark:to-slate-950">
+<div class="app-background-pattern h-full bg-primary-100/40 dark:bg-linear-to-b dark:from-slate-900 dark:via-slate-900 dark:to-slate-950">
 	<aside
 		class={`transition-width fixed inset-y-0 left-0 z-40 flex h-screen flex-col border-r border-primary-200/50 bg-primary-50/60 duration-300 dark:border-primary-800/30 dark:bg-gradient-to-b dark:from-slate-900 dark:via-slate-900 dark:to-primary-950/20 ${isSidebarOpen ? `${sidebarWidthExpanded}` : `${sidebarWidthCollapsed}`} `}
 	>
