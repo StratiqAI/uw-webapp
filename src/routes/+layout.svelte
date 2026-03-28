@@ -32,7 +32,7 @@
 			darkModeStore.initialize();
 		}
 
-		// Register widget schemas at app startup (both SchemaRegistry and ValidatedTopicStore)
+		// Register widget schemas at app startup (ValidatedTopicStore)
 		if (browser) {
 			try {
 				initializeWidgetSchemas();

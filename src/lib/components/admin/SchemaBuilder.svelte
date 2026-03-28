@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { schemaRegistry } from '$lib/stores/SchemaRegistry';
-	import type { DynamicSchemaDefinition, JsonSchemaDefinition } from '$lib/types/models';
+	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
+	import type { JsonSchemaDefinition } from '$lib/types/models';
 	import JsonSchemaFieldRow from './JsonSchemaFieldRow.svelte';
 
 	interface Props {
@@ -9,13 +9,14 @@
 
 	let { darkMode = false }: Props = $props();
 
-	let schema: DynamicSchemaDefinition = $state({
+	let schema = $state({
 		id: 'my:schema-v1',
 		name: 'New Schema',
+		description: '' as string | undefined,
 		jsonSchema: {
-			type: 'object',
-			properties: {},
-			required: []
+			type: 'object' as const,
+			properties: {} as Record<string, JsonSchemaDefinition>,
+			required: [] as string[]
 		}
 	});
 
@@ -49,9 +50,14 @@
 
 	function register() {
 		try {
-			// Deep clone using JSON serialization
-			const snapshot = JSON.parse(JSON.stringify(schema)) as DynamicSchemaDefinition;
-			schemaRegistry.register(snapshot);
+			const snapshot = JSON.parse(JSON.stringify(schema));
+			validatedTopicStore.registerSchema({
+				id: snapshot.id,
+				name: snapshot.name,
+				description: snapshot.description,
+				jsonSchema: snapshot.jsonSchema,
+				source: 'ui'
+			});
 			alert(`Registered ${schema.id} successfully!`);
 		} catch (e: any) {
 			alert('Error compiling schema: ' + (e?.message || String(e)));
@@ -63,6 +69,7 @@
 		schema = {
 			id: 'example:property-v1',
 			name: 'Property Example',
+			description: 'Example commercial real estate property schema',
 			jsonSchema: {
 				type: 'object',
 				properties: {
@@ -104,10 +111,11 @@
 		schema = {
 			id: 'my:schema-v1',
 			name: 'New Schema',
+			description: undefined,
 			jsonSchema: {
-				type: 'object',
-				properties: {},
-				required: []
+				type: 'object' as const,
+				properties: {} as Record<string, JsonSchemaDefinition>,
+				required: [] as string[]
 			}
 		};
 	}
@@ -216,11 +224,8 @@
 		<div
 			class="mt-4 p-3 rounded-md text-sm {darkMode ? 'bg-indigo-900/20 border border-indigo-800/50 text-indigo-200' : 'bg-indigo-50 border border-indigo-200 text-indigo-800'}"
 		>
-			<strong>Tip:</strong> After registering, use{' '}
-			<code class="{darkMode ? 'bg-indigo-900/50' : 'bg-indigo-100'} px-1.5 py-0.5 rounded">
-				validatedTopicStore.registerSchema(topic, schema)
-			</code>{' '}
-			to bind a topic to this schema.
+			<strong>Tip:</strong> This schema is registered as catalog-only. To also validate
+			published data, re-register with a <code class="{darkMode ? 'bg-indigo-900/50' : 'bg-indigo-100'} px-1.5 py-0.5 rounded">topicPattern</code>.
 		</div>
 	</div>
 

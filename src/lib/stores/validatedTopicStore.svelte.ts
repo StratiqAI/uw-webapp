@@ -64,6 +64,21 @@ import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import type { Schema, ValidateFunction } from 'ajv';
 import { SvelteMap } from 'svelte/reactivity';
+import type { JsonSchemaDefinition } from '$lib/types/models';
+
+/**
+ * Schema registration with optional topic-pattern binding.
+ * Schemas without a topicPattern are catalog-only (queryable by ID
+ * but not used for publish() validation).
+ */
+export interface SchemaRegistration {
+	id: string;
+	name: string;
+	description?: string;
+	source?: 'ui' | 'code' | 'ai';
+	topicPattern?: string;
+	jsonSchema: JsonSchemaDefinition;
+}
 
 /**
  * AJV Validator Configuration
@@ -234,6 +249,18 @@ export class ValidatedTopicStore {
 	#resolutionCache = new Map<string, SchemaEntry | null>();
 
 	/**
+	 * ID-based schema catalog. Stores full SchemaRegistration objects
+	 * for both topic-bound and catalog-only schemas.
+	 */
+	#schemasById = new Map<string, SchemaRegistration>();
+
+	/**
+	 * Reverse map from topic pattern to SchemaRegistration, enabling
+	 * getSchemaForTopic() to return full metadata after pattern resolution.
+	 */
+	#patternToRegistration = new Map<string, SchemaRegistration>();
+
+	/**
 	 * Reactive version counter that increments when schemas are registered.
 	 * 
 	 * Components that need to react to schema changes (e.g., displaying available schemas)
@@ -295,56 +322,50 @@ export class ValidatedTopicStore {
 	}
 
 	/**
-	 * Schema Registration
-	 * ====================
+	 * Schema Registration (overloaded)
 	 *
-	 * Registers a JSON Schema for validation of data published to matching topic patterns.
-	 * Supports MQTT-style wildcards: '+' (single level) and '#' (multi-level remainder).
+	 * Form 1 — SchemaRegistration object:
+	 *   Stores full metadata in the ID catalog. If topicPattern is present,
+	 *   also compiles with AJV for publish() validation.
 	 *
-	 * Registration Process:
-	 * 1. Normalize the pattern (clean path, remove extra slashes)
-	 * 2. Compile the schema into an optimized validation function (AJV compilation)
-	 * 3. Pre-compute regex pattern and specificity score (performance optimization)
-	 * 4. Store the SchemaEntry in the registry
-	 * 5. Invalidate resolution cache (new schema might change "best match" for existing topics)
-	 * 6. Increment schema version (triggers reactive updates in UI components)
+	 * Form 2 — (pattern, schema) legacy:
+	 *   Backward-compatible path. Compiles AJV validator for the pattern
+	 *   but does not create an entry in the ID catalog.
 	 *
-	 * Performance Note: Schema compilation happens once during registration, not on every publish.
-	 * This makes validation fast at runtime.
-	 *
-	 * Cache Invalidation: We clear the resolution cache because a newly registered schema
-	 * might be a better match for topics that previously matched a less specific schema.
-	 * Example: If 'app/#' was registered first, then 'app/users/+' is registered,
-	 * topics like 'app/users/user-1' should now use the more specific schema.
-	 *
-	 * @param pattern - Topic pattern with optional wildcards (e.g., 'app/users/+', 'app/#')
-	 * @param schema - JSON Schema object that will validate data published to matching topics
+	 * Both forms clear the resolution cache and bump schemaVersion.
 	 */
-	registerSchema(pattern: string, schema: Schema) {
-		const cleanedPattern = cleanPath(pattern);
+	registerSchema(registration: SchemaRegistration): void;
+	registerSchema(pattern: string, schema: Schema): void;
+	registerSchema(patternOrReg: string | SchemaRegistration, schema?: Schema): void {
+		if (typeof patternOrReg === 'object') {
+			const reg = patternOrReg;
+			this.#schemasById.set(reg.id, reg);
 
-		// Compile schema into a validation function (reusable, fast)
-		// AJV compilation happens once here, not on every publish()
-		const validate = ajv.compile(schema);
+			if (reg.topicPattern) {
+				const cleanedPattern = cleanPath(reg.topicPattern);
+				const validate = ajv.compile(reg.jsonSchema as Schema);
+				const entry: SchemaEntry = {
+					validate,
+					raw: reg.jsonSchema as Schema,
+					regex: this.#patternToRegex(cleanedPattern),
+					specificity: this.#calculateSpecificity(cleanedPattern)
+				};
+				this.#schemas.set(cleanedPattern, entry);
+				this.#patternToRegistration.set(cleanedPattern, reg);
+			}
+		} else {
+			const cleanedPattern = cleanPath(patternOrReg);
+			const validate = ajv.compile(schema!);
+			const entry: SchemaEntry = {
+				validate,
+				raw: schema!,
+				regex: this.#patternToRegex(cleanedPattern),
+				specificity: this.#calculateSpecificity(cleanedPattern)
+			};
+			this.#schemas.set(cleanedPattern, entry);
+		}
 
-		const entry: SchemaEntry = {
-			validate,
-			raw: schema,
-			regex: this.#patternToRegex(cleanedPattern),
-			specificity: this.#calculateSpecificity(cleanedPattern)
-		};
-
-		// Store compiled validator, raw schema, and regex for pattern matching
-		this.#schemas.set(cleanedPattern, entry);
-
-		// CRITICAL: Clear the resolution cache
-		// A new schema registration could change the "best match" for existing topics.
-		// Example: Registering 'app/users/+' after 'app/#' means 'app/users/user-1'
-		// should now use the more specific schema.
 		this.#resolutionCache.clear();
-
-		// Increment schema version to trigger reactivity in components using getRegisteredSchemas()
-		// Components that display available schemas can watch this value for updates
 		this.#schemaVersion++;
 	}
 
@@ -778,23 +799,41 @@ export class ValidatedTopicStore {
 		return prompt;
 	}
 
+	// ===== ID-based Schema Catalog =====
+
+	getSchemaById(id: string): SchemaRegistration | undefined {
+		return this.#schemasById.get(id);
+	}
+
+	getJsonSchemaById(id: string): JsonSchemaDefinition | undefined {
+		return this.#schemasById.get(id)?.jsonSchema;
+	}
+
+	getAllSchemaDefinitions(): SchemaRegistration[] {
+		return Array.from(this.#schemasById.values());
+	}
+
 	/**
-	 * Get All Registered Schemas
-	 * ===========================
-	 *
-	 * Returns a list of all registered schema patterns and their raw schemas.
-	 *
-	 * Use Cases:
-	 * - UI components that display available schemas
-	 * - Schema introspection and debugging
-	 * - Schema documentation generation
-	 * - Schema validation in development tools
-	 *
-	 * Reactivity: Components can watch #schemaVersion to react to schema registration changes,
-	 * then call this method to get the updated list. This pattern avoids making #schemas
-	 * reactive (which would be expensive) while still providing reactivity where needed.
-	 *
-	 * @returns Array of { pattern, schema } objects for all registered schemas
+	 * Resolves the best-matching SchemaRegistration for a topic.
+	 * Returns undefined if no registration is linked to the matched pattern
+	 * (e.g. when the schema was registered via the legacy (pattern, schema) form).
+	 */
+	getSchemaForTopic(topic: string): SchemaRegistration | undefined {
+		const entry = this.#getBestValidator(topic);
+		if (!entry) return undefined;
+		for (const [pattern, schemaEntry] of this.#schemas.entries()) {
+			if (schemaEntry === entry) {
+				return this.#patternToRegistration.get(pattern);
+			}
+		}
+		return undefined;
+	}
+
+	// ===== Pattern-based Schema Queries =====
+
+	/**
+	 * Returns all registered schema patterns and their raw schemas.
+	 * Reactivity: watch schemaVersion to react to changes, then call this method.
 	 */
 	getRegisteredSchemas(): Array<{ pattern: string; schema: Schema }> {
 		return Array.from(this.#schemas.entries()).map(([pattern, entry]) => ({

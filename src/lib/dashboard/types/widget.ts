@@ -206,7 +206,7 @@ export interface MapWidget extends BaseWidget {
 export interface SchemaWidget extends BaseWidget {
 	type: 'schema';
 	data: {
-		schemaId: string; // Schema ID from SchemaRegistry
+		schemaId: string; // Schema ID from ValidatedTopicStore
 		data?: unknown; // Optional initial data
 	};
 }
@@ -288,3 +288,4 @@ export interface ResizeState {
 	activeWidgetId: string | null;
 	resizeHandle: 'right' | 'bottom' | 'corner' | null;
 }
+

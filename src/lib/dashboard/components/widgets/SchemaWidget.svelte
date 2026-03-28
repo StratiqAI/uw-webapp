@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { SchemaWidget } from '$lib/dashboard/types/widget';
 	import { useReactiveValidatedTopic } from '$lib/hooks/validatedTopicStoreRunes.svelte';
-	import { schemaRegistry } from '$lib/stores/SchemaRegistry';
+	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import AutoDataView from '$lib/components/auto/AutoDataView.svelte';
 
 	interface Props {
@@ -24,8 +24,7 @@
 	const dataStream = useReactiveValidatedTopic<unknown>(() => topic);
 	let widgetData = $derived<unknown>(dataStream.current || data.data || {});
 
-	// Get schema definition from registry (full definition with metadata)
-	let schemaDefinition = $derived(schemaRegistry.getDefinition(schemaId));
+	let schemaDefinition = $derived(validatedTopicStore.getSchemaById(schemaId));
 
 	$effect(() => {
 		console.log(`📋 SchemaWidget:${widgetId} - Initialized with ValidatedTopicStore`);

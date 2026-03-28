@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { schemaRegistry } from '$lib/stores/SchemaRegistry';
-	import type { DynamicSchemaDefinition, JsonSchemaDefinition } from '$lib/types/models';
-	import { browser } from '$app/environment';
+	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
+	import type { JsonSchemaDefinition } from '$lib/types/models';
+
+	type SchemaReg = ReturnType<typeof validatedTopicStore.getAllSchemaDefinitions>[number];
 
 	interface Props {
 		darkMode?: boolean;
@@ -9,30 +10,20 @@
 
 	let { darkMode = false }: Props = $props();
 
-	let registeredSchemas = $state<DynamicSchemaDefinition[]>([]);
-	let selectedSchema = $state<DynamicSchemaDefinition | null>(null);
+	let selectedSchema = $state<SchemaReg | null>(null);
 
-	// Refresh schemas list
-	function refreshSchemas() {
-		if (browser) {
-			registeredSchemas = schemaRegistry.getAllDefinitions();
-		}
-	}
-
-	// Auto-refresh periodically
-	$effect(() => {
-		if (!browser) return;
-		refreshSchemas();
-		const interval = setInterval(refreshSchemas, 1000);
-		return () => clearInterval(interval);
+	let registeredSchemas = $derived.by(() => {
+		void validatedTopicStore.schemaVersion;
+		return validatedTopicStore.getAllSchemaDefinitions();
 	});
 
 	function formatSchemaType(schema: JsonSchemaDefinition): string {
-		let typeStr = schema.type || 'unknown';
-		if (schema.type === 'array' && schema.items) {
+		const rawType = schema.type;
+		let typeStr: string = Array.isArray(rawType) ? rawType.join(' | ') : (rawType || 'unknown');
+		if (rawType === 'array' && schema.items) {
 			typeStr = `array<${schema.items.type || 'any'}>`;
 		}
-		if (schema.type === 'string' && schema.enum) {
+		if (rawType === 'string' && schema.enum) {
 			typeStr = `enum(${schema.enum.join(', ')})`;
 		}
 		return typeStr;
@@ -45,7 +36,7 @@
 		return 0;
 	}
 
-	function copySchemaJson(schema: DynamicSchemaDefinition) {
+	function copySchemaJson(schema: SchemaReg) {
 		const json = JSON.stringify(schema, null, 2);
 		navigator.clipboard.writeText(json);
 		alert('Schema JSON copied to clipboard!');
@@ -64,15 +55,6 @@
 				<h2 class="font-semibold text-lg {darkMode ? 'text-white' : 'text-slate-900'}">
 					Registered Schemas
 				</h2>
-				<button
-					onclick={refreshSchemas}
-					class="px-2 py-1 text-xs font-medium {darkMode
-						? 'bg-slate-700 hover:bg-slate-600 text-slate-200'
-						: 'bg-slate-100 hover:bg-slate-200 text-slate-700'} rounded transition-colors"
-					title="Refresh"
-				>
-					↻
-				</button>
 			</div>
 			<div class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'}">
 				Total: {registeredSchemas.length}
@@ -129,7 +111,7 @@
 						{/if}
 					</div>
 					<button
-						onclick={() => copySchemaJson(selectedSchema)}
+						onclick={() => selectedSchema && copySchemaJson(selectedSchema)}
 						class="px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors"
 					>
 						Copy JSON

@@ -1,1 +1,1 @@
-export { validatedTopicStore } from './validatedTopicStore.svelte.ts';
+export { validatedTopicStore, type SchemaRegistration } from './validatedTopicStore.svelte';

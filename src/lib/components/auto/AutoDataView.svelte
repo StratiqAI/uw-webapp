@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { schemaRegistry } from '$lib/stores/SchemaRegistry';
+	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import type { JsonSchemaDefinition } from '$lib/types/models';
 	import AutoDataView from './AutoDataView.svelte';
 
@@ -13,9 +13,8 @@
 
 	let { data, schemaId, topic, fieldSchema, darkMode = false }: Props = $props();
 
-	// If we are at the root, look up the definition
 	let rootSchema = $derived(
-		!fieldSchema && schemaId ? schemaRegistry.getJsonSchema(schemaId) : null
+		!fieldSchema && schemaId ? validatedTopicStore.getJsonSchemaById(schemaId) : null
 	);
 
 	// Determine schema to use (fieldSchema for recursion, rootSchema for root)
