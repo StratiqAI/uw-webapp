@@ -5,17 +5,36 @@ import type {
 	ResizeState,
 	Position
 } from '$lib/dashboard/types/widget';
+import { DEFAULT_DASHBOARD_CONFIG } from '$lib/dashboard/types/widget';
+import {
+	createEmptyMultiTabState,
+	createEmptyTabSlice,
+	DEFAULT_TABS,
+	DEFAULT_ACTIVE_TAB,
+	generateTabId,
+	type DashboardTabId,
+	type MultiTabDashboardState,
+	type TabDashboardSlice,
+	type TabInfo
+} from '$lib/dashboard/types/dashboardTabs';
+import { DASHBOARD_STORAGE_VERSION } from '$lib/dashboard/utils/storage';
+import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
 import { isValidPosition, findAvailablePosition } from '$lib/dashboard/utils/grid';
 import { DashboardStorage } from '$lib/dashboard/utils/storage';
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 
-// Constants for better maintainability
-const DEFAULT_CONFIG: DashboardConfig = {
-	gridColumns: 12,
-	gridRows: 8,
-	gap: 16,
-	minCellHeight: 100
-} as const;
+const DEFAULT_CONFIG: DashboardConfig = structuredClone(DEFAULT_DASHBOARD_CONFIG);
+
+function cloneEmptyMultiTab(): MultiTabDashboardState {
+	return structuredClone(createEmptyMultiTabState());
+}
+
+function clearWidgetTopicsForLayout(widgets: Widget[]): void {
+	for (const w of widgets) {
+		const topic = getWidgetTopic(w.type, w.id, w.topicOverride);
+		validatedTopicStore.delete(topic);
+	}
+}
 
 const DEFAULT_DRAG_STATE: DragState = {
 	isDragging: false,
@@ -68,23 +87,33 @@ class DashboardStore {
 	#devMode = $state(false);
 	#hasUnsavedChanges = $state(false);
 	#projectId = $state<string | null>(null);
+	#activeTabId = $state<DashboardTabId>(DEFAULT_ACTIVE_TAB);
+	#tabOrder = $state<TabInfo[]>(structuredClone(DEFAULT_TABS) as TabInfo[]);
+	#tabSlices = $state<Record<DashboardTabId, TabDashboardSlice>>(cloneEmptyMultiTab().tabs);
 	
 	// Private state
 	#initialized = false;
 	#nextZIndex = 1;
 	#autoSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 	#eventListeners = new Map<keyof DashboardEvents, Set<Function>>();
-	
-	// Getters for read-only access
-	get widgets() { return this.#widgets; }
-	get config() { return this.#config; }
-	get dragState() { return this.#dragState; }
-	get resizeState() { return this.#resizeState; }
-	get hasUnsavedChanges() { return this.#hasUnsavedChanges; }
+	#suspendAutoSave = false;
+
+	/**
+	 * Expose $state via $derived so Svelte components subscribe when reading `dashboard.widgets`, etc.
+	 * Plain getters do not reliably establish template reactivity for class-based runes (Svelte 5).
+	 */
+	widgets = $derived(this.#widgets);
+	config = $derived(this.#config);
+	dragState = $derived(this.#dragState);
+	resizeState = $derived(this.#resizeState);
+	hasUnsavedChanges = $derived(this.#hasUnsavedChanges);
+	autoSaveEnabled = $derived(this.#autoSaveEnabled);
+	devMode = $derived(this.#devMode);
+	projectId = $derived(this.#projectId);
+	activeTabId = $derived(this.#activeTabId);
+	tabOrder = $derived(this.#tabOrder);
+	get tabIds(): DashboardTabId[] { return this.#tabOrder.map(t => t.id); }
 	get isInitialized() { return this.#initialized; }
-	get autoSaveEnabled() { return this.#autoSaveEnabled; }
-	get devMode() { return this.#devMode; }
-	get projectId() { return this.#projectId; }
 	
 	// Derived state with memoization
 	gridCells = $derived.by(() => this.#computeGridCells());
@@ -132,11 +161,16 @@ class DashboardStore {
 		this.#hasUnsavedChanges = false;
 		this.#projectId = projectId;
 		this.#initialized = false;
+		this.#activeTabId = DEFAULT_ACTIVE_TAB;
+		const fresh = cloneEmptyMultiTab();
+		this.#tabOrder = fresh.tabOrder;
+		this.#tabSlices = fresh.tabs;
 		
 		try {
 			DashboardStorage.setAutoSaveWidgetData(this.#autoSaveWidgetData);
 			
 			if (this.#devMode) {
+				this.#applyTabSlice(fresh.tabs[DEFAULT_ACTIVE_TAB]);
 				this.#initialized = true;
 				console.info('📦 Dashboard initialized in dev mode (localStorage disabled)');
 				return false;
@@ -149,6 +183,7 @@ class DashboardStore {
 				return true;
 			}
 			
+			this.#applyTabSlice(fresh.tabs[DEFAULT_ACTIVE_TAB]);
 			this.#initialized = true;
 			return false;
 		} catch (error) {
@@ -166,7 +201,14 @@ class DashboardStore {
 		}
 		
 		try {
-			const success = DashboardStorage.saveDashboard(this.#widgets, this.#config, this.#projectId);
+			this.#flushActiveTabIntoSlices();
+			const state: MultiTabDashboardState = {
+				version: DASHBOARD_STORAGE_VERSION,
+				activeTabId: this.#activeTabId,
+				tabOrder: $state.snapshot(this.#tabOrder) as TabInfo[],
+				tabs: $state.snapshot(this.#tabSlices) as MultiTabDashboardState['tabs']
+			};
+			const success = DashboardStorage.saveMultiTabState(state, this.#projectId);
 			if (success) {
 				this.#hasUnsavedChanges = false;
 				this.#emit('dashboard:saved', undefined);
@@ -177,6 +219,96 @@ class DashboardStore {
 			console.error('Failed to save dashboard:', error);
 			return false;
 		}
+	}
+
+	switchTab(tabId: DashboardTabId): void {
+		if (tabId === this.#activeTabId) return;
+		if (!this.#tabSlices[tabId]) return;
+
+		this.#flushActiveTabIntoSlices();
+		clearWidgetTopicsForLayout($state.snapshot(this.#widgets) as Widget[]);
+
+		this.#activeTabId = tabId;
+		this.#applyTabSlice(this.#tabSlices[tabId]);
+
+		this.resetInteractionStates();
+		this.#scheduleAutoSave();
+	}
+
+	addTab(label: string): DashboardTabId {
+		const id = generateTabId();
+		this.#tabOrder = [...$state.snapshot(this.#tabOrder) as TabInfo[], { id, label }];
+		this.#tabSlices = { ...$state.snapshot(this.#tabSlices) as Record<DashboardTabId, TabDashboardSlice>, [id]: createEmptyTabSlice() };
+		this.switchTab(id);
+		return id;
+	}
+
+	removeTab(tabId: DashboardTabId): boolean {
+		if (this.#tabOrder.length <= 1) return false;
+		const idx = this.#tabOrder.findIndex(t => t.id === tabId);
+		if (idx === -1) return false;
+
+		if (tabId === this.#activeTabId) {
+			clearWidgetTopicsForLayout($state.snapshot(this.#widgets) as Widget[]);
+		} else {
+			const slice = this.#tabSlices[tabId];
+			if (slice) clearWidgetTopicsForLayout($state.snapshot(slice.widgets) as Widget[]);
+		}
+
+		const newOrder = ($state.snapshot(this.#tabOrder) as TabInfo[]).filter(t => t.id !== tabId);
+		const newSlices = { ...$state.snapshot(this.#tabSlices) as Record<DashboardTabId, TabDashboardSlice> };
+		delete newSlices[tabId];
+
+		this.#tabOrder = newOrder;
+		this.#tabSlices = newSlices;
+
+		if (tabId === this.#activeTabId) {
+			const nextIdx = Math.min(idx, newOrder.length - 1);
+			this.#activeTabId = newOrder[nextIdx].id;
+			this.#applyTabSlice(this.#tabSlices[this.#activeTabId]);
+			this.resetInteractionStates();
+		}
+
+		this.#scheduleAutoSave();
+		return true;
+	}
+
+	renameTab(tabId: DashboardTabId, newLabel: string): void {
+		const order = $state.snapshot(this.#tabOrder) as TabInfo[];
+		const tab = order.find(t => t.id === tabId);
+		if (!tab) return;
+		tab.label = newLabel;
+		this.#tabOrder = order;
+		this.#scheduleAutoSave();
+	}
+
+	/**
+	 * Ensures widgets from app config exist on a tab (default: Market). Safe when that tab is not active.
+	 */
+	mergeMissingWidgetsFromConfig(tabId: DashboardTabId, configWidgets: Widget[]): void {
+		const slice = $state.snapshot(this.#tabSlices[tabId]) as TabDashboardSlice;
+		let added = false;
+		for (const cw of configWidgets) {
+			if (slice.widgets.some((w) => w.id === cw.id)) continue;
+			slice.widgets.push(structuredClone(cw));
+			added = true;
+		}
+		if (!added) return;
+
+		this.#tabSlices = { ...$state.snapshot(this.#tabSlices), [tabId]: slice } as Record<DashboardTabId, TabDashboardSlice>;
+
+		if (this.#activeTabId === tabId) {
+			this.#widgets = [...slice.widgets];
+			this.#widgetZIndexMap.clear();
+			this.#nextZIndex = 1;
+			this.#widgets.forEach((widget, index) => {
+				this.#widgetZIndexMap.set(widget.id, index + 1);
+				this.#nextZIndex = Math.max(this.#nextZIndex, index + 2);
+			});
+			this.ensureGridCapacity();
+		}
+
+		this.#scheduleAutoSave();
 	}
 	
 	// Widget Management
@@ -256,7 +388,7 @@ class DashboardStore {
 		
 		const newId = this.#generateWidgetId();
 		const newWidget: Widget = {
-			...structuredClone(widget),
+			...($state.snapshot(widget) as Widget),
 			id: newId,
 			gridColumn: position.gridColumn,
 			gridRow: position.gridRow,
@@ -387,25 +519,38 @@ class DashboardStore {
 	
 	// Data management
 	resetToDefault(defaultWidgets?: Widget[]): void {
-		console.log('🔄 Resetting to default layout...');
+		console.log('🔄 Resetting active tab to default layout...');
 
-		this.#widgets = [];
-		this.#widgetZIndexMap.clear();
-		this.#nextZIndex = 1;
-		this.#config = structuredClone(DEFAULT_CONFIG);
-		this.#hasUnsavedChanges = false;
+		this.#suspendAutoSave = true;
+		try {
+			this.#flushActiveTabIntoSlices();
+			clearWidgetTopicsForLayout($state.snapshot(this.#widgets) as Widget[]);
 
-		validatedTopicStore.clearAllAt('widgets');
-		this.clearSavedDashboard();
+			this.#widgets = [];
+			this.#widgetZIndexMap.clear();
+			this.#nextZIndex = 1;
+			this.#config = structuredClone(DEFAULT_CONFIG);
+
+			if (defaultWidgets && defaultWidgets.length > 0) {
+				defaultWidgets.forEach((widget) => {
+					this.addWidget(structuredClone(widget));
+				});
+				this.ensureGridCapacity();
+			}
+
+			this.#emit('dashboard:reset', undefined);
+		} finally {
+			queueMicrotask(() => {
+				this.#flushActiveTabIntoSlices();
+				this.#suspendAutoSave = false;
+				if (this.#autoSaveEnabled) {
+					this.save();
+				}
+			});
+		}
 
 		if (defaultWidgets && defaultWidgets.length > 0) {
-			defaultWidgets.forEach((widget) => {
-				this.addWidget(structuredClone(widget));
-			});
-			this.ensureGridCapacity();
-			this.#hasUnsavedChanges = false;
-			this.#emit('dashboard:reset', undefined);
-			console.log(`✅ Reset complete: loaded default layout (${defaultWidgets.length} widgets)`);
+			console.log(`✅ Reset complete: loaded default layout (${defaultWidgets.length} widgets) on ${this.#activeTabId}`);
 		} else {
 			console.log('✅ Reset complete (no default widgets)');
 		}
@@ -417,6 +562,14 @@ class DashboardStore {
 		
 		if (success) {
 			validatedTopicStore.clearAllAt('widgets');
+			const fresh = cloneEmptyMultiTab();
+			this.#tabOrder = fresh.tabOrder;
+			this.#tabSlices = fresh.tabs;
+			this.#activeTabId = DEFAULT_ACTIVE_TAB;
+			this.#widgets = [];
+			this.#widgetZIndexMap.clear();
+			this.#nextZIndex = 1;
+			this.#config = structuredClone(DEFAULT_CONFIG);
 			this.#hasUnsavedChanges = false;
 			console.log('✅ Dashboard cleared');
 		}
@@ -467,23 +620,55 @@ class DashboardStore {
 	}
 	
 	// Private methods
-	#loadFromSavedState(savedState: { widgets: Widget[]; config: DashboardConfig }): void {
-		this.#widgets = savedState.widgets;
-		this.#config = savedState.config;
-		
-		// Initialize z-index map
+	#flushActiveTabIntoSlices(): void {
+		this.#tabSlices = {
+			...$state.snapshot(this.#tabSlices),
+			[this.#activeTabId]: {
+				widgets: $state.snapshot(this.#widgets),
+				config: $state.snapshot(this.#config),
+				widgetData: DashboardStorage.collectWidgetDataFromStore()
+			}
+		};
+	}
+
+	#applyTabSlice(slice: TabDashboardSlice): void {
+		if (this.#widgets.length > 0) {
+			clearWidgetTopicsForLayout($state.snapshot(this.#widgets) as Widget[]);
+		}
+
+		const plain = $state.snapshot(slice) as TabDashboardSlice;
+		this.#widgets = plain.widgets;
+		this.#config = plain.config;
+
+		this.#widgetZIndexMap.clear();
+		this.#nextZIndex = 1;
 		this.#widgets.forEach((widget, index) => {
 			this.#widgetZIndexMap.set(widget.id, index + 1);
 			this.#nextZIndex = Math.max(this.#nextZIndex, index + 2);
 		});
-		
+
+		DashboardStorage.restoreWidgetDataSnapshot(plain.widgetData ?? {});
+
 		this.ensureGridCapacity();
+	}
+
+	#loadFromSavedState(savedState: MultiTabDashboardState): void {
+		const tabOrder = structuredClone(savedState.tabOrder);
+		const slices: Record<DashboardTabId, TabDashboardSlice> = {};
+		for (const t of tabOrder) {
+			slices[t.id] = savedState.tabs[t.id]
+				? structuredClone(savedState.tabs[t.id])
+				: createEmptyTabSlice();
+		}
+		this.#tabOrder = tabOrder;
+		this.#tabSlices = slices;
+		this.#activeTabId = savedState.activeTabId;
+		this.#applyTabSlice(slices[this.#activeTabId]);
 		this.#initialized = true;
-		console.info('📂 Dashboard loaded from storage');
 	}
 	
 	#scheduleAutoSave(): void {
-		if (!this.#autoSaveEnabled) return;
+		if (this.#suspendAutoSave || !this.#autoSaveEnabled) return;
 		
 		if (this.#autoSaveTimeout) {
 			clearTimeout(this.#autoSaveTimeout);
@@ -616,4 +801,4 @@ class DashboardStore {
 export const dashboard = new DashboardStore();
 
 // Export types for consumers
-export type { DashboardStore, DashboardEvents, WidgetUpdate, GridPosition };
+export type { DashboardStore, DashboardEvents, WidgetUpdate, GridPosition, DashboardTabId, TabInfo };

@@ -1,4 +1,14 @@
 import type { Widget, DashboardConfig } from '$lib/dashboard/types/widget';
+import {
+	createEmptyMultiTabState,
+	createEmptyTabSlice,
+	DEFAULT_TABS,
+	type DashboardTabId,
+	type MultiTabDashboardState,
+	type TabDashboardSlice,
+	type TabInfo,
+	type WidgetDataSnapshot as TabWidgetDataSnapshot
+} from '$lib/dashboard/types/dashboardTabs';
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 
 const STORAGE_KEYS = {
@@ -6,22 +16,20 @@ const STORAGE_KEYS = {
 	CONFIG: 'dashboard_config',
 	WIDGET_DATA: 'dashboard_widget_data',
 	VERSION: 'dashboard_version',
+	WORKSPACE: 'dashboard_workspace',
 	SELECTED_PROJECT: 'dashboard_selected_project'
 } as const;
 
+const VERSION_LEGACY_V3 = '3.0.0';
+const VERSION_V4 = '4.0.0';
+export const DASHBOARD_STORAGE_VERSION = '5.0.0';
+
 function getProjectScopedKey(baseKey: string, projectId: string | null): string {
-	if (!projectId) {
-		return baseKey;
-	}
+	if (!projectId) return baseKey;
 	return `${baseKey}_project_${projectId}`;
 }
 
-const CURRENT_VERSION = '3.0.0'; // Bumped version for ValidatedTopicStore migration
-
-export interface WidgetDataSnapshot {
-	[topic: string]: any;
-}
-
+/** @deprecated Legacy single-dashboard payload */
 export interface DashboardState {
 	widgets: Widget[];
 	config: DashboardConfig;
@@ -29,10 +37,110 @@ export interface DashboardState {
 	version: string;
 }
 
-// Auto-save configuration
+export type WidgetDataSnapshot = TabWidgetDataSnapshot;
+
 let autoSaveWidgetDataEnabled = true;
 let autoSaveWidgetDataTimeout: ReturnType<typeof setTimeout> | null = null;
-const AUTO_SAVE_DELAY = 1000; // 1 second debounce
+const AUTO_SAVE_DELAY = 1000;
+
+function isValidTabSlice(s: unknown): s is TabDashboardSlice {
+	if (!s || typeof s !== 'object') return false;
+	const o = s as Record<string, unknown>;
+	if (!Array.isArray(o.widgets)) return false;
+	if (!o.config || typeof o.config !== 'object') return false;
+	if (o.widgetData !== undefined && (typeof o.widgetData !== 'object' || o.widgetData === null)) return false;
+	return true;
+}
+
+function isValidMultiTabState(data: unknown): data is MultiTabDashboardState {
+	if (!data || typeof data !== 'object') return false;
+	const o = data as Record<string, unknown>;
+	if (o.version !== DASHBOARD_STORAGE_VERSION) return false;
+	if (typeof o.activeTabId !== 'string') return false;
+	if (!Array.isArray(o.tabOrder)) return false;
+	const tabOrder = o.tabOrder as unknown[];
+	for (const t of tabOrder) {
+		if (!t || typeof t !== 'object') return false;
+		const ti = t as Record<string, unknown>;
+		if (typeof ti.id !== 'string' || typeof ti.label !== 'string') return false;
+	}
+	if (!o.tabs || typeof o.tabs !== 'object') return false;
+	const tabs = o.tabs as Record<string, unknown>;
+	for (const t of tabOrder as TabInfo[]) {
+		if (!isValidTabSlice(tabs[t.id])) return false;
+	}
+	if (!(o.activeTabId as string) || !tabOrder.some((t: any) => t.id === o.activeTabId)) return false;
+	return true;
+}
+
+const V4_TAB_IDS = ['financial', 'market', 'property', 'legal'];
+const V4_TAB_LABELS: Record<string, string> = {
+	financial: 'Financial',
+	market: 'Market',
+	property: 'Property',
+	legal: 'Legal'
+};
+
+function migrateV4ToV5(v4: Record<string, unknown>): MultiTabDashboardState | null {
+	if (typeof v4.activeTabId !== 'string' || !v4.tabs || typeof v4.tabs !== 'object') return null;
+	const tabs = v4.tabs as Record<string, unknown>;
+	const tabOrder: TabInfo[] = [];
+	const newTabs: Record<DashboardTabId, TabDashboardSlice> = {};
+	for (const id of V4_TAB_IDS) {
+		const slice = tabs[id];
+		if (isValidTabSlice(slice)) {
+			tabOrder.push({ id, label: V4_TAB_LABELS[id] ?? id });
+			newTabs[id] = slice;
+		}
+	}
+	if (tabOrder.length === 0) return null;
+	const activeTabId = tabOrder.some((t) => t.id === v4.activeTabId) ? (v4.activeTabId as string) : tabOrder[0].id;
+	return { version: DASHBOARD_STORAGE_VERSION, activeTabId, tabOrder, tabs: newTabs };
+}
+
+function migrateLegacyV3ToMulti(legacy: {
+	widgets: Widget[];
+	config: DashboardConfig;
+	widgetData: WidgetDataSnapshot;
+}): MultiTabDashboardState {
+	const state = createEmptyMultiTabState('market');
+	state.tabs.market = {
+		widgets: legacy.widgets,
+		config: legacy.config,
+		widgetData: legacy.widgetData ?? {}
+	};
+	return state;
+}
+
+function tryParseLegacyV3(projectId: string | null): MultiTabDashboardState | null {
+	const widgetsKey = getProjectScopedKey(STORAGE_KEYS.WIDGETS, projectId);
+	const configKey = getProjectScopedKey(STORAGE_KEYS.CONFIG, projectId);
+	const widgetDataKey = getProjectScopedKey(STORAGE_KEYS.WIDGET_DATA, projectId);
+	const versionKey = getProjectScopedKey(STORAGE_KEYS.VERSION, projectId);
+
+	const version = localStorage.getItem(versionKey);
+	if (version !== VERSION_LEGACY_V3 && version !== null) return null;
+
+	const widgetsJson = localStorage.getItem(widgetsKey);
+	const configJson = localStorage.getItem(configKey);
+	if (!widgetsJson || !configJson) return null;
+
+	let widgets: unknown;
+	try { widgets = JSON.parse(widgetsJson); } catch { return null; }
+	if (!Array.isArray(widgets)) return null;
+
+	const config = JSON.parse(configJson) as DashboardConfig;
+	if (!config?.gridColumns || !config?.gridRows) return null;
+
+	const widgetDataJson = localStorage.getItem(widgetDataKey);
+	const widgetData = widgetDataJson ? (JSON.parse(widgetDataJson) as WidgetDataSnapshot) : {};
+
+	console.info('   📦 Migrating v3 → v5 (layout → Market tab)');
+	const migrated = migrateLegacyV3ToMulti({ widgets: widgets as Widget[], config, widgetData });
+	DashboardStorage.saveMultiTabState(migrated, projectId);
+	DashboardStorage.removeLegacyV3Keys(projectId);
+	return migrated;
+}
 
 export class DashboardStorage {
 	private static isLocalStorageAvailable(): boolean {
@@ -41,276 +149,156 @@ export class DashboardStorage {
 			localStorage.setItem(testKey, 'test');
 			localStorage.removeItem(testKey);
 			return true;
-		} catch {
-			return false;
-		}
+		} catch { return false; }
 	}
 
-	/**
-	 * Enable or disable auto-save for widget data
-	 */
 	static setAutoSaveWidgetData(enabled: boolean): void {
-		console.log(`🔧 [DashboardStorage] Auto-save widget data: ${enabled ? 'enabled' : 'disabled'}`);
 		autoSaveWidgetDataEnabled = enabled;
 	}
 
-	/**
-	 * Save only widget data (debounced)
-	 * Called automatically when ValidatedTopicStore data changes
-	 */
 	static autoSaveWidgetData(): void {
 		if (!autoSaveWidgetDataEnabled) return;
-
-		// Debounce to avoid excessive writes
-		if (autoSaveWidgetDataTimeout) {
-			clearTimeout(autoSaveWidgetDataTimeout);
-		}
-
+		if (autoSaveWidgetDataTimeout) clearTimeout(autoSaveWidgetDataTimeout);
 		autoSaveWidgetDataTimeout = setTimeout(() => {
-			console.log('💾 [DashboardStorage] Auto-saving widget data...');
 			this.saveWidgetDataOnly();
 			autoSaveWidgetDataTimeout = null;
 		}, AUTO_SAVE_DELAY);
 	}
 
-	/**
-	 * Save only widget data (without full dashboard)
-	 * Captures all data under the 'widgets/' path in ValidatedTopicStore
-	 */
 	private static saveWidgetDataOnly(): boolean {
-		if (!this.isLocalStorageAvailable()) {
-			return false;
-		}
-
+		if (!this.isLocalStorageAvailable()) return false;
 		try {
-			// Capture current widget data from ValidatedTopicStore
-			const widgetData: WidgetDataSnapshot = {};
-			const tree = validatedTopicStore.tree;
-			
-			// Get all widget data from the 'widgets' namespace
-			if (tree.widgets && typeof tree.widgets === 'object') {
-				// Iterate through widget types (metric, paragraph, etc.)
-				for (const [widgetType, widgetTypeData] of Object.entries(tree.widgets)) {
-					if (widgetTypeData && typeof widgetTypeData === 'object') {
-						// Iterate through widget instances
-						for (const [widgetId, data] of Object.entries(widgetTypeData)) {
-							const topic = `widgets/${widgetType}/${widgetId}`;
-							widgetData[topic] = data;
-						}
-					}
-				}
-			}
-
+			const widgetData = this.collectWidgetDataFromStore();
 			localStorage.setItem(STORAGE_KEYS.WIDGET_DATA, JSON.stringify(widgetData));
-			console.log(`   ✅ Auto-saved ${Object.keys(widgetData).length} widget topics`);
-
 			return true;
-		} catch (error) {
-			console.error('❌ [DashboardStorage] Failed to auto-save widget data:', error);
-			return false;
-		}
+		} catch { return false; }
 	}
 
-	static saveDashboard(widgets: Widget[], config: DashboardConfig, projectId: string | null = null): boolean {
-		console.log(`\n💾 [DashboardStorage] Saving dashboard${projectId ? ` for project ${projectId}` : ''} to localStorage...`);
-		
-		if (!this.isLocalStorageAvailable()) {
-			console.warn('LocalStorage is not available');
-			return false;
-		}
-
-		try {
-			// Capture current widget data from ValidatedTopicStore
-			const widgetData: WidgetDataSnapshot = {};
-			const tree = validatedTopicStore.tree;
-			
-			// Get all widget data from the 'widgets' namespace
-			if (tree.widgets && typeof tree.widgets === 'object') {
-				for (const [widgetType, widgetTypeData] of Object.entries(tree.widgets)) {
-					if (widgetTypeData && typeof widgetTypeData === 'object') {
-						for (const [widgetId, data] of Object.entries(widgetTypeData)) {
-							const topic = `widgets/${widgetType}/${widgetId}`;
-							widgetData[topic] = data;
-							console.log(`   ✅ Captured data for topic: ${topic}`);
-						}
+	static collectWidgetDataFromStore(): WidgetDataSnapshot {
+		const widgetData: WidgetDataSnapshot = {};
+		const tree = validatedTopicStore.tree;
+		if (tree.widgets && typeof tree.widgets === 'object') {
+			for (const [widgetType, widgetTypeData] of Object.entries(tree.widgets)) {
+				if (widgetTypeData && typeof widgetTypeData === 'object') {
+					for (const [widgetId, data] of Object.entries(widgetTypeData)) {
+						widgetData[`widgets/${widgetType}/${widgetId}`] = data;
 					}
 				}
 			}
-
-			console.log(`   Total topics saved: ${Object.keys(widgetData).length}`);
-
-			const state: DashboardState = {
-				widgets,
-				config,
-				widgetData,
-				version: CURRENT_VERSION
-			};
-
-			const widgetsKey = getProjectScopedKey(STORAGE_KEYS.WIDGETS, projectId);
-			const configKey = getProjectScopedKey(STORAGE_KEYS.CONFIG, projectId);
-			const widgetDataKey = getProjectScopedKey(STORAGE_KEYS.WIDGET_DATA, projectId);
-			const versionKey = getProjectScopedKey(STORAGE_KEYS.VERSION, projectId);
-
-			localStorage.setItem(widgetsKey, JSON.stringify(widgets));
-			localStorage.setItem(configKey, JSON.stringify(config));
-			localStorage.setItem(widgetDataKey, JSON.stringify(widgetData));
-			localStorage.setItem(versionKey, CURRENT_VERSION);
-
-			// Save the selected project ID
-			if (projectId !== null) {
-				localStorage.setItem(STORAGE_KEYS.SELECTED_PROJECT, projectId);
-			}
-
-			console.log('✅ [DashboardStorage] Dashboard saved successfully\n');
-			return true;
-		} catch (error) {
-			console.error('❌ [DashboardStorage] Failed to save dashboard to localStorage:', error);
-			return false;
 		}
+		return widgetData;
 	}
 
-	static loadDashboard(projectId: string | null = null): DashboardState | null {
-		const projectLabel = projectId ? ` for project ${projectId}` : '';
-		console.log(`\n📂 [DashboardStorage] Loading dashboard${projectLabel} from localStorage...`);
-		
-		if (!this.isLocalStorageAvailable()) {
-			console.warn('LocalStorage is not available');
-			return null;
-		}
-
+	static saveMultiTabState(state: MultiTabDashboardState, projectId: string | null = null): boolean {
+		if (!this.isLocalStorageAvailable()) return false;
 		try {
-			const widgetsKey = getProjectScopedKey(STORAGE_KEYS.WIDGETS, projectId);
-			const configKey = getProjectScopedKey(STORAGE_KEYS.CONFIG, projectId);
-			const widgetDataKey = getProjectScopedKey(STORAGE_KEYS.WIDGET_DATA, projectId);
+			const workspaceKey = getProjectScopedKey(STORAGE_KEYS.WORKSPACE, projectId);
 			const versionKey = getProjectScopedKey(STORAGE_KEYS.VERSION, projectId);
+			localStorage.setItem(workspaceKey, JSON.stringify(state));
+			localStorage.setItem(versionKey, DASHBOARD_STORAGE_VERSION);
+			if (projectId !== null) localStorage.setItem(STORAGE_KEYS.SELECTED_PROJECT, projectId);
+			return true;
+		} catch { return false; }
+	}
 
+	static loadDashboard(projectId: string | null = null): MultiTabDashboardState | null {
+		if (!this.isLocalStorageAvailable()) return null;
+		try {
+			const versionKey = getProjectScopedKey(STORAGE_KEYS.VERSION, projectId);
+			const workspaceKey = getProjectScopedKey(STORAGE_KEYS.WORKSPACE, projectId);
 			const version = localStorage.getItem(versionKey);
 
-			// Check if stored version matches current version
-			if (version !== CURRENT_VERSION) {
-				console.info(`   Version mismatch (stored: ${version}, current: ${CURRENT_VERSION}), clearing old data`);
+			if (version === DASHBOARD_STORAGE_VERSION) {
+				const json = localStorage.getItem(workspaceKey);
+				if (!json) return null;
+				const parsed = JSON.parse(json) as unknown;
+				if (isValidMultiTabState(parsed)) return parsed;
 				this.clearDashboard(projectId);
 				return null;
 			}
 
-			const widgetsJson = localStorage.getItem(widgetsKey);
-			const configJson = localStorage.getItem(configKey);
-			const widgetDataJson = localStorage.getItem(widgetDataKey);
-
-			if (!widgetsJson || !configJson) {
-				console.log('   No saved dashboard found');
-				return null;
+			if (version === VERSION_V4) {
+				const json = localStorage.getItem(workspaceKey);
+				if (json) {
+					const parsed = JSON.parse(json) as Record<string, unknown>;
+					const migrated = migrateV4ToV5(parsed);
+					if (migrated) {
+						console.info('   📦 Migrated v4 → v5');
+						this.saveMultiTabState(migrated, projectId);
+						return migrated;
+					}
+				}
 			}
 
-			const widgets = JSON.parse(widgetsJson) as Widget[];
-			const config = JSON.parse(configJson) as DashboardConfig;
-			const widgetData = widgetDataJson ? JSON.parse(widgetDataJson) as WidgetDataSnapshot : {};
-
-			// Validate loaded data
-			if (!Array.isArray(widgets) || !config.gridColumns || !config.gridRows) {
-				console.error('Invalid dashboard data in localStorage');
-				return null;
+			if (version === VERSION_LEGACY_V3 || version === null) {
+				const migrated = tryParseLegacyV3(projectId);
+				if (migrated) return migrated;
 			}
 
-			console.log(`   ✅ Loaded ${widgets.length} widgets`);
-			console.log(`   ✅ Loaded ${Object.keys(widgetData).length} widget data topics`);
+			if (version !== null && version !== VERSION_LEGACY_V3) {
+				this.clearDashboard(projectId);
+			}
 
-			// Restore widget data to ValidatedTopicStore
-			this.restoreWidgetData(widgetData);
-
-			return {
-				widgets,
-				config,
-				widgetData,
-				version: CURRENT_VERSION
-			};
-		} catch (error) {
-			console.error('❌ [DashboardStorage] Failed to load dashboard from localStorage:', error);
 			return null;
-		}
+		} catch { return null; }
+	}
+
+	static restoreWidgetDataSnapshot(widgetData: WidgetDataSnapshot): void {
+		Object.entries(widgetData).forEach(([topic, data]) => {
+			try { validatedTopicStore.publish(topic, data); } catch { /* skip */ }
+		});
 	}
 
 	static getSelectedProjectId(): string | null {
-		if (!this.isLocalStorageAvailable()) {
-			return null;
-		}
+		if (!this.isLocalStorageAvailable()) return null;
 		return localStorage.getItem(STORAGE_KEYS.SELECTED_PROJECT);
 	}
 
-	/**
-	 * Restore widget data to ValidatedTopicStore
-	 */
-	private static restoreWidgetData(widgetData: WidgetDataSnapshot): void {
-		console.log('\n📤 [DashboardStorage] Restoring widget data to ValidatedTopicStore...');
-		
-		Object.entries(widgetData).forEach(([topic, data]) => {
-			try {
-				// Publish directly to ValidatedTopicStore
-				const success = validatedTopicStore.publish(topic, data);
-				if (success) {
-					console.log(`   ✅ Restored data for topic: ${topic}`);
-				} else {
-					console.warn(`   ⚠️ Validation failed for topic: ${topic}`);
-				}
-			} catch (error) {
-				console.error(`   ❌ Failed to restore data for topic ${topic}:`, error);
-			}
-		});
-
-		console.log('✅ [DashboardStorage] Widget data restoration complete\n');
+	static removeLegacyV3Keys(projectId: string | null): void {
+		for (const key of [STORAGE_KEYS.WIDGETS, STORAGE_KEYS.CONFIG, STORAGE_KEYS.WIDGET_DATA]) {
+			localStorage.removeItem(getProjectScopedKey(key, projectId));
+		}
 	}
 
 	static clearDashboard(projectId: string | null = null): boolean {
-		const projectLabel = projectId ? ` for project ${projectId}` : '';
-		console.log(`\n🗑️  [DashboardStorage] Clearing dashboard${projectLabel} from localStorage...`);
-		
-		if (!this.isLocalStorageAvailable()) {
-			return false;
-		}
-
+		if (!this.isLocalStorageAvailable()) return false;
 		try {
-			const widgetsKey = getProjectScopedKey(STORAGE_KEYS.WIDGETS, projectId);
-			const configKey = getProjectScopedKey(STORAGE_KEYS.CONFIG, projectId);
-			const widgetDataKey = getProjectScopedKey(STORAGE_KEYS.WIDGET_DATA, projectId);
-			const versionKey = getProjectScopedKey(STORAGE_KEYS.VERSION, projectId);
-
-			localStorage.removeItem(widgetsKey);
-			localStorage.removeItem(configKey);
-			localStorage.removeItem(widgetDataKey);
-			localStorage.removeItem(versionKey);
-			
-			console.log('✅ [DashboardStorage] Dashboard cleared\n');
+			for (const key of Object.values(STORAGE_KEYS)) {
+				if (key === STORAGE_KEYS.SELECTED_PROJECT) continue;
+				localStorage.removeItem(getProjectScopedKey(key, projectId));
+			}
 			return true;
-		} catch (error) {
-			console.error('❌ [DashboardStorage] Failed to clear dashboard from localStorage:', error);
-			return false;
-		}
+		} catch { return false; }
 	}
 
 	static exportDashboard(projectId: string | null = null): string | null {
 		const state = this.loadDashboard(projectId);
 		if (!state) return null;
-
-		try {
-			return JSON.stringify(state, null, 2);
-		} catch (error) {
-			console.error('Failed to export dashboard:', error);
-			return null;
-		}
+		try { return JSON.stringify(state, null, 2); } catch { return null; }
 	}
 
 	static importDashboard(jsonString: string, projectId: string | null = null): boolean {
 		try {
-			const state = JSON.parse(jsonString) as DashboardState;
+			const parsed = JSON.parse(jsonString) as unknown;
+			if (isValidMultiTabState(parsed)) return this.saveMultiTabState(parsed, projectId);
 
-			if (!state.widgets || !state.config) {
-				throw new Error('Invalid dashboard data structure');
+			const asV4 = parsed as Record<string, unknown>;
+			if (asV4.version === VERSION_V4) {
+				const migrated = migrateV4ToV5(asV4);
+				if (migrated) return this.saveMultiTabState(migrated, projectId);
 			}
 
-			return this.saveDashboard(state.widgets, state.config, projectId);
-		} catch (error) {
-			console.error('Failed to import dashboard:', error);
+			const legacy = parsed as Partial<DashboardState>;
+			if (legacy.widgets && legacy.config && Array.isArray(legacy.widgets)) {
+				const multi = migrateLegacyV3ToMulti({
+					widgets: legacy.widgets,
+					config: legacy.config as DashboardConfig,
+					widgetData: (legacy.widgetData as WidgetDataSnapshot) ?? {}
+				});
+				return this.saveMultiTabState(multi, projectId);
+			}
+
 			return false;
-		}
+		} catch { return false; }
 	}
 }

@@ -1,9 +1,13 @@
 <script lang="ts">
+
+	// Sorting the variables for the widget
+
 	import type {
 		LocationQuotientRpcInput,
 		LocationQuotientSortOrder,
 		LocationQuotientWidgetConfig
 	} from '$lib/dashboard/types/widget';
+	
 	import {
 		loadLocationQuotientData,
 		type QcewSectorAggregate

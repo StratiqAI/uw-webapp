@@ -1,18 +1,29 @@
 <script lang="ts">
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
-	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
-	import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
-	import type { ParagraphWidget, Widget, WidgetType } from '../types/widget';
+	import type { Widget, WidgetType } from '../types/widget';
 	import { findAvailablePosition } from '../utils/grid';
 	import { PUBLIC_GEOAPIFY_API_KEY } from '$env/static/public';
+	import type { DashboardTabId } from '$lib/dashboard/types/dashboardTabs';
+	import type { Project } from '@stratiqai/types-simple';
+	import ProjectSwitcher from './ProjectSwitcher.svelte';
 
 	interface Props {
 		darkMode?: boolean;
-		/** Default widget layout to restore when user resets to default */
 		defaultWidgets?: Widget[];
+		projects?: Project[];
+		selectedProjectId?: string | null;
+		onProjectChange?: (projectId: string | null) => void;
+		onToggleDarkMode?: () => void;
 	}
 
-	let { darkMode = false, defaultWidgets }: Props = $props();
+	let {
+		darkMode = false,
+		defaultWidgets,
+		projects = [],
+		selectedProjectId = null,
+		onProjectChange,
+		onToggleDarkMode
+	}: Props = $props();
 
 	let showExportDialog = $state(false);
 	let showImportDialog = $state(false);
@@ -20,7 +31,51 @@
 	let exportedJson = $state('');
 	let importJson = $state('');
 	let importError = $state('');
+	let renamingTabId = $state<DashboardTabId | null>(null);
+	let renameValue = $state('');
+	let showDeleteConfirm = $state<DashboardTabId | null>(null);
 
+	function selectTab(id: DashboardTabId) {
+		if (renamingTabId) return;
+		dashboard.switchTab(id);
+	}
+
+	function handleAddTab() {
+		const label = `Dashboard ${dashboard.tabOrder.length + 1}`;
+		dashboard.addTab(label);
+	}
+
+	function handleDeleteTab(id: DashboardTabId) {
+		if (dashboard.tabOrder.length <= 1) return;
+		showDeleteConfirm = id;
+	}
+
+	function confirmDeleteTab() {
+		if (showDeleteConfirm) {
+			dashboard.removeTab(showDeleteConfirm);
+			showDeleteConfirm = null;
+		}
+	}
+
+	function startRename(id: DashboardTabId, currentLabel: string) {
+		renamingTabId = id;
+		renameValue = currentLabel;
+	}
+
+	function commitRename() {
+		if (renamingTabId && renameValue.trim()) {
+			dashboard.renameTab(renamingTabId, renameValue.trim());
+		}
+		renamingTabId = null;
+		renameValue = '';
+	}
+
+	function handleRenameKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter') commitRename();
+		if (e.key === 'Escape') { renamingTabId = null; renameValue = ''; }
+	}
+
+	// ── Dashboard actions ──────────────────────────────────────────
 	function handleSave() {
 		const success = dashboard.save();
 		if (success) {
@@ -30,16 +85,11 @@
 		}
 	}
 
-	function handleClear() {
-		//   if (confirm('Are you sure you want to clear the saved dashboard layout? This cannot be undone.')) {
-		dashboard.clearSavedDashboard();
-		//     alert('Saved dashboard cleared. Refresh to see default layout.');
-		//   }
-	}
-
 	function handleReset() {
 		if (
-			confirm('Are you sure you want to reset to the default layout? This will replace the current layout with the default.')
+			confirm(
+				'Are you sure you want to reset to the default layout? This will replace the current layout with the default.'
+			)
 		) {
 			dashboard.resetToDefault(defaultWidgets);
 		}
@@ -83,60 +133,7 @@
 		URL.revokeObjectURL(url);
 	}
 
-	function handleUpdateParagraphWidget() {
-		const topics = [
-			{
-				title: 'AI Dashboard Update',
-				content:
-					'The AI-powered dashboard is now processing **12,543 events per second** with an average latency of _15ms_. Machine learning models have achieved a 94% accuracy rate in predicting user behavior patterns.',
-				markdown: true
-			},
-			{
-				title: 'System Performance',
-				content:
-					'All systems are operating normally. CPU usage: 45%, Memory: 62%, Network throughput: optimal. No anomalies detected in the last hour.',
-				markdown: false
-			},
-			{
-				title: 'Market Analysis',
-				content:
-					"Today's market shows **strong growth** in the technology sector with a _3.2% increase_. AI and machine learning companies are leading the surge with unprecedented investor interest.",
-				markdown: true
-			},
-			{
-				title: 'Weather Report',
-				content:
-					'Current conditions: Partly cloudy, 72°F. Forecast: Mild temperatures continuing through the week with a 20% chance of rain on Thursday.',
-				markdown: false
-			},
-			{
-				title: 'Breaking News',
-				content:
-					'**Breaking:** Scientists announce breakthrough in quantum computing, achieving stable qubit coherence for over _100 microseconds_. This represents a ***10x improvement*** over previous records.',
-				markdown: true
-			}
-		];
-		// Pick a random topic
-		const topic = topics[Math.floor(Math.random() * topics.length)];
-
-		// Add timestamp to content
-		const timestamp = new Date().toLocaleTimeString();
-		const contentWithTime = `${topic.content}\n\n_Last updated: ${timestamp}_`;
-
-		const data: ParagraphWidget['data'] = {
-			title: topic.title,
-			content: topic.markdown ? contentWithTime : `${topic.content}\n\nLast updated: ${timestamp}`,
-			markdown: topic.markdown
-		};
-
-		console.log(`🤖 AI Agent generated new content: "${topic.title}"`);
-		
-		// Publish to ValidatedTopicStore using the standard widget topic path
-		// Using widget-6 as that's the paragraph widget in the default config
-		const paragraphTopic = getWidgetTopic('paragraph', 'widget-6');
-		validatedTopicStore.publish(paragraphTopic, data);
-	}
-
+	// ── Widget creation ────────────────────────────────────────────
 	function generateWidgetId(): string {
 		return `widget-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 	}
@@ -144,8 +141,7 @@
 	function createDefaultWidget(type: WidgetType): Widget | null {
 		const widgetId = generateWidgetId();
 		const config = dashboard.config;
-		
-		// Default sizes for each widget type
+
 		const defaultSizes: Record<WidgetType, { colSpan: number; rowSpan: number }> = {
 			title: { colSpan: 12, rowSpan: 1 },
 			metric: { colSpan: 2, rowSpan: 1 },
@@ -166,8 +162,7 @@
 		};
 
 		const { colSpan, rowSpan } = defaultSizes[type];
-		
-		// Find available position
+
 		const position = findAvailablePosition(
 			colSpan,
 			rowSpan,
@@ -181,7 +176,6 @@
 			return null;
 		}
 
-		// Create widget based on type
 		const baseWidget = {
 			id: widgetId,
 			gridColumn: position.gridColumn,
@@ -194,213 +188,37 @@
 
 		switch (type) {
 			case 'title':
-				return {
-					...baseWidget,
-					type: 'title',
-					data: {
-						title: 'New Title',
-						subtitle: 'Subtitle text',
-						alignment: 'center'
-					}
-				} as Widget;
-
+				return { ...baseWidget, type: 'title', data: { title: 'New Title', subtitle: 'Subtitle text', alignment: 'center' } } as Widget;
 			case 'metric':
-				return {
-					...baseWidget,
-					type: 'metric',
-					data: {
-						label: 'METRIC',
-						value: '0'
-					}
-				} as Widget;
-
+				return { ...baseWidget, type: 'metric', data: { label: 'METRIC', value: '0' } } as Widget;
 			case 'paragraph':
-				return {
-					...baseWidget,
-					type: 'paragraph',
-					data: {
-						title: 'New Paragraph',
-						content: 'Enter your content here...',
-						markdown: false
-					}
-				} as Widget;
-
+				return { ...baseWidget, type: 'paragraph', data: { title: 'New Paragraph', content: 'Enter your content here...', markdown: false } } as Widget;
 			case 'table':
-				return {
-					...baseWidget,
-					type: 'table',
-					data: {
-						title: 'New Table',
-						headers: ['Column 1', 'Column 2'],
-						rows: [
-							{ 'Column 1': 'Row 1', 'Column 2': 'Data' },
-							{ 'Column 1': 'Row 2', 'Column 2': 'Data' }
-						],
-						sortable: true,
-						paginated: false
-					}
-				} as Widget;
-
+				return { ...baseWidget, type: 'table', data: { title: 'New Table', headers: ['Column 1', 'Column 2'], rows: [{ 'Column 1': 'Row 1', 'Column 2': 'Data' }, { 'Column 1': 'Row 2', 'Column 2': 'Data' }], sortable: true, paginated: false } } as Widget;
 			case 'image':
-				return {
-					...baseWidget,
-					type: 'image',
-					data: {
-						title: 'New Image',
-						src: 'https://via.placeholder.com/800x600',
-						alt: 'Placeholder image',
-						objectFit: 'cover'
-					}
-				} as Widget;
-
+				return { ...baseWidget, type: 'image', data: { title: 'New Image', src: 'https://via.placeholder.com/800x600', alt: 'Placeholder image', objectFit: 'cover' } } as Widget;
 			case 'map':
-				return {
-					...baseWidget,
-					type: 'map',
-					data: {
-						title: 'New Map',
-						lat: 29.416775,
-						lon: -98.406103,
-						zoom: 15,
-						mapType: 'leaflet',
-						apiKey: PUBLIC_GEOAPIFY_API_KEY
-					}
-				} as Widget;
-
+				return { ...baseWidget, type: 'map', data: { title: 'New Map', lat: 29.416775, lon: -98.406103, zoom: 15, mapType: 'leaflet', apiKey: PUBLIC_GEOAPIFY_API_KEY } } as Widget;
 			case 'lineChart':
-				return {
-					...baseWidget,
-					type: 'lineChart',
-					data: {
-						labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
-						datasets: [
-							{
-								label: 'Dataset 1',
-								data: [10, 20, 15, 25, 30],
-								color: '#3b82f6'
-							}
-						],
-						options: {
-							responsive: true,
-							maintainAspectRatio: false
-						}
-					}
-				} as Widget;
-
+				return { ...baseWidget, type: 'lineChart', data: { labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'], datasets: [{ label: 'Dataset 1', data: [10, 20, 15, 25, 30], color: '#3b82f6' }], options: { responsive: true, maintainAspectRatio: false } } } as Widget;
 			case 'barChart':
-				return {
-					...baseWidget,
-					type: 'barChart',
-					data: {
-						labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
-						datasets: [
-							{
-								label: 'Dataset 1',
-								data: [10, 20, 15, 25, 30],
-								backgroundColor: '#3b82f6'
-							}
-						],
-						orientation: 'vertical'
-					}
-				} as Widget;
-
+				return { ...baseWidget, type: 'barChart', data: { labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'], datasets: [{ label: 'Dataset 1', data: [10, 20, 15, 25, 30], backgroundColor: '#3b82f6' }], orientation: 'vertical' } } as Widget;
 			case 'donutChart':
-				return {
-					...baseWidget,
-					type: 'donutChart',
-					data: {
-						labels: ['A', 'B', 'C', 'D'],
-						values: [28, 22, 35, 15],
-						colors: ['#6366f1', '#8b5cf6', '#a855f7', '#c084fc'],
-						centerLabel: 'Total'
-					}
-				} as Widget;
-
+				return { ...baseWidget, type: 'donutChart', data: { labels: ['A', 'B', 'C', 'D'], values: [28, 22, 35, 15], colors: ['#6366f1', '#8b5cf6', '#a855f7', '#c084fc'], centerLabel: 'Total' } } as Widget;
 			case 'areaChart':
-				return {
-					...baseWidget,
-					type: 'areaChart',
-					data: {
-						labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-						datasets: [
-							{ label: 'Series 1', data: [20, 35, 45, 40, 55, 60], color: '#06b6d4' },
-							{ label: 'Series 2', data: [10, 25, 30, 35, 40, 50], color: '#8b5cf6' }
-						]
-					}
-				} as Widget;
-
+				return { ...baseWidget, type: 'areaChart', data: { labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], datasets: [{ label: 'Series 1', data: [20, 35, 45, 40, 55, 60], color: '#06b6d4' }, { label: 'Series 2', data: [10, 25, 30, 35, 40, 50], color: '#8b5cf6' }] } } as Widget;
 			case 'gauge':
-				return {
-					...baseWidget,
-					type: 'gauge',
-					data: { value: 65, min: 0, max: 100, label: 'Score', unit: '%', color: '#22c55e' }
-				} as Widget;
-
+				return { ...baseWidget, type: 'gauge', data: { value: 65, min: 0, max: 100, label: 'Score', unit: '%', color: '#22c55e' } } as Widget;
 			case 'sparkline':
-				return {
-					...baseWidget,
-					type: 'sparkline',
-					data: {
-						values: [12, 19, 15, 25, 22, 30, 28, 35],
-						label: 'Trend',
-						color: '#3b82f6'
-					}
-				} as Widget;
-
+				return { ...baseWidget, type: 'sparkline', data: { values: [12, 19, 15, 25, 22, 30, 28, 35], label: 'Trend', color: '#3b82f6' } } as Widget;
 			case 'heatmap':
-				return {
-					...baseWidget,
-					type: 'heatmap',
-					data: {
-						rows: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-						cols: ['AM', 'PM'],
-						values: [
-							[4, 6],
-							[3, 5],
-							[5, 7],
-							[2, 4],
-							[6, 8]
-						]
-					}
-				} as Widget;
-
+				return { ...baseWidget, type: 'heatmap', data: { rows: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], cols: ['AM', 'PM'], values: [[4, 6], [3, 5], [5, 7], [2, 4], [6, 8]] } } as Widget;
 			case 'divergingBarChart':
-				return {
-					...baseWidget,
-					type: 'divergingBarChart',
-					data: {
-						labels: ['Strongly disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly agree'],
-						values: [-24, -18, 12, 32, 42],
-						positiveColor: '#3b82f6',
-						negativeColor: '#ef4444'
-					}
-				} as Widget;
-
+				return { ...baseWidget, type: 'divergingBarChart', data: { labels: ['Strongly disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly agree'], values: [-24, -18, 12, 32, 42], positiveColor: '#3b82f6', negativeColor: '#ef4444' } } as Widget;
 			case 'schema':
-				return {
-					...baseWidget,
-					type: 'schema',
-					data: {
-						schemaId: 'example-schema', // Default schema ID - user can change this
-						data: {}
-					}
-				} as Widget;
-
+				return { ...baseWidget, type: 'schema', data: { schemaId: 'example-schema', data: {} } } as Widget;
 			case 'locationQuotient':
-				return {
-					...baseWidget,
-					type: 'locationQuotient',
-					data: {
-						areaFips: 'C3890',
-						year: 2025,
-						regionLabel: 'Portland-Vancouver-Hillsboro, OR-WA',
-						sortOrder: 'lq_desc',
-						exportBaseThreshold: 1.08,
-						localBandLow: 0.92,
-						localBandHigh: 1.08
-					}
-				} as Widget;
-
+				return { ...baseWidget, type: 'locationQuotient', data: { areaFips: 'C3890', year: 2025, regionLabel: 'Portland-Vancouver-Hillsboro, OR-WA', sortOrder: 'lq_desc', exportBaseThreshold: 1.08, localBandLow: 0.92, localBandHigh: 1.08 } } as Widget;
 			default:
 				return null;
 		}
@@ -423,148 +241,205 @@
 		{ type: 'metric', label: 'Metric', icon: '📊' },
 		{ type: 'paragraph', label: 'Paragraph', icon: '📄' },
 		{ type: 'table', label: 'Table', icon: '📋' },
-		{ type: 'image', label: 'Image', icon: '🖼️' },
-		{ type: 'map', label: 'Map', icon: '🗺️' },
+		{ type: 'image', label: 'Image', icon: '🖼' },
+		{ type: 'map', label: 'Map', icon: '🗺' },
 		{ type: 'lineChart', label: 'Line Chart', icon: '📈' },
 		{ type: 'barChart', label: 'Bar Chart', icon: '📊' },
 		{ type: 'donutChart', label: 'Donut Chart', icon: '🍩' },
 		{ type: 'areaChart', label: 'Area Chart', icon: '📉' },
-		{ type: 'gauge', label: 'Gauge', icon: '⏱️' },
-		{ type: 'sparkline', label: 'Sparkline', icon: '〰️' },
+		{ type: 'gauge', label: 'Gauge', icon: '⏱' },
+		{ type: 'sparkline', label: 'Sparkline', icon: '〰' },
 		{ type: 'heatmap', label: 'Heatmap', icon: '🔥' },
-		{ type: 'divergingBarChart', label: 'Diverging Bar Chart', icon: '↔️' },
+		{ type: 'divergingBarChart', label: 'Diverging Bar', icon: '↔' },
 		{ type: 'schema', label: 'Schema Widget', icon: '📋' },
 		{ type: 'locationQuotient', label: 'Location Quotient', icon: '📍' }
 	];
 </script>
 
-<div class="h-14 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border-b flex items-center justify-between px-6 shadow-sm">
-	<div class="flex items-center gap-4">
-		<!-- Auto-save toggle -->
-		<label class="flex cursor-pointer items-center gap-2">
-			<input
-				type="checkbox"
-				checked={dashboard.autoSaveEnabled}
-				onchange={(e) => dashboard.setAutoSave(e.currentTarget.checked)}
-				class="h-4 w-4 rounded {darkMode ? 'text-indigo-500' : 'text-indigo-600'} focus:ring-indigo-500"
+<!-- ═══════════════════ UNIFIED TOP BAR ═══════════════════ -->
+<header
+	class="flex h-12 items-center gap-3 border-b px-4 sm:px-5 {darkMode
+		? 'bg-linear-to-r from-slate-800 via-slate-800/95 to-slate-800 border-slate-700/70'
+		: 'bg-white border-slate-200'}"
+>
+	<!-- ── LEFT: Project + Tabs ──────────────────────────── -->
+	<div class="flex items-center gap-2 min-w-0">
+		{#if projects.length > 0 && onProjectChange}
+			<ProjectSwitcher
+				{projects}
+				{selectedProjectId}
+				{darkMode}
+				onProjectChange={onProjectChange}
 			/>
-			<span class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-700'}">Auto-save</span>
-		</label>
-
-		<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
-
-		<!-- Dev Mode toggle -->
-		<label class="flex cursor-pointer items-center gap-2">
-			<input
-				type="checkbox"
-				checked={dashboard.devMode}
-				onchange={(e) => dashboard.setDevMode(e.currentTarget.checked)}
-				class="h-4 w-4 rounded {darkMode ? 'text-orange-500' : 'text-orange-600'} focus:ring-orange-500"
-			/>
-			<span class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-700'}">Dev Mode</span>
-			<span class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'}">(disable storage)</span>
-		</label>
-
-		{#if dashboard.hasUnsavedChanges}
-			<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
-			<span class="text-xs {darkMode ? 'text-orange-400' : 'text-orange-600'}">• Unsaved changes</span>
+			<div class="h-5 w-px shrink-0 {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
 		{/if}
+
+		<div class="flex items-center gap-0.5" role="tablist" aria-label="Dashboard views">
+			{#each dashboard.tabOrder as tab (tab.id)}
+				{#if renamingTabId === tab.id}
+					<!-- svelte-ignore a11y_autofocus -->
+					<input
+						type="text"
+						bind:value={renameValue}
+						onblur={commitRename}
+						onkeydown={handleRenameKeydown}
+						class="w-24 rounded-md border px-2 py-0.5 text-[13px] font-medium outline-none
+							{darkMode ? 'bg-slate-700 border-indigo-500 text-white' : 'bg-white border-indigo-400 text-slate-900'}"
+						autofocus
+					/>
+				{:else}
+					<button
+						type="button"
+						role="tab"
+						aria-selected={dashboard.activeTabId === tab.id}
+						class="group relative flex items-center gap-1 rounded-md px-2.5 py-1 text-[13px] font-medium transition-colors whitespace-nowrap
+							{dashboard.activeTabId === tab.id
+								? 'bg-indigo-600 text-white shadow-sm'
+								: darkMode
+									? 'text-slate-400 hover:bg-slate-700/60 hover:text-slate-200'
+									: 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'}"
+						onclick={() => selectTab(tab.id)}
+						ondblclick={() => startRename(tab.id, tab.label)}
+						title="Click to switch, double-click to rename"
+					>
+						{tab.label}
+						{#if dashboard.tabOrder.length > 1}
+							<!-- svelte-ignore a11y_click_events_have_key_events -->
+							<span
+								role="button"
+								tabindex="-1"
+								class="ml-0.5 hidden rounded-sm p-0.5 opacity-0 transition-opacity group-hover:inline-flex group-hover:opacity-70 hover:opacity-100!
+									{dashboard.activeTabId === tab.id
+										? 'hover:bg-indigo-700/80'
+										: darkMode ? 'hover:bg-slate-600' : 'hover:bg-slate-200'}"
+								onclick={(e: MouseEvent) => { e.stopPropagation(); handleDeleteTab(tab.id); }}
+								title="Delete dashboard"
+							>
+								<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg>
+							</span>
+						{/if}
+					</button>
+				{/if}
+			{/each}
+
+			<button
+				type="button"
+				class="rounded-md p-1 transition-colors
+					{darkMode ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-700/60' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'}"
+				onclick={handleAddTab}
+				title="Add dashboard"
+			>
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
+			</button>
+		</div>
 	</div>
 
-	<div class="flex items-center gap-2">
-		<!-- Add Widget -->
+	<!-- ── RIGHT: Actions ────────────────────────────────── -->
+	<div class="ml-auto flex items-center gap-1 shrink-0">
+		<!-- Widget actions -->
 		<button
 			onclick={() => (showAddWidgetDialog = true)}
-			class="px-3 py-1.5 text-sm font-medium {darkMode ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'} rounded-md transition-colors shadow-sm hover:shadow-md"
+			class="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[13px] font-medium transition-colors
+				{darkMode
+					? 'bg-indigo-600 hover:bg-indigo-500 text-white'
+					: 'bg-indigo-600 hover:bg-indigo-700 text-white'} shadow-sm"
 		>
-			+ Add Widget
+			<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
+			Widget
 		</button>
 
 		<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
 
-		<!-- Manual Save -->
+		<!-- Dashboard actions group -->
 		<button
 			onclick={handleSave}
 			disabled={!dashboard.hasUnsavedChanges}
-			class="px-3 py-1.5 text-sm font-medium {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'} rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+			class="rounded-md p-1.5 transition-colors {darkMode
+				? 'text-slate-400 hover:text-white hover:bg-slate-700'
+				: 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'} disabled:opacity-30 disabled:pointer-events-none"
+			title="Save layout"
 		>
-			Save Layout
+			<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+			</svg>
 		</button>
 
-		<!-- Export -->
 		<button
 			onclick={handleExport}
-			class="px-3 py-1.5 text-sm font-medium {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'} rounded-md transition-colors"
+			class="rounded-md p-1.5 transition-colors {darkMode
+				? 'text-slate-400 hover:text-white hover:bg-slate-700'
+				: 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}"
+			title="Export"
 		>
-			Export
+			<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+			</svg>
 		</button>
 
-		<!-- Import -->
 		<button
 			onclick={() => (showImportDialog = true)}
-			class="px-3 py-1.5 text-sm font-medium {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'} rounded-md transition-colors"
+			class="rounded-md p-1.5 transition-colors {darkMode
+				? 'text-slate-400 hover:text-white hover:bg-slate-700'
+				: 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}"
+			title="Import"
 		>
-			Import
+			<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L9 8m4-4v12"/>
+			</svg>
 		</button>
 
-		<!-- Reset -->
 		<button
 			onclick={handleReset}
-			class="px-3 py-1.5 text-sm font-medium {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'} rounded-md transition-colors"
+			class="rounded-md p-1.5 transition-colors {darkMode
+				? 'text-slate-400 hover:text-white hover:bg-slate-700'
+				: 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}"
+			title="Reset to default"
 		>
-			Reset
+			<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+			</svg>
 		</button>
 
 		<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
 
-		<!-- Clear Storage -->
-		<button
-			onclick={handleClear}
-			class="p-2 {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'} rounded-md transition-colors"
-			title="Clear saved dashboard"
-		>
-			<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-			</svg>
-		</button>
+		<!-- Dark mode toggle -->
+		{#if onToggleDarkMode}
+			<button
+				class="rounded-md p-1.5 transition-colors {darkMode
+					? 'text-slate-400 hover:text-white hover:bg-slate-700'
+					: 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}"
+				onclick={onToggleDarkMode}
+				aria-label="Toggle dark mode"
+				title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+			>
+				{#if darkMode}
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+					</svg>
+				{:else}
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+					</svg>
+				{/if}
+			</button>
+		{/if}
 	</div>
-</div>
+</header>
+
+<!-- ═══════════════════ DIALOGS ═══════════════════ -->
 
 <!-- Export Dialog -->
 {#if showExportDialog}
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-		<div
-			class="flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border p-6 shadow-xl"
-		>
-			<h3 class="mb-4 text-lg font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">Export Dashboard Configuration</h3>
-
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+		<div class="flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border p-6 shadow-2xl">
+			<h3 class="mb-4 text-lg font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">Export Dashboard</h3>
 			<div class="mb-4 flex-1 overflow-auto">
-				<textarea
-					readonly
-					value={exportedJson}
-					class="h-64 w-full rounded-lg border {darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-slate-50 text-slate-900 border-slate-300'} p-3 font-mono text-xs"
-				></textarea>
+				<textarea readonly value={exportedJson} class="h-64 w-full rounded-lg border {darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-slate-50 text-slate-900 border-slate-300'} p-3 font-mono text-xs"></textarea>
 			</div>
-
 			<div class="flex justify-end gap-2">
-				<button
-					onclick={copyToClipboard}
-					class="px-4 py-2 text-sm font-medium {darkMode ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'} rounded-md transition-colors shadow-sm hover:shadow-md"
-				>
-					Copy to Clipboard
-				</button>
-				<button
-					onclick={downloadJson}
-					class="px-4 py-2 text-sm font-medium {darkMode ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-slate-900 hover:bg-slate-800 text-white'} rounded-md transition-colors shadow-sm hover:shadow-md"
-				>
-					Download JSON
-				</button>
-				<button
-					onclick={() => (showExportDialog = false)}
-					class="px-4 py-2 text-sm font-medium {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'} rounded-md transition-colors"
-				>
-					Close
-				</button>
+				<button onclick={copyToClipboard} class="px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors shadow-sm">Copy</button>
+				<button onclick={downloadJson} class="px-4 py-2 text-sm font-medium {darkMode ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-slate-900 hover:bg-slate-800 text-white'} rounded-md transition-colors shadow-sm">Download</button>
+				<button onclick={() => (showExportDialog = false)} class="px-4 py-2 text-sm font-medium {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'} rounded-md transition-colors">Close</button>
 			</div>
 		</div>
 	</div>
@@ -572,10 +447,9 @@
 
 <!-- Import Dialog -->
 {#if showImportDialog}
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-		<div class="w-full max-w-2xl rounded-lg {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border p-6 shadow-xl">
-			<h3 class="mb-4 text-lg font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">Import Dashboard Configuration</h3>
-
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+		<div class="w-full max-w-2xl rounded-xl {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border p-6 shadow-2xl">
+			<h3 class="mb-4 text-lg font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">Import Dashboard</h3>
 			<div class="mb-4">
 				<textarea
 					bind:value={importJson}
@@ -583,29 +457,29 @@
 					class="h-64 w-full rounded-lg border {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-400' : 'bg-slate-50 text-slate-900 border-slate-300 placeholder-slate-500'} p-3 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
 				></textarea>
 			</div>
-
 			{#if importError}
 				<p class="mb-4 text-sm {darkMode ? 'text-red-400' : 'text-red-600'}">{importError}</p>
 			{/if}
-
 			<div class="flex justify-end gap-2">
-				<button
-					onclick={handleImport}
-					disabled={!importJson.trim()}
-					class="px-4 py-2 text-sm font-medium {darkMode ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'} rounded-md transition-colors shadow-sm hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
-				>
-					Import
-				</button>
-				<button
-					onclick={() => {
-						showImportDialog = false;
-						importJson = '';
-						importError = '';
-					}}
-					class="px-4 py-2 text-sm font-medium {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'} rounded-md transition-colors"
-				>
-					Cancel
-				</button>
+				<button onclick={handleImport} disabled={!importJson.trim()} class="px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50">Import</button>
+				<button onclick={() => { showImportDialog = false; importJson = ''; importError = ''; }} class="px-4 py-2 text-sm font-medium {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'} rounded-md transition-colors">Cancel</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Delete Tab Confirmation -->
+{#if showDeleteConfirm}
+	{@const tabLabel = dashboard.tabOrder.find(t => t.id === showDeleteConfirm)?.label ?? 'this dashboard'}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+		<div class="w-full max-w-sm rounded-xl {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border p-6 shadow-2xl">
+			<h3 class="mb-2 text-lg font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">Delete Dashboard</h3>
+			<p class="mb-5 text-sm {darkMode ? 'text-slate-400' : 'text-slate-600'}">
+				Are you sure you want to delete <strong>"{tabLabel}"</strong>? All widgets on this dashboard will be removed.
+			</p>
+			<div class="flex justify-end gap-2">
+				<button onclick={() => (showDeleteConfirm = null)} class="px-4 py-2 text-sm font-medium rounded-md transition-colors {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'}">Cancel</button>
+				<button onclick={confirmDeleteTab} class="px-4 py-2 text-sm font-medium rounded-md bg-red-600 hover:bg-red-700 text-white shadow-sm transition-colors">Delete</button>
 			</div>
 		</div>
 	</div>
@@ -613,30 +487,26 @@
 
 <!-- Add Widget Dialog -->
 {#if showAddWidgetDialog}
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-		<div class="w-full max-w-3xl rounded-lg {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border p-6 shadow-xl">
-			<h3 class="mb-2 text-lg font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">Add Widget</h3>
-			<p class="mb-4 text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'}">Select a widget type to add to your dashboard</p>
-
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+		<div class="w-full max-w-3xl rounded-xl {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border p-6 shadow-2xl">
+			<h3 class="mb-1 text-lg font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">Add Widget</h3>
+			<p class="mb-4 text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'}">Select a widget type to add to the current tab</p>
 			<div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
 				{#each widgetTypes as { type, label, icon }}
 					<button
 						onclick={() => handleAddWidget(type)}
-						class="flex flex-col items-center gap-2 rounded-lg border-2 {darkMode ? 'border-slate-700 hover:border-indigo-500 hover:bg-indigo-900/20' : 'border-slate-200 hover:border-indigo-500 hover:bg-indigo-50'} p-4 transition-all hover:shadow-md hover:scale-[1.02]"
+						class="flex flex-col items-center gap-2 rounded-lg border-2 p-4 transition-all hover:shadow-md hover:scale-[1.02]
+							{darkMode
+								? 'border-slate-700 hover:border-indigo-500 hover:bg-indigo-900/20'
+								: 'border-slate-200 hover:border-indigo-500 hover:bg-indigo-50'}"
 					>
-						<span class="text-3xl">{icon}</span>
+						<span class="text-2xl">{icon}</span>
 						<span class="text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'}">{label}</span>
 					</button>
 				{/each}
 			</div>
-
 			<div class="mt-6 flex justify-end">
-				<button
-					onclick={() => (showAddWidgetDialog = false)}
-					class="px-4 py-2 text-sm font-medium {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'} rounded-md transition-colors"
-				>
-					Cancel
-				</button>
+				<button onclick={() => (showAddWidgetDialog = false)} class="px-4 py-2 text-sm font-medium {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'} rounded-md transition-colors">Cancel</button>
 			</div>
 		</div>
 	</div>

@@ -136,9 +136,11 @@
 	minCellHeight={dashboard.config.minCellHeight}
 	{...dropHandlers}
 >
-	{#each dashboard.widgets as widget (widget.id)}
-		<WidgetWrapper {widget} {darkMode} onDragStart={handleWidgetDragStart} onDragEnd={handleWidgetDragEnd} />
-	{/each}
+	{#key dashboard.activeTabId}
+		{#each dashboard.widgets as widget (widget.id)}
+			<WidgetWrapper {widget} {darkMode} onDragStart={handleWidgetDragStart} onDragEnd={handleWidgetDragEnd} />
+		{/each}
+	{/key}
 
 	{#if dashboard.dragState.isDragging && dashboard.dragState.ghostPosition}
 		<GhostIndicator

@@ -274,6 +274,14 @@ export interface DashboardConfig {
 	minCellHeight: number;
 }
 
+/** Default grid settings shared by the dashboard store and new tab slices */
+export const DEFAULT_DASHBOARD_CONFIG: DashboardConfig = {
+	gridColumns: 12,
+	gridRows: 8,
+	gap: 16,
+	minCellHeight: 100
+} as const;
+
 export interface DragState {
 	isDragging: boolean;
 	activeWidgetId: string | null;
