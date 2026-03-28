@@ -268,7 +268,7 @@ export function useValidatedErrors(topic: string) {
  *   const metrics = useValidatedCollection<MetricData>('widgets/metric');
  *   
  *   {#each metrics.items as { id, data }}
- *     <MetricWidget {data} widgetId={id} />
+ *     <!-- Render a dashboard widget; e.g. a component from @stratiqai/widget-metric -->
  *   {/each}
  * </script>
  * ```

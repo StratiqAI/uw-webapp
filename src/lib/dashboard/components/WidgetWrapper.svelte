@@ -18,8 +18,8 @@
 	import SparklineWidget from '$lib/dashboard/components/widgets/SparklineWidget.svelte';
 	import HeatmapWidget from '$lib/dashboard/components/widgets/HeatmapWidget.svelte';
 	import DivergingBarChartWidget from '$lib/dashboard/components/widgets/DivergingBarChartWidget.svelte';
-	import MetricWidget from '$lib/dashboard/components/widgets/MetricWidget.svelte';
 	import MapWidget from '$lib/dashboard/components/widgets/MapWidget.svelte';
+	import { getWidgetComponent } from '$lib/dashboard/setup/widgetRegistry';
 	import SchemaWidget from '$lib/dashboard/components/widgets/SchemaWidget.svelte';
 	import LocationQuotientWidget from '$lib/dashboard/components/widgets/LocationQuotientWidget.svelte';
 
@@ -179,6 +179,9 @@
 	}
 
 	const zIndex = $derived(dashboard.getWidgetZIndex(widget.id));
+
+	// Dynamic component lookup for package-based widgets (registry-first)
+	const RegisteredComp = $derived(getWidgetComponent(widget.type));
 </script>
 
 <div
@@ -212,7 +215,11 @@
 
 		<!-- Widget Body -->
 		<div class="widget-body {darkMode ? 'bg-slate-800' : 'bg-slate-50'} {widget.title ? 'p-4' : 'h-full p-4'}">
-			{#if widget.type === 'title'}
+			{#if RegisteredComp}
+				<RegisteredComp
+					data={widget.data} widgetId={widget.id}
+					topicOverride={widget.topicOverride} {darkMode} />
+			{:else if widget.type === 'title'}
 				<TitleWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
 			{:else if widget.type === 'paragraph'}
 				<ParagraphWidget 
@@ -243,8 +250,6 @@
 				<HeatmapWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
 			{:else if widget.type === 'divergingBarChart'}
 				<DivergingBarChartWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
-			{:else if widget.type === 'metric'}
-				<MetricWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
 			{:else if widget.type === 'map'}
 				<MapWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
 			{:else if widget.type === 'schema'}

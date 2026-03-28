@@ -8,6 +8,8 @@
 
 import type { Widget, WidgetType } from '$lib/dashboard/types/widget';
 import { PUBLIC_GEOAPIFY_API_KEY } from '$env/static/public';
+import { getWidgetManifest } from '$lib/dashboard/setup/widgetRegistry';
+import { metricWidget } from '@stratiqai/widget-metric';
 
 /**
  * Default data for each widget type. Values conform to the Zod schemas
@@ -94,10 +96,7 @@ export const DEFAULT_WIDGET_DATA: Record<WidgetType, Record<string, unknown>> = 
 		positiveColor: '#3b82f6',
 		negativeColor: '#ef4444'
 	},
-	metric: {
-		label: '—',
-		value: '—'
-	},
+	metric: { ...(metricWidget.defaultData as Record<string, unknown>) },
 	map: {
 		title: null,
 		description: null,
@@ -130,7 +129,7 @@ export const DEFAULT_WIDGET_DATA: Record<WidgetType, Record<string, unknown>> = 
  */
 export const DEFAULT_WIDGET_SIZES: Record<WidgetType, { colSpan: number; rowSpan: number }> = {
 	title: { colSpan: 12, rowSpan: 1 },
-	metric: { colSpan: 2, rowSpan: 1 },
+	metric: { ...metricWidget.defaultSize },
 	paragraph: { colSpan: 6, rowSpan: 2 },
 	table: { colSpan: 6, rowSpan: 4 },
 	image: { colSpan: 6, rowSpan: 4 },
@@ -148,10 +147,26 @@ export const DEFAULT_WIDGET_SIZES: Record<WidgetType, { colSpan: number; rowSpan
 };
 
 /**
- * Returns default data for a widget by its type. Used when there is no
- * override in widgetInitialData, so every widget gets valid store data.
+ * Returns default data for a widget by its type. Checks the widget package
+ * registry first, then falls back to the hardcoded map.
  */
 export function getDefaultDataForWidget(widget: Widget): Record<string, unknown> {
+	const manifest = getWidgetManifest(widget.type);
+	if (manifest) {
+		return { ...(manifest.defaultData as Record<string, unknown>) };
+	}
 	const d = DEFAULT_WIDGET_DATA[widget.type] ?? DEFAULT_WIDGET_DATA.title;
 	return { ...d };
+}
+
+/**
+ * Returns default size for a widget type. Checks the widget package
+ * registry first, then falls back to the hardcoded map.
+ */
+export function getDefaultSizeForWidget(widgetType: WidgetType | string): { colSpan: number; rowSpan: number } {
+	const manifest = getWidgetManifest(widgetType);
+	if (manifest) {
+		return { ...manifest.defaultSize };
+	}
+	return DEFAULT_WIDGET_SIZES[widgetType as WidgetType] ?? { colSpan: 4, rowSpan: 2 };
 }

@@ -8,6 +8,13 @@
 	import { createDropHandlers } from '$lib/dashboard/utils/drag-drop';
 	import { DEFAULT_WIDGET_SIZES, getDefaultDataForWidget } from '$lib/dashboard/setup/defaultDashboardValues';
 	import type { Widget, WidgetType } from '$lib/dashboard/types/widget';
+	import { setDashboardWidgetHost } from '@stratiqai/dashboard-widget-sdk';
+	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
+	import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
+
+	// Inject host services into Svelte context so package-based widgets
+	// can access the store and topic resolution via getDashboardWidgetHost().
+	setDashboardWidgetHost({ validatedTopicStore, getWidgetTopic });
 
 	interface Props {
 		darkMode?: boolean;

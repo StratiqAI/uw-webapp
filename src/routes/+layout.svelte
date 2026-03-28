@@ -5,7 +5,12 @@
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import { setContext, onMount } from 'svelte';
 	import { initializeWidgetSchemas } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { registerWidget } from '$lib/dashboard/setup/widgetRegistry';
+	import { metricWidget } from '@stratiqai/widget-metric';
 	import { browser } from '$app/environment';
+
+	// Register package-based widgets before schema initialization
+	registerWidget(metricWidget);
 
 	let { children, data } = $props<{ children: any; data: LayoutData }>();
 

@@ -1,37 +1,28 @@
 <script lang="ts">
-	import type { MetricWidget } from '$lib/dashboard/types/widget';
-	import { useReactiveValidatedTopic } from '$lib/hooks/validatedTopicStoreRunes.svelte';
-	import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import type { MetricWidgetData } from './schema.js';
+	import { useReactiveValidatedTopic, getDashboardWidgetHost } from '@stratiqai/dashboard-widget-sdk';
 
 	interface Props {
-		data: MetricWidget['data'];
+		data: MetricWidgetData;
 		widgetId?: string;
 		topicOverride?: string;
 		darkMode?: boolean;
 	}
 
 	let { data, widgetId = 'metric-widget-default', topicOverride, darkMode = false }: Props = $props();
-	
-	// Use topic override if provided, otherwise use default topic naming convention
-	const topic = $derived(getWidgetTopic('metric', widgetId, topicOverride));
-	
-	// Subscribe to data updates using ValidatedTopicStore hook (reactive to topic changes)
-	const dataStream = useReactiveValidatedTopic<MetricWidget['data']>(() => topic);
-	let widgetData = $derived<MetricWidget['data']>(dataStream.current || data);
 
-	$effect(() => {
-		console.log(`📊 MetricWidget:${widgetId} - Initialized with ValidatedTopicStore`);
-		console.log(`   Topic: ${topic}`);
-		console.log(`   Initial data:`, data);
-	});
+	const host = getDashboardWidgetHost();
+	const topic = $derived(host.getWidgetTopic('metric', widgetId, topicOverride));
+	const dataStream = useReactiveValidatedTopic<MetricWidgetData>(() => topic);
+	let widgetData = $derived<MetricWidgetData>(dataStream.current || data);
 </script>
-  
+
 <div class="metric-widget h-full flex flex-col justify-center">
 	<p class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'} mb-1">{widgetData.label}</p>
 	<p class="text-3xl font-bold {darkMode ? 'text-slate-100' : 'text-slate-900'}">
-		{widgetData.value}{widgetData.unit ? ` ${widgetData.unit}` : ''}
+	Right 	{widgetData.value}{widgetData.unit ? ` ${widgetData.unit}` : ''}
 	</p>
-	{#if widgetData.change !== undefined}
+	{#if widgetData.change != null}
 		<p class="text-sm mt-2 flex items-center {widgetData.changeType === 'increase' ? (darkMode ? 'text-green-400' : 'text-green-600') : (darkMode ? 'text-red-400' : 'text-red-600')}">
 			{#if widgetData.changeType === 'increase'}
 				<svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">

@@ -7,6 +7,10 @@ import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { zodTextFormat } from 'openai/helpers/zod';
 import type { WidgetType } from './widget';
+import type { MetricWidgetData } from '@stratiqai/widget-metric';
+import { metricWidgetDataSchema as MetricWidgetDataSchema } from '@stratiqai/widget-metric';
+
+export type { MetricWidgetData };
 
 // ===== Zod Schemas for Widget Data =====
 
@@ -113,13 +117,7 @@ export const DivergingBarChartWidgetDataSchema = z.object({
 	negativeColor: z.string().nullable().optional()
 });
 
-export const MetricWidgetDataSchema = z.object({
-	label: z.string(),
-	value: z.union([z.string(), z.number()]),
-	change: z.number().nullable().optional(),
-	changeType: z.enum(['increase', 'decrease']).nullable().optional(),
-	unit: z.string().nullable().optional()
-});
+export { MetricWidgetDataSchema };
 
 export const MapWidgetDataSchema = z.object({
 	title: z.string().nullable().optional(),
@@ -182,7 +180,6 @@ export type GaugeWidgetData = z.infer<typeof GaugeWidgetDataSchema>;
 export type SparklineWidgetData = z.infer<typeof SparklineWidgetDataSchema>;
 export type HeatmapWidgetData = z.infer<typeof HeatmapWidgetDataSchema>;
 export type DivergingBarChartWidgetData = z.infer<typeof DivergingBarChartWidgetDataSchema>;
-export type MetricWidgetData = z.infer<typeof MetricWidgetDataSchema>;
 export type MapWidgetData = z.infer<typeof MapWidgetDataSchema>;
 export type SchemaWidgetData = z.infer<typeof SchemaWidgetDataSchema>;
 export type LocationQuotientWidgetData = z.infer<typeof LocationQuotientWidgetDataSchema>;

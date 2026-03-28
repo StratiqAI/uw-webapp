@@ -1,5 +1,6 @@
 // Widget type definitions
 // All widgets now use ValidatedTopicStore for reactive data binding with schema validation
+import type { MetricWidgetData } from '@stratiqai/widget-metric';
 export type WidgetType =
 	| 'table'
 	| 'title'
@@ -212,13 +213,7 @@ export interface SchemaWidget extends BaseWidget {
 
 export interface MetricWidget extends BaseWidget {
 	type: 'metric';
-	data: {
-		label: string;
-		value: string | number;
-		change?: number;
-		changeType?: 'increase' | 'decrease';
-		unit?: string;
-	};
+	data: MetricWidgetData;
 }
 
 /** Sort mode for the sector list (UI only; does not change the RPC). */

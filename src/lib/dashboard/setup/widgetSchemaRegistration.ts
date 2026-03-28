@@ -13,6 +13,7 @@ import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { WidgetDataSchemas } from '$lib/dashboard/types/widgetSchemas';
 import type { WidgetType } from '$lib/dashboard/types/widget';
+import { getRegisteredManifests } from '$lib/dashboard/setup/widgetRegistry';
 
 /**
  * Map widget types to human-readable names
@@ -52,7 +53,6 @@ export const WIDGET_TYPES: WidgetType[] = [
 	'sparkline',
 	'heatmap',
 	'divergingBarChart',
-	'metric',
 	'map',
 	'schema',
 	'locationQuotient'
@@ -97,6 +97,20 @@ export function registerWidgetSchemas(): void {
 		}
 	}
 
+	// Register package-based widget manifests
+	for (const manifest of getRegisteredManifests()) {
+		const schemaId = `widget:${manifest.kind}-${manifest.schemaVersion}`;
+		try {
+			schemaRegistry.registerZodSchema(schemaId, manifest.zodSchema, {
+				name: manifest.displayName,
+				description: `Data schema for ${manifest.displayName.toLowerCase()}`
+			});
+			console.log(`   ✅ SchemaRegistry (package): ${schemaId} (${manifest.displayName})`);
+		} catch (error) {
+			console.error(`   ❌ Failed to register package widget ${schemaId}:`, error);
+		}
+	}
+
 	console.log('✅ [Widget Schema Registration] All widget schemas registered with SchemaRegistry');
 	schemasRegistered = true;
 }
@@ -136,6 +150,21 @@ export function registerWidgetSchemasWithTopicStore(): void {
 		}
 	}
 
+	// Register package-based widget manifests
+	for (const manifest of getRegisteredManifests()) {
+		const topicPattern = `widgets/${manifest.kind}/+`;
+		try {
+			const jsonSchema = zodToJsonSchema(manifest.zodSchema, {
+				name: `${manifest.kind}WidgetData`,
+				$refStrategy: 'none'
+			});
+			validatedTopicStore.registerSchema(topicPattern, jsonSchema);
+			console.log(`   ✅ ValidatedTopicStore (package): ${topicPattern}`);
+		} catch (error) {
+			console.error(`   ❌ Failed to register package topic ${topicPattern}:`, error);
+		}
+	}
+
 	console.log('✅ [Widget Schema Registration] All widget schemas registered with ValidatedTopicStore');
 }
 
@@ -169,7 +198,7 @@ export function getWidgetSchemaId(widgetType: WidgetType): string {
  * @param topicOverride - Optional topic override (if provided, returns this instead)
  * @returns The topic path (e.g., 'widgets/metric/widget-1')
  */
-export function getWidgetTopic(widgetType: WidgetType, widgetId: string, topicOverride?: string): string {
+export function getWidgetTopic(widgetType: WidgetType | string, widgetId: string, topicOverride?: string): string {
 	if (topicOverride) {
 		return topicOverride;
 	}
