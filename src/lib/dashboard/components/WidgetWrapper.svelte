@@ -41,6 +41,18 @@
 	let lqMenuSignals = $state<Record<string, { refresh: number; exportRequest: number }>>({});
 	let selectedTopic = $state<string>('');
 	let previewData = $state<unknown>(null);
+	let lastRefreshedAt = $state<Date | null>(null);
+
+	const isWidgetFullscreen = $derived(dashboard.fullscreenWidgetId === widget.id);
+
+	$effect(() => {
+		if (!isWidgetFullscreen) return;
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') dashboard.setFullscreenWidget(null);
+		};
+		window.addEventListener('keydown', onKey);
+		return () => window.removeEventListener('keydown', onKey);
+	});
 
 	const currentTopic = $derived(widget.topicOverride || getWidgetTopic(widget.type, widget.id));
 	const schemaId = $derived.by(() => {
@@ -142,6 +154,13 @@
 					bumpLqRefresh(widget.id);
 				}
 				refreshWidgetData();
+				lastRefreshedAt = new Date();
+				break;
+
+			case 'viewFullscreen':
+				dashboard.setFullscreenWidget(
+					dashboard.fullscreenWidgetId === widget.id ? null : widget.id
+				);
 				break;
 
 			case 'remove':
@@ -188,12 +207,15 @@
 	role="button"
 	tabindex="0"
 	class="widget-wrapper group relative h-full"
-	style="
-    grid-column: {widget.gridColumn} / span {widget.colSpan};
-    grid-row: {widget.gridRow} / span {widget.rowSpan};
-    z-index: {zIndex};
-  "
-	draggable={!widget.locked}
+	class:widget-wrapper--fullscreen={isWidgetFullscreen}
+	style={isWidgetFullscreen
+		? `position: fixed; inset: 1rem; width: calc(100vw - 2rem); height: calc(100vh - 2rem); z-index: 100050; max-width: none;`
+		: `
+    grid-column: ${widget.gridColumn} / span ${widget.colSpan};
+    grid-row: ${widget.gridRow} / span ${widget.rowSpan};
+    z-index: ${zIndex};
+  `}
+	draggable={!widget.locked && !isWidgetFullscreen}
 	ondragstart={dragHandlers.handleDragStart}
 	ondragend={dragHandlers.handleDragEnd}
 >
@@ -211,7 +233,13 @@
 		{/if}
 
 		<!-- Dropdown Menu -->
-		<WidgetDropdown {widget} {darkMode} onAction={handleWidgetAction} />
+		<WidgetDropdown
+			{widget}
+			{darkMode}
+			isFullscreen={isWidgetFullscreen}
+			{lastRefreshedAt}
+			onAction={handleWidgetAction}
+		/>
 
 		<!-- Widget Body -->
 		<div class="widget-body {darkMode ? 'bg-slate-800' : 'bg-slate-50'} {widget.title ? 'p-4' : 'h-full p-4'}">
@@ -283,7 +311,7 @@
 	</div>
 
 	<!-- Resize Handles -->
-	{#if !widget.locked}
+	{#if !widget.locked && !isWidgetFullscreen}
 		<ResizeHandles widgetId={widget.id} />
 	{/if}
 </div>
@@ -481,6 +509,10 @@
 	}
 
 	.widget-wrapper[draggable='false'] {
+		cursor: default;
+	}
+
+	.widget-wrapper--fullscreen {
 		cursor: default;
 	}
 

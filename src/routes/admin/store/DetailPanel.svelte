@@ -19,10 +19,21 @@
 
 	let matchedSchema = $derived.by(() => {
 		void validatedTopicStore.schemaVersion;
+
+		// Direct match (topic is a leaf with a schema)
 		const reg = validatedTopicStore.getSchemaForTopic(topic);
 		if (reg) {
-			return { pattern: reg.topicPattern ?? reg.id, schema: reg.jsonSchema as Record<string, unknown> };
+			return { pattern: reg.topicPattern ?? reg.id, schema: reg.jsonSchema as Record<string, unknown>, indirect: false };
 		}
+
+		// Branch-node fallback: if the topic is a container, check if a schema
+		// applies to its immediate children (e.g. widgets/metric -> widgets/metric/+)
+		const childProbe = topic + '/_probe';
+		const childReg = validatedTopicStore.getSchemaForTopic(childProbe);
+		if (childReg) {
+			return { pattern: childReg.topicPattern ?? childReg.id, schema: childReg.jsonSchema as Record<string, unknown>, indirect: true };
+		}
+
 		return null;
 	});
 
@@ -244,11 +255,14 @@
 		{:else if activeTab === 'schema'}
 			<!-- SCHEMA TAB -->
 			<div class="p-4 space-y-4">
-				{#if matchedSchema}
-					<div class="flex items-center gap-2 text-sm">
-						<span class="{darkMode ? 'text-slate-400' : 'text-slate-500'}">Matched pattern:</span>
-						<code class="rounded px-2 py-0.5 font-mono text-xs {darkMode ? 'bg-slate-700 text-amber-400' : 'bg-amber-50 text-amber-700'}">{matchedSchema.pattern}</code>
-					</div>
+			{#if matchedSchema}
+				<div class="flex items-center gap-2 text-sm flex-wrap">
+					<span class="{darkMode ? 'text-slate-400' : 'text-slate-500'}">{matchedSchema.indirect ? 'Child schema:' : 'Matched pattern:'}</span>
+					<code class="rounded px-2 py-0.5 font-mono text-xs {darkMode ? 'bg-slate-700 text-amber-400' : 'bg-amber-50 text-amber-700'}">{matchedSchema.pattern}</code>
+					{#if matchedSchema.indirect}
+						<span class="rounded px-1.5 py-0.5 text-xs {darkMode ? 'bg-indigo-900/30 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}">applies to children</span>
+					{/if}
+				</div>
 
 					{#if schemaFields.length > 0}
 						<div class="space-y-1">

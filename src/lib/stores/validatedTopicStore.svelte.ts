@@ -81,6 +81,17 @@ export interface SchemaRegistration {
 }
 
 /**
+ * Fired by ValidatedTopicStore on every successful publish, delete, or clearAllAt.
+ * External sync layers (e.g. TopicStoreSync) listen via onChange() to persist or
+ * broadcast changes without monkey-patching the store.
+ */
+export type StoreChangeEvent =
+	| { type: 'publish'; topic: string; value: unknown }
+	| { type: 'delete'; topic: string }
+	| { type: 'clear'; path: string }
+	| { type: 'register-schema'; registration: SchemaRegistration };
+
+/**
  * AJV Validator Configuration
  * ===========================
  *
@@ -153,7 +164,7 @@ type SubscriberCallback<T = any> = (value: T, topic: string) => void;
  */
 const patternToRegex = (pattern: string): RegExp => {
 	const regexSource = pattern
-		.replace(/[.+?^${}()|[\]\\]/g, '\\$&') // Escape regex special characters
+		.replace(/[.?^${}()|[\]\\]/g, '\\$&') // Escape regex specials (NOT + or # — those are MQTT wildcards)
 		.replace(/\+/g, '[^/]+') // + becomes "one or more non-slash characters"
 		.replace(/#/g, '.*'); // # becomes "any characters" (multi-level match)
 	return new RegExp(`^${regexSource}$`);
@@ -270,6 +281,27 @@ export class ValidatedTopicStore {
 	#schemaVersion = $state(0);
 
 	/**
+	 * External change listeners registered via onChange().
+	 * Used by the sync layer to persist/broadcast mutations without modifying store internals.
+	 */
+	#changeListeners = new Set<(event: StoreChangeEvent) => void>();
+
+	#emitChange(event: StoreChangeEvent): void {
+		for (const listener of this.#changeListeners) {
+			try {
+				listener(event);
+			} catch {
+				// Never let a listener error break store operations
+			}
+		}
+	}
+
+	onChange(listener: (event: StoreChangeEvent) => void): () => void {
+		this.#changeListeners.add(listener);
+		return () => this.#changeListeners.delete(listener);
+	}
+
+	/**
 	 * Specificity Calculation
 	 * ========================
 	 *
@@ -314,7 +346,7 @@ export class ValidatedTopicStore {
 	 */
 	#patternToRegex(pattern: string): RegExp {
 		const source = pattern
-			.replace(/[.+?^${}()|[\]\\]/g, '\\$&') // Escape regex special characters
+			.replace(/[.?^${}()|[\]\\]/g, '\\$&') // Escape regex specials (NOT + or # — MQTT wildcards)
 			.replace(/\+/g, '[^/]+')                // '+' -> single topic level matcher
 			.replace(/#$/, '.*')                    // '#' at end -> multi-level matcher (MQTT spec)
 			.replace(/#/g, '.*');                   // '#' anywhere -> multi-level matcher (fallback)
@@ -367,6 +399,10 @@ export class ValidatedTopicStore {
 
 		this.#resolutionCache.clear();
 		this.#schemaVersion++;
+
+		if (typeof patternOrReg === 'object') {
+			this.#emitChange({ type: 'register-schema', registration: patternOrReg });
+		}
 	}
 
 	/**
@@ -521,6 +557,8 @@ export class ValidatedTopicStore {
 			}
 		});
 
+		this.#emitChange({ type: 'publish', topic, value });
+
 		return true;
 	}
 
@@ -614,21 +652,23 @@ export class ValidatedTopicStore {
 	 *
 	 * @param topic - Topic path to delete (e.g., 'app/users/user-1')
 	 */
-	delete(topic: string): void {
+	#deleteInternal(topic: string): void {
 		const parts = topic.split('/').filter(Boolean);
 		const targetKey = parts.pop();
-		if (!targetKey) return; // Empty path, nothing to delete
+		if (!targetKey) return;
 
-		// Navigate to parent object
 		const parent = parts.length === 0 ? this.#tree : this.at<Record<string, any>>(parts.join('/'));
 
-		// Delete the key if parent exists and key exists
 		if (parent && targetKey in parent) {
 			delete parent[targetKey];
 		}
 
-		// Clear any validation errors for this topic
 		this.#errors.delete(topic);
+	}
+
+	delete(topic: string): void {
+		this.#deleteInternal(topic);
+		this.#emitChange({ type: 'delete', topic });
 	}
 
 	/**
@@ -885,17 +925,16 @@ export class ValidatedTopicStore {
 
 			const fullPath = `${cleanRoot}/${key}`;
 
-			// 1. Trigger deletion (which cleans up error state)
-			this.delete(fullPath);
+			this.#deleteInternal(fullPath);
 
-			// 2. Notify subscribers that this specific topic is now null/deleted
-			// This ensures programmatic subscribers are aware of bulk deletions
 			this.#subscribers.forEach((sub) => {
 				if (sub.regex.test(fullPath)) {
 					sub.callback(undefined, fullPath);
 				}
 			});
 		}
+
+		this.#emitChange({ type: 'clear', path: cleanRoot });
 	}
 
 	// Getters for Svelte 5 consumption

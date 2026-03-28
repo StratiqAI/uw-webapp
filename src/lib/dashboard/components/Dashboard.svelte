@@ -164,3 +164,12 @@
 		/>
 	{/if}
 </GridContainer>
+
+{#if dashboard.fullscreenWidgetId}
+	<button
+		type="button"
+		class="fixed inset-0 z-[100040] cursor-default border-0 bg-black/55 p-0"
+		aria-label="Exit widget full screen"
+		onclick={() => dashboard.setFullscreenWidget(null)}
+	></button>
+{/if}

@@ -3,16 +3,22 @@
 	import '../app.css';
 	import type { LayoutData } from './$types';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
-	import { setContext, onMount } from 'svelte';
+	import { setContext, onMount, onDestroy } from 'svelte';
 	import { initializeWidgetSchemas } from '$lib/dashboard/setup/widgetSchemaRegistration';
 	import { registerWidget } from '$lib/dashboard/setup/widgetRegistry';
 	import { metricWidget } from '@stratiqai/widget-metric';
 	import { browser } from '$app/environment';
+	import { initTopicStoreSync } from '$lib/stores/topicStoreSync';
+	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
+	import { DashboardStorage } from '$lib/dashboard/utils/storage';
 
 	// Register package-based widgets before schema initialization
 	registerWidget(metricWidget);
 
 	let { children, data } = $props<{ children: any; data: LayoutData }>();
+
+	let destroySync: (() => void) | null = null;
+	let unsubDashboardSync: (() => void) | null = null;
 
 	let isSidebarOpen = $state(false);
 	let sidebarWidthCollapsed = `w-14`;
@@ -20,26 +26,48 @@
 	let mainMarginLeftExpanded = `ml-72`;
 	let mainMarginLeftCollapsed = `ml-14`;
 
-	// Initialize dark mode store and provide via context
-	// Note: Dark mode class is already applied via blocking script in app.html
-	// This just syncs the store state with what's already applied
+	// Initialise schemas and cross-tab sync synchronously during component init.
+	// This runs BEFORE child onMount callbacks (e.g. dashboard page), so the
+	// sync layer's restored data is already in the store when the dashboard loads.
+	if (browser) {
+		try {
+			initializeWidgetSchemas();
+		} catch (error) {
+			console.error('Failed to initialize widget schemas:', error);
+		}
+
+		destroySync = initTopicStoreSync(validatedTopicStore);
+
+		// Keep DashboardStorage in sync with ALL widget topic changes (admin edits,
+		// cross-tab sync, etc.) so it never holds stale data on next page load.
+		unsubDashboardSync = validatedTopicStore.onChange((event) => {
+			if (
+				(event.type === 'publish' || event.type === 'delete') &&
+				event.topic.startsWith('widgets/')
+			) {
+				DashboardStorage.autoSaveWidgetData();
+			} else if (event.type === 'clear') {
+				DashboardStorage.autoSaveWidgetData();
+			}
+		});
+
+		// Immediately persist sync-restored data to DashboardStorage so the
+		// two persistence layers start in sync.
+		DashboardStorage.saveWidgetDataNow();
+	}
+
 	onMount(() => {
-		// Sync store with what's already on the document (from blocking script)
 		if (typeof document !== 'undefined') {
 			const isDark = document.documentElement.classList.contains('dark');
 			darkModeStore.set(isDark);
 		} else {
 			darkModeStore.initialize();
 		}
+	});
 
-		// Register widget schemas at app startup (ValidatedTopicStore)
-		if (browser) {
-			try {
-				initializeWidgetSchemas();
-			} catch (error) {
-				console.error('Failed to initialize widget schemas:', error);
-			}
-		}
+	onDestroy(() => {
+		destroySync?.();
+		unsubDashboardSync?.();
 	});
 	
 	// Provide dark mode store functions via context

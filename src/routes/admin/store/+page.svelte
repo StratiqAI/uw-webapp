@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import { countTopics } from './utils';
@@ -9,10 +10,76 @@
 
 	let darkMode = $derived(darkModeStore.darkMode);
 
+	const SIDEBAR_MIN = 200;
+	const SIDEBAR_MAX = 560;
+	const SIDEBAR_DEFAULT = 280;
+
 	let selectedTopic = $state<string | null>(null);
 	let treeFilter = $state('');
 	let publishOpen = $state(false);
 	let errorsOpen = $state(false);
+	let sidebarWidth = $state(SIDEBAR_DEFAULT);
+	let rightSidebarWidth = $state(SIDEBAR_DEFAULT);
+
+	function clampSidebarWidth(w: number): number {
+		if (typeof window === 'undefined') return Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w));
+		const maxByViewport = Math.floor(window.innerWidth * 0.5);
+		return Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w), maxByViewport);
+	}
+
+	function onSidebarResizePointerDown(e: PointerEvent) {
+		const target = e.currentTarget as HTMLElement;
+		target.setPointerCapture(e.pointerId);
+		const startX = e.clientX;
+		const startW = sidebarWidth;
+
+		function onMove(ev: PointerEvent) {
+			sidebarWidth = clampSidebarWidth(startW + (ev.clientX - startX));
+		}
+
+		function onUp(ev: PointerEvent) {
+			target.releasePointerCapture(ev.pointerId);
+			target.removeEventListener('pointermove', onMove);
+			target.removeEventListener('pointerup', onUp);
+			target.removeEventListener('pointercancel', onUp);
+		}
+
+		target.addEventListener('pointermove', onMove);
+		target.addEventListener('pointerup', onUp);
+		target.addEventListener('pointercancel', onUp);
+	}
+
+	function onRightSidebarResizePointerDown(e: PointerEvent) {
+		const target = e.currentTarget as HTMLElement;
+		target.setPointerCapture(e.pointerId);
+		const startX = e.clientX;
+		const startW = rightSidebarWidth;
+
+		function onMove(ev: PointerEvent) {
+			// Dragging the handle left widens the right panel.
+			rightSidebarWidth = clampSidebarWidth(startW - (ev.clientX - startX));
+		}
+
+		function onUp(ev: PointerEvent) {
+			target.releasePointerCapture(ev.pointerId);
+			target.removeEventListener('pointermove', onMove);
+			target.removeEventListener('pointerup', onUp);
+			target.removeEventListener('pointercancel', onUp);
+		}
+
+		target.addEventListener('pointermove', onMove);
+		target.addEventListener('pointerup', onUp);
+		target.addEventListener('pointercancel', onUp);
+	}
+
+	onMount(() => {
+		function onResize() {
+			sidebarWidth = clampSidebarWidth(sidebarWidth);
+			rightSidebarWidth = clampSidebarWidth(rightSidebarWidth);
+		}
+		window.addEventListener('resize', onResize);
+		return () => window.removeEventListener('resize', onResize);
+	});
 
 	let stats = $derived.by(() => {
 		void validatedTopicStore.tree;
@@ -127,7 +194,10 @@
 	<!-- Main 3-column body -->
 	<div class="flex flex-1 overflow-hidden">
 		<!-- Left: Topic Tree -->
-		<div class="flex w-[280px] shrink-0 flex-col border-r {darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-white'}">
+		<div
+			class="flex shrink-0 flex-col overflow-hidden {darkMode ? 'bg-slate-800/50' : 'bg-white'}"
+			style="width: {sidebarWidth}px"
+		>
 			<div class="flex items-center gap-2 border-b p-2 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
 				<svg class="h-3.5 w-3.5 shrink-0 {darkMode ? 'text-slate-500' : 'text-slate-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -151,6 +221,30 @@
 			/>
 		</div>
 
+		<div
+			role="slider"
+			tabindex="0"
+			aria-label="Topic tree panel width"
+			aria-valuenow={sidebarWidth}
+			aria-valuemin={SIDEBAR_MIN}
+			aria-valuemax={SIDEBAR_MAX}
+			aria-orientation="horizontal"
+			class="w-1.5 shrink-0 cursor-col-resize touch-none select-none
+				{darkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-slate-200 hover:bg-slate-300'}
+				focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-indigo-500"
+			onpointerdown={onSidebarResizePointerDown}
+			onkeydown={(e) => {
+				const step = e.shiftKey ? 40 : 12;
+				if (e.key === 'ArrowLeft') {
+					e.preventDefault();
+					sidebarWidth = clampSidebarWidth(sidebarWidth - step);
+				} else if (e.key === 'ArrowRight') {
+					e.preventDefault();
+					sidebarWidth = clampSidebarWidth(sidebarWidth + step);
+				}
+			}}
+		></div>
+
 		<!-- Center: Detail Panel -->
 		<div class="flex flex-1 flex-col overflow-hidden {darkMode ? 'bg-slate-900' : 'bg-slate-50'}">
 			{#if selectedTopic}
@@ -168,8 +262,35 @@
 			{/if}
 		</div>
 
+		<div
+			role="slider"
+			tabindex="0"
+			aria-label="Schemas panel width"
+			aria-valuenow={rightSidebarWidth}
+			aria-valuemin={SIDEBAR_MIN}
+			aria-valuemax={SIDEBAR_MAX}
+			aria-orientation="horizontal"
+			class="w-1.5 shrink-0 cursor-col-resize touch-none select-none
+				{darkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-slate-200 hover:bg-slate-300'}
+				focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-indigo-500"
+			onpointerdown={onRightSidebarResizePointerDown}
+			onkeydown={(e) => {
+				const step = e.shiftKey ? 40 : 12;
+				if (e.key === 'ArrowLeft') {
+					e.preventDefault();
+					rightSidebarWidth = clampSidebarWidth(rightSidebarWidth + step);
+				} else if (e.key === 'ArrowRight') {
+					e.preventDefault();
+					rightSidebarWidth = clampSidebarWidth(rightSidebarWidth - step);
+				}
+			}}
+		></div>
+
 		<!-- Right: Schema Explorer -->
-		<div class="flex w-[280px] shrink-0 flex-col border-l {darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-white'}">
+		<div
+			class="flex shrink-0 flex-col overflow-hidden {darkMode ? 'bg-slate-800/50' : 'bg-white'}"
+			style="width: {rightSidebarWidth}px"
+		>
 			<div class="border-b px-3 py-2.5 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
 				<h2 class="text-xs font-semibold uppercase tracking-wider {darkMode ? 'text-slate-400' : 'text-slate-500'}">Schemas</h2>
 			</div>

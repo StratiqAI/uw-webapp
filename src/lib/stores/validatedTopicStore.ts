@@ -1,1 +1,6 @@
-export { validatedTopicStore, type SchemaRegistration } from './validatedTopicStore.svelte';
+export {
+	validatedTopicStore,
+	ValidatedTopicStore,
+	type SchemaRegistration,
+	type StoreChangeEvent
+} from './validatedTopicStore.svelte';

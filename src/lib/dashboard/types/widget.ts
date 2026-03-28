@@ -58,7 +58,8 @@ export type WidgetAction =
 	| 'exportData'
 	| 'refresh'
 	| 'settings'
-	| 'remove';
+	| 'remove'
+	| 'viewFullscreen';
 
 export interface TableWidget extends BaseWidget {
 	type: 'table';

@@ -165,6 +165,11 @@ export class DashboardStorage {
 		}, AUTO_SAVE_DELAY);
 	}
 
+	static saveWidgetDataNow(): boolean {
+		if (!autoSaveWidgetDataEnabled) return false;
+		return this.saveWidgetDataOnly();
+	}
+
 	private static saveWidgetDataOnly(): boolean {
 		if (!this.isLocalStorageAvailable()) return false;
 		try {
@@ -243,9 +248,13 @@ export class DashboardStorage {
 		} catch { return null; }
 	}
 
-	static restoreWidgetDataSnapshot(widgetData: WidgetDataSnapshot): void {
+	static restoreWidgetDataSnapshot(widgetData: WidgetDataSnapshot, options?: { force?: boolean }): void {
+		const force = options?.force ?? false;
 		Object.entries(widgetData).forEach(([topic, data]) => {
-			try { validatedTopicStore.publish(topic, data); } catch { /* skip */ }
+			try {
+				if (!force && validatedTopicStore.at(topic) !== undefined) return;
+				validatedTopicStore.publish(topic, data);
+			} catch { /* skip */ }
 		});
 	}
 

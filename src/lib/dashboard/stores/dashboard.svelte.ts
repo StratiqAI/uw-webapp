@@ -80,6 +80,7 @@ class DashboardStore {
 	#config = $state<DashboardConfig>(structuredClone(DEFAULT_CONFIG));
 	#dragState = $state<DragState>(structuredClone(DEFAULT_DRAG_STATE));
 	#resizeState = $state<ResizeState>(structuredClone(DEFAULT_RESIZE_STATE));
+	#fullscreenWidgetId = $state<string | null>(null);
 	
 	// Settings
 	#autoSaveEnabled = $state(true);
@@ -112,6 +113,7 @@ class DashboardStore {
 	projectId = $derived(this.#projectId);
 	activeTabId = $derived(this.#activeTabId);
 	tabOrder = $derived(this.#tabOrder);
+	fullscreenWidgetId = $derived(this.#fullscreenWidgetId);
 	get tabIds(): DashboardTabId[] { return this.#tabOrder.map(t => t.id); }
 	get isInitialized() { return this.#initialized; }
 	
@@ -157,6 +159,7 @@ class DashboardStore {
 		// Reset state for new project
 		this.#widgets = [];
 		this.#widgetZIndexMap.clear();
+		this.#fullscreenWidgetId = null;
 		this.#nextZIndex = 1;
 		this.#hasUnsavedChanges = false;
 		this.#projectId = projectId;
@@ -225,6 +228,7 @@ class DashboardStore {
 		if (tabId === this.#activeTabId) return;
 		if (!this.#tabSlices[tabId]) return;
 
+		this.#fullscreenWidgetId = null;
 		this.#flushActiveTabIntoSlices();
 		clearWidgetTopicsForLayout($state.snapshot(this.#widgets) as Widget[]);
 
@@ -342,7 +346,11 @@ class DashboardStore {
 	removeWidget(id: string): boolean {
 		const widget = this.#widgets.find(w => w.id === id);
 		if (!widget) return false;
-		
+
+		if (this.#fullscreenWidgetId === id) {
+			this.#fullscreenWidgetId = null;
+		}
+
 		this.#widgets = this.#widgets.filter((w) => w.id !== id);
 		this.#widgetZIndexMap.delete(id);
 		this.#scheduleAutoSave();
@@ -491,6 +499,10 @@ class DashboardStore {
 	resetInteractionStates(): void {
 		this.#dragState = structuredClone(DEFAULT_DRAG_STATE);
 		this.#resizeState = structuredClone(DEFAULT_RESIZE_STATE);
+	}
+
+	setFullscreenWidget(id: string | null): void {
+		this.#fullscreenWidgetId = id;
 	}
 	
 	updateGridConfig(config: Partial<DashboardConfig>): void {

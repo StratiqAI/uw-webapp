@@ -134,7 +134,7 @@ export function findMatchingTopics(
 	prefix = ''
 ): string[] {
 	const regexSource = pattern
-		.replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+		.replace(/[.?^${}()|[\]\\]/g, '\\$&')
 		.replace(/\+/g, '[^/]+')
 		.replace(/#/g, '.*');
 	const regex = new RegExp(`^${regexSource}$`);
