@@ -190,6 +190,9 @@
 	}
 
 	const zIndex = $derived(dashboard.getWidgetZIndex(widget.id));
+	const isBeingDragged = $derived(
+		dashboard.dragState.isDragging && dashboard.dragState.activeWidgetId === widget.id
+	);
 
 	// Dynamic component lookup for package-based widgets (registry-first)
 	const RegisteredComp = $derived(getWidgetComponent(widget.type));
@@ -198,8 +201,9 @@
 <div
 	role="button"
 	tabindex="0"
-	class="widget-wrapper animate-fadeIn group relative h-full"
+	class="widget-wrapper group relative h-full"
 	class:widget-wrapper--fullscreen={isWidgetFullscreen}
+	class:widget-wrapper--dragging={isBeingDragged}
 	style={isWidgetFullscreen
 		? `position: fixed; inset: 1rem; width: calc(100vw - 2rem); height: calc(100vh - 2rem); z-index: 100050; max-width: none;`
 		: `
@@ -516,6 +520,12 @@
 
 	.widget-wrapper--fullscreen {
 		cursor: default;
+	}
+
+	.widget-wrapper--dragging {
+		opacity: 0.3;
+		transform: scale(0.97);
+		transition: opacity 0.15s ease, transform 0.15s ease;
 	}
 
 	.widget-content {

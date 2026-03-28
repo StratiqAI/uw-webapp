@@ -24,6 +24,7 @@
 
 	let containerEl = $state<HTMLElement>();
 	let topicDropGhost = $state<{ position: { gridColumn: number; gridRow: number }; widgetType: WidgetType; topic: string } | null>(null);
+	let ghostValid = $state(true);
 
 	function getPositionFromEvent(e: DragEvent): { gridColumn: number; gridRow: number } | null {
 		if (!containerEl) return null;
@@ -69,7 +70,8 @@
 					{ ...dashboard.activeWidget, ...position },
 					dashboard.activeWidget.id
 				);
-				dashboard.setDragState({ ghostPosition: canPlace ? position : null });
+				ghostValid = canPlace;
+				dashboard.setDragState({ ghostPosition: position });
 			}
 		},
 
@@ -109,15 +111,17 @@
 			}
 
 			const position = dashboard.dragState.ghostPosition;
-			if (position && dashboard.dragState.activeWidgetId) {
+			if (position && dashboard.dragState.activeWidgetId && ghostValid) {
 				dashboard.moveWidget(dashboard.dragState.activeWidgetId, position);
 			}
+			ghostValid = true;
 			dashboard.resetInteractionStates();
 			topicDropGhost = null;
 		},
 
 		onDragLeave: () => {
 			topicDropGhost = null;
+			ghostValid = true;
 			dashboard.setDragState({ ghostPosition: null });
 			topicDragStore.set(null);
 		}
@@ -131,6 +135,7 @@
 	}
 
 	function handleWidgetDragEnd() {
+		ghostValid = true;
 		dashboard.resetInteractionStates();
 	}
 </script>
@@ -156,6 +161,7 @@
 				colSpan: dashboard.activeWidget?.colSpan || 1,
 				rowSpan: dashboard.activeWidget?.rowSpan || 1
 			}}
+			valid={ghostValid}
 		/>
 	{:else if topicDropGhost}
 		<GhostIndicator
