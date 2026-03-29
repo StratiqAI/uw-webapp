@@ -61,7 +61,7 @@ function zodToCleanJsonSchema(zodSchema: unknown, name: string): JsonSchemaDefin
 		$refStrategy: 'none'
 	}) as Record<string, unknown>;
 
-	const { $schema, ...clean } = raw;
+	const { $schema, ...clean } = raw; 
 
 	if (clean.$ref && clean.definitions) {
 		const refPath = (clean.$ref as string).replace('#/definitions/', '');

@@ -223,6 +223,39 @@
 
 	// Dynamic component lookup for package-based widgets (registry-first)
 	const RegisteredComp = $derived(getWidgetComponent(widget.type));
+
+	/**
+	 * Read live data reactively from the ValidatedTopicStore so that when AI or
+	 * another publisher updates the topic, the header title/description reflects
+	 * the new values immediately — without a full widget reconfigure.
+	 *
+	 * The TitleWidget is excluded: its data.title IS the rendered content, not a
+	 * chrome header label, so lifting it would duplicate the text.
+	 */
+	const liveData = $derived.by(() => {
+		const _ = validatedTopicStore.tree; // reactive dependency
+		return validatedTopicStore.at(currentTopic);
+	});
+
+	const displayTitle = $derived.by(() => {
+		if (widget.type === 'title') return widget.title;
+		const d = liveData as Record<string, unknown> | undefined | null;
+		if (d && typeof d === 'object') {
+			const t = d.title;
+			if (typeof t === 'string' && t.trim()) return t;
+		}
+		return widget.title;
+	});
+
+	const displayDescription = $derived.by(() => {
+		if (widget.type === 'title') return widget.description;
+		const d = liveData as Record<string, unknown> | undefined | null;
+		if (d && typeof d === 'object') {
+			const desc = d.description;
+			if (typeof desc === 'string' && desc.trim()) return desc;
+		}
+		return widget.description;
+	});
 </script>
 
 <div
@@ -261,12 +294,12 @@
 		<!-- Gradient accent line at top of card -->
 		<div class="pointer-events-none absolute inset-x-0 top-0 z-10 h-px {darkMode ? 'bg-linear-to-r from-transparent via-primary-400/40 to-transparent' : 'bg-linear-to-r from-transparent via-primary-400/25 to-transparent'}"></div>
 
-		<!-- Widget Header (if title is set) -->
-		{#if widget.title}
+		<!-- Widget Header (if a title is available — static or from live data) -->
+		{#if displayTitle}
 			<div class="widget-header border-b {darkMode ? 'border-slate-700/40 bg-linear-to-r from-slate-800/90 to-slate-800/60' : 'border-slate-200/60 bg-linear-to-r from-slate-50 to-white'} px-4 py-3">
-				<h3 class="text-sm font-semibold tracking-wide {darkMode ? 'text-slate-100' : 'text-slate-700'}">{widget.title}</h3>
-				{#if widget.description}
-					<p class="mt-0.5 text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'}">{widget.description}</p>
+				<h3 class="text-sm font-semibold tracking-wide {darkMode ? 'text-slate-100' : 'text-slate-700'}">{displayTitle}</h3>
+				{#if displayDescription}
+					<p class="mt-0.5 text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'}">{displayDescription}</p>
 				{/if}
 			</div>
 		{/if}
@@ -281,7 +314,7 @@
 		/>
 
 		<!-- Widget Body -->
-		<div class="widget-body {darkMode ? 'bg-transparent' : 'bg-white/60'} {widget.title ? 'p-4' : 'h-full p-4'}">
+		<div class="widget-body {darkMode ? 'bg-transparent' : 'bg-white/60'} {displayTitle ? 'p-4' : 'h-full p-4'}">
 			{#if RegisteredComp}
 				<RegisteredComp
 					data={widget.data} widgetId={widget.id}
