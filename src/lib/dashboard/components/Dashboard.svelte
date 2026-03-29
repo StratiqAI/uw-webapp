@@ -11,10 +11,31 @@
 	import { setDashboardWidgetHost } from '@stratiqai/dashboard-widget-sdk';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { createSupabaseBrowserClient } from '$lib/supabase/browser';
 
-	// Inject host services into Svelte context so package-based widgets
-	// can access the store and topic resolution via getDashboardWidgetHost().
-	setDashboardWidgetHost({ validatedTopicStore, getWidgetTopic });
+	const serviceMap = new Map<string, unknown>();
+	const sbClient = createSupabaseBrowserClient();
+	if (sbClient) serviceMap.set('supabase', sbClient);
+
+	setDashboardWidgetHost({
+		validatedTopicStore: {
+			get tree() { return validatedTopicStore.tree; },
+			at: <T>(topic: string) => validatedTopicStore.at<T>(topic),
+			publish: (topic: string, data: unknown) => validatedTopicStore.publish(topic, data),
+			registerSchema: (pattern: string, schema: unknown) =>
+				validatedTopicStore.registerSchema(pattern, schema as any),
+			patch(topic: string, partial: Record<string, unknown>): boolean {
+				const current = validatedTopicStore.at<Record<string, unknown>>(topic);
+				const merged = { ...(current ?? {}), ...partial };
+				return validatedTopicStore.publish(topic, merged);
+			}
+		},
+		getWidgetTopic,
+		services: {
+			get: <T>(name: string) => serviceMap.get(name) as T | undefined,
+			has: (name: string) => serviceMap.has(name)
+		}
+	});
 
 	interface Props {
 		darkMode?: boolean;

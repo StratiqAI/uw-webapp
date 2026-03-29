@@ -14,17 +14,18 @@ export default defineConfig(({ command }) => ({
 	},
 	...(command === 'serve'
 		? {
-				resolve: {
-					// Compile workspace packages from `src/lib` so HMR works without
-					// `svelte-package --watch`. Production builds use `dist/` via package.json.
-					alias: {
-						'@stratiqai/dashboard-widget-sdk': path.resolve(__dirname, 'packages/dashboard-widget-sdk/src/lib'),
-						'@stratiqai/widget-metric': path.resolve(__dirname, 'packages/widget-metric/src/lib'),
-						'@stratiqai/widget-json-viewer': path.resolve(__dirname, 'packages/widget-json-viewer/src/lib'),
-						'@stratiqai/widget-broker-card': path.resolve(__dirname, 'packages/widget-broker-card/src/lib')
-					}
+			resolve: {
+				// Compile workspace packages from `src/lib` so HMR works without
+				// `svelte-package --watch`. Production builds use `dist/` via package.json.
+				alias: {
+					'@stratiqai/dashboard-widget-sdk': path.resolve(__dirname, 'packages/dashboard-widget-sdk/src/lib'),
+					'@stratiqai/widget-metric': path.resolve(__dirname, 'packages/widget-metric/src/lib'),
+					'@stratiqai/widget-json-viewer': path.resolve(__dirname, 'packages/widget-json-viewer/src/lib'),
+					'@stratiqai/widget-broker-card': path.resolve(__dirname, 'packages/widget-broker-card/src/lib'),
+					'@stratiqai/widget-lq-analysis': path.resolve(__dirname, 'packages/widget-lq-analysis/src/lib')
 				}
 			}
+		}
 		: {}),
 	server: {
 		fs: {
@@ -36,7 +37,8 @@ export default defineConfig(({ command }) => ({
 			'@stratiqai/dashboard-widget-sdk',
 			'@stratiqai/widget-metric',
 			'@stratiqai/widget-json-viewer',
-			'@stratiqai/widget-broker-card'
+			'@stratiqai/widget-broker-card',
+			'@stratiqai/widget-lq-analysis'
 		]
 	}
 }));

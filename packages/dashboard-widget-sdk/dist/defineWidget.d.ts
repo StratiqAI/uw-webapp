@@ -12,10 +12,14 @@ export declare function defineWidget<TData>(config: {
     displayName: string;
     schemaVersion?: string;
     zodSchema: z.ZodSchema<TData>;
+    /** Narrow schema for topic store validation (defaults to zodSchema). */
+    inputSchema?: z.ZodSchema;
     component: Component<StandardWidgetProps<TData>>;
     defaultData: TData;
     defaultSize?: {
         colSpan: number;
         rowSpan: number;
     };
+    /** Services this widget requires from the host (informational). */
+    capabilities?: string[];
 }): WidgetManifest<TData>;

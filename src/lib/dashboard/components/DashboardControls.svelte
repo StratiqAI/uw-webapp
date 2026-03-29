@@ -165,7 +165,8 @@
 			schema: { colSpan: 6, rowSpan: 3 },
 			locationQuotient: { colSpan: 12, rowSpan: 4 },
 			jsonViewer: { colSpan: 6, rowSpan: 3 },
-			brokerCard: { colSpan: 3, rowSpan: 2 }
+			brokerCard: { colSpan: 3, rowSpan: 2 },
+			lqAnalysis: { colSpan: 12, rowSpan: 4 }
 		};
 
 		const { colSpan, rowSpan } = defaultSizes[type];
@@ -245,6 +246,21 @@
 						avatarUrl: null
 					}
 				} as Widget;
+			case 'lqAnalysis':
+				return {
+					...baseWidget,
+					type: 'lqAnalysis',
+					data: {
+						city: 'Portland',
+						state: 'OR',
+						year: 2025,
+						regionLabel: 'Portland-Vancouver-Hillsboro, OR-WA',
+						sortOrder: 'lq_desc',
+						exportBaseThreshold: 1.08,
+						localBandLow: 0.92,
+						localBandHigh: 1.08
+					}
+				} as Widget;
 			default:
 				return null;
 		}
@@ -280,7 +296,8 @@
 		{ type: 'schema', label: 'Schema Widget', icon: '📋' },
 		{ type: 'locationQuotient', label: 'Location Quotient', icon: '📍' },
 		{ type: 'jsonViewer', label: 'JSON Viewer', icon: '{ }' },
-		{ type: 'brokerCard', label: 'Broker Card', icon: '👤' }
+		{ type: 'brokerCard', label: 'Broker Card', icon: '👤' },
+		{ type: 'lqAnalysis', label: 'LQ Analysis', icon: '📍' }
 	];
 </script>
 

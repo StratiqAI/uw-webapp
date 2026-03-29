@@ -10,6 +10,12 @@ export interface StandardWidgetProps<TData = unknown> {
 	widgetId?: string;
 	topicOverride?: string;
 	darkMode?: boolean;
+	/** Host-driven refresh counter; incrementing triggers refetch in useExternalData. */
+	refreshSignal?: number;
+	/** Persist config changes back to the dashboard store (widget.data). */
+	onUpdateConfig?: (data: TData) => void;
+	/** Register a toggle function the host calls when the user clicks Configure/Edit. */
+	onConfigureReady?: (toggleFn: () => void) => void;
 }
 
 /**
@@ -21,9 +27,23 @@ export interface WidgetManifest<TData = unknown> {
 	displayName: string;
 	schemaVersion: string;
 	zodSchema: z.ZodSchema<TData>;
+	/**
+	 * If present, the topic store uses this for validation instead of zodSchema.
+	 * Allows the topic store to hold a narrow input shape (e.g. city/state/zip)
+	 * while widget.data holds the full config validated by zodSchema.
+	 */
+	inputSchema?: z.ZodSchema;
 	component: Component<StandardWidgetProps<TData>>;
 	defaultData: TData;
 	defaultSize: { colSpan: number; rowSpan: number };
+	/** Services this widget requires from the host (informational). */
+	capabilities?: string[];
+}
+
+/** Provides typed access to host-injected service instances. */
+export interface ServiceAccessor {
+	get<S = unknown>(name: string): S | undefined;
+	has(name: string): boolean;
 }
 
 /**
@@ -36,6 +56,10 @@ export interface DashboardWidgetHost {
 		at<T>(topic: string): T | undefined;
 		publish(topic: string, data: unknown): boolean;
 		registerSchema(topicPattern: string, jsonSchema: unknown): void;
+		/** Read-merge-publish: update specific fields without clobbering the rest. */
+		patch(topic: string, partial: Record<string, unknown>): boolean;
 	};
 	getWidgetTopic(kind: string, widgetId: string, topicOverride?: string): string;
+	/** Service registry -- host provides named service instances. */
+	services?: ServiceAccessor;
 }

@@ -34,7 +34,8 @@ const WIDGET_NAMES: Record<WidgetType, string> = {
 	schema: 'Schema Widget',
 	locationQuotient: 'Location Quotient Widget',
 	jsonViewer: 'JSON Viewer',
-	brokerCard: 'Broker Card'
+	brokerCard: 'Broker Card',
+	lqAnalysis: 'LQ Analysis'
 };
 
 export const WIDGET_TYPES: WidgetType[] = [
@@ -103,6 +104,7 @@ export function initializeWidgetSchemas(): void {
 	for (const manifest of getRegisteredManifests()) {
 		const schemaId = `widget:${manifest.kind}-${manifest.schemaVersion}`;
 		const topicPattern = `widgets/${manifest.kind}/+`;
+		const topicZod = manifest.inputSchema ?? manifest.zodSchema;
 
 		try {
 			validatedTopicStore.registerSchema({
@@ -111,7 +113,7 @@ export function initializeWidgetSchemas(): void {
 				description: `Data schema for ${manifest.displayName.toLowerCase()}`,
 				source: 'code',
 				topicPattern,
-				jsonSchema: zodToCleanJsonSchema(manifest.zodSchema, `${manifest.kind}WidgetData`)
+				jsonSchema: zodToCleanJsonSchema(topicZod, `${manifest.kind}WidgetData`)
 			});
 		} catch (error) {
 			console.error(`Failed to register package widget ${schemaId}:`, error);

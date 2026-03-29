@@ -13,6 +13,8 @@ import type { JsonViewerWidgetData } from '@stratiqai/widget-json-viewer';
 import { jsonViewerWidgetDataSchema as JsonViewerWidgetDataSchema } from '@stratiqai/widget-json-viewer';
 import type { BrokerCardWidgetData } from '@stratiqai/widget-broker-card';
 import { brokerCardWidgetDataSchema as BrokerCardWidgetDataSchema } from '@stratiqai/widget-broker-card';
+import type { LqAnalysisConfig } from '@stratiqai/widget-lq-analysis';
+import { lqAnalysisConfigSchema as LqAnalysisConfigSchema } from '@stratiqai/widget-lq-analysis';
 
 export type { MetricWidgetData, JsonViewerWidgetData, BrokerCardWidgetData };
 
@@ -169,7 +171,8 @@ export const WidgetDataSchemas = {
 	schema: SchemaWidgetDataSchema,
 	locationQuotient: LocationQuotientWidgetDataSchema,
 	jsonViewer: JsonViewerWidgetDataSchema,
-	brokerCard: BrokerCardWidgetDataSchema
+	brokerCard: BrokerCardWidgetDataSchema,
+	lqAnalysis: LqAnalysisConfigSchema
 } as const;
 
 // ===== Inferred Types from Schemas =====
@@ -189,6 +192,7 @@ export type DivergingBarChartWidgetData = z.infer<typeof DivergingBarChartWidget
 export type MapWidgetData = z.infer<typeof MapWidgetDataSchema>;
 export type SchemaWidgetData = z.infer<typeof SchemaWidgetDataSchema>;
 export type LocationQuotientWidgetData = z.infer<typeof LocationQuotientWidgetDataSchema>;
+export type LqAnalysisWidgetData = z.infer<typeof LqAnalysisConfigSchema>;
 
 // Union type of all widget data
 export type WidgetData =
@@ -209,7 +213,8 @@ export type WidgetData =
 	| SchemaWidgetData
 	| LocationQuotientWidgetData
 	| JsonViewerWidgetData
-	| BrokerCardWidgetData;
+	| BrokerCardWidgetData
+	| LqAnalysisWidgetData;
 
 // ===== Type-safe Widget Data Mapping =====
 
@@ -232,6 +237,7 @@ export interface WidgetDataTypeMap {
 	locationQuotient: LocationQuotientWidgetData;
 	jsonViewer: JsonViewerWidgetData;
 	brokerCard: BrokerCardWidgetData;
+	lqAnalysis: LqAnalysisConfig;
 }
 
 // ===== Widget Channel Configuration =====
@@ -653,6 +659,13 @@ export const WidgetChannels = {
 		widgetType: 'brokerCard',
 		schema: BrokerCardWidgetDataSchema,
 		description: description || `Broker card channel: ${channelId}`
+	}),
+
+	lqAnalysis: (channelId: string, description?: string): WidgetChannelConfig<'lqAnalysis'> => ({
+		channelId,
+		widgetType: 'lqAnalysis',
+		schema: LqAnalysisConfigSchema,
+		description: description || `LQ analysis channel: ${channelId}`
 	})
 } as const;
 

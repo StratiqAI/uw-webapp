@@ -81,6 +81,9 @@
 	let previewData = $state<unknown>(null);
 	let lastRefreshedAt = $state<Date | null>(null);
 
+	let registeredRefreshCounter = $state(0);
+	let registeredConfigureFn: (() => void) | null = null;
+
 	const isWidgetFullscreen = $derived(dashboard.fullscreenWidgetId === widget.id);
 
 	$effect(() => {
@@ -156,6 +159,10 @@
 			case 'configure':
 			case 'edit':
 			case 'settings':
+				if (RegisteredComp && registeredConfigureFn) {
+					registeredConfigureFn();
+					break;
+				}
 				if (widget.type === 'locationQuotient') {
 					widgetConfigureFlipFn?.();
 					break;
@@ -174,6 +181,9 @@
 				break;
 
 			case 'refresh':
+				if (RegisteredComp) {
+					registeredRefreshCounter++;
+				}
 				if (widget.type === 'locationQuotient') {
 					bumpLqRefresh(widget.id);
 				}
@@ -327,10 +337,13 @@
 
 		<!-- Widget Body -->
 		<div class="widget-body {darkMode ? 'bg-transparent' : 'bg-white/60'} {displayTitle ? 'p-4' : 'h-full p-4'}">
-			{#if RegisteredComp}
-				<RegisteredComp
-					data={widget.data} widgetId={widget.id}
-					topicOverride={widget.topicOverride} {darkMode} />
+		{#if RegisteredComp}
+			<RegisteredComp
+				data={widget.data} widgetId={widget.id}
+				topicOverride={widget.topicOverride} {darkMode}
+				refreshSignal={registeredRefreshCounter}
+				onUpdateConfig={(d: any) => dashboard.updateWidget(widget.id, { data: d })}
+				onConfigureReady={(fn: () => void) => { registeredConfigureFn = fn; }} />
 			{:else if widget.type === 'title'}
 				<TitleWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
 			{:else if widget.type === 'paragraph'}

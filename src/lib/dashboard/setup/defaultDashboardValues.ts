@@ -12,6 +12,7 @@ import { getWidgetManifest } from '$lib/dashboard/setup/widgetRegistry';
 import { metricWidget } from '@stratiqai/widget-metric';
 import { jsonViewerWidget } from '@stratiqai/widget-json-viewer';
 import { brokerCardWidget } from '@stratiqai/widget-broker-card';
+import { lqAnalysisWidget } from '@stratiqai/widget-lq-analysis';
 
 /**
  * Default data for each widget type. Values conform to the Zod schemas
@@ -124,7 +125,8 @@ export const DEFAULT_WIDGET_DATA: Record<WidgetType, Record<string, unknown>> = 
 		exportBaseThreshold: 1.08,
 		localBandLow: 0.92,
 		localBandHigh: 1.08
-	}
+	},
+	lqAnalysis: { ...(lqAnalysisWidget.defaultData as Record<string, unknown>) }
 };
 
 /**
@@ -149,7 +151,8 @@ export const DEFAULT_WIDGET_SIZES: Record<WidgetType, { colSpan: number; rowSpan
 	heatmap: { colSpan: 6, rowSpan: 4 },
 	divergingBarChart: { colSpan: 6, rowSpan: 3 },
 	schema: { colSpan: 6, rowSpan: 3 },
-	locationQuotient: { colSpan: 12, rowSpan: 4 }
+	locationQuotient: { colSpan: 12, rowSpan: 4 },
+	lqAnalysis: { ...lqAnalysisWidget.defaultSize }
 };
 
 /**

@@ -3,6 +3,7 @@
 import type { MetricWidgetData } from '@stratiqai/widget-metric';
 import type { JsonViewerWidgetData } from '@stratiqai/widget-json-viewer';
 import type { BrokerCardWidgetData } from '@stratiqai/widget-broker-card';
+import type { LqAnalysisConfig } from '@stratiqai/widget-lq-analysis';
 export type WidgetType =
 	| 'table'
 	| 'title'
@@ -21,7 +22,8 @@ export type WidgetType =
 	| 'schema'
 	| 'locationQuotient'
 	| 'jsonViewer'
-	| 'brokerCard';
+	| 'brokerCard'
+	| 'lqAnalysis';
 
 export interface Position {
 	gridColumn: number;
@@ -259,6 +261,11 @@ export interface LocationQuotientWidget extends BaseWidget {
 	data: LocationQuotientWidgetConfig;
 }
 
+export interface LqAnalysisWidgetDef extends BaseWidget {
+	type: 'lqAnalysis';
+	data: LqAnalysisConfig;
+}
+
 export type Widget =
 	| TableWidget
 	| TitleWidget
@@ -277,7 +284,8 @@ export type Widget =
 	| SchemaWidget
 	| LocationQuotientWidget
 	| JsonViewerWidget
-	| BrokerCardWidget;
+	| BrokerCardWidget
+	| LqAnalysisWidgetDef;
 
 export interface DashboardConfig {
 	gridColumns: number;

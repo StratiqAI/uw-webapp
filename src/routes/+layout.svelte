@@ -9,6 +9,7 @@
 	import { metricWidget } from '@stratiqai/widget-metric';
 	import { jsonViewerWidget } from '@stratiqai/widget-json-viewer';
 	import { brokerCardWidget } from '@stratiqai/widget-broker-card';
+	import { lqAnalysisWidget } from '@stratiqai/widget-lq-analysis';
 	import { browser } from '$app/environment';
 	import { initTopicStoreSync } from '$lib/stores/topicStoreSync';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
@@ -20,6 +21,7 @@
 	registerWidget(metricWidget);
 	registerWidget(jsonViewerWidget);
 	registerWidget(brokerCardWidget);
+	registerWidget(lqAnalysisWidget);
 
 	let { children, data } = $props<{ children: any; data: LayoutData }>();
 
