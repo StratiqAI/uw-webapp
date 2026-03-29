@@ -151,21 +151,14 @@
 	function handleWidgetAction(action: WidgetAction) {
 		switch (action) {
 			case 'configure':
+			case 'edit':
+			case 'settings':
 				if (widget.type === 'locationQuotient') {
 					widgetConfigureFlipFn?.();
 					break;
 				}
 				selectedTopic = currentTopic;
 				showEditDialog = true;
-				break;
-			case 'edit':
-			case 'settings':
-				selectedTopic = currentTopic;
-				showEditDialog = true;
-				break;
-
-			case 'customInstructions':
-				widgetFlipFn?.();
 				break;
 
 			case 'duplicate':

@@ -201,18 +201,6 @@
 			icon: ICONS.settings
 		});
 
-		items.push({
-			action: 'configure',
-			label: 'Configure',
-			icon: ICONS.configure
-		});
-
-		items.push({
-			action: 'customInstructions',
-			label: 'AI Agent',
-			icon: ICONS.aiAgent
-		});
-
 		if (hasDataRefresh(widget)) {
 			items.push({
 				action: 'exportData',
