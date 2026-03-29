@@ -2,11 +2,15 @@
 	import { onMount } from 'svelte';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
+	import { streamCatalog } from '$lib/stores/streamCatalog.svelte';
 	import { countTopics } from './utils';
 	import TopicTree from './TopicTree.svelte';
 	import DetailPanel from './DetailPanel.svelte';
 	import SchemaExplorer from './SchemaExplorer.svelte';
+	import StreamsPanel from './StreamsPanel.svelte';
 	import PublishPanel from './PublishPanel.svelte';
+
+	let activeTab = $state<'topics' | 'streams'>('topics');
 
 	let darkMode = $derived(darkModeStore.darkMode);
 
@@ -89,7 +93,8 @@
 			topics: total,
 			schemas: validatedTopicStore.getRegisteredSchemas().length,
 			errors: validatedTopicStore.errors.size,
-			schemaVersion: validatedTopicStore.schemaVersion
+			schemaVersion: validatedTopicStore.schemaVersion,
+			streams: streamCatalog.streams.length
 		};
 	});
 
@@ -142,6 +147,16 @@
 				<span class="rounded-full px-2 py-0.5 text-xs font-medium {darkMode ? 'bg-indigo-900/30 text-indigo-400' : 'bg-indigo-100 text-indigo-600'}">
 					v{stats.schemaVersion}
 				</span>
+				<button
+					type="button"
+					class="rounded-full px-2 py-0.5 text-xs font-medium transition-colors
+						{activeTab === 'streams'
+							? (darkMode ? 'bg-teal-900/50 text-teal-300' : 'bg-teal-100 text-teal-700')
+							: (darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}"
+					onclick={() => activeTab = activeTab === 'streams' ? 'topics' : 'streams'}
+				>
+					{stats.streams} stream{stats.streams !== 1 ? 's' : ''}
+				</button>
 			</div>
 		</div>
 
@@ -191,8 +206,15 @@
 		</div>
 	{/if}
 
-	<!-- Main 3-column body -->
-	<div class="flex flex-1 overflow-hidden">
+	<!-- Streams panel (full-width, replaces topic/schema layout when active) -->
+	{#if activeTab === 'streams'}
+		<div class="flex flex-1 overflow-hidden">
+			<StreamsPanel {darkMode} />
+		</div>
+	{/if}
+
+	<!-- Main 3-column body (hidden when streams tab is active) -->
+	<div class="flex flex-1 overflow-hidden" class:hidden={activeTab === 'streams'}>
 		<!-- Left: Topic Tree -->
 		<div
 			class="flex shrink-0 flex-col overflow-hidden {darkMode ? 'bg-slate-800/50' : 'bg-white'}"

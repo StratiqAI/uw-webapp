@@ -11,6 +11,7 @@
 	import { initTopicStoreSync } from '$lib/stores/topicStoreSync';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import { DashboardStorage } from '$lib/dashboard/utils/storage';
+	import { streamCatalog } from '$lib/stores/streamCatalog.svelte';
 	import ToastContainer from '$lib/components/Toast/ToastContainer.svelte';
 
 	// Register package-based widgets before schema initialization
@@ -39,6 +40,9 @@
 
 		destroySync = initTopicStoreSync(validatedTopicStore);
 
+		// Initialise stream catalog after schemas are ready (so registerStreamSchema can resolve ids)
+		streamCatalog.init();
+
 		// Keep DashboardStorage in sync with ALL widget topic changes (admin edits,
 		// cross-tab sync, etc.) so it never holds stale data on next page load.
 		unsubDashboardSync = validatedTopicStore.onChange((event) => {
@@ -65,6 +69,7 @@
 	onDestroy(() => {
 		destroySync?.();
 		unsubDashboardSync?.();
+		streamCatalog.destroy();
 	});
 	
 	// Provide theme store via context for child components

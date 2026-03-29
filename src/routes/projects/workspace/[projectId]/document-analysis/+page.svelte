@@ -8,7 +8,6 @@
 	import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from '$env/static/public';
 	import { getAppSyncWsClient, initAppSyncWsClient } from '$lib/realtime/websocket/wsClient';
 	import { computeExecutionIdForSubmitInput } from '$lib/ai-query/calculateExecutionId';
-	import { parseJavaMapLikeString } from '$lib/ai-query/parseJavaMapLikeString';
 	
 	// ProjectDocument type for PDFViewer (id and filename)
 	interface ProjectDocument {
@@ -36,6 +35,9 @@
 	import { GraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
 	import { M_SUBMIT_AI_QUERY, S_ON_UPDATE_AI_QUERY_EXECUTION_BY_EXECUTION_ID } from '@stratiqai/types-simple';
+	import { streamCatalog } from '$lib/stores/streamCatalog.svelte';
+	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
+	import SendToDashboardModal from './components/SendToDashboardModal.svelte';
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Initialize the state variables for this component
@@ -80,6 +82,9 @@
 	/** AppSync subscription cleanup for AI query execution (by deterministic executionId hash). */
 	let aiQueryExecutionUnsub: (() => void) | null = null;
 	let aiQueryExecutionTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+	/** "Send to Dashboard" modal state */
+	let showSendToDashboard = $state(false);
 
 	function cleanupAiQueryExecutionSubscription() {
 		if (aiQueryExecutionTimeoutId != null) {
@@ -271,6 +276,18 @@
 					structuredOutput,
 					matchCount: documentIds.length
 				};
+
+				// Auto-publish to any bound stream for this prompt
+				if (prompt.id) {
+					const stream = streamCatalog.getStreamByPromptId(prompt.id);
+					if (stream && structuredOutput !== undefined) {
+						const ok = validatedTopicStore.publish(stream.topic, structuredOutput);
+						if (!ok) {
+							console.warn(`[document-analysis] Auto-publish to stream "${stream.topic}" rejected by validation`);
+						}
+					}
+				}
+
 				finishLoading();
 			} else if (exec.status === 'ERROR') {
 				settled = true;
@@ -412,7 +429,6 @@
 
 	type QueryResultDisplay = { mode: 'json'; body: string } | { mode: 'text'; body: string };
 
-	/** Pretty-print JSON when `answer` is JSON, Java map-style text, or `structuredOutput` is structured. */
 	function formatQueryResultDisplay(answer: string, structured: unknown | undefined): QueryResultDisplay {
 		if (structured !== undefined && structured !== null && typeof structured === 'object') {
 			return { mode: 'json', body: JSON.stringify(structured, null, 2) };
@@ -423,13 +439,7 @@
 			const parsed = JSON.parse(raw);
 			return { mode: 'json', body: JSON.stringify(parsed, null, 2) };
 		} catch {
-			/* e.g. `{brokers=[{phone=..., name=...}]}` from model / Java toString */
-			try {
-				const loose = parseJavaMapLikeString(raw);
-				return { mode: 'json', body: JSON.stringify(loose, null, 2) };
-			} catch {
-				return { mode: 'text', body: answer };
-			}
+			return { mode: 'text', body: answer };
 		}
 	}
 
@@ -493,11 +503,24 @@
 							<span class="text-sm font-normal {darkMode ? 'text-slate-400' : 'text-slate-500'}"> — {lastSelectedPrompt.name}</span>
 						{/if}
 					</h3>
-					<button
-						type="button"
-						onclick={() => { visionQueryResult = null; lastSelectedPrompt = null; }}
-						class="rounded border px-2 py-1 text-sm {darkMode ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-700 hover:bg-slate-100'}"
-					>Clear</button>
+					<div class="flex items-center gap-2">
+						<button
+								type="button"
+								onclick={() => showSendToDashboard = true}
+								class="flex items-center gap-1.5 rounded border px-3 py-1.5 text-sm font-medium transition-colors
+									{darkMode ? 'border-indigo-600 bg-indigo-900/20 text-indigo-300 hover:bg-indigo-900/40' : 'border-indigo-400 bg-indigo-50 text-indigo-700 hover:bg-indigo-100'}"
+							>
+								<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+								</svg>
+								Send to Dashboard
+							</button>
+						<button
+							type="button"
+							onclick={() => { visionQueryResult = null; lastSelectedPrompt = null; }}
+							class="rounded border px-2 py-1 text-sm {darkMode ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-700 hover:bg-slate-100'}"
+						>Clear</button>
+					</div>
 				</div>
 				<div class="p-6 space-y-4">
 					{#if queryResultDisplay}
@@ -649,6 +672,17 @@
 			isCreating={isCreatingPrompt}
 			onSave={handleSavePrompt}
 			onCancel={handleCancelPrompt}
+		/>
+	{/if}
+
+	<!-- Send to Dashboard modal -->
+	{#if showSendToDashboard}
+		<SendToDashboardModal
+			{darkMode}
+			prompt={lastSelectedPrompt}
+			result={visionQueryResult?.structuredOutput ?? visionQueryResult?.answer}
+			onclose={() => showSendToDashboard = false}
+			onpublished={() => showSendToDashboard = false}
 		/>
 	{/if}
 </div>

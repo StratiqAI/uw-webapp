@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
+	import { streamCatalog } from '$lib/stores/streamCatalog.svelte';
 	import { schemaToFields, findMatchingTopics, formatJson, type FieldDescriptor } from './utils';
 
 	interface Props {
@@ -86,10 +87,11 @@
 
 	<div class="flex-1 overflow-y-auto p-2 space-y-1">
 		<!-- Topic-bound schemas -->
-		{#each filteredPatternSchemas as { pattern, schema } (pattern)}
+		{#each filteredPatternSchemas as { pattern, schema, id } (pattern)}
 			{@const fields = schemaToFields(schema as Record<string, unknown>)}
 			{@const isExpanded = expandedPatterns.has(pattern)}
 			{@const isHighlighted = highlightedPattern === pattern}
+			{@const streamCount = id ? streamCatalog.getStreamsBySchemaId(id).length : 0}
 			<div class="rounded border {isHighlighted ? (darkMode ? 'border-indigo-500/50 bg-indigo-900/10' : 'border-indigo-300 bg-indigo-50/50') : (darkMode ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-white')}">
 				<button
 					type="button"
@@ -100,6 +102,11 @@
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
 					</svg>
 					<code class="min-w-0 flex-1 truncate text-xs font-medium {darkMode ? 'text-amber-400' : 'text-amber-700'}">{pattern}</code>
+					{#if streamCount > 0}
+						<span class="text-xs rounded-full px-1.5 py-0.5 {darkMode ? 'bg-teal-900/40 text-teal-400' : 'bg-teal-50 text-teal-700'}" title="{streamCount} stream{streamCount !== 1 ? 's' : ''} use this schema">
+							{streamCount}▸
+						</span>
+					{/if}
 					{#if fields.length > 0}
 						<span class="text-xs {darkMode ? 'text-slate-500' : 'text-slate-400'}">{fields.length}p</span>
 					{/if}
@@ -161,6 +168,7 @@
 				{#each filteredCatalog as def (def.id)}
 					{@const fields = schemaToFields(def.jsonSchema as Record<string, unknown>)}
 					{@const isExpanded = expandedPatterns.has(def.id)}
+					{@const defStreamCount = streamCatalog.getStreamsBySchemaId(def.id).length}
 					<div class="rounded border {darkMode ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-white'}">
 						<button
 							type="button"
@@ -174,6 +182,11 @@
 								<code class="font-medium {darkMode ? 'text-teal-400' : 'text-teal-700'}">{def.id}</code>
 								<span class="{darkMode ? 'text-slate-500' : 'text-slate-400'}"> — {def.name}</span>
 							</span>
+							{#if defStreamCount > 0}
+								<span class="text-xs rounded-full px-1.5 py-0.5 {darkMode ? 'bg-teal-900/40 text-teal-400' : 'bg-teal-50 text-teal-700'}" title="{defStreamCount} stream{defStreamCount !== 1 ? 's' : ''} use this schema">
+									{defStreamCount}▸
+								</span>
+							{/if}
 						</button>
 						{#if isExpanded}
 							<div class="border-t px-2.5 pb-2 {darkMode ? 'border-slate-700' : 'border-slate-100'}">

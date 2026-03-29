@@ -875,10 +875,11 @@ export class ValidatedTopicStore {
 	 * Returns all registered schema patterns and their raw schemas.
 	 * Reactivity: watch schemaVersion to react to changes, then call this method.
 	 */
-	getRegisteredSchemas(): Array<{ pattern: string; schema: Schema }> {
+	getRegisteredSchemas(): Array<{ pattern: string; schema: Schema; id?: string }> {
 		return Array.from(this.#schemas.entries()).map(([pattern, entry]) => ({
 			pattern,
-			schema: entry.raw
+			schema: entry.raw,
+			id: this.#patternToRegistration.get(pattern)?.id
 		}));
 	}
 
