@@ -1,4 +1,4 @@
-export type { StandardWidgetProps, WidgetManifest, DashboardWidgetHost, ServiceAccessor } from './types.js';
+export type { StandardWidgetProps, WidgetManifest, DashboardWidgetHost, ServiceAccessor, DashboardAppTheme } from './types.js';
 export { defineWidget } from './defineWidget.js';
 export { setDashboardWidgetHost, getDashboardWidgetHost } from './context.svelte.js';
 export { useReactiveValidatedTopic } from './hooks.svelte.js';

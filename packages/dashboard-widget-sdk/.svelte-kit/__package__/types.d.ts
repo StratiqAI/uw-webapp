@@ -4,11 +4,15 @@ import type { z } from 'zod';
  * Standard props every widget component receives from the host dashboard.
  * Widget authors should declare their component's Props to extend or match this shape.
  */
+/** Host app theme (light / dark / warm “coffee”). Optional; widgets may fall back to darkMode. */
+export type DashboardAppTheme = 'light' | 'dark' | 'warm';
 export interface StandardWidgetProps<TData = unknown> {
     data: TData;
     widgetId?: string;
     topicOverride?: string;
     darkMode?: boolean;
+    /** When set, widgets can style for warm (coffee) vs light explicitly. */
+    theme?: DashboardAppTheme;
     /** Host-driven refresh counter; incrementing triggers refetch in useExternalData. */
     refreshSignal?: number;
     /** Persist config changes back to the dashboard store (widget.data). */

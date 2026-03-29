@@ -6,6 +6,10 @@
 <script lang="ts">
 	// Importing Svelte Library Functions
 	import { getContext } from 'svelte';
+	import {
+		WIDGET_TITLE_BAR_CONTEXT,
+		type WidgetTitleBarContext
+	} from '$lib/dashboard/context/widgetTitleBarContext';
 
 	// Importing 3rd Party Libraries
 	import { z } from 'zod';
@@ -54,6 +58,8 @@
 		onAIGenerationReady?: (generateFn: (prompt: string) => Promise<void>) => void;
 		/** Callback to expose flip control to parent */
 		onFlipControlReady?: (flipFn: () => void) => void;
+		/** When true, AI connection status is shown in the host title bar instead of over the body. */
+		showTitleInChrome?: boolean;
 	}
 
 	const {
@@ -65,8 +71,11 @@
 		enableAIGeneration = true,
 		class: className = '',
 		onAIGenerationReady,
-		onFlipControlReady
+		onFlipControlReady,
+		showTitleInChrome = false
 	}: Props = $props();
+
+	const titleBarCtx = getContext<WidgetTitleBarContext | undefined>(WIDGET_TITLE_BAR_CONTEXT);
 
 	// Get topic path for this widget
 	const topic = $derived(getWidgetTopic('paragraph', widgetId, topicOverride));
@@ -121,6 +130,16 @@
 		console.log(`📝 ParagraphWidget:${widgetId} - Initialized with ValidatedTopicStore`);
 		console.log(`   Topic: ${topic}`);
 		console.log(`   Initial data:`, data);
+	});
+
+	/** Lift AI connection state to WidgetWrapper title bar when the card has a header. */
+	$effect(() => {
+		if (!titleBarCtx || !enableAIGeneration || !showTitleInChrome) {
+			titleBarCtx?.setAiConnectionState(null);
+			return;
+		}
+		titleBarCtx.setAiConnectionState(connectionState);
+		return () => titleBarCtx.setAiConnectionState(null);
 	});
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
@@ -285,10 +304,9 @@
 				</Alert>
 			{/if}
 
-			<!-- AI Generation Controls -->
-			{#if enableAIGeneration}
+			<!-- AI connection status (over body only when there is no host title bar) -->
+			{#if enableAIGeneration && !showTitleInChrome}
 				<div class="absolute right-12 top-4 z-10 flex items-center gap-2">
-					<!-- Connection Status Indicator -->
 					<div class="flex items-center gap-1">
 						<div
 							class="h-2 w-2 rounded-full"
@@ -308,11 +326,11 @@
 
 			<!-- Content Display -->
 			<div class="px-4 pb-4 pt-4" class:loading={isLoading}>
-				{#if widgetData.title}
+				<!-- {#if widgetData.title}
 					<h3 class="mb-3 text-xl font-semibold {darkMode ? 'text-slate-100' : 'text-slate-800'}">
 						{widgetData.title}
 					</h3>
-				{/if}
+				{/if} -->
 
 				{#if isLoading && !widgetData.content}
 					<div class="flex items-center justify-center py-12">

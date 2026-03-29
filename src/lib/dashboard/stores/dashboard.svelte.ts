@@ -19,7 +19,7 @@ import {
 } from '$lib/dashboard/types/dashboardTabs';
 import { DASHBOARD_STORAGE_VERSION } from '$lib/dashboard/utils/storage';
 import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
-import { isValidPosition, findAvailablePosition, resolveCollisions } from '$lib/dashboard/utils/grid';
+import { isValidPosition, findAvailablePosition, resolveCollisions, repairOverlaps } from '$lib/dashboard/utils/grid';
 import type { WidgetRect } from '$lib/dashboard/utils/grid';
 import { DashboardStorage } from '$lib/dashboard/utils/storage';
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
@@ -783,6 +783,10 @@ class DashboardStore {
 		const plain = $state.snapshot(slice) as TabDashboardSlice;
 		this.#widgets = plain.widgets;
 		this.#config = plain.config;
+
+		if (repairOverlaps(this.#widgets)) {
+			console.log('🔧 Repaired overlapping widget positions');
+		}
 
 		this.#widgetZIndexMap.clear();
 		this.#nextZIndex = 1;

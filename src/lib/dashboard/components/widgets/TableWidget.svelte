@@ -60,9 +60,9 @@
 
 <div class="table-widget flex h-full flex-col">
 	<div class="flex-1 overflow-auto">
-		{#if widgetData.title}
+		<!-- {#if widgetData.title}
 			<h3 class="mb-2 text-lg font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'}">{widgetData.title}</h3>
-		{/if}
+		{/if} -->
 		<table class="w-full text-sm">
 			<thead class="sticky top-0 {darkMode ? 'bg-slate-800' : 'bg-slate-50'}">
 				<tr>

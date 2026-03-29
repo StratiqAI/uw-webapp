@@ -16,6 +16,8 @@
 		isFullscreen?: boolean;
 		lastRefreshedAt?: Date | null;
 		onAction: (action: WidgetAction) => void;
+		/** When true, trigger is inline in the title row (upper-right cluster) instead of floating over the body. */
+		inTitleBar?: boolean;
 	}
 
 	let {
@@ -23,7 +25,8 @@
 		darkMode = false,
 		isFullscreen = false,
 		lastRefreshedAt = null,
-		onAction
+		onAction,
+		inTitleBar = false
 	}: Props = $props();
 
 	let isOpen = $state(false);
@@ -241,18 +244,20 @@
 	);
 </script>
 
-<div class="widget-dropdown relative z-[9999]">
+<div class="widget-dropdown z-[9999] {inTitleBar ? 'relative shrink-0' : 'relative'}">
 	<button
 		bind:this={buttonEl}
 		onclick={toggleDropdown}
-		class="dropdown-trigger absolute right-2 top-2 z-[9999] flex h-9 w-9 items-center justify-center rounded-lg border transition-opacity {darkMode
+		class="dropdown-trigger z-[9999] flex items-center justify-center rounded-lg border transition-opacity {darkMode
 			? 'border-slate-600/80 bg-slate-800/90 text-slate-300 hover:bg-slate-700 hover:text-white'
-			: 'border-slate-200 bg-white/95 text-slate-600 hover:bg-slate-50 hover:text-slate-900'} opacity-0 shadow-sm group-hover:opacity-100"
+			: 'border-slate-200 bg-white/95 text-slate-600 hover:bg-slate-50 hover:text-slate-900'} opacity-0 shadow-sm group-hover:opacity-100 {inTitleBar
+			? 'relative h-8 w-8'
+			: 'absolute right-2 top-2 h-9 w-9'}"
 		aria-label="Widget menu"
 		aria-expanded={isOpen}
 		type="button"
 	>
-		<svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+		<svg class={inTitleBar ? 'h-4 w-4' : 'h-5 w-5'} fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 			<circle cx="6" cy="12" r="1.75" />
 			<circle cx="12" cy="12" r="1.75" />
 			<circle cx="18" cy="12" r="1.75" />

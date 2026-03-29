@@ -128,6 +128,57 @@ export function getGridPositionFromCoordinates(
 	return { gridColumn: col, gridRow: row };
 }
 
+/**
+ * Scan all widgets for pairwise overlaps and push later ones downward until
+ * none overlap.  Mutates the array in-place and returns true if any widget
+ * was repositioned.  Called on load / tab-switch to guarantee a clean grid.
+ */
+export function repairOverlaps(widgets: Widget[]): boolean {
+	if (widgets.length < 2) return false;
+
+	const rects: WidgetRect[] = widgets.map((w) => ({
+		id: w.id,
+		gridColumn: w.gridColumn,
+		gridRow: w.gridRow,
+		colSpan: w.colSpan,
+		rowSpan: w.rowSpan
+	}));
+
+	rects.sort((a, b) => a.gridRow - b.gridRow || a.gridColumn - b.gridColumn);
+
+	let changed = true;
+	let maxIter = rects.length * rects.length + 1;
+	let anyRepaired = false;
+
+	while (changed && maxIter-- > 0) {
+		changed = false;
+		for (let i = 0; i < rects.length; i++) {
+			for (let j = i + 1; j < rects.length; j++) {
+				if (rectsOverlap(rects[i], rects[j])) {
+					rects[j].gridRow = rects[i].gridRow + rects[i].rowSpan;
+					changed = true;
+					anyRepaired = true;
+				}
+			}
+		}
+		if (changed) {
+			rects.sort((a, b) => a.gridRow - b.gridRow || a.gridColumn - b.gridColumn);
+		}
+	}
+
+	if (anyRepaired) {
+		for (const r of rects) {
+			const w = widgets.find((w) => w.id === r.id);
+			if (w) {
+				w.gridRow = r.gridRow;
+				w.gridColumn = r.gridColumn;
+			}
+		}
+	}
+
+	return anyRepaired;
+}
+
 export function findAvailablePosition(
 	colSpan: number,
 	rowSpan: number,

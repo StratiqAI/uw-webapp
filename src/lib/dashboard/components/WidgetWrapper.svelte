@@ -1,5 +1,11 @@
 <script lang="ts">
+	import { setContext } from 'svelte';
 	import type { Widget, WidgetAction } from '$lib/dashboard/types/widget';
+	import {
+		WIDGET_TITLE_BAR_CONTEXT,
+		type AiConnectionState,
+		type WidgetTitleBarContext
+	} from '$lib/dashboard/context/widgetTitleBarContext';
 	import { createDragHandlers } from '$lib/dashboard/utils/drag-drop';
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
@@ -28,6 +34,14 @@
 	import { streamCatalog, type DataStream } from '$lib/stores/streamCatalog.svelte';
 
 	const DEFAULT_LQ_MENU_SIGNALS = { refresh: 0, exportRequest: 0 };
+
+	let titleBarAiConnection = $state<AiConnectionState | null>(null);
+
+	setContext<WidgetTitleBarContext>(WIDGET_TITLE_BAR_CONTEXT, {
+		setAiConnectionState: (v) => {
+			titleBarAiConnection = v;
+		}
+	});
 
 	interface Props {
 		widget: Widget;
@@ -278,6 +292,22 @@
 		}
 		return widget.description;
 	});
+
+	const widgetBodyPaddingClass = $derived(
+		widget.type === 'brokerCard'
+			? 'min-h-0 flex-1 overflow-hidden p-0'
+			: displayTitle
+				? 'p-4'
+				: 'h-full p-4'
+	);
+
+	const widgetBodyBgClass = $derived(
+		widget.type === 'brokerCard'
+			? 'bg-transparent'
+			: darkMode
+				? 'bg-transparent'
+				: 'bg-white/60'
+	);
 </script>
 
 <div
@@ -304,43 +334,94 @@
 	ondragend={dragHandlers.handleDragEnd}
 >
 	<div
-		class="widget-content h-full overflow-hidden rounded-xl border
+		class="widget-content h-full overflow-hidden rounded-2xl border
+		{widget.type === 'brokerCard' ? 'flex min-h-0 flex-col' : ''}
 		{darkMode
-			? 'border-slate-700/50 bg-linear-to-b from-slate-800 to-slate-900/80 shadow-xl shadow-black/40'
-			: 'border-slate-200/70 bg-white shadow-sm'}
+			? 'border-slate-700/35 bg-linear-to-b from-slate-800/96 to-slate-900/94 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.35)]'
+			: 'border-slate-200/60 bg-white shadow-[0_4px_24px_-8px_rgba(15,23,42,0.08)]'}
 		transition-all duration-200
 		{darkMode
-			? 'hover:border-slate-600/60 hover:shadow-2xl hover:shadow-black/50 hover:-translate-y-px'
-			: 'hover:border-slate-300/80 hover:shadow-md hover:-translate-y-px'}"
+			? 'hover:border-slate-600/45 hover:shadow-[0_16px_48px_-12px_rgba(0,0,0,0.42)] hover:-translate-y-px'
+			: 'hover:border-slate-300/70 hover:shadow-[0_8px_28px_-8px_rgba(15,23,42,0.12)] hover:-translate-y-px'}"
 	>
-		<!-- Gradient accent line at top of card -->
-		<div class="pointer-events-none absolute inset-x-0 top-0 z-10 h-px {darkMode ? 'bg-linear-to-r from-transparent via-primary-400/40 to-transparent' : 'bg-linear-to-r from-transparent via-primary-400/25 to-transparent'}"></div>
+		<!-- Subtle top edge — was a strong bevel highlight -->
+		<div class="pointer-events-none absolute inset-x-0 top-0 z-10 h-px {darkMode ? 'bg-linear-to-r from-transparent via-primary-400/15 to-transparent' : 'bg-linear-to-r from-transparent via-primary-400/18 to-transparent'}"></div>
 
 		<!-- Widget Header (if a title is available — static or from live data) -->
 		{#if displayTitle}
-			<div class="widget-header border-b {darkMode ? 'border-slate-700/40 bg-linear-to-r from-slate-800/90 to-slate-800/60' : 'border-slate-200/60 bg-linear-to-r from-slate-50 to-white'} px-4 py-3">
-				<h3 class="text-sm font-semibold tracking-wide {darkMode ? 'text-slate-100' : 'text-slate-700'}">{displayTitle}</h3>
-				{#if displayDescription}
-					<p class="mt-0.5 text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'}">{displayDescription}</p>
-				{/if}
+			<div
+				class="widget-header shrink-0 border-b {darkMode ? 'border-slate-700/30 bg-linear-to-r from-slate-800/95 to-slate-800/88' : 'border-slate-200/55 bg-linear-to-r from-slate-50 to-white'} flex items-center gap-2 px-4 py-1"
+			>
+				<div class="min-w-0 flex-1">
+					<h3 class="text-base font-semibold leading-snug tracking-wide {darkMode ? 'text-slate-100' : 'text-slate-700'}">
+						{displayTitle}
+					</h3>
+					{#if displayDescription}
+						<p class="mt-0 text-xs leading-snug {darkMode ? 'text-slate-400' : 'text-slate-500'}">{displayDescription}</p>
+					{/if}
+				</div>
+				<div class="flex shrink-0 items-center gap-1.5">
+					{#if widget.type === 'paragraph' && titleBarAiConnection !== null}
+						<div class="flex items-center gap-1.5 pr-0.5">
+							<div
+								class="h-2 w-2 shrink-0 rounded-full"
+								class:bg-green-500={titleBarAiConnection === 'Researching' && !darkMode}
+								class:bg-green-400={titleBarAiConnection === 'Researching' && darkMode}
+								class:bg-yellow-500={titleBarAiConnection === 'Ready' && !darkMode}
+								class:bg-yellow-400={titleBarAiConnection === 'Ready' && darkMode}
+								class:bg-blue-500={titleBarAiConnection === 'Complete' && !darkMode}
+								class:bg-blue-400={titleBarAiConnection === 'Complete' && darkMode}
+							></div>
+							<span class="whitespace-nowrap text-xs {darkMode ? 'text-slate-300' : 'text-slate-600'}">
+								{titleBarAiConnection}
+							</span>
+						</div>
+					{/if}
+					{#if widget.locked}
+						<div
+							class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md opacity-0 transition-opacity group-hover:opacity-100 {darkMode ? 'text-slate-400' : 'text-gray-400'}"
+							title="Widget locked"
+							aria-label="Widget locked"
+						>
+							<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+								></path>
+							</svg>
+						</div>
+					{/if}
+					<WidgetDropdown
+						{widget}
+						{darkMode}
+						isFullscreen={isWidgetFullscreen}
+						{lastRefreshedAt}
+						inTitleBar
+						onAction={handleWidgetAction}
+					/>
+				</div>
 			</div>
 		{/if}
 
-		<!-- Dropdown Menu -->
-		<WidgetDropdown
-			{widget}
-			{darkMode}
-			isFullscreen={isWidgetFullscreen}
-			{lastRefreshedAt}
-			onAction={handleWidgetAction}
-		/>
+		{#if !displayTitle}
+			<WidgetDropdown
+				{widget}
+				{darkMode}
+				isFullscreen={isWidgetFullscreen}
+				{lastRefreshedAt}
+				onAction={handleWidgetAction}
+			/>
+		{/if}
 
 		<!-- Widget Body -->
-		<div class="widget-body {darkMode ? 'bg-transparent' : 'bg-white/60'} {displayTitle ? 'p-4' : 'h-full p-4'}">
+		<div class="widget-body {widgetBodyBgClass} {widgetBodyPaddingClass}">
 		{#if RegisteredComp}
 			<RegisteredComp
 				data={widget.data} widgetId={widget.id}
 				topicOverride={widget.topicOverride} {darkMode}
+				theme={themeStore.theme}
 				refreshSignal={registeredRefreshCounter}
 				onUpdateConfig={(d: any) => dashboard.updateWidget(widget.id, { data: d })}
 				onConfigureReady={(fn: () => void) => { registeredConfigureFn = fn; }} />
@@ -352,6 +433,7 @@
 					widgetId={widget.id}
 					topicOverride={widget.topicOverride}
 					{darkMode}
+					showTitleInChrome={!!displayTitle}
 					onAIGenerationReady={handleAIGenerationReady}
 					onFlipControlReady={handleFlipControlReady}
 				/>
@@ -392,8 +474,8 @@
 			{/if}
 		</div>
 
-		<!-- Lock indicator -->
-		{#if widget.locked}
+		<!-- Lock indicator (title bar shows lock when a header exists) -->
+		{#if widget.locked && !displayTitle}
 			<div class="absolute left-2 top-2 opacity-0 transition-opacity group-hover:opacity-100">
 				<svg class="h-4 w-4 {darkMode ? 'text-slate-400' : 'text-gray-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path
