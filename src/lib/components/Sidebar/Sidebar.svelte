@@ -1,5 +1,6 @@
 <script lang="ts">
 	import UserDropdown from './UserDropdown.svelte';
+	import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
 	import type { CurrentUser } from '$lib/types/auth';
 	import { themeStore } from '$lib/stores/themeStore.svelte';
 
@@ -209,8 +210,13 @@
 
 	<!-- Footer -->
 	<div class="{isSidebarOpen ? 'p-4' : 'p-3'} border-t {isDarkTheme ? 'border-primary-800/40 bg-slate-900' : 'border-primary-200/60 bg-white'} relative z-50 overflow-visible">
-		<div class="flex items-center {isSidebarOpen ? 'justify-start gap-3' : 'justify-center'} relative">
-			<UserDropdown {currentUser} darkMode={isDarkTheme} {isSidebarOpen} onToggleDarkMode={themeStore.toggle} />
+		<div class="flex flex-col {isSidebarOpen ? 'gap-3' : 'gap-2 items-center'}">
+			<div class="flex {isSidebarOpen ? 'justify-start' : 'justify-center'}">
+				<ThemeSwitcher collapsed={!isSidebarOpen} />
+			</div>
+			<div class="flex items-center {isSidebarOpen ? 'justify-start gap-3' : 'justify-center'} relative">
+				<UserDropdown {currentUser} darkMode={isDarkTheme} {isSidebarOpen} />
+			</div>
 		</div>
 	</div>
 </div>

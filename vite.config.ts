@@ -19,7 +19,9 @@ export default defineConfig(({ command }) => ({
 					// `svelte-package --watch`. Production builds use `dist/` via package.json.
 					alias: {
 						'@stratiqai/dashboard-widget-sdk': path.resolve(__dirname, 'packages/dashboard-widget-sdk/src/lib'),
-						'@stratiqai/widget-metric': path.resolve(__dirname, 'packages/widget-metric/src/lib')
+						'@stratiqai/widget-metric': path.resolve(__dirname, 'packages/widget-metric/src/lib'),
+						'@stratiqai/widget-json-viewer': path.resolve(__dirname, 'packages/widget-json-viewer/src/lib'),
+						'@stratiqai/widget-broker-card': path.resolve(__dirname, 'packages/widget-broker-card/src/lib')
 					}
 				}
 			}
@@ -30,6 +32,11 @@ export default defineConfig(({ command }) => ({
 		}
 	},
 	ssr: {
-		noExternal: ['@stratiqai/dashboard-widget-sdk', '@stratiqai/widget-metric']
+		noExternal: [
+			'@stratiqai/dashboard-widget-sdk',
+			'@stratiqai/widget-metric',
+			'@stratiqai/widget-json-viewer',
+			'@stratiqai/widget-broker-card'
+		]
 	}
 }));

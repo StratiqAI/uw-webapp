@@ -9,8 +9,12 @@ import { zodTextFormat } from 'openai/helpers/zod';
 import type { WidgetType } from './widget';
 import type { MetricWidgetData } from '@stratiqai/widget-metric';
 import { metricWidgetDataSchema as MetricWidgetDataSchema } from '@stratiqai/widget-metric';
+import type { JsonViewerWidgetData } from '@stratiqai/widget-json-viewer';
+import { jsonViewerWidgetDataSchema as JsonViewerWidgetDataSchema } from '@stratiqai/widget-json-viewer';
+import type { BrokerCardWidgetData } from '@stratiqai/widget-broker-card';
+import { brokerCardWidgetDataSchema as BrokerCardWidgetDataSchema } from '@stratiqai/widget-broker-card';
 
-export type { MetricWidgetData };
+export type { MetricWidgetData, JsonViewerWidgetData, BrokerCardWidgetData };
 
 // ===== Zod Schemas for Widget Data =====
 
@@ -117,7 +121,7 @@ export const DivergingBarChartWidgetDataSchema = z.object({
 	negativeColor: z.string().nullable().optional()
 });
 
-export { MetricWidgetDataSchema };
+export { MetricWidgetDataSchema, JsonViewerWidgetDataSchema, BrokerCardWidgetDataSchema };
 
 export const MapWidgetDataSchema = z.object({
 	title: z.string().nullable().optional(),
@@ -163,7 +167,9 @@ export const WidgetDataSchemas = {
 	metric: MetricWidgetDataSchema,
 	map: MapWidgetDataSchema,
 	schema: SchemaWidgetDataSchema,
-	locationQuotient: LocationQuotientWidgetDataSchema
+	locationQuotient: LocationQuotientWidgetDataSchema,
+	jsonViewer: JsonViewerWidgetDataSchema,
+	brokerCard: BrokerCardWidgetDataSchema
 } as const;
 
 // ===== Inferred Types from Schemas =====
@@ -201,7 +207,9 @@ export type WidgetData =
 	| MetricWidgetData
 	| MapWidgetData
 	| SchemaWidgetData
-	| LocationQuotientWidgetData;
+	| LocationQuotientWidgetData
+	| JsonViewerWidgetData
+	| BrokerCardWidgetData;
 
 // ===== Type-safe Widget Data Mapping =====
 
@@ -222,6 +230,8 @@ export interface WidgetDataTypeMap {
 	map: MapWidgetData;
 	schema: SchemaWidgetData;
 	locationQuotient: LocationQuotientWidgetData;
+	jsonViewer: JsonViewerWidgetData;
+	brokerCard: BrokerCardWidgetData;
 }
 
 // ===== Widget Channel Configuration =====
@@ -629,6 +639,20 @@ export const WidgetChannels = {
 		widgetType: 'locationQuotient',
 		schema: LocationQuotientWidgetDataSchema,
 		description: description || `Location quotient channel: ${channelId}`
+	}),
+
+	jsonViewer: (channelId: string, description?: string): WidgetChannelConfig<'jsonViewer'> => ({
+		channelId,
+		widgetType: 'jsonViewer',
+		schema: JsonViewerWidgetDataSchema,
+		description: description || `JSON viewer channel: ${channelId}`
+	}),
+
+	brokerCard: (channelId: string, description?: string): WidgetChannelConfig<'brokerCard'> => ({
+		channelId,
+		widgetType: 'brokerCard',
+		schema: BrokerCardWidgetDataSchema,
+		description: description || `Broker card channel: ${channelId}`
 	})
 } as const;
 

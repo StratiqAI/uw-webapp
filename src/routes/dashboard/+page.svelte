@@ -229,7 +229,6 @@
 			{projects}
 			{selectedProjectId}
 			onProjectChange={handleProjectChange}
-			onThemeChange={themeStore.setTheme}
 		/>
 
 

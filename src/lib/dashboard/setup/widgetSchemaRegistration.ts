@@ -32,7 +32,9 @@ const WIDGET_NAMES: Record<WidgetType, string> = {
 	metric: 'Metric Widget',
 	map: 'Map Widget',
 	schema: 'Schema Widget',
-	locationQuotient: 'Location Quotient Widget'
+	locationQuotient: 'Location Quotient Widget',
+	jsonViewer: 'JSON Viewer',
+	brokerCard: 'Broker Card'
 };
 
 export const WIDGET_TYPES: WidgetType[] = [

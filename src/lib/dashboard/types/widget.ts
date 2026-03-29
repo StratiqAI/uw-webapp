@@ -1,6 +1,8 @@
 // Widget type definitions
 // All widgets now use ValidatedTopicStore for reactive data binding with schema validation
 import type { MetricWidgetData } from '@stratiqai/widget-metric';
+import type { JsonViewerWidgetData } from '@stratiqai/widget-json-viewer';
+import type { BrokerCardWidgetData } from '@stratiqai/widget-broker-card';
 export type WidgetType =
 	| 'table'
 	| 'title'
@@ -17,7 +19,9 @@ export type WidgetType =
 	| 'metric'
 	| 'map'
 	| 'schema'
-	| 'locationQuotient';
+	| 'locationQuotient'
+	| 'jsonViewer'
+	| 'brokerCard';
 
 export interface Position {
 	gridColumn: number;
@@ -217,6 +221,16 @@ export interface MetricWidget extends BaseWidget {
 	data: MetricWidgetData;
 }
 
+export interface JsonViewerWidget extends BaseWidget {
+	type: 'jsonViewer';
+	data: JsonViewerWidgetData;
+}
+
+export interface BrokerCardWidget extends BaseWidget {
+	type: 'brokerCard';
+	data: BrokerCardWidgetData;
+}
+
 /** Sort mode for the sector list (UI only; does not change the RPC). */
 export type LocationQuotientSortOrder = 'lq_desc' | 'lq_asc' | 'name_asc';
 
@@ -261,7 +275,9 @@ export type Widget =
 	| MetricWidget
 	| MapWidget
 	| SchemaWidget
-	| LocationQuotientWidget;
+	| LocationQuotientWidget
+	| JsonViewerWidget
+	| BrokerCardWidget;
 
 export interface DashboardConfig {
 	gridColumns: number;

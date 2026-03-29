@@ -341,7 +341,6 @@
 <DashboardControls
 	{darkMode}
 	{currentTheme}
-	onThemeChange={themeStore.setTheme}
 />
 
 <main class="mx-auto max-w-7xl p-4">

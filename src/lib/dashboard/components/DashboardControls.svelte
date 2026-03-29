@@ -17,10 +17,6 @@
 		projects?: Project[];
 		selectedProjectId?: string | null;
 		onProjectChange?: (projectId: string | null) => void;
-		/** Preferred over onToggleDarkMode — receives the chosen theme. */
-		onThemeChange?: (theme: AppTheme) => void;
-		/** Legacy: kept for backward compatibility. */
-		onToggleDarkMode?: () => void;
 	}
 
 	let {
@@ -29,9 +25,7 @@
 		defaultWidgets,
 		projects = [],
 		selectedProjectId = null,
-		onProjectChange,
-		onThemeChange,
-		onToggleDarkMode
+		onProjectChange
 	}: Props = $props();
 
 	let showExportDialog = $state(false);
@@ -169,7 +163,9 @@
 			heatmap: { colSpan: 6, rowSpan: 4 },
 			divergingBarChart: { colSpan: 6, rowSpan: 3 },
 			schema: { colSpan: 6, rowSpan: 3 },
-			locationQuotient: { colSpan: 12, rowSpan: 4 }
+			locationQuotient: { colSpan: 12, rowSpan: 4 },
+			jsonViewer: { colSpan: 6, rowSpan: 3 },
+			brokerCard: { colSpan: 3, rowSpan: 2 }
 		};
 
 		const { colSpan, rowSpan } = defaultSizes[type];
@@ -232,6 +228,23 @@
 				return { ...baseWidget, type: 'schema', data: { schemaId: 'example-schema', data: {} } } as Widget;
 			case 'locationQuotient':
 				return { ...baseWidget, type: 'locationQuotient', data: { areaFips: 'C3890', year: 2025, regionLabel: 'Portland-Vancouver-Hillsboro, OR-WA', sortOrder: 'lq_desc', exportBaseThreshold: 1.08, localBandLow: 0.92, localBandHigh: 1.08 } } as Widget;
+			case 'jsonViewer':
+				return { ...baseWidget, type: 'jsonViewer', data: { title: null, description: null, json: {} } } as Widget;
+			case 'brokerCard':
+				return {
+					...baseWidget,
+					type: 'brokerCard',
+					data: {
+						title: null,
+						description: null,
+						fullName: 'Pete Beihea',
+						company: 'Newmark',
+						phone: '310-407-3830',
+						email: 'pete.beihea@nmrk.com',
+						initials: 'PB',
+						avatarUrl: null
+					}
+				} as Widget;
 			default:
 				return null;
 		}
@@ -265,7 +278,9 @@
 		{ type: 'heatmap', label: 'Heatmap', icon: '🔥' },
 		{ type: 'divergingBarChart', label: 'Diverging Bar', icon: '↔' },
 		{ type: 'schema', label: 'Schema Widget', icon: '📋' },
-		{ type: 'locationQuotient', label: 'Location Quotient', icon: '📍' }
+		{ type: 'locationQuotient', label: 'Location Quotient', icon: '📍' },
+		{ type: 'jsonViewer', label: 'JSON Viewer', icon: '{ }' },
+		{ type: 'brokerCard', label: 'Broker Card', icon: '👤' }
 	];
 </script>
 
@@ -476,75 +491,6 @@
 			</button>
 		</div>
 
-		<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
-
-		<!-- Theme switcher (3-option pill) -->
-		{#if onThemeChange || onToggleDarkMode}
-			<div
-				class="flex items-center rounded-lg p-0.5 gap-0.5 {darkMode
-					? 'bg-slate-800/80 border border-slate-700/60'
-					: currentTheme === 'warm'
-						? 'bg-[#2d2010]/10 border border-[#c8a870]/30'
-						: 'bg-slate-100 border border-slate-200/80'}"
-				title="Switch theme"
-				role="group"
-				aria-label="Theme switcher"
-			>
-				<!-- Light -->
-				<button
-					class="theme-btn relative rounded-md p-1.5 transition-all duration-150 {currentTheme === 'light'
-						? 'bg-white shadow-sm text-amber-500'
-						: darkMode
-							? 'text-slate-500 hover:text-slate-300 hover:bg-slate-700/60'
-							: currentTheme === 'warm'
-								? 'text-[#c8a870]/70 hover:text-[#f0e8d8] hover:bg-white/10'
-								: 'text-slate-400 hover:text-slate-600 hover:bg-white'}"
-					onclick={() => onThemeChange ? onThemeChange('light') : null}
-					aria-label="Light theme"
-					aria-pressed={currentTheme === 'light'}
-				>
-					<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-						<circle cx="12" cy="12" r="5"/><path stroke-linecap="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364-.707-.707M6.343 6.343l-.707-.707m12.728 0-.707.707M6.343 17.657l-.707.707"/>
-					</svg>
-				</button>
-
-				<!-- Dark -->
-				<button
-					class="theme-btn relative rounded-md p-1.5 transition-all duration-150 {currentTheme === 'dark'
-						? 'bg-slate-700 shadow-sm text-indigo-400'
-						: darkMode
-							? 'text-slate-500 hover:text-slate-300 hover:bg-slate-700/60'
-							: currentTheme === 'warm'
-								? 'text-[#c8a870]/70 hover:text-[#f0e8d8] hover:bg-white/10'
-								: 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/60'}"
-					onclick={() => onThemeChange ? onThemeChange('dark') : onToggleDarkMode?.()}
-					aria-label="Dark theme"
-					aria-pressed={currentTheme === 'dark'}
-				>
-					<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
-					</svg>
-				</button>
-
-				<!-- Warm -->
-				<button
-					class="theme-btn relative rounded-md p-1.5 transition-all duration-150 {currentTheme === 'warm'
-						? 'bg-[#f5f0e5] shadow-sm text-[#a06020]'
-						: darkMode
-							? 'text-slate-500 hover:text-slate-300 hover:bg-slate-700/60'
-							: 'text-slate-400 hover:text-slate-600 hover:bg-amber-50'}"
-					onclick={() => onThemeChange ? onThemeChange('warm') : null}
-					aria-label="Warm theme"
-					aria-pressed={currentTheme === 'warm'}
-				>
-					<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M5 9h11v7a3 3 0 01-3 3H8a3 3 0 01-3-3V9z" />
-						<path stroke-linecap="round" stroke-linejoin="round" d="M17 10.5c2.5 0 4.5 1.8 4.5 4s-2 4-4.5 4" />
-						<path stroke-linecap="round" stroke-linejoin="round" d="M8 4v2M11 4v2M14 4v2" />
-					</svg>
-				</button>
-			</div>
-		{/if}
 	</div>
 </header>
 

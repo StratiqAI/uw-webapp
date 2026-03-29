@@ -2,11 +2,8 @@
 	import { Avatar, Dropdown, DropdownHeader, DropdownItem, DropdownGroup } from 'flowbite-svelte';
 	import type { CurrentUser } from '$lib/types/auth';
 	import { goto } from '$app/navigation';
-	import { themeStore } from '$lib/stores/themeStore.svelte';
 
-	let { currentUser = $bindable(), darkMode = false, isSidebarOpen = false, onToggleDarkMode } = $props<{ currentUser?: CurrentUser; darkMode?: boolean; isSidebarOpen?: boolean; onToggleDarkMode?: () => void }>();
-
-	let themeLabel = $derived(themeStore.label);
+	let { currentUser = $bindable(), darkMode = false, isSidebarOpen = false } = $props<{ currentUser?: CurrentUser; darkMode?: boolean; isSidebarOpen?: boolean }>();
 
 	function handleSignOut() {
 		goto('/auth/logout');
@@ -111,32 +108,6 @@
 						</svg>
 						Notifications
 					</a>
-				</li>
-				<li>
-					<button
-						onclick={() => onToggleDarkMode?.()}
-						title="Current: {themeLabel}. Cycles light → dark → warm."
-						class="group flex w-full items-center gap-2 rounded-md px-3 py-2 {darkMode ? 'text-slate-200 hover:bg-slate-700 hover:text-white' : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'} transition-colors"
-					>
-						<svg
-							class="h-4 w-4 shrink-0 {darkMode ? 'text-slate-400 group-hover:text-white' : 'text-slate-500 group-hover:text-slate-900'}"
-							aria-hidden="true"
-							xmlns="http://www.w3.org/2000/svg"
-							width="24"
-							height="24"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
-							/>
-						</svg>
-						<span class="text-left">Switch theme <span class="opacity-70">({themeLabel})</span></span>
-					</button>
 				</li>
 			</ul>
 		</DropdownGroup>

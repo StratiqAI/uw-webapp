@@ -141,11 +141,7 @@
 	let outputSchema = $state<Record<string, unknown> | null>(null);
 	let canvasRef: any = null;
 
-	// ------------------------------------------------------------------------------------------------
-	// Theme state
-	// ------------------------------------------------------------------------------------------------
 	let darkMode = $derived.by(() => darkModeStore.darkMode);
-	let toggleDarkMode = darkModeStore.toggle;
 
 	// ------------------------------------------------------------------------------------------------
 	// Project state
@@ -1361,7 +1357,6 @@
 				gridElements = [];
 				connections = [];
 			}}
-			onToggleDarkMode={toggleDarkMode}
 			onProjectChange={handleProjectChange}
 			onWorkflowChange={handleWorkflowChange}
 			onRenameWorkflow={handleRenameWorkflow}

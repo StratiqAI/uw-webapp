@@ -10,6 +10,8 @@ import type { Widget, WidgetType } from '$lib/dashboard/types/widget';
 import { PUBLIC_GEOAPIFY_API_KEY } from '$env/static/public';
 import { getWidgetManifest } from '$lib/dashboard/setup/widgetRegistry';
 import { metricWidget } from '@stratiqai/widget-metric';
+import { jsonViewerWidget } from '@stratiqai/widget-json-viewer';
+import { brokerCardWidget } from '@stratiqai/widget-broker-card';
 
 /**
  * Default data for each widget type. Values conform to the Zod schemas
@@ -97,6 +99,8 @@ export const DEFAULT_WIDGET_DATA: Record<WidgetType, Record<string, unknown>> = 
 		negativeColor: '#ef4444'
 	},
 	metric: { ...(metricWidget.defaultData as Record<string, unknown>) },
+	jsonViewer: { ...(jsonViewerWidget.defaultData as Record<string, unknown>) },
+	brokerCard: { ...(brokerCardWidget.defaultData as Record<string, unknown>) },
 	map: {
 		title: null,
 		description: null,
@@ -130,6 +134,8 @@ export const DEFAULT_WIDGET_DATA: Record<WidgetType, Record<string, unknown>> = 
 export const DEFAULT_WIDGET_SIZES: Record<WidgetType, { colSpan: number; rowSpan: number }> = {
 	title: { colSpan: 12, rowSpan: 1 },
 	metric: { ...metricWidget.defaultSize },
+	jsonViewer: { ...jsonViewerWidget.defaultSize },
+	brokerCard: { ...brokerCardWidget.defaultSize },
 	paragraph: { colSpan: 6, rowSpan: 2 },
 	table: { colSpan: 6, rowSpan: 4 },
 	image: { colSpan: 6, rowSpan: 4 },

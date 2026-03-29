@@ -7,6 +7,8 @@
 	import { initializeWidgetSchemas } from '$lib/dashboard/setup/widgetSchemaRegistration';
 	import { registerWidget } from '$lib/dashboard/setup/widgetRegistry';
 	import { metricWidget } from '@stratiqai/widget-metric';
+	import { jsonViewerWidget } from '@stratiqai/widget-json-viewer';
+	import { brokerCardWidget } from '@stratiqai/widget-broker-card';
 	import { browser } from '$app/environment';
 	import { initTopicStoreSync } from '$lib/stores/topicStoreSync';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
@@ -16,6 +18,8 @@
 
 	// Register package-based widgets before schema initialization
 	registerWidget(metricWidget);
+	registerWidget(jsonViewerWidget);
+	registerWidget(brokerCardWidget);
 
 	let { children, data } = $props<{ children: any; data: LayoutData }>();
 
