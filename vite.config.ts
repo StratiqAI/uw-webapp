@@ -9,6 +9,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig(({ command }) => ({
 	plugins: [tailwindcss(), sveltekit()],
+	build: {
+		chunkSizeWarningLimit: 2500
+	},
 	preview: {
 		port: 5173
 	},

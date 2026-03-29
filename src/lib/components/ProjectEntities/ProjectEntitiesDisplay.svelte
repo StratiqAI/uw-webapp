@@ -54,9 +54,9 @@
 	let excludedImages = $state<Set<string>>(new Set());
 
 	// Reactive stores that automatically update when entities are added
-	const texts = getProjectTextsStore(projectId);
-	const tables = getProjectTablesStore(projectId);
-	const images = getProjectImagesStore(projectId);
+	const texts = $derived.by(() => getProjectTextsStore(projectId));
+	const tables = $derived.by(() => getProjectTablesStore(projectId));
+	const images = $derived.by(() => getProjectImagesStore(projectId));
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Markdown Table Detection and Parsing

@@ -85,6 +85,7 @@
 	let autoFlip: boolean = false;
 	let interval: NodeJS.Timeout | undefined;
 	let secondInterval: NodeJS.Timeout | undefined;
+	// svelte-ignore state_referenced_locally (countdown resets use current `flipTime` in handlers)
 	let seconds: number = flipTime;
 	let pages: HTMLCanvasElement[] = [];
 	let password = $state('');

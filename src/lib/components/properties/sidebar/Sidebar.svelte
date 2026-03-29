@@ -1,14 +1,13 @@
 <script lang="ts">
 	let { property } = $props();
-	// console.log(property);
-	const menuItems = [
+	const menuItems = $derived([
 		{ label: 'Document Review', active: false, href: `/properties/${property.id}/document` },
 		{ label: 'Summary', active: true, href: `/properties/${property.id}/summary` },
 		{ label: 'Investment Analysis', active: false, href: `/properties/${property.id}/analysis` },
 		{ label: 'Market overview', active: false, href: `/properties/${property.id}/market` },
 		{ label: 'Sales comps', active: false, href: `/properties/${property.id}/salescomps` },
 		{ label: 'Rent comps', active: false, href: `/properties/${property.id}/rentcomps` }
-	];
+	]);
 </script>
 
 <aside class="flex min-w-50 flex-col border-r border-l border-gray-200 bg-white">

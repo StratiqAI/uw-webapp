@@ -1,4 +1,5 @@
 // src/hooks.server.ts
+import '$lib/server/retainSubscriptionDocumentsForSsr';
 import { type CurrentUser } from '$lib/types/auth';
 import { createSupabaseServerClient } from '$lib/supabase/server';
 import type { Handle } from '@sveltejs/kit';

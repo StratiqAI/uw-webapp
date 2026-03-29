@@ -30,13 +30,15 @@
 		notificationBell = NotificationBellComponent,
 		notificationBellProps = {}
 	}: WorkspaceHeaderBarProps = $props();
+
+	const NotificationBell = $derived(notificationBell);
 	
 	// Editable project name state
 	let isEditingName = $state(false);
-	let editedName = $state(projectName);
+	let editedName = $state('');
 	let isSaving = $state(false);
 
-	// Update editedName when projectName changes
+	// Keep edited name in sync with the prop (including first run)
 	$effect(() => {
 		editedName = projectName;
 	});
@@ -248,7 +250,7 @@
 		</div>
 		<div class="flex items-center gap-1 sm:gap-2 flex-shrink-0">
 			<!-- Notifications Bell -->
-			<svelte:component this={notificationBell} {...notificationBellProps} />
+			<NotificationBell {...notificationBellProps} />
 			<!-- Help button - hidden on mobile, shown on sm+ -->
 			<div class="hidden sm:block">
 				<Button href="/support" icon>Help & Documentation</Button>

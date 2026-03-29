@@ -66,12 +66,12 @@
 		M_UPDATE_WORKFLOW,
 		M_DELETE_WORKFLOW,
 		M_START_WORKFLOW_EXECUTION,
+		S_ON_WORKFLOW_EXECUTION_STATUS_CHANGE,
 		type CreateWorkflowMutation,
 		type UpdateWorkflowMutation,
 		type DeleteWorkflowMutation
 	} from '@stratiqai/types-simple';
 	import { Q_GET_PROJECT } from '$lib/realtime/graphql/queries/Project';
-	import { S_ON_WORKFLOW_EXECUTION_STATUS_CHANGE } from '@stratiqai/types-simple';
 	import { fetchWorkflowExecutions } from '../../services/backend/workflowExecutionService';
 	import type { WorkflowExecutionListItem } from '../../services/backend/workflowExecutionService';
 	import { getAppSyncWsClient, initAppSyncWsClient } from '$lib/realtime/websocket/wsClient';
@@ -146,16 +146,15 @@
 	// ------------------------------------------------------------------------------------------------
 	// Project state
 	// ------------------------------------------------------------------------------------------------
-	let projects = $state<Project[]>(data.projects || []);
-	// Initialize from URL params
-	let selectedProjectId = $state<string | null>(data.projectId || null);
+	const projects = $derived(data.projects ?? []);
+	// URL-driven selection is applied in `$effect` below
+	let selectedProjectId = $state<string | null>(null);
 
 	// ------------------------------------------------------------------------------------------------
 	// Workflow state
 	// ------------------------------------------------------------------------------------------------
 	let workflows = $state<Workflow[]>([]);
-	// Initialize from URL params
-	let selectedWorkflowId = $state<string | null>(data.workflowId || null);
+	let selectedWorkflowId = $state<string | null>(null);
 	let loadingWorkflows = $state(false);
 
 	// ------------------------------------------------------------------------------------------------

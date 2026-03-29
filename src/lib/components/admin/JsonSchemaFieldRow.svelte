@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { JsonSchemaDefinition } from '$lib/types/models';
+	import JsonSchemaFieldRowRecursive from './JsonSchemaFieldRow.svelte';
 
 	interface Props {
 		fieldName: string;
@@ -18,14 +19,25 @@
 
 	const types: Array<JsonSchemaDefinition['type']> = ['string', 'number', 'integer', 'boolean', 'object', 'array'];
 
-	let localName = $state(fieldName);
-	let localType = $state(fieldSchema.type);
-	let localRequired = $state(required);
-	let localDescription = $state(fieldSchema.description || '');
-	let localEnum = $state(fieldSchema.enum?.join(', ') || '');
-	let localMin = $state(fieldSchema.minimum);
-	let localMax = $state(fieldSchema.maximum);
-	let localFormat = $state(fieldSchema.format || '');
+	let localName = $state('');
+	let localType = $state<JsonSchemaDefinition['type']>('string');
+	let localRequired = $state(false);
+	let localDescription = $state('');
+	let localEnum = $state('');
+	let localMin = $state<number | undefined>(undefined);
+	let localMax = $state<number | undefined>(undefined);
+	let localFormat = $state('');
+
+	$effect(() => {
+		localName = fieldName;
+		localType = fieldSchema.type;
+		localRequired = required;
+		localDescription = fieldSchema.description || '';
+		localEnum = fieldSchema.enum?.join(', ') || '';
+		localMin = fieldSchema.minimum;
+		localMax = fieldSchema.maximum;
+		localFormat = fieldSchema.format || '';
+	});
 
 	// Sync changes back to parent
 	function updateSchema() {
@@ -264,7 +276,7 @@
 		<div class="mt-3 space-y-3">
 			{#each Object.entries(fieldSchema.properties) as [subName, subSchema]}
 				<div class="relative">
-					<svelte:self
+					<JsonSchemaFieldRowRecursive
 						fieldName={subName}
 						fieldSchema={subSchema}
 						required={fieldSchema.required?.includes(subName) || false}
@@ -319,7 +331,7 @@
 				<div class="space-y-3">
 					{#each Object.entries(fieldSchema.items.properties) as [itemPropName, itemPropSchema]}
 						<div class="relative">
-							<svelte:self
+							<JsonSchemaFieldRowRecursive
 								fieldName={itemPropName}
 								fieldSchema={itemPropSchema}
 								required={fieldSchema.items.required?.includes(itemPropName) || false}

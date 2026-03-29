@@ -18,8 +18,12 @@
 	let darkMode = $derived(themeStore.darkMode);
 	let currentTheme = $derived(themeStore.theme);
 
-	// Set page data context for child components
-	setContext('pageData', { currentUser: data.currentUser });
+	// Set page data context for child components (getter keeps context in sync with `data`)
+	setContext('pageData', {
+		get currentUser() {
+			return data.currentUser;
+		}
+	});
 
 	const dashboardWidgets: Widget[] = [
 		{

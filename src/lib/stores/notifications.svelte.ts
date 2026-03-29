@@ -4,11 +4,10 @@
  */
 
 import type { Notification } from '@stratiqai/types-simple';
-import { S_ON_CREATE_NOTIFICATION } from '@stratiqai/types-simple';
 
 // Re-export for convenience
 export type { Notification };
-export { S_ON_CREATE_NOTIFICATION };
+export { S_ON_CREATE_NOTIFICATION } from '@stratiqai/types-simple';
 
 class NotificationStore {
 	notifications = $state<Notification[]>([]);

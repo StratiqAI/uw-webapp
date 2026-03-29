@@ -20,7 +20,7 @@
 <div class="metric-widget h-full flex flex-col justify-center">
 	<p class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'} mb-1">{widgetData.label}</p>
 	<p class="text-3xl font-bold {darkMode ? 'text-slate-100' : 'text-slate-900'}">
-	Right 	{widgetData.value}{widgetData.unit ? ` ${widgetData.unit}` : ''}
+		{widgetData.value}{widgetData.unit ? ` ${widgetData.unit}` : ''}
 	</p>
 	{#if widgetData.change != null}
 		<p class="text-sm mt-2 flex items-center {widgetData.changeType === 'increase' ? (darkMode ? 'text-green-400' : 'text-green-600') : (darkMode ? 'text-red-400' : 'text-red-600')}">

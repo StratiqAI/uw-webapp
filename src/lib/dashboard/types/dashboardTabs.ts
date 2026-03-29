@@ -12,8 +12,8 @@ export interface TabInfo {
 export const DEFAULT_TABS: readonly TabInfo[] = [
 	{ id: 'financial', label: 'Financial' },
 	{ id: 'market', label: 'Market' },
-	{ id: 'property', label: 'Property' },
-	{ id: 'legal', label: 'Legal' }
+	{ id: 'property', label: 'Site/Location' },
+	{ id: 'legal', label: 'Government/Legal' }
 ] as const;
 
 export const DEFAULT_ACTIVE_TAB: DashboardTabId = 'market';

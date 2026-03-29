@@ -140,11 +140,13 @@
 		previewData = validatedTopicStore.at(selectedTopic);
 	});
 
-	const dragHandlers = createDragHandlers(widget, {
-		onDragStart,
-		onDragEnd,
-		onDrop: () => {}
-	});
+	const dragHandlers = $derived.by(() =>
+		createDragHandlers(widget, {
+			onDragStart,
+			onDragEnd,
+			onDrop: () => {}
+		})
+	);
 	
 	function handleAIGenerationReady(generateFn: (prompt: string) => Promise<void>) {
 		widgetAIGenerateFn = generateFn;

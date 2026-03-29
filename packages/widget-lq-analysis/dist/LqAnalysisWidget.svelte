@@ -50,8 +50,14 @@
 		localBandHigh: data.localBandHigh ?? DEFAULT_LOCAL_BAND_HIGH
 	});
 
+	const inputFallback = $derived<LqAnalysisInput>({
+		city: widgetData.city,
+		state: widgetData.state,
+		zip: widgetData.zip
+	});
+
 	const lqResult = useExternalData({
-		input: () => topicData.current,
+		input: () => topicData.current ?? inputFallback,
 		config: () => ({
 			year: widgetData.year,
 			areaFips: widgetData.areaFips,

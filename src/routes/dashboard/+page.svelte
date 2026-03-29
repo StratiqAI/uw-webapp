@@ -26,12 +26,16 @@
 	let darkMode = $derived.by(() => themeStore.darkMode);
 	let currentTheme = $derived.by(() => themeStore.theme);
 
-	// Project state
-	let projects = $state<Project[]>(data.projects || []);
+	// Project state (derive from load so updates when `data` changes)
+	const projects = $derived(data.projects ?? []);
 	let selectedProjectId = $state<string | null>(null);
 
-	// Set page data context for child components
-	setContext('pageData', { currentUser: data.currentUser });
+	// Set page data context for child components (getter keeps context in sync with `data`)
+	setContext('pageData', {
+		get currentUser() {
+			return data.currentUser;
+		}
+	});
 	
 	// Update context when theme changes
 	$effect(() => {

@@ -9,9 +9,10 @@
     }
     let { path, description, title, subtitle }: Props = $props();
   
-    let imgsrc = `https://open-graph-vercel.vercel.app/api/flowbite-svelte-admin-dashboard?title=${subtitle}`;
-  
-    let og_url: string = `https://flowbite-svelte-admin-dashboard.vercel.app${path}`;
+    const imgsrc = $derived(
+      `https://open-graph-vercel.vercel.app/api/flowbite-svelte-admin-dashboard?title=${subtitle}`
+    );
+    const og_url = $derived(`https://flowbite-svelte-admin-dashboard.vercel.app${path}`);
   </script>
   
   <RunesMetaTags

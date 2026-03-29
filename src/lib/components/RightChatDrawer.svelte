@@ -7,6 +7,8 @@
 
 	let { model: initialModel }: { onActions?: (actions: AIAction[]) => void; model?: string } =
 		$props();
+	// Initial-only default; user changes are local until parent passes a new `model`
+	// svelte-ignore state_referenced_locally
 	let model = $state(initialModel ?? 'gpt-4o-mini');
 
 	// --- demo state ---

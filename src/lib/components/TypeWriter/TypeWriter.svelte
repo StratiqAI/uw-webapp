@@ -50,14 +50,14 @@
   // used to cancel an in-flight run when inputs change/unmount
   let runToken = 0;
 
-  const pauses: Record<string, number> = {
+  const pauses = $derived.by((): Record<string, number> => ({
     ',': pausePunctuationMs,
     '.': pausePunctuationMs + 150,
     '?': pausePunctuationMs + 150,
     '!': pausePunctuationMs + 150,
     ':': pausePunctuationMs - 60,
     ';': pausePunctuationMs - 60
-  };
+  }));
 
   const reducedMotion = $derived(
     browser && matchMedia?.('(prefers-reduced-motion: reduce)')?.matches

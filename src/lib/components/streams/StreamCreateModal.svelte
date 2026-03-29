@@ -30,13 +30,22 @@
 
 	const isEditing = $derived(!!editStream);
 
-	// Form state
-	let title = $state(editStream?.title ?? prefill?.title ?? '');
-	let topic = $state(editStream?.topic ?? prefill?.topic ?? '');
-	let schemaId = $state(editStream?.schemaId ?? prefill?.schemaId ?? '');
-	let description = $state(editStream?.description ?? '');
-	let promptId = $state(editStream?.promptId ?? prefill?.promptId ?? '');
-	let promptName = $state(editStream?.promptName ?? prefill?.promptName ?? '');
+	// Form state (sync when opening for create vs edit or when prefill changes)
+	let title = $state('');
+	let topic = $state('');
+	let schemaId = $state('');
+	let description = $state('');
+	let promptId = $state('');
+	let promptName = $state('');
+
+	$effect(() => {
+		title = editStream?.title ?? prefill?.title ?? '';
+		topic = editStream?.topic ?? prefill?.topic ?? '';
+		schemaId = editStream?.schemaId ?? prefill?.schemaId ?? '';
+		description = editStream?.description ?? '';
+		promptId = editStream?.promptId ?? prefill?.promptId ?? '';
+		promptName = editStream?.promptName ?? prefill?.promptName ?? '';
+	});
 
 	let titleError = $state('');
 	let topicError = $state('');

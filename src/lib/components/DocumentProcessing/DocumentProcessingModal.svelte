@@ -1,12 +1,10 @@
 <!-- src/lib/components/DocumentProcessing/DocumentProcessingModal.svelte -->
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
 	import { createProcessingStore } from './processing.store.svelte';
 	import { generateMockProcessingState } from './mockData';
 	import DocumentHeader from './DocumentHeader.svelte';
 	import DocumentPreviewPanel from './DocumentPreviewPanel.svelte';
 	import DiscoveryFeedPanel from './DiscoveryFeedPanel.svelte';
-	import type { DocumentProcessingState } from './types';
 
 	const { documentId, projectId, filename, isOpen, onClose } = $props<{
 		documentId: string;
@@ -16,13 +14,13 @@
 		onClose: () => void;
 	}>();
 
-	// Create store instance
-	const store = createProcessingStore(documentId, projectId, filename);
+	type ProcessingStore = ReturnType<typeof createProcessingStore>;
+	let store = $state<ProcessingStore | null>(null);
 
-	// Initialize with mock data for now
-	onMount(() => {
-		const mockState = generateMockProcessingState(documentId, projectId, filename);
-		store.initializeWithMockData(mockState);
+	$effect(() => {
+		const s = createProcessingStore(documentId, projectId, filename);
+		s.initializeWithMockData(generateMockProcessingState(documentId, projectId, filename));
+		store = s;
 	});
 
 	// Handle backdrop click
@@ -42,19 +40,24 @@
 
 <svelte:window onkeydown={handleKeyDown} />
 
-{#if isOpen}
+{#if isOpen && store}
 	<!-- Backdrop -->
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity"
 		onclick={handleBackdropClick}
-		role="dialog"
-		aria-modal="true"
-		aria-labelledby="modal-title"
+		onkeydown={(e) => e.key === 'Escape' && onClose()}
+		role="presentation"
+		tabindex="-1"
 	>
 		<!-- Modal Container -->
 		<div
 			class="relative mx-4 flex h-[90vh] w-full max-w-7xl flex-col overflow-hidden rounded-lg bg-white shadow-xl dark:bg-gray-800"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="modal-title"
+			tabindex="-1"
 			onclick={(e) => e.stopPropagation()}
+			onkeydown={(e) => e.key === 'Escape' && onClose()}
 		>
 			<!-- Header -->
 			<DocumentHeader state={store.state} {onClose} />

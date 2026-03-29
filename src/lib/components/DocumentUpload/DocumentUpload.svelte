@@ -21,7 +21,8 @@
 		onDoclinkRemoved?: (projectId: string) => void | Promise<void>;
 	}>();
 
-	// The uploader store manages all state and logic
+	// The uploader store manages all state and logic (token/project/metadata synced in $effect below)
+	// svelte-ignore state_referenced_locally
 	const uploader = createUploader(idToken, projectId, metadata ?? null);
 	
 	// Update uploader metadata when it changes reactively

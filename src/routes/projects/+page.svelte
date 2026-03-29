@@ -13,12 +13,16 @@
 	// Realtime Section
 	import { ProjectSyncManager, store } from '$lib/realtime/websocket/projectSync';
 	import { addSubscription, removeSubscription } from '$lib/stores/appSyncClientStore';
-	import { notificationStore, type Notification } from '$lib/stores/notifications.svelte';
+	import {
+		notificationStore,
+		S_ON_CREATE_NOTIFICATION,
+		type Notification
+	} from '$lib/stores/notifications.svelte';
 
 	// Types Section
 	import type { PageProps } from './$types';
 	import type { Project } from '@stratiqai/types-simple';
-	import { M_CREATE_PROJECT, M_DELETE_PROJECT, S_ON_CREATE_NOTIFICATION } from '@stratiqai/types-simple';
+	import { M_CREATE_PROJECT, M_DELETE_PROJECT } from '@stratiqai/types-simple';
 	import { print } from 'graphql';
 
 	// Dark Mode Section
