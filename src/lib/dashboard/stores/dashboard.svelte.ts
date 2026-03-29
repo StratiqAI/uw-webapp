@@ -51,6 +51,15 @@ const DEFAULT_RESIZE_STATE: ResizeState = {
 
 const GRID_BUFFER_ROWS = 2;
 const AUTO_SAVE_DELAY_MS = 1000;
+const UNDO_STACK_LIMIT = 40;
+
+type LayoutSnapshot = Array<{
+	id: string;
+	gridColumn: number;
+	gridRow: number;
+	colSpan: number;
+	rowSpan: number;
+}>;
 
 // Custom error classes for better error handling
 class DashboardError extends Error {
@@ -101,6 +110,10 @@ class DashboardStore {
 	#eventListeners = new Map<keyof DashboardEvents, Set<Function>>();
 	#suspendAutoSave = false;
 
+	// Undo / redo stacks (layout-only snapshots — lightweight)
+	#undoStack: LayoutSnapshot[] = [];
+	#redoStack: LayoutSnapshot[] = [];
+
 	/**
 	 * Expose $state via $derived so Svelte components subscribe when reading `dashboard.widgets`, etc.
 	 * Plain getters do not reliably establish template reactivity for class-based runes (Svelte 5).
@@ -119,6 +132,8 @@ class DashboardStore {
 	displacementPreview = $derived(this.#displacementPreview);
 	get tabIds(): DashboardTabId[] { return this.#tabOrder.map(t => t.id); }
 	get isInitialized() { return this.#initialized; }
+	get canUndo(): boolean { return this.#undoStack.length > 0; }
+	get canRedo(): boolean { return this.#redoStack.length > 0; }
 	
 	// Derived state with memoization
 	gridCells = $derived.by(() => this.#computeGridCells());
@@ -456,30 +471,65 @@ class DashboardStore {
 	resizeWidget(id: string, colSpan: number, rowSpan: number): boolean {
 		const widget = this.#widgets.find((w) => w.id === id);
 		if (!widget || widget.locked) return false;
-		
+
 		const newColSpan = this.#clamp(
 			colSpan,
 			widget.minWidth || 1,
 			widget.maxWidth || this.#config.gridColumns
 		);
-		
+
 		const newRowSpan = this.#clamp(
 			rowSpan,
 			widget.minHeight || 1,
 			widget.maxHeight || this.#config.gridRows
 		);
-		
-		const testWidget = { ...widget, colSpan: newColSpan, rowSpan: newRowSpan };
-		
-		if (!this.canPlaceWidget(testWidget, id)) {
-			this.#autoExpandGrid(testWidget);
-		}
-		
-		if (!this.canPlaceWidget(testWidget, id)) {
+
+		if (!this.fitsInColumns(newColSpan, widget.gridColumn)) {
 			return false;
 		}
-		
-		return this.updateWidget(id, { colSpan: newColSpan, rowSpan: newRowSpan });
+
+		const placed: WidgetRect = {
+			id: widget.id,
+			gridColumn: widget.gridColumn,
+			gridRow: widget.gridRow,
+			colSpan: newColSpan,
+			rowSpan: newRowSpan
+		};
+
+		const others: WidgetRect[] = this.#widgets
+			.filter((w) => w.id !== id)
+			.map((w) => ({
+				id: w.id,
+				gridColumn: w.gridColumn,
+				gridRow: w.gridRow,
+				colSpan: w.colSpan,
+				rowSpan: w.rowSpan
+			}));
+
+		const displaced = resolveCollisions(placed, others);
+
+		const newWidgets = this.#widgets.map((w) => {
+			if (w.id === id) {
+				return { ...w, colSpan: newColSpan, rowSpan: newRowSpan } as Widget;
+			}
+			const newPos = displaced.get(w.id);
+			return newPos ? ({ ...w, ...newPos } as Widget) : w;
+		});
+
+		let maxRow = 0;
+		for (const w of newWidgets) {
+			const bottom = w.gridRow + w.rowSpan - 1;
+			if (bottom > maxRow) maxRow = bottom;
+		}
+		if (maxRow > this.#config.gridRows) {
+			this.#config = { ...this.#config, gridRows: maxRow + GRID_BUFFER_ROWS };
+		}
+
+		this.#widgets = newWidgets;
+		this.#displacementPreview = Object.fromEntries(displaced);
+		this.#scheduleAutoSave();
+		this.#emit('widget:updated', { id, updates: { colSpan: newColSpan, rowSpan: newRowSpan } });
+		return true;
 	}
 	
 	// Z-index management
@@ -763,6 +813,58 @@ class DashboardStore {
 		};
 	}
 	
+	// ─── Undo / Redo ──────────────────────────────────────────────────
+	#takeLayoutSnapshot(): LayoutSnapshot {
+		return this.#widgets.map((w) => ({
+			id: w.id,
+			gridColumn: w.gridColumn,
+			gridRow: w.gridRow,
+			colSpan: w.colSpan,
+			rowSpan: w.rowSpan
+		}));
+	}
+
+	pushUndoSnapshot(): void {
+		this.#undoStack.push(this.#takeLayoutSnapshot());
+		if (this.#undoStack.length > UNDO_STACK_LIMIT) {
+			this.#undoStack.shift();
+		}
+		this.#redoStack = [];
+	}
+
+	#applyLayoutSnapshot(snapshot: LayoutSnapshot): void {
+		const lookup = new Map(snapshot.map((s) => [s.id, s]));
+		this.#widgets = this.#widgets.map((w) => {
+			const s = lookup.get(w.id);
+			return s
+				? ({ ...w, gridColumn: s.gridColumn, gridRow: s.gridRow, colSpan: s.colSpan, rowSpan: s.rowSpan } as Widget)
+				: w;
+		});
+		this.ensureGridCapacity();
+		this.#scheduleAutoSave();
+	}
+
+	undo(): boolean {
+		const snapshot = this.#undoStack.pop();
+		if (!snapshot) return false;
+		this.#redoStack.push(this.#takeLayoutSnapshot());
+		this.#applyLayoutSnapshot(snapshot);
+		return true;
+	}
+
+	redo(): boolean {
+		const snapshot = this.#redoStack.pop();
+		if (!snapshot) return false;
+		this.#undoStack.push(this.#takeLayoutSnapshot());
+		this.#applyLayoutSnapshot(snapshot);
+		return true;
+	}
+
+	clearUndoHistory(): void {
+		this.#undoStack = [];
+		this.#redoStack = [];
+	}
+
 	// Private methods
 	#flushActiveTabIntoSlices(): void {
 		this.#tabSlices = {

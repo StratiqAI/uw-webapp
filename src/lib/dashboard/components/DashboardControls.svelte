@@ -394,6 +394,35 @@
 
 		<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
 
+		<!-- Undo / Redo -->
+		<button
+			onclick={() => dashboard.undo()}
+			disabled={!dashboard.canUndo}
+			class="rounded-md p-1.5 transition-colors {darkMode
+				? 'text-slate-400 hover:text-white hover:bg-slate-700'
+				: 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'} disabled:opacity-30 disabled:pointer-events-none"
+			title="Undo (Ctrl+Z)"
+		>
+			<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"/>
+			</svg>
+		</button>
+
+		<button
+			onclick={() => dashboard.redo()}
+			disabled={!dashboard.canRedo}
+			class="rounded-md p-1.5 transition-colors {darkMode
+				? 'text-slate-400 hover:text-white hover:bg-slate-700'
+				: 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'} disabled:opacity-30 disabled:pointer-events-none"
+			title="Redo (Ctrl+Shift+Z)"
+		>
+			<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 000 12h3"/>
+			</svg>
+		</button>
+
+		<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
+
 		<!-- Dashboard actions group -->
 		<button
 			onclick={handleSave}

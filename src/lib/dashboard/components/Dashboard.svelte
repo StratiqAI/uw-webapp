@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount, onDestroy } from 'svelte';
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
 	import { topicDragStore, TOPIC_DROP_MIME } from '$lib/dashboard/stores/topicDragStore';
 	import GridContainer from '$lib/dashboard/components/GridContainer.svelte';
@@ -178,6 +179,7 @@
 	});
 
 	function handleWidgetDragStart(widget: Widget) {
+		dashboard.pushUndoSnapshot();
 		dashboard.setDragState({
 			isDragging: true,
 			activeWidgetId: widget.id
@@ -190,6 +192,23 @@
 		dashboard.clearDisplacementPreview();
 		dashboard.resetInteractionStates();
 	}
+
+	// Keyboard shortcuts for undo / redo
+	function handleKeyboard(e: KeyboardEvent) {
+		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
+		const mod = e.ctrlKey || e.metaKey;
+		if (!mod || e.key.toLowerCase() !== 'z') return;
+
+		e.preventDefault();
+		if (e.shiftKey) {
+			dashboard.redo();
+		} else {
+			dashboard.undo();
+		}
+	}
+
+	onMount(() => window.addEventListener('keydown', handleKeyboard));
+	onDestroy(() => window.removeEventListener('keydown', handleKeyboard));
 </script>
 
 <GridContainer

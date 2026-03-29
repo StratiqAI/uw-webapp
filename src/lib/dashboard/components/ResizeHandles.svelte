@@ -38,6 +38,7 @@
 		const widget = dashboard.widgets.find((w) => w.id === widgetId);
 		if (!widget) return;
 
+		dashboard.pushUndoSnapshot();
 		dashboard.setResizeState({
 			isResizing: true,
 			activeWidgetId: widgetId,
@@ -75,6 +76,7 @@
 		}
 
 		function handleMouseUp() {
+			dashboard.clearDisplacementPreview();
 			dashboard.resetInteractionStates();
 			document.removeEventListener('mousemove', handleMouseMove);
 			document.removeEventListener('mouseup', handleMouseUp);
