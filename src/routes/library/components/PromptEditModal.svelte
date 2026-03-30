@@ -559,6 +559,15 @@
 			alert('Please enter a template name');
 			return;
 		}
+		if (responseFormatType === 'json_schema' && Object.keys(schemaProperties).length > 0) {
+			const missing = orderedFieldEntries
+				.filter(([, f]) => !f.description?.trim())
+				.map(([name]) => name);
+			if (missing.length > 0) {
+				alert(`Please add a description for: ${missing.join(', ')}`);
+				return;
+			}
+		}
 		if (!onSave) {
 			alert('Save handler is not available. Please refresh the page.');
 			return;
@@ -672,589 +681,304 @@
 </script>
 
 {#if template || isCreating}
+{@const inputCls = `w-full px-3 py-2 text-sm rounded-lg border transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 ${darkMode ? 'bg-slate-800/80 text-white border-slate-600/80 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-200 placeholder-slate-400'}`}
+{@const labelCls = `block text-[11px] font-medium uppercase tracking-wider mb-1.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}
+
+<div
+	class="fixed inset-0 bg-black/50 backdrop-blur-[2px] flex items-start justify-center z-50 pt-[3vh] pb-[3vh] overflow-y-auto"
+	onclick={handleCancel}
+	onkeydown={handleKeydown}
+	role="dialog"
+	aria-modal="true"
+	aria-labelledby="modal-title"
+	tabindex="-1"
+>
 	<div
-		class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
-		onclick={handleCancel}
-		onkeydown={handleKeydown}
-		role="dialog"
-		aria-modal="true"
-		aria-labelledby="modal-title"
-		tabindex="-1"
+		class="w-full max-w-3xl mx-4 {darkMode ? 'bg-slate-900 border-slate-700/50' : 'bg-white border-slate-200/80'} rounded-2xl shadow-2xl border flex flex-col max-h-[94vh]"
+		onclick={(e) => e.stopPropagation()}
+		onkeydown={(e) => e.stopPropagation()}
+		role="presentation"
 	>
-		<div
-			class="{darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto m-4 border"
-			onclick={(e) => e.stopPropagation()}
-			onkeydown={(e) => e.stopPropagation()}
-			role="presentation"
-		>
-			<div class="p-6">
-				<!-- Header -->
-				<div class="flex items-center gap-3 mb-6 pb-4 {darkMode ? 'border-slate-700' : 'border-slate-200'} border-b">
-					<div class="w-10 h-10 {darkMode ? 'bg-indigo-900' : 'bg-indigo-100'} rounded-lg flex items-center justify-center">
-						<span class="{darkMode ? 'text-indigo-300' : 'text-indigo-600'} font-bold text-sm">AI</span>
+		<!-- ═══ Sticky Header ═══ -->
+		<div class="shrink-0 flex items-center justify-between px-6 py-3.5 border-b {darkMode ? 'border-slate-700/50' : 'border-slate-200/80'}">
+			<div class="flex items-center gap-3 min-w-0">
+				<div class="w-8 h-8 rounded-lg shrink-0 {darkMode ? 'bg-indigo-500/15' : 'bg-indigo-50'} flex items-center justify-center">
+					<svg class="w-4 h-4 {darkMode ? 'text-indigo-400' : 'text-indigo-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+					</svg>
+				</div>
+				<h2 id="modal-title" class="text-sm font-semibold truncate {darkMode ? 'text-white' : 'text-slate-900'}">
+					{isCreating ? 'New Prompt' : 'Edit Prompt'}
+				</h2>
+			</div>
+			<div class="flex items-center gap-2 shrink-0">
+				<button
+					type="button"
+					onclick={handleSave}
+					disabled={saving || !templateName.trim()}
+					class="px-4 py-1.5 text-xs font-semibold rounded-lg transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed
+						{darkMode ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}"
+				>
+					{saving ? 'Saving...' : 'Save'}
+				</button>
+				<button
+					type="button"
+					onclick={handleCancel}
+					class="p-1.5 rounded-lg transition-colors {darkMode ? 'text-slate-500 hover:text-white hover:bg-slate-700/80' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}"
+					aria-label="Close"
+				>
+					<svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+				</button>
+			</div>
+		</div>
+
+		<!-- ═══ Scrollable Body ═══ -->
+		<div class="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+
+			<!-- ── Section: Identity ── -->
+			<div class="space-y-3">
+				<div class="grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-3">
+					<div>
+						<label for="template-name" class={labelCls}>Name <span class="text-red-400">*</span></label>
+						<input id="template-name" type="text" bind:value={templateName} placeholder="e.g. Property Location Details" class={inputCls} />
 					</div>
 					<div>
-						<h2 id="modal-title" class="text-xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">
-							{isCreating ? 'Create new prompt' : 'Edit prompt'}
-						</h2>
-						<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-0.5">Describe what you want the AI to do and how you want the answer</p>
+						<label for="template-description" class={labelCls}>Description</label>
+						<input id="template-description" type="text" bind:value={templateDescription} placeholder="What this prompt does" class={inputCls} />
 					</div>
 				</div>
+			</div>
 
-				<div class="space-y-5">
-					<!-- Template Name -->
-					<div>
-						<label for="template-name" class="block text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'} mb-2">
-						Name <span class="text-red-500">*</span>
-						</label>
-						<input
-							id="template-name"
-							type="text"
-							bind:value={templateName}
-							placeholder="e.g. Property summary, Market overview"
-							class="w-full px-3 py-2.5 {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-						/>
-					</div>
-
-					<!-- Template Description -->
-					<div>
-						<label for="template-description" class="block text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'} mb-2">
-							Description
-						</label>
-						<input
-							id="template-description"
-							type="text"
-							bind:value={templateDescription}
-							placeholder="Short description of what this prompt does"
-							class="w-full px-3 py-2.5 {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-						/>
-					</div>
-
-					<hr class="{darkMode ? 'border-slate-700' : 'border-slate-200'}" />
-
-					<!-- User Prompt -->
-					<div>
-						<label for="ai-user-prompt" class="block text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'} mb-2">
-							What to ask
-						</label>
-
-						<!-- Input variables: show what placeholders this prompt expects -->
-						{#if promptInputVariables.length > 0}
-							<div
-								class="mb-3 rounded-lg border p-3 {darkMode ? 'border-amber-500/40 bg-amber-950/20' : 'border-amber-300 bg-amber-50/80'}"
-								role="region"
-								aria-label="Spots to fill in when you run this prompt"
-							>
-								<p class="text-xs font-medium uppercase tracking-wider mb-2 {darkMode ? 'text-amber-400/90' : 'text-amber-700'}">
-									Spots to fill in later
-									<span class="ml-1.5 font-normal normal-case {darkMode ? 'text-amber-500/70' : 'text-amber-600'}">({promptInputVariables.length})</span>
-								</p>
-								<div class="flex flex-wrap gap-2">
-									{#each promptInputVariables as { name, syntax }}
-										<div
-											class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium {darkMode ? 'bg-slate-700/80 text-amber-200 border border-slate-600' : 'bg-white text-amber-900 border border-amber-200 shadow-sm'}"
-											title="Used as {syntax} in your prompt"
-										>
-											<svg class="size-3.5 shrink-0 {darkMode ? 'text-amber-500' : 'text-amber-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-											</svg>
-											<span class="font-mono text-xs">{syntax}</span>
-										</div>
-									{/each}
-								</div>
-								<p class="text-xs mt-2 {darkMode ? 'text-slate-400' : 'text-slate-500'}">
-									These will be filled in when you run this. In your text below, use {'{{'}name{'}}'} or {'{'}name{'}'} for each one.
-								</p>
-							</div>
-						{/if}
-
-						<textarea
-							id="ai-user-prompt"
-							bind:value={aiQueryPrompt}
-							placeholder="e.g. Summarize the key points from: {'{input}'}"
-							class="w-full px-3 py-2.5 {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none text-sm"
-							rows="5"
-						></textarea>
-						<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1.5">Use {'{input}'} or {'{{'}name{'}}'} to plug in data when you run this</p>
-					</div>
-
-					<!-- Response Format -->
-					<div>
-						<h3 class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-wide mb-3">
-							How should the AI answer?
-						</h3>
-						<div>
-							<label for="response-format" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-1.5">
-								Answer format
-							</label>
-							<select
-								id="response-format"
-								bind:value={responseFormatType}
-								class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-							>
-								<option value="json_schema">Structured form (define fields) — default</option>
-								<option value="text">Plain text</option>
-								<option value="json_object">Structured list</option>
-							</select>
+			<!-- ── Section: Prompt ── -->
+			<div class="rounded-xl border {darkMode ? 'border-slate-700/50 bg-slate-800/30' : 'border-slate-200/80 bg-slate-50/50'} overflow-hidden">
+				<div class="px-4 pt-3 pb-1">
+					<label for="ai-user-prompt" class="text-[11px] font-semibold uppercase tracking-wider {darkMode ? 'text-slate-400' : 'text-slate-500'}">
+						Prompt
+					</label>
+				</div>
+				<div class="px-4 pb-4">
+					<textarea
+						id="ai-user-prompt"
+						bind:value={aiQueryPrompt}
+						placeholder="e.g. Extract the property location details such as address, city, state, zip code..."
+						class="w-full px-0 py-2 text-sm border-0 resize-none focus:outline-none focus:ring-0 {darkMode ? 'bg-transparent text-white placeholder-slate-600' : 'bg-transparent text-slate-900 placeholder-slate-400'}"
+						rows="4"
+					></textarea>
+					{#if promptInputVariables.length > 0}
+						<div class="flex items-center gap-1.5 flex-wrap pt-2 border-t {darkMode ? 'border-slate-700/40' : 'border-slate-200/60'}">
+							<span class="text-[10px] uppercase tracking-wider font-semibold {darkMode ? 'text-slate-600' : 'text-slate-400'}">Variables</span>
+							{#each promptInputVariables as { syntax }}
+								<span class="px-1.5 py-0.5 rounded text-[10px] font-mono {darkMode ? 'bg-amber-500/10 text-amber-400/90 border border-amber-500/20' : 'bg-amber-50 text-amber-600 border border-amber-200/80'}">{syntax}</span>
+							{/each}
 						</div>
-						{#if responseFormatType === 'json_schema'}
-							<div class="mt-3 space-y-3">
-								<div class="rounded-md border {darkMode ? 'border-teal-600 bg-teal-900/30' : 'border-teal-300 bg-teal-50'} p-4">
-										<div class="mb-4">
-											<div class="mb-2 flex items-center justify-between">
-												<div class="block text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'}">Fields to get back</div>
-												<div class="flex gap-2">
-													<button
-														type="button"
-														onclick={() => addSchemaField(true)}
-														class="rounded bg-amber-600 px-3 py-1 text-xs text-white hover:bg-amber-700"
-														title="Add a field for the AI to explain its reasoning (recommended)"
-													>
-														+ Add reasoning
-													</button>
-													<button
-														type="button"
-														onclick={() => addSchemaField(false)}
-														class="rounded bg-teal-600 px-3 py-1 text-xs text-white hover:bg-teal-700"
-													>
-														+ Add field
-													</button>
-												</div>
-											</div>
-											<div class="space-y-3">
-												{#each orderedFieldEntries as [fieldName, fieldSchema] (fieldName)}
-													<div class="rounded border {darkMode ? 'border-gray-600 bg-slate-800' : 'border-gray-300 bg-white'} p-3">
-														<div class="mb-2 flex items-center gap-2">
-															{#key fieldName}
-																<input
-																	type="text"
-																	value={fieldName}
-																	onblur={(e) => {
-																		const newName = e.currentTarget.value.trim();
-																		if (newName && newName !== fieldName) {
-																			updateFieldName(fieldName, newName);
-																		} else if (!newName) {
-																			e.currentTarget.value = fieldName;
-																		}
-																	}}
-																	onkeydown={(e) => {
-																		if (e.key === 'Enter') e.currentTarget.blur();
-																	}}
-																	class="flex-1 rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-sm font-medium"
-																	placeholder="e.g. summary, price_range"
-																/>
-															{/key}
-															<select
-																value={fieldSchema.type || 'string'}
-																onchange={(e) => updateSchemaFieldType(fieldName, e.currentTarget.value)}
-																class="rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-sm"
-															>
-																<option value="string">string</option>
-																<option value="number">number</option>
-																<option value="integer">integer</option>
-																<option value="boolean">boolean</option>
-																<option value="array">array</option>
-																<option value="object">object</option>
-															</select>
-															<label class="flex cursor-pointer items-center gap-1 text-sm {darkMode ? 'text-slate-200' : 'text-slate-700'}">
-																<input
-																	type="checkbox"
-																	checked={schemaRequired.includes(fieldName)}
-																	onchange={() => toggleSchemaFieldRequired(fieldName)}
-																	class="cursor-pointer"
-																/>
-																Required
-															</label>
-															<button
-																type="button"
-																onclick={() => removeSchemaField(fieldName)}
-																class="rounded bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
-															>
-																Remove
-															</button>
-														</div>
-														<div class="mb-2">
-															<div class="mb-1 block text-xs font-medium {darkMode ? 'text-slate-300' : 'text-gray-700'}">
-																Extraction Description <span class="text-red-500">*</span>
-															</div>
-															<textarea
-																value={fieldSchema.description || ''}
-																oninput={(e) => updateSchemaField(fieldName, { description: e.currentTarget.value })}
-																placeholder="Describe this Property's purpose and expected values... 
-This will be used by the LLM to extract this property"
-																class="w-full rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-xs"
-																rows="2"
-															></textarea>
-														</div>
-														{#if fieldSchema.type === 'string'}
-															<div class="mb-2">
-																<div class="mb-1 block text-xs font-medium {darkMode ? 'text-slate-300' : 'text-gray-700'}">
-																	Allowed values (comma-separated, optional)
-																</div>
-																<input
-																	type="text"
-																	value={fieldSchema.enum ? fieldSchema.enum.join(', ') : ''}
-																	oninput={(e) => {
-																		const value = e.currentTarget.value.trim();
-																		if (value) {
-																			const enumValues = value.split(',').map((v) => v.trim()).filter(Boolean);
-																			updateSchemaField(fieldName, { enum: enumValues });
-																		} else {
-																			const updated = { ...fieldSchema };
-																			delete updated.enum;
-																			updateSchemaField(fieldName, updated);
-																		}
-																	}}
-																	placeholder="e.g., low, medium, high"
-																	class="w-full rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-xs"
-																/>
-															</div>
-														{/if}
-														{#if fieldSchema.type === 'number' || fieldSchema.type === 'integer'}
-															<div class="mb-2 grid grid-cols-2 gap-2">
-																<div>
-																	<div class="mb-1 block text-xs font-medium {darkMode ? 'text-slate-300' : 'text-gray-700'}">Minimum</div>
-																	<input
-																		type="number"
-																		value={fieldSchema.minimum ?? ''}
-																		oninput={(e) => {
-																			const value = e.currentTarget.value;
-																			updateSchemaField(fieldName, value ? { minimum: Number(value) } : { minimum: undefined });
-																		}}
-																		class="w-full rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-xs"
-																	/>
-																</div>
-																<div>
-																	<div class="mb-1 block text-xs font-medium {darkMode ? 'text-slate-300' : 'text-gray-700'}">Maximum</div>
-																	<input
-																		type="number"
-																		value={fieldSchema.maximum ?? ''}
-																		oninput={(e) => {
-																			const value = e.currentTarget.value;
-																			updateSchemaField(fieldName, value ? { maximum: Number(value) } : { maximum: undefined });
-																		}}
-																		class="w-full rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-xs"
-																	/>
-																</div>
-															</div>
-														{/if}
-														{#if fieldSchema.type === 'object'}
-															<div class="mt-2 border-l-2 {darkMode ? 'border-teal-600' : 'border-teal-500'} pl-3">
-																<SchemaNodesEditor
-																	nodes={fieldSchema.objectChildren ?? []}
-																	{darkMode}
-																	{newNestedId}
-																	sectionTitle="Nested properties"
-																	addButtonLabel="+ Add property"
-																	onNodesChange={(ch) => updateSchemaField(fieldName, { objectChildren: ch })}
-																/>
-															</div>
-														{/if}
-														{#if fieldSchema.type === 'array'}
-															{@const item = fieldSchema.itemSchema ?? { type: 'string' }}
-															<div class="mt-2 space-y-2 border-l-2 {darkMode ? 'border-teal-600' : 'border-teal-500'} pl-3">
-																<div class="text-xs font-medium {darkMode ? 'text-slate-300' : 'text-slate-600'}">
-																	Each array element is a
-																</div>
-																<select
-																	value={item.type}
-																	onchange={(e) => {
-																		const v = e.currentTarget.value as NestedSchemaNodeType;
-																		const next: NestedItemSchema =
-																			v === 'object'
-																				? { type: 'object', properties: [] }
-																				: v === 'array'
-																					? { type: 'array', items: { type: 'string' } }
-																					: { type: v };
-																		updateSchemaField(fieldName, { itemSchema: next });
-																	}}
-																	class="rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-sm"
-																>
-																	<option value="string">string</option>
-																	<option value="number">number</option>
-																	<option value="integer">integer</option>
-																	<option value="boolean">boolean</option>
-																	<option value="object">object</option>
-																	<option value="array">array</option>
-																</select>
-																{#if item.type === 'object'}
-																	<div class="mb-2">
-																		<div
-																			class="mb-1 block text-xs font-medium {darkMode ? 'text-slate-300' : 'text-gray-700'}"
-																		>
-																			Description of each array element (optional)
-																		</div>
-																		<textarea
-																			value={item.description ?? ''}
-																			oninput={(e) => {
-																				const cur = schemaProperties[fieldName];
-																				const it = (cur?.itemSchema ?? {
-																					type: 'object',
-																					properties: []
-																				}) as NestedItemSchema;
-																				updateSchemaField(fieldName, {
-																					itemSchema: {
-																						...it,
-																						type: 'object',
-																						description: e.currentTarget.value
-																					}
-																				});
-																			}}
-																			placeholder="e.g. An object containing detailed information about a broker."
-																			class="w-full rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-xs"
-																			rows="2"
-																		></textarea>
-																	</div>
-																	<SchemaNodesEditor
-																		nodes={item.properties ?? []}
-																		{darkMode}
-																		{newNestedId}
-																		sectionTitle="Fields on each array item"
-																		addButtonLabel="+ Add item field"
-																		onNodesChange={(props) => {
-																			const cur = schemaProperties[fieldName];
-																			const it = (cur?.itemSchema ?? {
-																				type: 'object',
-																				properties: []
-																			}) as NestedItemSchema;
-																			updateSchemaField(fieldName, {
-																				itemSchema: { ...it, type: 'object', properties: props }
-																			});
-																		}}
-																	/>
-																{:else if item.type === 'array'}
-																	{@const inner = item.items ?? { type: 'string' }}
-																	<div class="text-xs font-medium {darkMode ? 'text-slate-300' : 'text-slate-600'}">
-																		Inner element type
-																	</div>
-																	<select
-																		value={inner.type}
-																		onchange={(e) => {
-																			const v = e.currentTarget.value as NestedSchemaNodeType;
-																			const nextInner: NestedItemSchema =
-																				v === 'object'
-																					? { type: 'object', properties: [] }
-																					: v === 'array'
-																						? { type: 'array', items: { type: 'string' } }
-																						: { type: v };
-																			updateSchemaField(fieldName, {
-																				itemSchema: { ...item, type: 'array', items: nextInner }
-																			});
-																		}}
-																		class="rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-sm"
-																	>
-																		<option value="string">string</option>
-																		<option value="number">number</option>
-																		<option value="integer">integer</option>
-																		<option value="boolean">boolean</option>
-																		<option value="object">object</option>
-																		<option value="array">array</option>
-																	</select>
-																	{#if inner.type === 'object'}
-																		<div class="mb-2">
-																			<div
-																				class="mb-1 block text-xs font-medium {darkMode ? 'text-slate-300' : 'text-gray-700'}"
-																			>
-																				Description of each inner element (optional)
-																			</div>
-																			<textarea
-																				value={inner.description ?? ''}
-																				oninput={(e) => {
-																					const cur = schemaProperties[fieldName];
-																					const it = (cur?.itemSchema ?? {
-																						type: 'array',
-																						items: inner
-																					}) as NestedItemSchema;
-																					const inn = (it.items ?? inner) as NestedItemSchema;
-																					updateSchemaField(fieldName, {
-																						itemSchema: {
-																							...it,
-																							type: 'array',
-																							items: {
-																								...inn,
-																								type: 'object',
-																								description: e.currentTarget.value
-																							}
-																						}
-																					});
-																				}}
-																				class="w-full rounded border {darkMode ? 'border-gray-600 bg-slate-700 text-slate-100' : 'border-gray-200 bg-white text-slate-900'} px-2 py-1 text-xs"
-																				rows="2"
-																			></textarea>
-																		</div>
-																		<SchemaNodesEditor
-																			nodes={inner.properties ?? []}
-																			{darkMode}
-																			{newNestedId}
-																			sectionTitle="Fields on each inner item"
-																			addButtonLabel="+ Add field"
-																			onNodesChange={(props) => {
-																				const cur = schemaProperties[fieldName];
-																				const it = (cur?.itemSchema ?? {
-																					type: 'array',
-																					items: inner
-																				}) as NestedItemSchema;
-																				const inn = (it.items ?? inner) as NestedItemSchema;
-																				updateSchemaField(fieldName, {
-																					itemSchema: {
-																						...it,
-																						type: 'array',
-																						items: {
-																							...inn,
-																							type: 'object',
-																							properties: props
-																						}
-																					}
-																				});
-																			}}
-																		/>
-																	{:else if inner.type === 'array'}
-																		<div class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'}">
-																			Deepest level uses string elements; add an object field above with its own array for deeper nesting.
-																		</div>
-																	{/if}
-																{/if}
-															</div>
-														{/if}
-													</div>
-												{/each}
-												{#if Object.keys(schemaProperties).length === 0}
-													<p class="text-sm {darkMode ? 'text-gray-400' : 'text-gray-500'}">
-														No fields yet. Click “+ Add reasoning” or “+ Add field” above to define what the AI should return.
-													</p>
-												{/if}
-											</div>
-										</div>
-										<div class="rounded-md border {darkMode ? 'border-teal-700 bg-teal-900/30' : 'border-teal-200 bg-teal-100'} p-3">
-											<strong class="mb-2 block text-sm {darkMode ? 'text-teal-200' : 'text-slate-900'}">Schema Preview:</strong>
-											<pre class="max-h-72 overflow-auto text-xs {darkMode ? 'text-slate-200' : 'text-slate-700'}">{JSON.stringify(schemaPreview, null, 2)}</pre>
-										</div>
-									</div>
-							</div>
-						{/if}
-					</div>
+					{/if}
 				</div>
+			</div>
 
-				<!-- Advanced Options -->
-				<div class="mt-6 pt-6 {darkMode ? 'border-slate-700' : 'border-slate-200'} border-t">
-					<button
-						type="button"
-						onclick={() => (showAdvanced = !showAdvanced)}
-						class="w-full flex items-center justify-between text-left py-2 {darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-700 hover:text-slate-900'} transition-colors"
-					>
-						<span class="text-sm font-semibold">More options</span>
-						<svg
-							class="w-5 h-5 transition-transform {showAdvanced ? 'rotate-180' : ''}"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
+			<!-- ── Section: Response Fields ── -->
+			<div>
+				<div class="flex items-center justify-between mb-3">
+					<div class="flex items-center gap-2.5">
+						<span class="text-[11px] font-semibold uppercase tracking-wider {darkMode ? 'text-slate-400' : 'text-slate-500'}">Response Format</span>
+						<select
+							bind:value={responseFormatType}
+							class="text-xs rounded-lg border px-2 py-1 {darkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-white text-slate-500 border-slate-200'} focus:outline-none focus:ring-1 focus:ring-indigo-500"
 						>
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-						</svg>
-					</button>
-
-					{#if showAdvanced}
-						<div class="mt-4 space-y-5">
-							<div>
-								<h3 class="text-xs font-semibold {darkMode ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-wide mb-3">
-									Answer behavior
-								</h3>
-								<div class="grid grid-cols-2 gap-4">
-									<div>
-										<label for="temperature" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-1.5">
-											Creativity <span class="text-xs font-normal">(0–2, higher = more varied)</span>
-										</label>
-										<input
-											type="number"
-											id="temperature"
-											bind:value={temperature}
-											min="0"
-											max="2"
-											step="0.1"
-											placeholder="1.0"
-											class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-										/>
-									</div>
-									<div>
-										<label for="max-tokens" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-1.5">
-											Max Tokens
-										</label>
-										<input
-											type="number"
-											id="max-tokens"
-											bind:value={maxTokens}
-											min="1"
-											placeholder="Auto"
-											class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-										/>
-									</div>
-									<div>
-										<label for="top-p" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-1.5">
-											Diversity <span class="text-xs font-normal">(0–1)</span>
-										</label>
-										<input
-											type="number"
-											id="top-p"
-											bind:value={topP}
-											min="0"
-											max="1"
-											step="0.1"
-											placeholder="1.0"
-											class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-										/>
-									</div>
-									<div>
-										<label for="frequency-penalty" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-1.5">
-											Frequency Penalty
-										</label>
-										<input
-											type="number"
-											id="frequency-penalty"
-											bind:value={frequencyPenalty}
-											min="-2"
-											max="2"
-											step="0.1"
-											placeholder="0"
-											class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-										/>
-									</div>
-								</div>
-								<div class="mt-4">
-									<label for="stop-sequences" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-1.5">
-										Stop at these phrases <span class="text-xs font-normal">(comma-separated)</span>
-									</label>
-									<input
-										type="text"
-										id="stop-sequences"
-										bind:value={stopSequences}
-										placeholder="e.g. END, [DONE]"
-										class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 text-white border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-									/>
-								</div>
-							</div>
+							<option value="json_schema">Structured</option>
+							<option value="text">Plain text</option>
+							<option value="json_object">JSON object</option>
+						</select>
+					</div>
+					{#if responseFormatType === 'json_schema'}
+						<div class="flex gap-1.5">
+							<button type="button" onclick={() => addSchemaField(true)}
+								class="px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors {darkMode ? 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/20' : 'bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200/60'}"
+							>+ Reasoning</button>
+							<button type="button" onclick={() => addSchemaField(false)}
+								class="px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors {darkMode ? 'bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200/60'}"
+							>+ Field</button>
 						</div>
 					{/if}
 				</div>
 
-				<!-- Footer -->
-				<div class="flex gap-3 mt-8 pt-6 {darkMode ? 'border-slate-700' : 'border-slate-200'} border-t">
-					<button
-						type="button"
-						onclick={handleSave}
-						disabled={saving}
-						class="flex-1 px-4 py-2.5 {darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-900 hover:bg-slate-800'} text-white rounded-md transition-colors font-semibold text-sm shadow-sm hover:shadow disabled:opacity-60 disabled:cursor-not-allowed"
-					>
-						{saving ? 'Saving…' : (isCreating ? 'Create prompt' : 'Save changes')}
-					</button>
-					<button
-						type="button"
-						onclick={handleCancel}
-						class="flex-1 px-4 py-2.5 {darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-200 border-slate-600' : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300'} rounded-md transition-colors font-semibold text-sm border"
-					>
-						Cancel
-					</button>
-				</div>
+				{#if responseFormatType === 'json_schema'}
+					<div class="space-y-2">
+						{#each orderedFieldEntries as [fieldName, fieldSchema] (fieldName)}
+							<div class="rounded-xl border {darkMode ? 'border-slate-700/50 bg-slate-800/30' : 'border-slate-200/80 bg-white'} overflow-hidden">
+								<div class="px-3.5 py-2.5">
+									<!-- Field header row -->
+									<div class="flex items-center gap-2">
+										{#key fieldName}
+											<input
+												type="text"
+												value={fieldName}
+												onblur={(e) => { const n = e.currentTarget.value.trim(); if (n && n !== fieldName) updateFieldName(fieldName, n); else if (!n) e.currentTarget.value = fieldName; }}
+												onkeydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+												class="flex-1 min-w-0 px-2 py-1 text-sm font-semibold rounded-md border bg-transparent {darkMode ? 'border-transparent text-white hover:border-slate-600 focus:border-indigo-500' : 'border-transparent text-slate-900 hover:border-slate-200 focus:border-indigo-500'} focus:outline-none transition-colors"
+												placeholder="field_name"
+											/>
+										{/key}
+										<select
+											value={fieldSchema.type || 'string'}
+											onchange={(e) => updateSchemaFieldType(fieldName, e.currentTarget.value)}
+											class="text-[11px] rounded-md border px-1.5 py-1 {darkMode ? 'bg-slate-700/60 text-slate-400 border-slate-600/60' : 'bg-slate-50 text-slate-500 border-slate-200'} focus:outline-none"
+										>
+											<option value="string">string</option>
+											<option value="number">number</option>
+											<option value="integer">integer</option>
+											<option value="boolean">boolean</option>
+											<option value="array">array</option>
+											<option value="object">object</option>
+										</select>
+										<button
+											type="button"
+											onclick={() => toggleSchemaFieldRequired(fieldName)}
+											class="px-2 py-0.5 text-[10px] font-bold rounded-md uppercase tracking-wide transition-all
+												{schemaRequired.includes(fieldName)
+													? darkMode ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' : 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+													: darkMode ? 'bg-transparent text-slate-600 border border-slate-700' : 'bg-transparent text-slate-300 border border-slate-200'}"
+										>Req</button>
+										<button type="button" onclick={() => removeSchemaField(fieldName)}
+											class="p-1 rounded-md transition-colors {darkMode ? 'text-slate-600 hover:text-red-400 hover:bg-red-500/10' : 'text-slate-300 hover:text-red-500 hover:bg-red-50'}"
+											title="Remove field"
+										>
+											<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+										</button>
+									</div>
+									<!-- Description (required) -->
+									<div class="mt-2">
+										<textarea
+											value={fieldSchema.description || ''}
+											oninput={(e) => updateSchemaField(fieldName, { description: e.currentTarget.value })}
+											placeholder="Description required — what should the AI extract for this field?"
+											class="w-full px-2 py-1.5 text-xs rounded-md border resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500/40
+												{!fieldSchema.description?.trim()
+													? darkMode ? 'bg-red-500/5 border-red-500/30 text-slate-300 placeholder-red-400/60' : 'bg-red-50/50 border-red-200/80 text-slate-600 placeholder-red-300'
+													: darkMode ? 'bg-slate-900/40 border-slate-700/40 text-slate-300 placeholder-slate-600' : 'bg-slate-50/80 border-slate-100 text-slate-600 placeholder-slate-400'}"
+											rows="1"
+										></textarea>
+									</div>
+									<!-- Type-specific options -->
+									{#if fieldSchema.type === 'string'}
+										{#if fieldSchema.enum}
+											<input type="text" value={fieldSchema.enum.join(', ')}
+												oninput={(e) => { const v = e.currentTarget.value.trim(); if (v) updateSchemaField(fieldName, { enum: v.split(',').map((s) => s.trim()).filter(Boolean) }); else { const u = { ...fieldSchema }; delete u.enum; updateSchemaField(fieldName, u); }}}
+												placeholder="Allowed values: low, medium, high"
+												class="mt-2 w-full px-2 py-1.5 text-xs rounded-md border {darkMode ? 'bg-slate-900/40 border-slate-700/40 text-slate-300' : 'bg-slate-50/80 border-slate-100 text-slate-600'} focus:outline-none focus:ring-1 focus:ring-indigo-500/40"
+											/>
+										{/if}
+										<button type="button"
+											onclick={() => { if (fieldSchema.enum) { const u = { ...fieldSchema }; delete u.enum; updateSchemaField(fieldName, u); } else { updateSchemaField(fieldName, { enum: [] }); }}}
+											class="mt-1.5 text-[10px] font-medium {darkMode ? 'text-slate-600 hover:text-slate-400' : 'text-slate-400 hover:text-slate-500'} transition-colors"
+										>{fieldSchema.enum ? 'Remove allowed values' : '+ Restrict to allowed values'}</button>
+									{/if}
+									{#if fieldSchema.type === 'number' || fieldSchema.type === 'integer'}
+										<div class="mt-2 grid grid-cols-2 gap-2">
+											<input type="number" value={fieldSchema.minimum ?? ''} oninput={(e) => updateSchemaField(fieldName, e.currentTarget.value ? { minimum: Number(e.currentTarget.value) } : { minimum: undefined })} placeholder="Min" class="px-2 py-1.5 text-xs rounded-md border {darkMode ? 'bg-slate-900/40 border-slate-700/40 text-slate-300' : 'bg-slate-50/80 border-slate-100 text-slate-600'} focus:outline-none focus:ring-1 focus:ring-indigo-500/40" />
+											<input type="number" value={fieldSchema.maximum ?? ''} oninput={(e) => updateSchemaField(fieldName, e.currentTarget.value ? { maximum: Number(e.currentTarget.value) } : { maximum: undefined })} placeholder="Max" class="px-2 py-1.5 text-xs rounded-md border {darkMode ? 'bg-slate-900/40 border-slate-700/40 text-slate-300' : 'bg-slate-50/80 border-slate-100 text-slate-600'} focus:outline-none focus:ring-1 focus:ring-indigo-500/40" />
+										</div>
+									{/if}
+									{#if fieldSchema.type === 'object'}
+										<div class="mt-3 border-l-2 {darkMode ? 'border-indigo-500/30' : 'border-indigo-200'} pl-3">
+											<SchemaNodesEditor nodes={fieldSchema.objectChildren ?? []} {darkMode} {newNestedId} sectionTitle="Nested properties" addButtonLabel="+ Property" onNodesChange={(ch) => updateSchemaField(fieldName, { objectChildren: ch })} />
+										</div>
+									{/if}
+									{#if fieldSchema.type === 'array'}
+										{@const item = fieldSchema.itemSchema ?? { type: 'string' }}
+										<div class="mt-3 space-y-2 border-l-2 {darkMode ? 'border-indigo-500/30' : 'border-indigo-200'} pl-3">
+											<div class="flex items-center gap-2">
+												<span class="text-[10px] uppercase tracking-wider font-semibold {darkMode ? 'text-slate-600' : 'text-slate-400'}">Each item</span>
+												<select value={item.type} onchange={(e) => { const v = e.currentTarget.value as NestedSchemaNodeType; const next: NestedItemSchema = v === 'object' ? { type: 'object', properties: [] } : v === 'array' ? { type: 'array', items: { type: 'string' } } : { type: v }; updateSchemaField(fieldName, { itemSchema: next }); }}
+													class="text-[11px] rounded-md border px-1.5 py-0.5 {darkMode ? 'bg-slate-700/60 text-slate-400 border-slate-600/60' : 'bg-slate-50 text-slate-500 border-slate-200'} focus:outline-none"
+												>
+													<option value="string">string</option><option value="number">number</option><option value="integer">integer</option><option value="boolean">boolean</option><option value="object">object</option><option value="array">array</option>
+												</select>
+											</div>
+											{#if item.type === 'object'}
+												<textarea value={item.description ?? ''} oninput={(e) => { const cur = schemaProperties[fieldName]; const it = (cur?.itemSchema ?? { type: 'object', properties: [] }) as NestedItemSchema; updateSchemaField(fieldName, { itemSchema: { ...it, type: 'object', description: e.currentTarget.value } }); }}
+													placeholder="Description of each array element"
+													class="w-full px-2 py-1.5 text-xs rounded-md border resize-none {darkMode ? 'bg-slate-900/40 border-slate-700/40 text-slate-300' : 'bg-slate-50/80 border-slate-100 text-slate-600'} focus:outline-none focus:ring-1 focus:ring-indigo-500/40" rows="1"
+												></textarea>
+												<SchemaNodesEditor nodes={item.properties ?? []} {darkMode} {newNestedId} sectionTitle="Item fields" addButtonLabel="+ Field"
+													onNodesChange={(props) => { const cur = schemaProperties[fieldName]; const it = (cur?.itemSchema ?? { type: 'object', properties: [] }) as NestedItemSchema; updateSchemaField(fieldName, { itemSchema: { ...it, type: 'object', properties: props } }); }}
+												/>
+											{:else if item.type === 'array'}
+												{@const inner = item.items ?? { type: 'string' }}
+												<div class="flex items-center gap-2">
+													<span class="text-[10px] uppercase tracking-wider font-semibold {darkMode ? 'text-slate-600' : 'text-slate-400'}">Inner</span>
+													<select value={inner.type} onchange={(e) => { const v = e.currentTarget.value as NestedSchemaNodeType; const ni: NestedItemSchema = v === 'object' ? { type: 'object', properties: [] } : v === 'array' ? { type: 'array', items: { type: 'string' } } : { type: v }; updateSchemaField(fieldName, { itemSchema: { ...item, type: 'array', items: ni } }); }}
+														class="text-[11px] rounded-md border px-1.5 py-0.5 {darkMode ? 'bg-slate-700/60 text-slate-400 border-slate-600/60' : 'bg-slate-50 text-slate-500 border-slate-200'} focus:outline-none"
+													>
+														<option value="string">string</option><option value="number">number</option><option value="integer">integer</option><option value="boolean">boolean</option><option value="object">object</option><option value="array">array</option>
+													</select>
+												</div>
+												{#if inner.type === 'object'}
+													<textarea value={inner.description ?? ''} oninput={(e) => { const cur = schemaProperties[fieldName]; const it = (cur?.itemSchema ?? { type: 'array', items: inner }) as NestedItemSchema; const inn = (it.items ?? inner) as NestedItemSchema; updateSchemaField(fieldName, { itemSchema: { ...it, type: 'array', items: { ...inn, type: 'object', description: e.currentTarget.value } } }); }}
+														class="w-full px-2 py-1.5 text-xs rounded-md border resize-none {darkMode ? 'bg-slate-900/40 border-slate-700/40 text-slate-300' : 'bg-slate-50/80 border-slate-100 text-slate-600'} focus:outline-none focus:ring-1 focus:ring-indigo-500/40" rows="1"
+													></textarea>
+													<SchemaNodesEditor nodes={inner.properties ?? []} {darkMode} {newNestedId} sectionTitle="Inner fields" addButtonLabel="+ Field"
+														onNodesChange={(props) => { const cur = schemaProperties[fieldName]; const it = (cur?.itemSchema ?? { type: 'array', items: inner }) as NestedItemSchema; const inn = (it.items ?? inner) as NestedItemSchema; updateSchemaField(fieldName, { itemSchema: { ...it, type: 'array', items: { ...inn, type: 'object', properties: props } } }); }}
+													/>
+												{:else if inner.type === 'array'}
+													<p class="text-[10px] {darkMode ? 'text-slate-600' : 'text-slate-400'}">Max nesting reached. Use an object with an array field for deeper nesting.</p>
+												{/if}
+											{/if}
+										</div>
+									{/if}
+								</div>
+							</div>
+						{/each}
+
+						{#if Object.keys(schemaProperties).length === 0}
+							<div class="rounded-xl border-2 border-dashed {darkMode ? 'border-slate-700/60' : 'border-slate-200'} py-8 text-center">
+								<p class="text-sm {darkMode ? 'text-slate-500' : 'text-slate-400'}">No fields defined yet</p>
+								<p class="text-xs mt-1 {darkMode ? 'text-slate-600' : 'text-slate-300'}">Click <strong>+ Field</strong> above to define what the AI returns</p>
+							</div>
+						{/if}
+					</div>
+
+					<!-- Schema preview toggle -->
+					{#if Object.keys(schemaProperties).length > 0}
+						<details class="mt-3">
+							<summary class="text-[11px] font-medium cursor-pointer select-none {darkMode ? 'text-slate-600 hover:text-slate-400' : 'text-slate-400 hover:text-slate-500'} transition-colors">
+								JSON schema preview
+							</summary>
+							<pre class="mt-2 p-3 rounded-lg text-[10px] leading-relaxed overflow-auto max-h-48 {darkMode ? 'bg-slate-800/60 text-slate-400 border border-slate-700/40' : 'bg-slate-50 text-slate-500 border border-slate-100'}">{JSON.stringify(schemaPreview, null, 2)}</pre>
+						</details>
+					{/if}
+				{/if}
 			</div>
+
+			<!-- ── Section: Advanced ── -->
+			<details class="group">
+				<summary class="flex items-center gap-2 cursor-pointer select-none py-1 {darkMode ? 'text-slate-600 hover:text-slate-400' : 'text-slate-400 hover:text-slate-500'} transition-colors">
+					<svg class="w-3 h-3 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+					<span class="text-[11px] font-medium uppercase tracking-wider">Advanced</span>
+				</summary>
+				<div class="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
+					<div>
+						<label for="temperature" class={labelCls}>Creativity</label>
+						<input type="number" id="temperature" bind:value={temperature} min="0" max="2" step="0.1" placeholder="1.0" class={inputCls} />
+					</div>
+					<div>
+						<label for="max-tokens" class={labelCls}>Max tokens</label>
+						<input type="number" id="max-tokens" bind:value={maxTokens} min="1" placeholder="Auto" class={inputCls} />
+					</div>
+					<div>
+						<label for="top-p" class={labelCls}>Diversity</label>
+						<input type="number" id="top-p" bind:value={topP} min="0" max="1" step="0.1" placeholder="1.0" class={inputCls} />
+					</div>
+					<div>
+						<label for="frequency-penalty" class={labelCls}>Freq penalty</label>
+						<input type="number" id="frequency-penalty" bind:value={frequencyPenalty} min="-2" max="2" step="0.1" placeholder="0" class={inputCls} />
+					</div>
+				</div>
+				<div class="mt-3">
+					<label for="stop-sequences" class={labelCls}>Stop sequences</label>
+					<input type="text" id="stop-sequences" bind:value={stopSequences} placeholder="e.g. END, [DONE]" class={inputCls} />
+				</div>
+			</details>
 		</div>
 	</div>
+</div>
 {/if}
