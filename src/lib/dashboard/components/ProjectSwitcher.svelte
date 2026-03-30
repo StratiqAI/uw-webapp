@@ -66,12 +66,12 @@
 			class="absolute top-full left-0 mt-2 w-64 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto"
 		>
 			<div class="p-2">
-				{#if projects.length === 0}
-					<div class="px-3 py-2 text-sm {darkMode ? 'text-slate-400' : 'text-slate-600'}">
-						No projects available
-					</div>
-				{:else}
-					{#each projects as project}
+			{#if projects.length === 0}
+				<div class="px-3 py-2 text-sm {darkMode ? 'text-slate-400' : 'text-slate-600'}">
+					No projects available
+				</div>
+			{:else}
+				{#each projects.filter((p) => p.name !== 'New Project') as project}
 						<button
 							onclick={() => handleSelect(project.id)}
 							class="w-full text-left px-3 py-2 rounded-md text-sm {darkMode ? selectedProjectId === project.id ? 'bg-indigo-900 text-indigo-300' : 'text-slate-300 hover:bg-slate-700' : selectedProjectId === project.id ? 'bg-indigo-100 text-indigo-700' : 'text-slate-700 hover:bg-slate-100'} transition-colors"
