@@ -3,7 +3,7 @@
 	 * StreamsPanel
 	 *
 	 * Full producer → consumer graph view of all registered Data Streams.
-	 * Displayed in the "Streams" tab of the Store Inspector.
+	 * Displayed in the "Streams" tab of the Knowledge Map.
 	 */
 	import { streamCatalog, type DataStream } from '$lib/stores/streamCatalog.svelte';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';

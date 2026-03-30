@@ -3,6 +3,18 @@
 	import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
 	import type { CurrentUser } from '$lib/types/auth';
 	import { themeStore } from '$lib/stores/themeStore.svelte';
+	import { page } from '$app/stores';
+	import { browser } from '$app/environment';
+	import { DashboardStorage } from '$lib/dashboard/utils/storage';
+
+	type NavItem = {
+		label: string;
+		href: string;
+		activeKey: string;
+		icon: string;
+		/** If true, row is non-navigable and shows a coming-soon treatment */
+		disabled?: boolean;
+	};
 
 	let active = $state('upload');
 	let {
@@ -20,62 +32,89 @@
 	/** Matches app chrome: dark sidebar only when theme is `dark` (light/warm use non-dark branch + CSS tokens). */
 	let isDarkTheme = $derived(themeStore.theme === 'dark');
 
-	const navItems = [
-		{
-			label: 'Projects',
-			href: '/projects',
-			activeKey: '/project',
-			icon: `<path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="M9 8h10M9 12h10M9 16h10M4.99 8H5m-.02 4h.01m0 4H5"/>`
-		},
-		{
-			label: 'Dashboard',
-			href: '/dashboard',
-			activeKey: '/dashboard',
-			icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 3h8v8H3V3Zm10 0h8v5h-8V3ZM3 14h8v7H3v-7Zm10 3h8v4h-8v-4Z"/>`
-		},
-		{
-			label: 'Workflows',
-			href: '/workflow',
-			activeKey: '/workflow',
-			icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5ZM14 5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V5ZM4 16a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3ZM14 13a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-6Z"/>`
-		},
-		{
-			label: 'Prompt Library',
-			href: '/library',
-			activeKey: '/library',
-			icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"/>`
-		},
-		// {
-		// 	label: 'Documents',
-		// 	href: '/documents',
-		// 	activeKey: '/document',
-		// 	icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 3v4a1 1 0 0 1-1 1H5m5 10v-2m3 2v-6m3 6v-3m4-11v16a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7.914a1 1 0 0 1 .293-.707l3.914-3.914A1 1 0 0 1 9.914 3H18a1 1 0 0 1 1 1Z"/>`
-		// },
-		// {
-		// 	label: 'Data Sources',
-		// 	href: '/data-layers',
-		// 	activeKey: '/data-layer',
-		// 	icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>`
-		// },
-		{
-			label: 'Store Inspector',
-			href: '/admin/store',
-			activeKey: '/admin/store',
-			icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>`
-		},
-		{
-			label: 'Learning',
-			href: '/learning',
-			activeKey: 'analysis',
-			icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 14H4m6.5 3L8 20m5.5-3 2.5 3M4.88889 17H19.1111c.4909 0 .8889-.4157.8889-.9286V4.92857C20 4.41574 19.602 4 19.1111 4H4.88889C4.39797 4 4 4.41574 4 4.92857V16.0714c0 .5129.39797.9286.88889.9286ZM13 14v-3h4v3h-4Z"/>`
-		},
-		{
-			label: 'Support',
-			href: '/support',
-			activeKey: 'support',
-			icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.03v13m0-13c-2.819-.831-4.715-1.076-8.029-1.023A.99.99 0 0 0 3 6v11c0 .563.466 1.014 1.03 1.007 3.122-.043 5.018.212 7.97 1.023m0-13c2.819-.831 4.715-1.076 8.029-1.023A.99.99 0 0 1 21 6v11c0 .563-.466 1.014-1.03 1.007-3.122-.043-5.018.212-7.97 1.023"/>`
-		}
-	];
+	/** Project id from workspace URL, else last dashboard-selected project (localStorage). */
+	const workspaceProjectId = $derived.by(() => {
+		const path = $page.url.pathname;
+		const m = path.match(/^\/projects\/workspace\/([^/]+)/);
+		if (m?.[1]) return m[1];
+		return browser ? DashboardStorage.getSelectedProjectId() : null;
+	});
+
+	const navItems = $derived.by((): NavItem[] => {
+		const pid = workspaceProjectId;
+		const projectWorkspaceBase = pid ? `/projects/workspace/${pid}` : null;
+		const documentAnalysisHref = projectWorkspaceBase
+			? `${projectWorkspaceBase}/document-analysis`
+			: '/projects';
+		const dealRoomHref = projectWorkspaceBase ? `${projectWorkspaceBase}/deal-room` : '/projects';
+
+		return [
+			{
+				label: 'Projects',
+				href: '/projects',
+				activeKey: '/project',
+				icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776"/>`
+			},
+			{
+				label: 'Document Analysis',
+				href: documentAnalysisHref,
+				activeKey: 'document-analysis',
+				icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Zm3.75 11.625a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/>`
+			},
+			{
+				label: 'Dashboard',
+				href: '/dashboard',
+				activeKey: '/dashboard',
+				icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z"/>`
+			},
+			{
+				label: 'Workflows',
+				href: '/workflow',
+				activeKey: '/workflow',
+				disabled: true,
+				icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/>`
+			},
+			{
+				label: 'Prompt Library',
+				href: '/library',
+				activeKey: '/library',
+				icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"/>`
+			},
+			{
+				label: 'Knowledge Map',
+				href: '/admin/store',
+				activeKey: '/admin/store',
+				icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z"/>`
+			},
+			{
+				label: 'Deal Room',
+				href: dealRoomHref,
+				activeKey: 'deal-room',
+				icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0 1 12 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 0 1-.673-.38m0 0A2.18 2.18 0 0 1 3 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 0 1 3.413-.387m7.5 0V5.25A2.25 2.25 0 0 0 13.5 3h-3a2.25 2.25 0 0 0-2.25 2.25v.894m7.5 0a48.667 48.667 0 0 0-7.5 0M12 12.75h.008v.008H12v-.008Z"/>`
+			},
+			{
+				label: 'Learning',
+				href: '/learning',
+				activeKey: 'analysis',
+				icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5"/>`
+			},
+			{
+				label: 'Support',
+				href: '/support',
+				activeKey: 'support',
+				icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16.712 4.33a9.027 9.027 0 0 1 1.652 1.306c.51.51.944 1.064 1.306 1.652M16.712 4.33l-3.448 4.138m3.448-4.138a9.014 9.014 0 0 0-9.424 0M19.67 7.288l-4.138 3.448m4.138-3.448a9.014 9.014 0 0 1 0 9.424m-4.138-5.976a3.736 3.736 0 0 0-.88-1.388 3.737 3.737 0 0 0-1.388-.88m2.268 2.268a3.765 3.765 0 0 1 0 2.528m-2.268-4.796a3.765 3.765 0 0 0-2.528 0m4.796 4.796c-.181.506-.475.982-.88 1.388a3.736 3.736 0 0 1-1.388.88m2.268-2.268 4.138 3.448m0 0a9.027 9.027 0 0 1-1.306 1.652c-.51.51-1.064.944-1.652 1.306m0 0-3.448-4.138m3.448 4.138a9.014 9.014 0 0 1-9.424 0m5.976-4.138a3.765 3.765 0 0 1-2.528 0m0 0a3.736 3.736 0 0 1-1.388-.88 3.737 3.737 0 0 1-.88-1.388m2.268 2.268L7.288 19.67m0 0a9.024 9.024 0 0 1-1.652-1.306 9.027 9.027 0 0 1-1.306-1.652m0 0 4.138-3.448M4.33 16.712a9.014 9.014 0 0 1 0-9.424m4.138 5.976a3.765 3.765 0 0 1 0-2.528m0 0c.181-.506.475-.982.88-1.388a3.736 3.736 0 0 1 1.388-.88m-2.268 2.268L4.33 7.288m6.406 1.18L7.288 4.33m0 0a9.024 9.024 0 0 0-1.652 1.306A9.025 9.025 0 0 0 4.33 7.288"/>`
+			}
+		];
+	});
+
+	function navItemIsActive(item: NavItem): boolean {
+		if (item.disabled) return false;
+		if (active === item.activeKey) return true;
+		const path = $page.url.pathname;
+		if (item.activeKey === 'document-analysis' && path.includes('/document-analysis')) return true;
+		if (item.activeKey === 'deal-room' && path.includes('/deal-room')) return true;
+		return false;
+	}
 </script>
 
 <div class="group relative flex h-full w-full flex-col {isDarkTheme ? 'bg-slate-900 border-primary-800/40' : 'bg-white border-primary-200/60'} border-r shadow-sm overflow-visible">
@@ -162,49 +201,85 @@
 	<!-- Navigation -->
 	<nav class="flex-1 overflow-y-auto {isSidebarOpen ? 'p-5' : 'p-3'} space-y-1">
 		{#each navItems as item}
-			<a
-				href={item.href}
-				class={`group flex rounded-lg px-3 py-2.5 text-sm font-medium transition-all
-					${isSidebarOpen ? 'items-center gap-3' : 'justify-center items-center'}
+			{#if item.disabled}
+				<div
+					class={`flex rounded-lg py-2.5 text-sm font-medium cursor-not-allowed select-none
+					${isSidebarOpen ? 'items-center gap-3 px-3' : 'justify-center items-center px-3'}
+					${isDarkTheme ? 'text-slate-500' : 'text-slate-400'}`}
+					aria-disabled="true"
+					title={isSidebarOpen ? undefined : `${item.label} — Coming Soon`}
+					aria-label={`${item.label}, Coming Soon, unavailable`}
+				>
+					<svg
+						class={`shrink-0 ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6'} ${isDarkTheme ? 'text-slate-500' : 'text-slate-400'}`}
+						aria-hidden="true"
+						xmlns="http://www.w3.org/2000/svg"
+						width="24"
+						height="24"
+						fill="none"
+						viewBox="0 0 24 24"
+					>
+						{@html item.icon}
+					</svg>
+					{#if isSidebarOpen}
+						<span class="flex-1 min-w-0 text-left truncate">{item.label}</span>
+						<span
+							class={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${isDarkTheme ? 'bg-slate-700/90 text-slate-400' : 'bg-slate-200 text-slate-600'}`}
+						>
+							Coming Soon
+						</span>
+					{/if}
+				</div>
+			{:else}
+				<a
+					href={item.href}
+					class={`group flex rounded-lg py-2.5 text-sm font-medium transition-all
+					${isSidebarOpen ? 'items-center gap-3 px-3' : 'justify-center items-center px-3'}
 					${
-						active === item.activeKey
-							? isDarkTheme 
-								? 'bg-primary-900/50 text-primary-100 shadow-sm' 
+						navItemIsActive(item)
+							? isDarkTheme
+								? 'bg-primary-900/50 text-primary-100 shadow-sm'
 								: 'bg-primary-100 text-primary-800 shadow-sm'
 							: isDarkTheme
 								? 'text-slate-300 hover:bg-primary-900/40 hover:text-primary-200'
 								: 'text-slate-700 hover:bg-primary-100/60 hover:text-primary-900'
 					}
 				`}
-				onclick={() => (active = item.activeKey)}
-			>
-				<svg 
-					class={`flex-shrink-0 transition-colors ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6'} ${
-						active === item.activeKey
-							? isDarkTheme ? 'text-primary-100' : 'text-primary-800'
-							: isDarkTheme ? 'text-slate-400 group-hover:text-primary-200' : 'text-slate-500 group-hover:text-primary-700'
-					}`}
-					aria-hidden="true" 
-					xmlns="http://www.w3.org/2000/svg" 
-					width="24" 
-					height="24" 
-					fill="none" 
-					viewBox="0 0 24 24"
+					onclick={() => (active = item.activeKey)}
 				>
-					{@html item.icon}
-				</svg>
-				{#if isSidebarOpen}
-					<span class="flex-1 text-left whitespace-nowrap">{item.label}</span>
-					<svg 
-						class={`w-4 h-4 ${isDarkTheme ? 'text-slate-500' : 'text-slate-400'} opacity-0 group-hover:opacity-100 transition-opacity`}
-						fill="none" 
-						stroke="currentColor" 
+					<svg
+						class={`shrink-0 transition-colors ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6'} ${
+							navItemIsActive(item)
+								? isDarkTheme
+									? 'text-primary-100'
+									: 'text-primary-800'
+								: isDarkTheme
+									? 'text-slate-400 group-hover:text-primary-200'
+									: 'text-slate-500 group-hover:text-primary-700'
+						}`}
+						aria-hidden="true"
+						xmlns="http://www.w3.org/2000/svg"
+						width="24"
+						height="24"
+						fill="none"
 						viewBox="0 0 24 24"
 					>
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16m-7-7l7 7-7 7"></path>
+						{@html item.icon}
 					</svg>
-				{/if}
-			</a>
+					{#if isSidebarOpen}
+						<span class="flex-1 text-left whitespace-nowrap">{item.label}</span>
+						<svg
+							class={`w-4 h-4 ${isDarkTheme ? 'text-slate-500' : 'text-slate-400'} opacity-0 group-hover:opacity-100 transition-opacity`}
+							fill="none"
+							stroke="currentColor"
+							viewBox="0 0 24 24"
+						>
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16m-7-7l7 7-7 7"
+							></path>
+						</svg>
+					{/if}
+				</a>
+			{/if}
 		{/each}
 	</nav>
 

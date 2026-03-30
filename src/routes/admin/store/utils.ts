@@ -1,5 +1,5 @@
 /**
- * Utilities for the admin store inspector page.
+ * Utilities for the admin Knowledge Map page.
  * Schema-to-field conversion, topic counting, and pattern matching.
  */
 

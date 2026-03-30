@@ -5,7 +5,7 @@
 	 * A compact list of Data Streams from the StreamCatalog.
 	 * Optionally filters by schema compatibility with a given widget schemaId.
 	 * Used inside the WidgetWrapper configure dialog, SendToDashboard modal, and
-	 * the Store Inspector streams panel.
+	 * the Knowledge Map streams panel.
 	 */
 	import { streamCatalog, type DataStream } from '$lib/stores/streamCatalog.svelte';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';

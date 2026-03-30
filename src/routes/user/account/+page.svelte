@@ -15,8 +15,8 @@
 	let newPassword = $state('');
 	let confirmPassword = $state('');
 
-	// Avatar state
-	let avatarUrl = $state('/images/remove/dh.jpg');
+	// Avatar state (empty until user uploads a photo)
+	let avatarUrl = $state('');
 	let showTimezoneTooltip = $state(false);
 	let showAccountTypeTooltip = $state(false);
 </script>
@@ -52,11 +52,28 @@
 
 					<!-- Avatar Section -->
 					<div class="flex items-center gap-6 mb-6 pb-6 {darkMode ? 'border-slate-700' : 'border-slate-200'} border-b">
-						<img
-							src={avatarUrl}
-							alt=""
-							class="h-20 w-20 rounded-full {darkMode ? 'ring-2 ring-slate-700' : 'ring-2 ring-slate-200'} object-cover"
-						/>
+						{#if avatarUrl}
+							<img
+								src={avatarUrl}
+								alt=""
+								class="h-20 w-20 rounded-full {darkMode ? 'ring-2 ring-slate-700' : 'ring-2 ring-slate-200'} object-cover"
+							/>
+						{:else}
+							<div
+								class="flex h-20 w-20 shrink-0 items-center justify-center rounded-full ring-2 {darkMode
+									? 'bg-slate-700 text-slate-400 ring-slate-700'
+									: 'bg-slate-100 text-slate-500 ring-slate-200'}"
+								aria-hidden="true"
+							>
+								<svg class="h-10 w-10" fill="currentColor" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+									<path
+										fill-rule="evenodd"
+										d="M8 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+										clip-rule="evenodd"
+									/>
+								</svg>
+							</div>
+						{/if}
 						<div class="flex items-center gap-3">
 							<button
 								type="button"

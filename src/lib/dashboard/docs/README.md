@@ -64,6 +64,8 @@ src/lib/dashboard/
     └── IMPLEMENTATION_SUMMARY.md           # What was built
 ```
 
+**AI Streams (Data Streams):** [`docs/AI_STREAMS.md`](../../../../docs/AI_STREAMS.md) — structured AI output → widgets via `streamCatalog`, topics, and `ValidatedTopicStore`.
+
 ---
 
 ## 🚀 Quick Start

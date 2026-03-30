@@ -139,29 +139,36 @@
 	// Tab navigation items
 	const tabs = [
 		{ href: 'get-started', label: 'Get Started' },
-		{ href: 'document-analysis', label: 'Document Analysis' },
-		{ href: 'deal-room', label: 'Deal Room' },
-		{ href: 'financial-analysis', label: 'Financial Analysis' }
+		{ href: 'document-analysis', label: 'Document Analysis' }
 	];
+
+	function tabHref(href: string): string {
+		return href === 'get-started' ? workspaceBasePath : `${workspaceBasePath}/${href}`;
+	}
 
 	// Check if a tab is active
 	const isActive = (href: string) => {
 		return currentPath === `${workspaceBasePath}/${href}` ||
-		       (href === 'get-started' && currentPath === workspaceBasePath) ||
-		       (href === 'deal-room' && currentPath.startsWith(`${workspaceBasePath}/deal-room`)) ||
-		       (href === 'financial-analysis' && currentPath.startsWith(`${workspaceBasePath}/financial-analysis`));
+			(href === 'get-started' && currentPath === workspaceBasePath);
 	};
 
-	// Get current active tab for dropdown
+	// Select / highlight value (includes unlisted workspace routes e.g. sidebar-only pages)
 	const activeTab = $derived.by(() => {
 		for (const tab of tabs) {
 			if (isActive(tab.href)) {
-				return tab.href === 'get-started' ? workspaceBasePath : `${workspaceBasePath}/${tab.href}`;
+				return tabHref(tab.href);
 			}
 		}
-		// Default to get-started if no match
+		if (
+			workspaceBasePath &&
+			(currentPath === workspaceBasePath || currentPath.startsWith(`${workspaceBasePath}/`))
+		) {
+			return currentPath;
+		}
 		return workspaceBasePath;
 	});
+
+	const activeTabIsListed = $derived(tabs.some((t) => tabHref(t.href) === activeTab));
 
 	// Handle dropdown change
 	function handleDropdownChange(event: Event) {
@@ -275,20 +282,21 @@
 					: 'bg-white border-indigo-200 text-slate-900 focus:ring-indigo-500 focus:border-indigo-500'}"
 			>
 				{#each tabs as tab}
-					{@const tabHref = tab.href === 'get-started' ? workspaceBasePath : `${workspaceBasePath}/${tab.href}`}
-					<option value={tabHref}>
+					<option value={tabHref(tab.href)}>
 						{tab.label}
 					</option>
 				{/each}
+				{#if !activeTabIsListed}
+					<option value={activeTab}>{pageTitle}</option>
+				{/if}
 			</select>
 		</div>
 
 		<!-- Tab buttons for larger screens -->
 		<div class="hidden md:flex items-center gap-1 overflow-x-auto scrollbar-hide">
 			{#each tabs as tab}
-				{@const tabHref = tab.href === 'get-started' ? workspaceBasePath : `${workspaceBasePath}/${tab.href}`}
 				<TabButton 
-					href={tabHref}
+					href={tabHref(tab.href)}
 					className={`flex-shrink-0 ${isActive(tab.href) 
 						? (darkMode 
 							? 'text-white bg-indigo-600 hover:bg-indigo-700 border-indigo-500 shadow-sm' 
