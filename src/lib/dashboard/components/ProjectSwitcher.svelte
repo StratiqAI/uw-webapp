@@ -71,30 +71,18 @@
 						No projects available
 					</div>
 				{:else}
-					<button
-						onclick={() => handleSelect(null)}
-						class="w-full text-left px-3 py-2 rounded-md text-sm {darkMode ? selectedProjectId === null ? 'bg-indigo-900 text-indigo-300' : 'text-slate-300 hover:bg-slate-700' : selectedProjectId === null ? 'bg-indigo-100 text-indigo-700' : 'text-slate-700 hover:bg-slate-100'} transition-colors"
-					>
-						<div class="flex items-center gap-2">
-							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h8v8H3V3Zm10 0h8v5h-8V3ZM3 14h8v7H3v-7Zm10 3h8v4h-8v-4Z"></path>
-							</svg>
-							<span>All Projects</span>
-						</div>
-					</button>
-					<div class="h-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'} my-2"></div>
 					{#each projects as project}
 						<button
 							onclick={() => handleSelect(project.id)}
 							class="w-full text-left px-3 py-2 rounded-md text-sm {darkMode ? selectedProjectId === project.id ? 'bg-indigo-900 text-indigo-300' : 'text-slate-300 hover:bg-slate-700' : selectedProjectId === project.id ? 'bg-indigo-100 text-indigo-700' : 'text-slate-700 hover:bg-slate-100'} transition-colors"
 						>
 							<div class="flex items-center gap-2">
-								<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5m-4 0h4"></path>
 								</svg>
 								<span class="truncate">{project.name || 'Unnamed Project'}</span>
 								{#if selectedProjectId === project.id}
-									<svg class="w-4 h-4 ml-auto flex-shrink-0 {darkMode ? 'text-indigo-300' : 'text-indigo-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<svg class="w-4 h-4 ml-auto shrink-0 {darkMode ? 'text-indigo-300' : 'text-indigo-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
 									</svg>
 								{/if}
@@ -102,6 +90,18 @@
 						</button>
 					{/each}
 				{/if}
+				<div class="h-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'} my-2"></div>
+				<button
+					onclick={() => { isOpen = false; goto('/projects?action=new'); }}
+					class="w-full text-left px-3 py-2 rounded-md text-sm transition-colors {darkMode ? 'text-indigo-400 hover:bg-slate-700' : 'text-indigo-600 hover:bg-slate-100'}"
+				>
+					<div class="flex items-center gap-2">
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+						</svg>
+						<span>Create New Project</span>
+					</div>
+				</button>
 			</div>
 		</div>
 	{/if}

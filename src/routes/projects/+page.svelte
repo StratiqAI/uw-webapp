@@ -9,6 +9,7 @@
 	// Environment Section
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 
 	// Realtime Section
 	import { ProjectSyncManager, store } from '$lib/realtime/websocket/projectSync';
@@ -112,6 +113,13 @@
 		title: 'My StratiqAI Projects',
 		subtitle: 'My StratiqAI Projects'
 	};
+
+	$effect(() => {
+		if (browser && $page.url.searchParams.get('action') === 'new') {
+			history.replaceState(null, '', '/projects');
+			createNewProjectHandler(new Event('click'));
+		}
+	});
 
 	async function createNewProjectHandler(e: Event) {
 		e.preventDefault();
