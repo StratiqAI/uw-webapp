@@ -1,0 +1,21 @@
+{
+	"compilerOptions": {
+		"target": "ESNext",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"strict": true,
+		"declaration": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"isolatedModules": true,
+		"outDir": "dist",
+		"paths": {
+			"@stratiqai/dashboard-widget-sdk": ["../../node_modules/@stratiqai/dashboard-widget-sdk/dist"],
+			"@stratiqai/widget-pro-forma-base": ["../../node_modules/@stratiqai/widget-pro-forma-base/dist"],
+			"@stratiqai/widget-pro-forma-unlevered-cf": ["../../node_modules/@stratiqai/widget-pro-forma-unlevered-cf/dist"]
+		}
+	},
+	"include": ["src/lib"]
+}

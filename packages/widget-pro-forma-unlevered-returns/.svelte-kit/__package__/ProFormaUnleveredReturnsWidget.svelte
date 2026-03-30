@@ -1,0 +1,280 @@
+<script lang="ts">
+	import {
+		useReactiveValidatedTopic,
+		getDashboardWidgetHost,
+		type StandardWidgetProps
+	} from '@stratiqai/dashboard-widget-sdk';
+	import { FlipCard, fmt, pct, proFormaTheme, irr, npv, equityMultiple } from '@stratiqai/widget-pro-forma-base';
+	import {
+		computeUnleveredProjections,
+		extractUnleveredCashFlows
+	} from '@stratiqai/widget-pro-forma-unlevered-cf';
+	import type { ProFormaUnleveredReturnsConfig, ProFormaUnleveredReturnsInput } from './schema.js';
+
+	const FORM_STEP_RATE = '0.01';
+	const FORM_STEP_CURRENCY = '1';
+
+	let {
+		data,
+		widgetId = 'pro-forma-unlevered-returns-default',
+		topicOverride,
+		darkMode = true,
+		onUpdateConfig,
+		onConfigureReady
+	}: StandardWidgetProps<ProFormaUnleveredReturnsConfig> = $props();
+
+	const host = getDashboardWidgetHost();
+	const topic = () => host.getWidgetTopic('proFormaUnleveredReturns', widgetId, topicOverride);
+	const topicData = useReactiveValidatedTopic<ProFormaUnleveredReturnsInput>(topic);
+
+	const widgetData = $derived<ProFormaUnleveredReturnsConfig>({
+		propertyName: data.propertyName,
+		projectionYears: data.projectionYears ?? 5,
+		purchasePrice: data.purchasePrice ?? 0,
+		acquisitionCosts: data.acquisitionCosts ?? 0,
+		initialCapEx: data.initialCapEx ?? 0,
+		egiYear1: data.egiYear1 ?? 0,
+		egiGrowthRate: data.egiGrowthRate ?? 0.03,
+		totalOpexYear1: data.totalOpexYear1 ?? 0,
+		opexGrowthRate: data.opexGrowthRate ?? 0.03,
+		terminalCapRate: data.terminalCapRate ?? 0.055,
+		costOfSalePercent: data.costOfSalePercent ?? 0.03,
+		unleveredDiscountRate: data.unleveredDiscountRate ?? 0.1
+	});
+
+	const mergedConfig = $derived<ProFormaUnleveredReturnsConfig>({
+		...widgetData,
+		...(topicData.current?.egiYear1 != null ? { egiYear1: topicData.current.egiYear1 } : {}),
+		...(topicData.current?.purchasePrice != null
+			? { purchasePrice: topicData.current.purchasePrice }
+			: {})
+	});
+
+	const unleveredResult = $derived(computeUnleveredProjections(mergedConfig));
+	const cfs = $derived(extractUnleveredCashFlows(unleveredResult));
+	const irrVal = $derived(irr(cfs));
+	const npvVal = $derived(npv(mergedConfig.unleveredDiscountRate, cfs));
+	const multVal = $derived(equityMultiple(cfs));
+
+	const N = $derived(mergedConfig.projectionYears);
+	const years = $derived(Array.from({ length: N + 1 }, (_, i) => i));
+
+	const t = $derived(proFormaTheme(darkMode));
+
+	function cellMetric(y: number, value: string): string {
+		return y === 0 ? value : '-';
+	}
+
+	let isFlipped = $state(false);
+	let draft = $state({
+		propertyName: '',
+		years: 5,
+		purchase: 0,
+		acqCosts: 0,
+		capEx: 0,
+		egiY1: 0,
+		egiG: 0.03,
+		opexY1: 0,
+		opexG: 0.03,
+		exitCap: 0.055,
+		costSale: 0.03,
+		discount: 0.1
+	});
+
+	function syncDraft() {
+		draft = {
+			propertyName: widgetData.propertyName ?? '',
+			years: widgetData.projectionYears,
+			purchase: widgetData.purchasePrice,
+			acqCosts: widgetData.acquisitionCosts,
+			capEx: widgetData.initialCapEx,
+			egiY1: widgetData.egiYear1,
+			egiG: widgetData.egiGrowthRate,
+			opexY1: widgetData.totalOpexYear1,
+			opexG: widgetData.opexGrowthRate,
+			exitCap: widgetData.terminalCapRate,
+			costSale: widgetData.costOfSalePercent,
+			discount: widgetData.unleveredDiscountRate
+		};
+	}
+
+	function toggleFlip() {
+		isFlipped = !isFlipped;
+		if (isFlipped) syncDraft();
+	}
+
+	$effect(() => {
+		onConfigureReady?.(toggleFlip);
+	});
+
+	function applyConfig() {
+		onUpdateConfig?.({
+			propertyName: draft.propertyName.trim() || undefined,
+			projectionYears: draft.years,
+			purchasePrice: draft.purchase,
+			acquisitionCosts: draft.acqCosts,
+			initialCapEx: draft.capEx,
+			egiYear1: draft.egiY1,
+			egiGrowthRate: draft.egiG,
+			totalOpexYear1: draft.opexY1,
+			opexGrowthRate: draft.opexG,
+			terminalCapRate: draft.exitCap,
+			costOfSalePercent: draft.costSale,
+			unleveredDiscountRate: draft.discount
+		});
+		isFlipped = false;
+	}
+</script>
+
+<FlipCard {isFlipped} shellClass={t.shell} flipBackClass={t.flipBackBg}>
+	{#snippet front()}
+		<table class="w-full border-collapse text-sm">
+			<thead>
+				<tr>
+					<th colspan={N + 2} class="px-4 py-2.5 text-left text-sm font-bold tracking-tight {t.headerBg} {t.headerText} rounded-t-lg">
+						Unlevered Return Metrics
+						{#if mergedConfig.propertyName}
+							<span class="ml-2 font-normal opacity-80">— {mergedConfig.propertyName}</span>
+						{/if}
+					</th>
+				</tr>
+				<tr class="{darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'} border-b">
+					<th class="px-4 py-2 text-left text-xs font-medium {t.muted} w-[200px]">($)</th>
+					{#each years as y}
+						<th class="px-3 py-2 text-right text-xs font-medium {t.muted} min-w-[72px]">Year {y}</th>
+					{/each}
+				</tr>
+			</thead>
+			<tbody>
+				<tr class={t.sectionHeaderBg}>
+					<td colspan={N + 2} class="px-4 py-1.5 text-xs uppercase tracking-wider {t.sectionHeaderText}">
+						Unlevered return metrics
+					</td>
+				</tr>
+
+				<tr class="border-b {t.cellBorder}">
+					<td class="py-1.5 pl-8 pr-4 text-xs {t.labelText}">Unlevered IRR</td>
+					{#each years as y}
+						<td class="px-3 py-1.5 text-right font-mono text-xs tabular-nums {t.cellText}">
+							{cellMetric(y, irrVal === null ? '—' : pct(irrVal))}
+						</td>
+					{/each}
+				</tr>
+
+				<tr class="border-b {t.cellBorder}">
+					<td class="py-1.5 pl-8 pr-4 text-xs {t.labelText}">Unlevered NPV</td>
+					{#each years as y}
+						<td class="px-3 py-1.5 text-right font-mono text-xs tabular-nums {t.cellText}">
+							{cellMetric(y, Number.isFinite(npvVal) ? fmt(npvVal) : '—')}
+						</td>
+					{/each}
+				</tr>
+
+				<tr class="{t.subtotalBg}">
+					<td class="py-2 pl-8 pr-4 text-xs {t.subtotalText}">Equity Multiple (Unlevered)</td>
+					{#each years as y}
+						<td class="px-3 py-2 text-right font-mono text-xs tabular-nums {t.subtotalText}">
+							{cellMetric(y, multVal === null ? '—' : `${multVal.toFixed(2)}x`)}
+						</td>
+					{/each}
+				</tr>
+			</tbody>
+		</table>
+
+		<div class="shrink-0 border-t px-4 py-2.5 text-[11px] {t.summaryBorder} {t.muted}">
+			Discount rate (NPV) {pct(mergedConfig.unleveredDiscountRate)} · Based on unlevered before-tax cash flows
+		</div>
+	{/snippet}
+
+	{#snippet back()}
+		<div class="flex min-h-full flex-col items-center px-4 py-5 sm:px-6">
+			<div class="flex w-full max-w-lg flex-1 flex-col">
+				<header class="mb-4">
+					<h3 class="text-lg font-bold {t.cfgTitle}">Configure Unlevered Returns</h3>
+					<p class="mt-1 text-sm {t.muted}">
+						Uses the same cash flows as the Unlevered CF widget. Set the hurdle rate for NPV.
+					</p>
+				</header>
+				<section class="{t.cfgPanel} max-h-[calc(100%-72px)] overflow-y-auto">
+					<form
+						class="flex flex-col gap-3"
+						onsubmit={(e) => {
+							e.preventDefault();
+							applyConfig();
+						}}
+					>
+						<label class="block">
+							<span class={t.cfgLabel}>Property name (optional)</span>
+							<input type="text" bind:value={draft.propertyName} class={t.cfgField} />
+						</label>
+						<label class="block">
+							<span class={t.cfgLabel}>Unlevered discount rate (NPV)</span>
+							<input type="number" bind:value={draft.discount} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
+						</label>
+						<label class="block">
+							<span class={t.cfgLabel}>Holding period (Year N)</span>
+							<input type="number" bind:value={draft.years} min="1" max="10" class={t.cfgField} />
+						</label>
+						<fieldset class="rounded-lg border p-3 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
+							<legend class="px-1 text-xs font-semibold {t.muted}">Acquisition</legend>
+							<div class="grid grid-cols-3 gap-2">
+								<label class="block"
+									><span class={t.cfgLabel}>Purchase</span>
+									<input type="number" bind:value={draft.purchase} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
+								</label>
+								<label class="block"
+									><span class={t.cfgLabel}>Acq. costs</span>
+									<input type="number" bind:value={draft.acqCosts} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
+								</label>
+								<label class="block"
+									><span class={t.cfgLabel}>CapEx</span>
+									<input type="number" bind:value={draft.capEx} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
+								</label>
+							</div>
+						</fieldset>
+						<fieldset class="rounded-lg border p-3 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
+							<legend class="px-1 text-xs font-semibold {t.muted}">NOI</legend>
+							<div class="grid grid-cols-2 gap-2">
+								<label class="block"
+									><span class={t.cfgLabel}>Y1 EGI</span>
+									<input type="number" bind:value={draft.egiY1} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
+								</label>
+								<label class="block"
+									><span class={t.cfgLabel}>EGI gr.</span>
+									<input type="number" bind:value={draft.egiG} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
+								</label>
+								<label class="block"
+									><span class={t.cfgLabel}>Y1 OpEx</span>
+									<input type="number" bind:value={draft.opexY1} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
+								</label>
+								<label class="block"
+									><span class={t.cfgLabel}>OpEx gr.</span>
+									<input type="number" bind:value={draft.opexG} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
+								</label>
+							</div>
+						</fieldset>
+						<fieldset class="rounded-lg border p-3 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
+							<legend class="px-1 text-xs font-semibold {t.muted}">Exit</legend>
+							<div class="grid grid-cols-2 gap-2">
+								<label class="block"
+									><span class={t.cfgLabel}>Terminal cap</span>
+									<input type="number" bind:value={draft.exitCap} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
+								</label>
+								<label class="block"
+									><span class={t.cfgLabel}>Cost of sale</span>
+									<input type="number" bind:value={draft.costSale} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
+								</label>
+							</div>
+						</fieldset>
+						<div class="flex justify-end gap-2 border-t pt-4 {darkMode ? 'border-slate-600' : 'border-slate-200'}">
+							<button type="button" class={t.cfgBtnSecondary} onclick={() => (isFlipped = false)}>Cancel</button>
+							<button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500">
+								Apply
+							</button>
+						</div>
+					</form>
+				</section>
+			</div>
+		</div>
+	{/snippet}
+</FlipCard>

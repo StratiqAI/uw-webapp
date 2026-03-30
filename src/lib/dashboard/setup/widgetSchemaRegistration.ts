@@ -35,7 +35,14 @@ const WIDGET_NAMES: Record<WidgetType, string> = {
 	locationQuotient: 'Location Quotient Widget',
 	jsonViewer: 'JSON Viewer',
 	brokerCard: 'Broker Card',
-	lqAnalysis: 'LQ Analysis'
+	lqAnalysis: 'LQ Analysis',
+	proFormaRevenue: 'Pro Forma Revenue',
+	proFormaOpEx: 'Pro Forma OpEx',
+	proFormaNoi: 'Pro Forma NOI',
+	proFormaUnleveredCf: 'Pro Forma Unlevered CF',
+	proFormaLeveredCf: 'Pro Forma Levered CF',
+	proFormaUnleveredReturns: 'Pro Forma Unlevered Returns',
+	proFormaLeveredReturns: 'Pro Forma Levered Returns'
 };
 
 export const WIDGET_TYPES: WidgetType[] = [

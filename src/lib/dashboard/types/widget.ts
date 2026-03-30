@@ -4,6 +4,13 @@ import type { MetricWidgetData } from '@stratiqai/widget-metric';
 import type { JsonViewerWidgetData } from '@stratiqai/widget-json-viewer';
 import type { BrokerCardWidgetData } from '@stratiqai/widget-broker-card';
 import type { LqAnalysisConfig } from '@stratiqai/widget-lq-analysis';
+import type { ProFormaRevenueConfig } from '@stratiqai/widget-pro-forma-revenue';
+import type { ProFormaOpExConfig } from '@stratiqai/widget-pro-forma-opex';
+import type { ProFormaNoiConfig } from '@stratiqai/widget-pro-forma-noi';
+import type { ProFormaUnleveredCfConfig } from '@stratiqai/widget-pro-forma-unlevered-cf';
+import type { ProFormaLeveredCfConfig } from '@stratiqai/widget-pro-forma-levered-cf';
+import type { ProFormaUnleveredReturnsConfig } from '@stratiqai/widget-pro-forma-unlevered-returns';
+import type { ProFormaLeveredReturnsConfig } from '@stratiqai/widget-pro-forma-levered-returns';
 export type WidgetType =
 	| 'table'
 	| 'title'
@@ -23,7 +30,14 @@ export type WidgetType =
 	| 'locationQuotient'
 	| 'jsonViewer'
 	| 'brokerCard'
-	| 'lqAnalysis';
+	| 'lqAnalysis'
+	| 'proFormaRevenue'
+	| 'proFormaOpEx'
+	| 'proFormaNoi'
+	| 'proFormaUnleveredCf'
+	| 'proFormaLeveredCf'
+	| 'proFormaUnleveredReturns'
+	| 'proFormaLeveredReturns';
 
 export interface Position {
 	gridColumn: number;
@@ -266,6 +280,41 @@ export interface LqAnalysisWidgetDef extends BaseWidget {
 	data: LqAnalysisConfig;
 }
 
+export interface ProFormaRevenueWidgetDef extends BaseWidget {
+	type: 'proFormaRevenue';
+	data: ProFormaRevenueConfig;
+}
+
+export interface ProFormaOpExWidgetDef extends BaseWidget {
+	type: 'proFormaOpEx';
+	data: ProFormaOpExConfig;
+}
+
+export interface ProFormaNoiWidgetDef extends BaseWidget {
+	type: 'proFormaNoi';
+	data: ProFormaNoiConfig;
+}
+
+export interface ProFormaUnleveredCfWidgetDef extends BaseWidget {
+	type: 'proFormaUnleveredCf';
+	data: ProFormaUnleveredCfConfig;
+}
+
+export interface ProFormaLeveredCfWidgetDef extends BaseWidget {
+	type: 'proFormaLeveredCf';
+	data: ProFormaLeveredCfConfig;
+}
+
+export interface ProFormaUnleveredReturnsWidgetDef extends BaseWidget {
+	type: 'proFormaUnleveredReturns';
+	data: ProFormaUnleveredReturnsConfig;
+}
+
+export interface ProFormaLeveredReturnsWidgetDef extends BaseWidget {
+	type: 'proFormaLeveredReturns';
+	data: ProFormaLeveredReturnsConfig;
+}
+
 export type Widget =
 	| TableWidget
 	| TitleWidget
@@ -285,7 +334,14 @@ export type Widget =
 	| LocationQuotientWidget
 	| JsonViewerWidget
 	| BrokerCardWidget
-	| LqAnalysisWidgetDef;
+	| LqAnalysisWidgetDef
+	| ProFormaRevenueWidgetDef
+	| ProFormaOpExWidgetDef
+	| ProFormaNoiWidgetDef
+	| ProFormaUnleveredCfWidgetDef
+	| ProFormaLeveredCfWidgetDef
+	| ProFormaUnleveredReturnsWidgetDef
+	| ProFormaLeveredReturnsWidgetDef;
 
 export interface DashboardConfig {
 	gridColumns: number;

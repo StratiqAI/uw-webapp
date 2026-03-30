@@ -1,0 +1,20 @@
+export declare const proFormaLeveredReturnsWidget: import("@stratiqai/dashboard-widget-sdk").WidgetManifest<{
+    leveredDiscountRate: number;
+    projectionYears: number;
+    purchasePrice: number;
+    acquisitionCosts: number;
+    initialCapEx: number;
+    egiYear1: number;
+    egiGrowthRate: number;
+    totalOpexYear1: number;
+    opexGrowthRate: number;
+    terminalCapRate: number;
+    costOfSalePercent: number;
+    loanLtv: number;
+    loanInterestRate: number;
+    amortizationYears: number;
+    interestOnly: boolean;
+    propertyName?: string | undefined;
+}>;
+export type { ProFormaLeveredReturnsConfig, ProFormaLeveredReturnsInput } from './schema.js';
+export { proFormaLeveredReturnsConfigSchema, proFormaLeveredReturnsInputSchema } from './schema.js';

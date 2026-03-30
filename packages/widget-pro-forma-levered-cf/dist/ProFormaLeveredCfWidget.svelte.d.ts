@@ -1,0 +1,20 @@
+import { type StandardWidgetProps } from '@stratiqai/dashboard-widget-sdk';
+declare const ProFormaLeveredCfWidget: import("svelte").Component<StandardWidgetProps<{
+    egiYear1: number;
+    totalOpexYear1: number;
+    purchasePrice: number;
+    loanLtv: number;
+    loanInterestRate: number;
+    amortizationYears: number;
+    interestOnly: boolean;
+    projectionYears: number;
+    acquisitionCosts: number;
+    initialCapEx: number;
+    egiGrowthRate: number;
+    opexGrowthRate: number;
+    terminalCapRate: number;
+    costOfSalePercent: number;
+    propertyName?: string | undefined;
+}>, {}, "">;
+type ProFormaLeveredCfWidget = ReturnType<typeof ProFormaLeveredCfWidget>;
+export default ProFormaLeveredCfWidget;

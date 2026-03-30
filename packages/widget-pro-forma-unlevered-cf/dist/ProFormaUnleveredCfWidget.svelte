@@ -1,0 +1,323 @@
+<script lang="ts">
+	import {
+		useReactiveValidatedTopic,
+		getDashboardWidgetHost,
+		type StandardWidgetProps
+	} from '@stratiqai/dashboard-widget-sdk';
+	import { FlipCard, fmt, pct, proFormaTheme } from '@stratiqai/widget-pro-forma-base';
+	import type { ProFormaUnleveredCfConfig, ProFormaUnleveredCfInput } from './schema.js';
+	import { computeUnleveredProjections } from './calculations.js';
+
+	const FORM_STEP_RATE = '0.01';
+	const FORM_STEP_CURRENCY = '1';
+
+	let {
+		data,
+		widgetId = 'pro-forma-unlevered-cf-default',
+		topicOverride,
+		darkMode = true,
+		onUpdateConfig,
+		onConfigureReady
+	}: StandardWidgetProps<ProFormaUnleveredCfConfig> = $props();
+
+	const host = getDashboardWidgetHost();
+	const topic = () => host.getWidgetTopic('proFormaUnleveredCf', widgetId, topicOverride);
+	const topicData = useReactiveValidatedTopic<ProFormaUnleveredCfInput>(topic);
+
+	const widgetData = $derived<ProFormaUnleveredCfConfig>({
+		propertyName: data.propertyName,
+		projectionYears: data.projectionYears ?? 5,
+		purchasePrice: data.purchasePrice ?? 0,
+		acquisitionCosts: data.acquisitionCosts ?? 0,
+		initialCapEx: data.initialCapEx ?? 0,
+		egiYear1: data.egiYear1 ?? 0,
+		egiGrowthRate: data.egiGrowthRate ?? 0.03,
+		totalOpexYear1: data.totalOpexYear1 ?? 0,
+		opexGrowthRate: data.opexGrowthRate ?? 0.03,
+		terminalCapRate: data.terminalCapRate ?? 0.055,
+		costOfSalePercent: data.costOfSalePercent ?? 0.03
+	});
+
+	const mergedConfig = $derived<ProFormaUnleveredCfConfig>({
+		...widgetData,
+		...(topicData.current?.egiYear1 != null ? { egiYear1: topicData.current.egiYear1 } : {}),
+		...(topicData.current?.totalOpexYear1 != null
+			? { totalOpexYear1: topicData.current.totalOpexYear1 }
+			: {}),
+		...(topicData.current?.purchasePrice != null
+			? { purchasePrice: topicData.current.purchasePrice }
+			: {})
+	});
+
+	const result = $derived(computeUnleveredProjections(mergedConfig));
+	const columns = $derived(result.columns);
+	const t = $derived(proFormaTheme(darkMode));
+
+	function fmtCf(year: number, value: number): string {
+		if (year === 0 && value === 0 && mergedConfig.purchasePrice + mergedConfig.acquisitionCosts + mergedConfig.initialCapEx === 0) {
+			return '-';
+		}
+		if (value === 0 && year > 0) return '-';
+		if (value < 0) return `(${fmt(Math.abs(value))})`;
+		return fmt(value);
+	}
+
+	function fmtAcq(year: number, amount: number): string {
+		if (year !== 0 || amount === 0) return '-';
+		return `(${fmt(amount)})`;
+	}
+
+	function fmtSale(year: number, N: number, amount: number, valid: boolean): string {
+		if (year !== N) return '-';
+		if (!valid) return '—';
+		if (amount === 0) return '-';
+		return fmt(amount);
+	}
+
+	let isFlipped = $state(false);
+	let draftPropertyName = $state('');
+	let draftYears = $state(5);
+	let draftPurchase = $state(0);
+	let draftAcqCosts = $state(0);
+	let draftCapEx = $state(0);
+	let draftEgiY1 = $state(0);
+	let draftEgiGrowth = $state(0.03);
+	let draftOpexY1 = $state(0);
+	let draftOpexGrowth = $state(0.03);
+	let draftExitCap = $state(0.055);
+	let draftCostSale = $state(0.03);
+
+	function syncDraft() {
+		draftPropertyName = widgetData.propertyName ?? '';
+		draftYears = widgetData.projectionYears;
+		draftPurchase = widgetData.purchasePrice;
+		draftAcqCosts = widgetData.acquisitionCosts;
+		draftCapEx = widgetData.initialCapEx;
+		draftEgiY1 = widgetData.egiYear1;
+		draftEgiGrowth = widgetData.egiGrowthRate;
+		draftOpexY1 = widgetData.totalOpexYear1;
+		draftOpexGrowth = widgetData.opexGrowthRate;
+		draftExitCap = widgetData.terminalCapRate;
+		draftCostSale = widgetData.costOfSalePercent;
+	}
+
+	function toggleFlip() {
+		isFlipped = !isFlipped;
+		if (isFlipped) syncDraft();
+	}
+
+	$effect(() => {
+		onConfigureReady?.(toggleFlip);
+	});
+
+	function applyConfig() {
+		onUpdateConfig?.({
+			propertyName: draftPropertyName.trim() || undefined,
+			projectionYears: draftYears,
+			purchasePrice: draftPurchase,
+			acquisitionCosts: draftAcqCosts,
+			initialCapEx: draftCapEx,
+			egiYear1: draftEgiY1,
+			egiGrowthRate: draftEgiGrowth,
+			totalOpexYear1: draftOpexY1,
+			opexGrowthRate: draftOpexGrowth,
+			terminalCapRate: draftExitCap,
+			costOfSalePercent: draftCostSale
+		});
+		isFlipped = false;
+	}
+
+	function cancelConfig() {
+		isFlipped = false;
+	}
+
+	const N = $derived(mergedConfig.projectionYears);
+</script>
+
+<FlipCard {isFlipped} shellClass={t.shell} flipBackClass={t.flipBackBg}>
+	{#snippet front()}
+		<table class="w-full border-collapse text-sm">
+			<thead>
+				<tr>
+					<th
+						colspan={N + 2}
+						class="px-4 py-2.5 text-left text-sm font-bold tracking-tight {t.headerBg} {t.headerText} rounded-t-lg"
+					>
+						Unlevered Before-Tax Cash Flow
+						{#if mergedConfig.propertyName}
+							<span class="ml-2 font-normal opacity-80">— {mergedConfig.propertyName}</span>
+						{/if}
+					</th>
+				</tr>
+				<tr class="{darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'} border-b">
+					<th class="px-4 py-2 text-left text-xs font-medium {t.muted} w-[220px] min-w-[180px]">
+						($)
+					</th>
+					{#each columns as c}
+						<th class="px-3 py-2 text-right text-xs font-medium {t.muted} min-w-[100px]">
+							Year {c.year}
+						</th>
+					{/each}
+				</tr>
+			</thead>
+			<tbody>
+				<tr class={t.sectionHeaderBg}>
+					<td colspan={N + 2} class="px-4 py-1.5 text-xs uppercase tracking-wider {t.sectionHeaderText}">
+						Unlevered before-tax cash flow
+					</td>
+				</tr>
+
+				<tr class="border-b {t.cellBorder}">
+					<td class="py-1.5 pl-8 pr-4 text-xs {t.labelText}">Acquisition Cost</td>
+					{#each columns as c}
+						<td class="px-3 py-1.5 text-right font-mono text-xs tabular-nums {t.cellText}">
+							{fmtAcq(c.year, c.acquisitionCost)}
+						</td>
+					{/each}
+				</tr>
+
+				<tr class="border-b {t.cellBorder}">
+					<td class="py-1.5 pl-8 pr-4 text-xs {t.labelText}">Net Operating Income</td>
+					{#each columns as c}
+						<td class="px-3 py-1.5 text-right font-mono text-xs tabular-nums {t.cellText}">
+							{c.year === 0 ? '-' : fmt(c.netOperatingIncome)}
+						</td>
+					{/each}
+				</tr>
+
+				<tr class="border-b {t.cellBorder}">
+					<td class="py-1.5 pl-8 pr-4 text-xs {t.labelText}">
+						Net Sale Proceeds (Reversion)
+						{#if !result.exitCapValid}
+							<span class="ml-1 text-[10px] opacity-70">(set exit cap)</span>
+						{/if}
+					</td>
+					{#each columns as c}
+						<td class="px-3 py-1.5 text-right font-mono text-xs tabular-nums {t.cellText}">
+							{fmtSale(c.year, N, c.netSaleProceeds, result.exitCapValid)}
+						</td>
+					{/each}
+				</tr>
+
+				<tr class="border-b-2 {t.cellBorder} {t.subtotalBg}">
+					<td class="py-2 pl-8 pr-4 text-xs {t.subtotalText}">Unlevered Before-Tax CF</td>
+					{#each columns as c}
+						<td class="px-3 py-2 text-right font-mono text-xs tabular-nums {t.subtotalText}">
+							{fmtCf(c.year, c.unleveredBeforeTaxCf)}
+						</td>
+					{/each}
+				</tr>
+			</tbody>
+		</table>
+
+		<div
+			class="shrink-0 flex flex-wrap items-center gap-x-4 gap-y-1 border-t px-4 py-2.5 text-[11px] {t.summaryBorder} {t.muted}"
+		>
+			<span>Exit cap {pct(mergedConfig.terminalCapRate)}</span>
+			<span>Cost of sale {pct(mergedConfig.costOfSalePercent)}</span>
+			<span>Year {N + 1} NOI (reversion) ${fmt(result.year6Noi)}</span>
+			{#if result.exitCapValid && result.grossSalePrice != null}
+				<span>Gross sale ${fmt(result.grossSalePrice)}</span>
+			{/if}
+		</div>
+	{/snippet}
+
+	{#snippet back()}
+		<div class="flex min-h-full flex-col items-center px-4 py-5 sm:px-6">
+			<div class="flex w-full max-w-lg flex-1 flex-col">
+				<header class="mb-4 shrink-0 text-center sm:text-left">
+					<h3 class="text-lg font-bold {t.cfgTitle}">Configure Unlevered Cash Flow</h3>
+					<p class="mt-1 text-sm {t.muted}">
+						Year 0 is acquisition; Years 1–(N−1) are NOI only; Year N adds net sale proceeds from Year (N+1) NOI ÷ exit cap, less cost of sale.
+					</p>
+				</header>
+
+				<section class="{t.cfgPanel} max-h-[calc(100%-80px)] overflow-y-auto" aria-label="Widget configuration">
+					<form
+						class="flex flex-col gap-3"
+						onsubmit={(e) => {
+							e.preventDefault();
+							applyConfig();
+						}}
+					>
+						<label class="block">
+							<span class={t.cfgLabel}>Property Name (optional)</span>
+							<input type="text" bind:value={draftPropertyName} class={t.cfgField} />
+						</label>
+
+						<label class="block">
+							<span class={t.cfgLabel}>Holding period (last column year)</span>
+							<input type="number" bind:value={draftYears} min="1" max="10" step="1" class={t.cfgField} />
+							<p class="mt-0.5 text-[11px] {t.muted}">Table shows Year 0 … Year N (e.g. 5 → sale in Year 5).</p>
+						</label>
+
+						<fieldset class="rounded-lg border p-3 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
+							<legend class="px-1 text-xs font-semibold {t.muted}">Acquisition (Year 0)</legend>
+							<div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+								<label class="block">
+									<span class={t.cfgLabel}>Purchase Price ($)</span>
+									<input type="number" bind:value={draftPurchase} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
+								</label>
+								<label class="block">
+									<span class={t.cfgLabel}>Acquisition Costs ($)</span>
+									<input type="number" bind:value={draftAcqCosts} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
+								</label>
+								<label class="block">
+									<span class={t.cfgLabel}>Initial CapEx ($)</span>
+									<input type="number" bind:value={draftCapEx} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
+								</label>
+							</div>
+						</fieldset>
+
+						<fieldset class="rounded-lg border p-3 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
+							<legend class="px-1 text-xs font-semibold {t.muted}">NOI bridge (same as Revenue / OpEx)</legend>
+							<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+								<label class="block">
+									<span class={t.cfgLabel}>Year 1 EGI ($)</span>
+									<input type="number" bind:value={draftEgiY1} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
+								</label>
+								<label class="block">
+									<span class={t.cfgLabel}>EGI growth / yr</span>
+									<input type="number" bind:value={draftEgiGrowth} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
+								</label>
+								<label class="block">
+									<span class={t.cfgLabel}>Year 1 Total OpEx ($)</span>
+									<input type="number" bind:value={draftOpexY1} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
+								</label>
+								<label class="block">
+									<span class={t.cfgLabel}>OpEx growth / yr</span>
+									<input type="number" bind:value={draftOpexGrowth} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
+								</label>
+							</div>
+						</fieldset>
+
+						<fieldset class="rounded-lg border p-3 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
+							<legend class="px-1 text-xs font-semibold {t.muted}">Reversion (Year N)</legend>
+							<label class="block">
+								<span class={t.cfgLabel}>Terminal cap rate (exit)</span>
+								<input type="number" bind:value={draftExitCap} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
+								<p class="mt-0.5 text-[11px] {t.muted}">
+									Must be greater than zero or sale proceeds show as unavailable (#DIV/0! equivalent).
+								</p>
+							</label>
+							<label class="block">
+								<span class={t.cfgLabel}>Cost of sale (% of gross price)</span>
+								<input type="number" bind:value={draftCostSale} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
+							</label>
+						</fieldset>
+
+						<div class="flex justify-end gap-2 border-t pt-4 {darkMode ? 'border-slate-600' : 'border-slate-200'}">
+							<button type="button" class={t.cfgBtnSecondary} onclick={cancelConfig}>Cancel</button>
+							<button
+								type="submit"
+								class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+							>
+								Apply
+							</button>
+						</div>
+					</form>
+				</section>
+			</div>
+		</div>
+	{/snippet}
+</FlipCard>

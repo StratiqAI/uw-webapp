@@ -166,7 +166,14 @@
 			locationQuotient: { colSpan: 12, rowSpan: 4 },
 			jsonViewer: { colSpan: 6, rowSpan: 3 },
 			brokerCard: { colSpan: 3, rowSpan: 2 },
-			lqAnalysis: { colSpan: 12, rowSpan: 4 }
+			lqAnalysis: { colSpan: 12, rowSpan: 4 },
+			proFormaRevenue: { colSpan: 12, rowSpan: 3 },
+			proFormaOpEx: { colSpan: 12, rowSpan: 3 },
+			proFormaNoi: { colSpan: 12, rowSpan: 2 },
+			proFormaUnleveredCf: { colSpan: 12, rowSpan: 3 },
+			proFormaLeveredCf: { colSpan: 12, rowSpan: 3 },
+			proFormaUnleveredReturns: { colSpan: 12, rowSpan: 2 },
+			proFormaLeveredReturns: { colSpan: 12, rowSpan: 2 }
 		};
 
 		const { colSpan, rowSpan } = defaultSizes[type];
@@ -261,6 +268,139 @@
 						localBandHigh: 1.08
 					}
 				} as Widget;
+			case 'proFormaRevenue':
+				return {
+					...baseWidget,
+					type: 'proFormaRevenue',
+					data: {
+						unitType: 'units',
+						totalUnits: 100,
+						totalSqFt: 0,
+						marketRentPerUnit: 1500,
+						rentGrowthRate: 0.03,
+						vacancyRate: 0.05,
+						otherIncomeAnnual: 24000,
+						otherIncomeGrowthRate: 0.02,
+						projectionYears: 5,
+						propertyName: ''
+					}
+				} as Widget;
+			case 'proFormaOpEx':
+				return {
+					...baseWidget,
+					type: 'proFormaOpEx',
+					data: {
+						unitType: 'units',
+						totalUnits: 100,
+						totalSqFt: 0,
+						egiYear1: 1734000,
+						egiGrowthRate: 0.03,
+						baseOperatingExpenses: 480000,
+						expenseGrowthRate: 0.03,
+						managementFeeRate: 0.04,
+						reservePerUnit: 250,
+						applyGrowthToReserves: false,
+						customExpenses: [],
+						projectionYears: 5,
+						propertyName: ''
+					}
+				} as Widget;
+			case 'proFormaNoi':
+				return {
+					...baseWidget,
+					type: 'proFormaNoi',
+					data: {
+						egiYear1: 1734000,
+						egiGrowthRate: 0.03,
+						totalOpexYear1: 920000,
+						opexGrowthRate: 0.03,
+						projectionYears: 5,
+						propertyName: '',
+						showBreakdown: false
+					}
+				} as Widget;
+			case 'proFormaUnleveredCf':
+				return {
+					...baseWidget,
+					type: 'proFormaUnleveredCf',
+					data: {
+						projectionYears: 5,
+						purchasePrice: 12_000_000,
+						acquisitionCosts: 180_000,
+						initialCapEx: 0,
+						egiYear1: 1_734_000,
+						egiGrowthRate: 0.03,
+						totalOpexYear1: 920_000,
+						opexGrowthRate: 0.03,
+						terminalCapRate: 0.055,
+						costOfSalePercent: 0.03,
+						propertyName: ''
+					}
+				} as Widget;
+			case 'proFormaLeveredCf':
+				return {
+					...baseWidget,
+					type: 'proFormaLeveredCf',
+					data: {
+						projectionYears: 5,
+						purchasePrice: 12_000_000,
+						acquisitionCosts: 180_000,
+						initialCapEx: 0,
+						egiYear1: 1_734_000,
+						egiGrowthRate: 0.03,
+						totalOpexYear1: 920_000,
+						opexGrowthRate: 0.03,
+						terminalCapRate: 0.055,
+						costOfSalePercent: 0.03,
+						propertyName: '',
+						loanLtv: 0.65,
+						loanInterestRate: 0.065,
+						amortizationYears: 30,
+						interestOnly: false
+					}
+				} as Widget;
+			case 'proFormaUnleveredReturns':
+				return {
+					...baseWidget,
+					type: 'proFormaUnleveredReturns',
+					data: {
+						projectionYears: 5,
+						purchasePrice: 12_000_000,
+						acquisitionCosts: 180_000,
+						initialCapEx: 0,
+						egiYear1: 1_734_000,
+						egiGrowthRate: 0.03,
+						totalOpexYear1: 920_000,
+						opexGrowthRate: 0.03,
+						terminalCapRate: 0.055,
+						costOfSalePercent: 0.03,
+						propertyName: '',
+						unleveredDiscountRate: 0.1
+					}
+				} as Widget;
+			case 'proFormaLeveredReturns':
+				return {
+					...baseWidget,
+					type: 'proFormaLeveredReturns',
+					data: {
+						projectionYears: 5,
+						purchasePrice: 12_000_000,
+						acquisitionCosts: 180_000,
+						initialCapEx: 0,
+						egiYear1: 1_734_000,
+						egiGrowthRate: 0.03,
+						totalOpexYear1: 920_000,
+						opexGrowthRate: 0.03,
+						terminalCapRate: 0.055,
+						costOfSalePercent: 0.03,
+						propertyName: '',
+						loanLtv: 0.65,
+						loanInterestRate: 0.065,
+						amortizationYears: 30,
+						interestOnly: false,
+						leveredDiscountRate: 0.12
+					}
+				} as Widget;
 			default:
 				return null;
 		}
@@ -297,7 +437,14 @@
 		{ type: 'locationQuotient', label: 'Location Quotient', icon: '📍' },
 		{ type: 'jsonViewer', label: 'JSON Viewer', icon: '{ }' },
 		{ type: 'brokerCard', label: 'Broker Card', icon: '👤' },
-		{ type: 'lqAnalysis', label: 'LQ Analysis', icon: '📍' }
+		{ type: 'lqAnalysis', label: 'LQ Analysis', icon: '📍' },
+		{ type: 'proFormaRevenue', label: 'Pro Forma Revenue', icon: '💰' },
+		{ type: 'proFormaOpEx', label: 'Pro Forma OpEx', icon: '📋' },
+		{ type: 'proFormaNoi', label: 'Pro Forma NOI', icon: '📐' },
+		{ type: 'proFormaUnleveredCf', label: 'Pro Forma Unlevered CF', icon: '💵' },
+		{ type: 'proFormaLeveredCf', label: 'Pro Forma Levered CF', icon: '🏦' },
+		{ type: 'proFormaUnleveredReturns', label: 'Pro Forma Unlevered Returns', icon: '📈' },
+		{ type: 'proFormaLeveredReturns', label: 'Pro Forma Levered Returns', icon: '📊' }
 	];
 </script>
 

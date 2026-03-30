@@ -10,6 +10,13 @@
 	import { jsonViewerWidget } from '@stratiqai/widget-json-viewer';
 	import { brokerCardWidget } from '@stratiqai/widget-broker-card';
 	import { lqAnalysisWidget } from '@stratiqai/widget-lq-analysis';
+	import { proFormaRevenueWidget } from '@stratiqai/widget-pro-forma-revenue';
+	import { proFormaOpExWidget } from '@stratiqai/widget-pro-forma-opex';
+	import { proFormaNoiWidget } from '@stratiqai/widget-pro-forma-noi';
+	import { proFormaUnleveredCfWidget } from '@stratiqai/widget-pro-forma-unlevered-cf';
+	import { proFormaLeveredCfWidget } from '@stratiqai/widget-pro-forma-levered-cf';
+	import { proFormaUnleveredReturnsWidget } from '@stratiqai/widget-pro-forma-unlevered-returns';
+	import { proFormaLeveredReturnsWidget } from '@stratiqai/widget-pro-forma-levered-returns';
 	import { browser } from '$app/environment';
 	import { initTopicStoreSync } from '$lib/stores/topicStoreSync';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
@@ -22,6 +29,13 @@
 	registerWidget(jsonViewerWidget);
 	registerWidget(brokerCardWidget);
 	registerWidget(lqAnalysisWidget);
+	registerWidget(proFormaRevenueWidget);
+	registerWidget(proFormaOpExWidget);
+	registerWidget(proFormaNoiWidget);
+	registerWidget(proFormaUnleveredCfWidget);
+	registerWidget(proFormaLeveredCfWidget);
+	registerWidget(proFormaUnleveredReturnsWidget);
+	registerWidget(proFormaLeveredReturnsWidget);
 
 	let { children, data } = $props<{ children: any; data: LayoutData }>();
 

@@ -1,0 +1,20 @@
+export declare const proFormaLeveredCfWidget: import("@stratiqai/dashboard-widget-sdk").WidgetManifest<{
+    egiYear1: number;
+    totalOpexYear1: number;
+    purchasePrice: number;
+    loanLtv: number;
+    loanInterestRate: number;
+    amortizationYears: number;
+    interestOnly: boolean;
+    projectionYears: number;
+    acquisitionCosts: number;
+    initialCapEx: number;
+    egiGrowthRate: number;
+    opexGrowthRate: number;
+    terminalCapRate: number;
+    costOfSalePercent: number;
+    propertyName?: string | undefined;
+}>;
+export type { ProFormaLeveredCfConfig, ProFormaLeveredCfInput } from './schema.js';
+export { proFormaLeveredCfConfigSchema, proFormaLeveredCfInputSchema } from './schema.js';
+export { computeLeveredProjections, extractLeveredCashFlows, type LeveredYearColumn } from './calculations.js';

@@ -28,7 +28,17 @@
 		heatmap: 'Heatmap',
 		divergingBarChart: 'Diverging Bar Chart',
 		schema: 'Schema',
-		locationQuotient: 'Location Quotient'
+		locationQuotient: 'Location Quotient',
+		jsonViewer: 'JSON Viewer',
+		brokerCard: 'Broker Card',
+		lqAnalysis: 'LQ Analysis',
+		proFormaRevenue: 'Pro Forma Revenue',
+		proFormaOpEx: 'Pro Forma OpEx',
+		proFormaNoi: 'Pro Forma NOI',
+		proFormaUnleveredCf: 'Pro Forma Unlevered CF',
+		proFormaLeveredCf: 'Pro Forma Levered CF',
+		proFormaUnleveredReturns: 'Pro Forma Unlevered Returns',
+		proFormaLeveredReturns: 'Pro Forma Levered Returns'
 	};
 
 	function getTopicLabel(data: unknown, id: string): string {
