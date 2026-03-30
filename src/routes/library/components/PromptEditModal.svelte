@@ -782,7 +782,7 @@
 						<span class="text-[11px] font-semibold uppercase tracking-wider {darkMode ? 'text-slate-400' : 'text-slate-500'}">Response Format</span>
 						<select
 							bind:value={responseFormatType}
-							class="text-xs rounded-lg border px-2 py-1 {darkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-white text-slate-500 border-slate-200'} focus:outline-none focus:ring-1 focus:ring-indigo-500"
+							class="text-xs rounded-lg border px-3 py-1 min-w-[9rem] {darkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-white text-slate-500 border-slate-200'} focus:outline-none focus:ring-1 focus:ring-indigo-500"
 						>
 							<option value="json_schema">Structured</option>
 							<option value="text">Plain text</option>
@@ -889,7 +889,7 @@
 											<div class="flex items-center gap-2">
 												<span class="text-[10px] uppercase tracking-wider font-semibold {darkMode ? 'text-slate-600' : 'text-slate-400'}">Each item</span>
 												<select value={item.type} onchange={(e) => { const v = e.currentTarget.value as NestedSchemaNodeType; const next: NestedItemSchema = v === 'object' ? { type: 'object', properties: [] } : v === 'array' ? { type: 'array', items: { type: 'string' } } : { type: v }; updateSchemaField(fieldName, { itemSchema: next }); }}
-													class="text-[11px] rounded-md border px-1.5 py-0.5 {darkMode ? 'bg-slate-700/60 text-slate-400 border-slate-600/60' : 'bg-slate-50 text-slate-500 border-slate-200'} focus:outline-none"
+													class="text-[11px] rounded-md border px-3 py-1 min-w-[7rem] {darkMode ? 'bg-slate-700/60 text-slate-400 border-slate-600/60' : 'bg-slate-50 text-slate-500 border-slate-200'} focus:outline-none"
 												>
 													<option value="string">string</option><option value="number">number</option><option value="integer">integer</option><option value="boolean">boolean</option><option value="object">object</option><option value="array">array</option>
 												</select>

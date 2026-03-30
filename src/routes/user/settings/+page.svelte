@@ -1,323 +1,166 @@
 <script lang="ts">
-	import { darkModeStore } from '$lib/stores/darkMode.svelte';
+	import { themeStore } from '$lib/stores/themeStore.svelte';
+	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
+	import ProfileTab from './tabs/ProfileTab.svelte';
+	import PreferencesTab from './tabs/PreferencesTab.svelte';
+	import NotificationsTab from './tabs/NotificationsTab.svelte';
+	import SecurityTab from './tabs/SecurityTab.svelte';
+	import BillingTab from './tabs/BillingTab.svelte';
+	import type { PageData } from './$types';
 
-	// Use unified dark mode store
-	let darkMode = $derived.by(() => darkModeStore.darkMode);
+	let { data } = $props<{ data: PageData }>();
 
-	// Form state
-	let name = $state('');
-	let zip = $state('');
-	let country = $state('');
-	let city = $state('');
-	let address = $state('');
-	let organization = $state('');
-	let department = $state('');
-	let accountType = $state('Choose your account type');
-	let biography = $state('');
-	let facebook = $state('');
-	let dribbble = $state('');
-	let twitter = $state('');
-	let behance = $state('');
-	let github = $state('');
-	let pinterest = $state('');
-	let instagram = $state('');
-	let tiktok = $state('');
+	let darkMode = $derived(themeStore.darkMode);
+	let isDarkTheme = $derived(themeStore.theme === 'dark');
 
-	let showAccountTypeTooltip = $state(false);
+	type TabId = 'profile' | 'preferences' | 'notifications' | 'security' | 'billing';
+
+	const tabs: Array<{ id: TabId; label: string; icon: string }> = [
+		{
+			id: 'profile',
+			label: 'Profile',
+			icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />'
+		},
+		{
+			id: 'preferences',
+			label: 'Preferences',
+			icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />'
+		},
+		{
+			id: 'notifications',
+			label: 'Notifications',
+			icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />'
+		},
+		{
+			id: 'security',
+			label: 'Security',
+			icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />'
+		},
+		{
+			id: 'billing',
+			label: 'Billing & Usage',
+			icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />'
+		}
+	];
+
+	let activeTab = $state<TabId>('profile');
+
+	$effect(() => {
+		const hash = $page.url.hash.replace('#', '') as TabId;
+		if (hash && tabs.some((t) => t.id === hash)) {
+			activeTab = hash;
+		}
+	});
+
+	function setTab(id: TabId) {
+		activeTab = id;
+		goto(`#${id}`, { replaceState: true, noScroll: true });
+	}
 </script>
 
-<div class="flex h-screen w-full overflow-hidden {darkMode ? 'bg-slate-900' : 'bg-slate-50'} transition-colors">
-	<!-- Main Content Area -->
-	<div class="flex-1 flex flex-col overflow-hidden {darkMode ? 'bg-slate-900' : 'bg-white'}">
-		<!-- Header -->
-		<div class="h-14 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border-b flex items-center justify-between px-6 shadow-sm">
-			<div class="flex items-center gap-4">
-				<div class="w-10 h-10 {darkMode ? 'bg-indigo-900' : 'bg-indigo-100'} rounded-lg flex items-center justify-center">
-					<svg class="w-5 h-5 {darkMode ? 'text-indigo-300' : 'text-indigo-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+<div class="flex h-full min-h-screen w-full {isDarkTheme ? 'bg-slate-900' : 'bg-slate-50'}">
+	<!-- Sidebar Navigation -->
+	<div
+		class="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r p-5 lg:flex {isDarkTheme
+			? 'bg-slate-800/50 border-slate-700'
+			: 'bg-white border-slate-200'}"
+	>
+		<div class="mb-6">
+			<h1 class="text-xl font-semibold {isDarkTheme ? 'text-white' : 'text-slate-900'} tracking-tight">
+				Settings
+			</h1>
+			<p class="mt-1 text-sm {isDarkTheme ? 'text-slate-400' : 'text-slate-500'}">
+				Manage your account
+			</p>
+		</div>
+
+		<nav class="space-y-1">
+			{#each tabs as tab}
+				<button
+					type="button"
+					onclick={() => setTab(tab.id)}
+					class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all {activeTab ===
+					tab.id
+						? isDarkTheme
+							? 'bg-primary-900/40 text-primary-300'
+							: 'bg-primary-50 text-primary-700'
+						: isDarkTheme
+							? 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'
+							: 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}"
+				>
+					<svg
+						class="h-5 w-5 shrink-0"
+						fill="none"
+						stroke="currentColor"
+						viewBox="0 0 24 24"
+					>
+						{@html tab.icon}
 					</svg>
-				</div>
-				<h1 class="text-2xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'} tracking-tight">Settings</h1>
+					{tab.label}
+				</button>
+			{/each}
+		</nav>
+	</div>
+
+	<!-- Mobile Tab Bar -->
+	<div class="fixed bottom-0 left-0 right-0 z-30 border-t lg:hidden {isDarkTheme ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}">
+		<div class="flex">
+			{#each tabs as tab}
+				<button
+					type="button"
+					onclick={() => setTab(tab.id)}
+					class="flex flex-1 flex-col items-center gap-1 py-2 text-[10px] font-medium transition-colors {activeTab ===
+					tab.id
+						? isDarkTheme
+							? 'text-primary-400'
+							: 'text-primary-600'
+						: isDarkTheme
+							? 'text-slate-500'
+							: 'text-slate-400'}"
+				>
+					<svg
+						class="h-5 w-5"
+						fill="none"
+						stroke="currentColor"
+						viewBox="0 0 24 24"
+					>
+						{@html tab.icon}
+					</svg>
+					{tab.label}
+				</button>
+			{/each}
+		</div>
+	</div>
+
+	<!-- Content Area -->
+	<div class="flex-1 overflow-y-auto pb-20 lg:pb-0">
+		<!-- Mobile Header -->
+		<div class="border-b px-5 py-4 lg:hidden {isDarkTheme ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'}">
+			<h1 class="text-xl font-semibold {isDarkTheme ? 'text-white' : 'text-slate-900'}">
+				Settings
+			</h1>
+		</div>
+
+		<div class="mx-auto max-w-3xl px-5 py-6 lg:px-8 lg:py-8">
+			<!-- Tab Title -->
+			<div class="mb-6">
+				<h2 class="text-lg font-semibold {isDarkTheme ? 'text-white' : 'text-slate-900'}">
+					{tabs.find((t) => t.id === activeTab)?.label}
+				</h2>
 			</div>
-			</div>
 
-		<!-- Main Content -->
-		<div class="flex-1 overflow-y-auto {darkMode ? 'bg-slate-900' : 'bg-slate-50'}">
-			<div class="max-w-6xl mx-auto px-6 py-8">
-				<!-- General Information Section -->
-				<div class="{darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border rounded-lg p-6 mb-6 shadow-sm">
-					<div class="flex items-center gap-3 mb-6 pb-4 {darkMode ? 'border-slate-700' : 'border-slate-200'} border-b">
-						<div class="w-10 h-10 {darkMode ? 'bg-indigo-900' : 'bg-indigo-100'} rounded-lg flex items-center justify-center">
-							<svg class="w-5 h-5 {darkMode ? 'text-indigo-300' : 'text-indigo-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-							</svg>
-						</div>
-						<h2 class="text-xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">General Information</h2>
-					</div>
-
-					<form onsubmit={(e) => { e.preventDefault(); }}>
-						<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-							<div>
-								<label for="name" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
-									Your Name <span class="text-red-500">*</span>
-								</label>
-								<input
-									type="text"
-									id="name"
-									bind:value={name}
-									placeholder="Ex. Bonnie Green"
-									class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
-									required
-								/>
-							</div>
-							<div>
-								<label for="zip" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
-									ZIP/Postal Code
-								</label>
-								<input
-									type="text"
-									id="zip"
-									bind:value={zip}
-									placeholder="Ex. 123456"
-									class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
-								/>
-							</div>
-							<div>
-								<label for="country" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
-									Country <span class="text-red-500">*</span>
-								</label>
-								<input
-									type="text"
-									id="country"
-									bind:value={country}
-									placeholder="United States"
-									class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
-									required
-								/>
-							</div>
-							<div>
-								<label for="city" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
-									Town/City <span class="text-red-500">*</span>
-								</label>
-								<input
-									type="text"
-									id="city"
-									bind:value={city}
-									placeholder="Ex. Sacramento"
-									class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
-									required
-								/>
-							</div>
-							<div>
-								<label for="address" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
-									Full Address <span class="text-red-500">*</span>
-								</label>
-								<input
-									type="text"
-									id="address"
-									bind:value={address}
-									placeholder="174 Cayuga Ave, San Francisco, CA 94112"
-									class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
-									required
-								/>
-							</div>
-							<div>
-								<label for="organization" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
-									Your Organization
-								</label>
-								<input
-									type="text"
-									id="organization"
-									bind:value={organization}
-									placeholder="Ex. StratiqAI LLC"
-									class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
-								/>
-							</div>
-							<div>
-								<label for="department" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
-									Department
-								</label>
-								<input
-									type="text"
-									id="department"
-									bind:value={department}
-									placeholder="Marketing"
-									class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
-								/>
-							</div>
-							<div>
-								<label for="account-type" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2 flex items-center gap-2">
-									Account Type
-									<button
-										type="button"
-										onclick={() => showAccountTypeTooltip = !showAccountTypeTooltip}
-										class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-										aria-label="Account type information"
-									>
-										<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-										</svg>
-									</button>
-								</label>
-								<select
-									id="account-type"
-									bind:value={accountType}
-									class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
-								>
-									<option>Choose your account type</option>
-									<option value="personal">Personal</option>
-									<option value="business">Business</option>
-									<option value="education">Education/University</option>
-								</select>
-							</div>
-							<div class="sm:col-span-2 lg:col-span-1">
-								<label for="biography" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
-									Biography
-								</label>
-								<textarea
-									id="biography"
-									bind:value={biography}
-									rows="8"
-									placeholder="Hello, my name is..."
-									class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors resize-none"
-								></textarea>
-							</div>
-						</div>
-
-						<div class="mt-6 pt-6 {darkMode ? 'border-slate-700' : 'border-slate-200'} border-t flex justify-end">
-							<button
-								type="submit"
-								class="px-5 py-2.5 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
-							>
-								Save changes
-							</button>
-						</div>
-					</form>
-				</div>
-
-				<!-- Social Section -->
-				<div class="{darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border rounded-lg p-6 shadow-sm">
-					<div class="flex items-center gap-3 mb-6 pb-4 {darkMode ? 'border-slate-700' : 'border-slate-200'} border-b">
-						<div class="w-10 h-10 {darkMode ? 'bg-indigo-900' : 'bg-indigo-100'} rounded-lg flex items-center justify-center">
-							<svg class="w-5 h-5 {darkMode ? 'text-indigo-300' : 'text-indigo-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-							</svg>
-						</div>
-						<h2 class="text-xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">Social Profiles</h2>
-					</div>
-
-					<form onsubmit={(e) => { e.preventDefault(); }}>
-						<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-							<div>
-								<label for="facebook" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
-									Facebook
-								</label>
-								<input
-									type="text"
-									id="facebook"
-									bind:value={facebook}
-									placeholder="Enter your facebook account"
-									class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
-								/>
-							</div>
-							<div>
-								<label for="dribbble" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
-									Dribbble
-								</label>
-								<input
-									type="text"
-									id="dribbble"
-									bind:value={dribbble}
-									placeholder="Enter your dribbble account"
-									class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
-								/>
-							</div>
-							<div>
-								<label for="twitter" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
-									Twitter
-								</label>
-								<input
-									type="text"
-									id="twitter"
-									bind:value={twitter}
-									placeholder="Enter your twitter account"
-									class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
-								/>
-							</div>
-							<div>
-								<label for="behance" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
-									Behance
-								</label>
-								<input
-									type="text"
-									id="behance"
-									bind:value={behance}
-									placeholder="Enter your behance account"
-									class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
-								/>
-							</div>
-							<div>
-								<label for="github" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
-									GitHub
-								</label>
-								<input
-									type="text"
-									id="github"
-									bind:value={github}
-									placeholder="Enter your github account"
-									class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
-								/>
-							</div>
-							<div>
-								<label for="pinterest" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
-									Pinterest
-								</label>
-								<input
-									type="text"
-									id="pinterest"
-									bind:value={pinterest}
-									placeholder="Enter your pinterest account"
-									class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
-								/>
-							</div>
-							<div>
-								<label for="instagram" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
-									Instagram
-								</label>
-								<input
-									type="text"
-									id="instagram"
-									bind:value={instagram}
-									placeholder="Enter your instagram account"
-									class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
-								/>
-							</div>
-							<div>
-								<label for="tiktok" class="block text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
-									TikTok
-								</label>
-								<input
-									type="text"
-									id="tiktok"
-									bind:value={tiktok}
-									placeholder="Enter your tiktok account"
-									class="w-full px-3 py-2 {darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
-								/>
-							</div>
-						</div>
-
-						<div class="mt-6 pt-6 {darkMode ? 'border-slate-700' : 'border-slate-200'} border-t flex justify-end">
-							<button
-								type="submit"
-								class="px-5 py-2.5 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
-							>
-								Save changes
-							</button>
-						</div>
-					</form>
-				</div>
-			</div>
+			{#if activeTab === 'profile'}
+				<ProfileTab currentUser={data.currentUser} {darkMode} />
+			{:else if activeTab === 'preferences'}
+				<PreferencesTab {darkMode} />
+			{:else if activeTab === 'notifications'}
+				<NotificationsTab {darkMode} />
+			{:else if activeTab === 'security'}
+				<SecurityTab currentUser={data.currentUser} {darkMode} />
+			{:else if activeTab === 'billing'}
+				<BillingTab currentUser={data.currentUser} {darkMode} />
+			{/if}
 		</div>
 	</div>
 </div>
