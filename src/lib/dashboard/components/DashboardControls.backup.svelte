@@ -4,8 +4,9 @@
 	import { findAvailablePosition } from '../utils/grid';
 	import { PUBLIC_GEOAPIFY_API_KEY } from '$env/static/public';
 	import type { DashboardTabId } from '$lib/dashboard/types/dashboardTabs';
+	import type { Project } from '@stratiqai/types-simple';
 	import type { AppTheme } from '$lib/stores/themeStore.svelte';
-	import UnifiedTopBar from '$lib/components/UnifiedTopBar.svelte';
+	import ProjectSwitcher from './ProjectSwitcher.svelte';
 	import ConfirmModal from '$lib/components/Dialog/ConfirmModal.svelte';
 	import { toastStore } from '$lib/stores/toastStore.svelte';
 
@@ -13,6 +14,8 @@
 		darkMode?: boolean;
 		currentTheme?: AppTheme;
 		defaultWidgets?: Widget[];
+		projects?: Project[];
+		selectedProjectId?: string | null;
 		onProjectChange?: (projectId: string | null) => void;
 	}
 
@@ -20,6 +23,8 @@
 		darkMode = false,
 		currentTheme = 'dark',
 		defaultWidgets,
+		projects = [],
+		selectedProjectId = null,
 		onProjectChange
 	}: Props = $props();
 
@@ -443,11 +448,24 @@
 	];
 </script>
 
-<UnifiedTopBar
-	pageTitle="Dashboard"
-	{onProjectChange}
+<!-- ═══════════════════ UNIFIED TOP BAR ═══════════════════ -->
+<header
+	class="dashboard-topbar flex h-12 items-center gap-3 border-b px-4 sm:px-5 {darkMode
+		? 'bg-linear-to-r from-slate-900 via-slate-800/95 to-slate-900 border-slate-700/50 shadow-sm shadow-black/20'
+		: 'bg-white/95 backdrop-blur-sm border-slate-200/80 shadow-sm'}"
 >
-	{#snippet tabs()}
+	<!-- ── LEFT: Project + Tabs ──────────────────────────── -->
+	<div class="flex items-center gap-2 min-w-0">
+		{#if projects.length > 0 && onProjectChange}
+			<ProjectSwitcher
+				{projects}
+				{selectedProjectId}
+				{darkMode}
+				onProjectChange={onProjectChange}
+			/>
+			<div class="h-5 w-px shrink-0 {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
+		{/if}
+
 		<div class="flex items-center gap-0.5" role="tablist" aria-label="Dashboard views">
 			{#each dashboard.tabOrder as tab (tab.id)}
 				{#if renamingTabId === tab.id}
@@ -466,12 +484,12 @@
 						type="button"
 						role="tab"
 						aria-selected={dashboard.activeTabId === tab.id}
-						class="group relative flex items-center gap-1 rounded-md px-2.5 py-1 text-[13px] font-medium transition-all duration-150 whitespace-nowrap
-							{dashboard.activeTabId === tab.id
-								? 'bg-linear-to-r from-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-900/40'
-								: darkMode
-									? 'text-slate-400 hover:bg-slate-700/60 hover:text-slate-200'
-									: 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'}"
+					class="group relative flex items-center gap-1 rounded-md px-2.5 py-1 text-[13px] font-medium transition-all duration-150 whitespace-nowrap
+						{dashboard.activeTabId === tab.id
+							? 'bg-linear-to-r from-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-900/40'
+							: darkMode
+								? 'text-slate-400 hover:bg-slate-700/60 hover:text-slate-200'
+								: 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'}"
 						onclick={() => selectTab(tab.id)}
 						ondblclick={() => startRename(tab.id, tab.label)}
 						title="Click to switch, double-click to rename"
@@ -506,9 +524,11 @@
 				<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
 			</button>
 		</div>
-	{/snippet}
+	</div>
 
-	{#snippet actions()}
+	<!-- ── RIGHT: Actions ────────────────────────────────── -->
+	<div class="ml-auto flex items-center gap-1 shrink-0">
+		<!-- Widget actions -->
 		<button
 			onclick={() => (showAddWidgetDialog = true)}
 			class="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[13px] font-semibold transition-all duration-150
@@ -521,6 +541,7 @@
 
 		<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
 
+		<!-- Undo / Redo -->
 		<button
 			onclick={() => dashboard.undo()}
 			disabled={!dashboard.canUndo}
@@ -549,6 +570,7 @@
 
 		<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
 
+		<!-- Dashboard actions group -->
 		<button
 			onclick={handleSave}
 			disabled={!dashboard.hasUnsavedChanges}
@@ -600,6 +622,7 @@
 
 		<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
 
+		<!-- Lock all / Unlock all (same visual language as theme switcher) -->
 		<div
 			class="flex items-center rounded-lg p-0.5 gap-0.5 shrink-0 {darkMode
 				? 'bg-slate-800/80 border border-slate-700/60'
@@ -660,8 +683,9 @@
 				<span class="hidden sm:inline whitespace-nowrap">Unlock all widgets</span>
 			</button>
 		</div>
-	{/snippet}
-</UnifiedTopBar>
+
+	</div>
+</header>
 
 <!-- ═══════════════════ DIALOGS ═══════════════════ -->
 

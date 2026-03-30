@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
+	import UnifiedTopBar from '$lib/components/UnifiedTopBar.svelte';
 
-	// Use unified dark mode store
 	let darkMode = $derived.by(() => darkModeStore.darkMode);
 
 	interface LearningResource {
@@ -67,21 +67,7 @@
 <div class="flex h-screen w-full overflow-hidden {darkMode ? 'bg-slate-900' : 'bg-slate-50'} transition-colors">
 	<!-- Main Content Area -->
 	<div class="flex-1 flex flex-col overflow-hidden {darkMode ? 'bg-slate-900' : 'bg-white'}">
-		<!-- Header -->
-		<div class="h-14 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border-b flex items-center justify-between px-6 shadow-sm">
-			<div class="flex items-center gap-4">
-				<div class="w-10 h-10 {darkMode ? 'bg-indigo-900' : 'bg-indigo-100'} rounded-lg flex items-center justify-center">
-					<svg class="w-5 h-5 {darkMode ? 'text-indigo-300' : 'text-indigo-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 14H4m6.5 3L8 20m5.5-3 2.5 3M4.88889 17H19.1111c.4909 0 .8889-.4157.8889-.9286V4.92857C20 4.41574 19.602 4 19.1111 4H4.88889C4.39797 4 4 4.41574 4 4.92857V16.0714c0 .5129.39797.9286.88889.9286ZM13 14v-3h4v3h-4Z"></path>
-					</svg>
-				</div>
-				<h1 class="text-2xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'} tracking-tight">Learning Center</h1>
-				<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
-				<span class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'}">
-					{resources.length} {resources.length === 1 ? 'resource' : 'resources'}
-				</span>
-			</div>
-		</div>
+		<UnifiedTopBar pageTitle="Learning" />
 
 		<!-- Main Content -->
 		<div class="flex-1 overflow-y-auto {darkMode ? 'bg-slate-900' : 'bg-slate-50'}">

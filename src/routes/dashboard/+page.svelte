@@ -12,6 +12,7 @@
 	import { onMount, setContext } from 'svelte';
 	import { themeStore } from '$lib/stores/themeStore.svelte';
 	import type { Project } from '@stratiqai/types-simple';
+	import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
 	import { createSupabaseBrowserClient } from '$lib/supabase/browser';
 	import { logSupabaseRpcSmokeTest } from '$lib/supabase/supabaseRpcSmokeTest';
 
@@ -26,9 +27,8 @@
 	let darkMode = $derived.by(() => themeStore.darkMode);
 	let currentTheme = $derived.by(() => themeStore.theme);
 
-	// Project state (derive from load so updates when `data` changes)
-	const projects = $derived(data.projects ?? []);
-	let selectedProjectId = $state<string | null>(null);
+	const projects = $derived(globalProjectStore.projects);
+	let selectedProjectId = $derived(globalProjectStore.selectedProjectId);
 
 	// Set page data context for child components (getter keeps context in sync with `data`)
 	setContext('pageData', {
@@ -44,7 +44,6 @@
 	});
 
 	function handleProjectChange(projectId: string | null) {
-		selectedProjectId = projectId;
 		// Save current dashboard before switching
 		if (dashboard.hasUnsavedChanges) {
 			dashboard.save();
@@ -122,13 +121,7 @@
 		}
 
 		try {
-			// Load selected project from storage or use first project
-			const savedProjectId = DashboardStorage.getSelectedProjectId();
-			if (savedProjectId && projects.some((p) => p.id === savedProjectId)) {
-				selectedProjectId = savedProjectId;
-			} else if (projects.length > 0) {
-				selectedProjectId = projects[0].id;
-			}
+			// Global store already initialized with localStorage selection via root layout
 
 			// Set initial grid size before loading widgets
 			updateGridSize();
@@ -230,8 +223,6 @@
 			{darkMode}
 			{currentTheme}
 			defaultWidgets={dashboardWidgets}
-			{projects}
-			{selectedProjectId}
 			onProjectChange={handleProjectChange}
 		/>
 

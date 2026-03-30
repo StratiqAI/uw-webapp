@@ -22,6 +22,7 @@
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import { DashboardStorage } from '$lib/dashboard/utils/storage';
 	import { streamCatalog } from '$lib/stores/streamCatalog.svelte';
+	import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
 	import ToastContainer from '$lib/components/Toast/ToastContainer.svelte';
 
 	// Register package-based widgets before schema initialization
@@ -81,8 +82,13 @@
 		DashboardStorage.saveWidgetDataNow();
 	}
 
+	$effect(() => {
+		if (browser && data.projects) {
+			globalProjectStore.initialize(data.projects);
+		}
+	});
+
 	onMount(() => {
-		// Sync themeStore with whatever app.html's blocking script already applied
 		themeStore.initialize();
 	});
 

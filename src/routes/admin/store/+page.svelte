@@ -9,6 +9,7 @@
 	import SchemaExplorer from './SchemaExplorer.svelte';
 	import StreamsPanel from './StreamsPanel.svelte';
 	import PublishPanel from './PublishPanel.svelte';
+	import UnifiedTopBar from '$lib/components/UnifiedTopBar.svelte';
 
 	let activeTab = $state<'topics' | 'streams'>('topics');
 
@@ -115,18 +116,8 @@
 </script>
 
 <div class="flex h-screen w-full flex-col overflow-hidden {darkMode ? 'bg-slate-900' : 'bg-slate-50'} transition-colors">
-	<!-- Header -->
-	<header class="flex h-12 shrink-0 items-center justify-between border-b px-4 {darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'} shadow-sm">
-		<div class="flex items-center gap-3">
-			<a href="/admin/store" class="flex items-center gap-2">
-				<svg class="h-5 w-5 {darkMode ? 'text-indigo-400' : 'text-indigo-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
-				</svg>
-				<h1 class="text-sm font-semibold {darkMode ? 'text-slate-100' : 'text-slate-900'}">Knowledge Map</h1>
-			</a>
-			<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
-
-			<!-- Stats pills -->
+	<UnifiedTopBar pageTitle="Knowledge Map">
+		{#snippet tabs()}
 			<div class="flex items-center gap-2">
 				<span class="rounded-full px-2 py-0.5 text-xs font-medium {darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'}">
 					{stats.topics} topics
@@ -158,9 +149,8 @@
 					{stats.streams} stream{stats.streams !== 1 ? 's' : ''}
 				</button>
 			</div>
-		</div>
-
-		<div class="flex items-center gap-2">
+		{/snippet}
+		{#snippet actions()}
 			<button
 				type="button"
 				class="rounded px-2.5 py-1 text-xs font-medium transition-colors
@@ -171,8 +161,8 @@
 			>
 				Publish
 			</button>
-		</div>
-	</header>
+		{/snippet}
+	</UnifiedTopBar>
 
 	<!-- Errors overlay -->
 	{#if errorsOpen && errorEntries.length > 0}

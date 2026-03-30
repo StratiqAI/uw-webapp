@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
+	import UnifiedTopBar from '$lib/components/UnifiedTopBar.svelte';
 
-	// Use unified dark mode store
 	let darkMode = $derived.by(() => darkModeStore.darkMode);
 
 	interface SupportSection {
@@ -116,19 +116,7 @@
 <div class="flex h-screen w-full overflow-hidden {darkMode ? 'bg-slate-900' : 'bg-slate-50'} transition-colors">
 	<!-- Main Content Area -->
 	<div class="flex-1 flex flex-col overflow-hidden {darkMode ? 'bg-slate-900' : 'bg-white'}">
-		<!-- Header -->
-		<div class="h-14 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border-b flex items-center justify-between px-6 shadow-sm">
-			<div class="flex items-center gap-4">
-				<div class="w-10 h-10 {darkMode ? 'bg-indigo-900' : 'bg-indigo-100'} rounded-lg flex items-center justify-center">
-					<svg class="w-5 h-5 {darkMode ? 'text-indigo-300' : 'text-indigo-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.03v13m0-13c-2.819-.831-4.715-1.076-8.029-1.023A.99.99 0 0 0 3 6v11c0 .563.466 1.014 1.03 1.007 3.122-.043 5.018.212 7.97 1.023m0-13c2.819-.831 4.715-1.076 8.029-1.023A.99.99 0 0 1 21 6v11c0 .563-.466 1.014-1.03 1.007-3.122-.043-5.018.212-7.97 1.023"></path>
-                            </svg>
-                        </div>
-				<h1 class="text-2xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'} tracking-tight">Support</h1>
-				<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
-				<span class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'}">Help & Resources</span>
-                        </div>
-                    </div>
+		<UnifiedTopBar pageTitle="Support" subtitle="Help & Resources" />
 
 		<!-- Main Content -->
 		<div class="flex-1 overflow-y-auto {darkMode ? 'bg-slate-900' : 'bg-slate-50'}">

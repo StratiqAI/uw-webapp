@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Project } from '@stratiqai/types-simple';
+	import { goto } from '$app/navigation';
 
 	interface Props {
 		projects: Project[];
