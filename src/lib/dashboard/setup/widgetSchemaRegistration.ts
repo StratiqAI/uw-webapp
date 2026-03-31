@@ -14,7 +14,7 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 import { WidgetDataSchemas } from '$lib/dashboard/types/widgetSchemas';
 import type { WidgetType } from '$lib/dashboard/types/widget';
 import type { JsonSchemaDefinition } from '$lib/types/models';
-import { getRegisteredManifests } from '$lib/dashboard/setup/widgetRegistry';
+import { getRegisteredManifests, getWidgetManifest } from '$lib/dashboard/setup/widgetRegistry';
 
 const WIDGET_NAMES: Record<WidgetType, string> = {
 	paragraph: 'Paragraph Widget',
@@ -125,13 +125,50 @@ export function initializeWidgetSchemas(): void {
 		} catch (error) {
 			console.error(`Failed to register package widget ${schemaId}:`, error);
 		}
+
+		if (manifest.outputSchema) {
+			const outputSchemaId = `widget:${manifest.kind}-out-${manifest.schemaVersion}`;
+			const outputTopicPattern = `widgets/${manifest.kind}/+/out`;
+			try {
+				validatedTopicStore.registerSchema({
+					id: outputSchemaId,
+					name: `${manifest.displayName} Output`,
+					description: `Output schema for ${manifest.displayName.toLowerCase()}`,
+					source: 'code',
+					topicPattern: outputTopicPattern,
+					jsonSchema: zodToCleanJsonSchema(manifest.outputSchema, `${manifest.kind}WidgetOutput`)
+				});
+			} catch (error) {
+				console.error(`Failed to register output schema ${outputSchemaId}:`, error);
+			}
+		}
 	}
 
 	schemasRegistered = true;
 }
 
-export function getWidgetSchemaId(widgetType: WidgetType): string {
+/**
+ * Returns the input schema id for any widget type (built-in or package-based).
+ * Checks the manifest registry first, then falls back to the built-in convention.
+ */
+export function getWidgetSchemaId(widgetType: WidgetType | string): string {
+	const manifest = getWidgetManifest(widgetType);
+	if (manifest) {
+		return `widget:${manifest.kind}-${manifest.schemaVersion}`;
+	}
 	return `widget:${widgetType}-v1`;
+}
+
+/**
+ * Returns the output schema id for a widget type, or null if the widget
+ * does not publish (subscribe-only / no outputSchema on the manifest).
+ */
+export function getWidgetOutputSchemaId(widgetType: string): string | null {
+	const manifest = getWidgetManifest(widgetType);
+	if (manifest?.outputSchema) {
+		return `widget:${manifest.kind}-out-${manifest.schemaVersion}`;
+	}
+	return null;
 }
 
 export function getWidgetTopic(widgetType: WidgetType | string, widgetId: string, topicOverride?: string): string {

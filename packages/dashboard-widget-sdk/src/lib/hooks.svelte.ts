@@ -27,3 +27,17 @@ export function useReactiveValidatedTopic<T = unknown>(topic: () => string) {
 		}
 	};
 }
+
+/**
+ * Publish validated data to a widget's output topic via the host context.
+ * Returns false if the host does not support output publishing or the
+ * widget kind has no registered output schema.
+ */
+export function publishWidgetOutput(kind: string, widgetId: string, data: unknown): boolean {
+	const host = getDashboardWidgetHost();
+	if (!host.publishWidgetOutput) {
+		console.warn(`publishWidgetOutput not available on host — ${kind}/${widgetId} publish skipped`);
+		return false;
+	}
+	return host.publishWidgetOutput(kind, widgetId, data);
+}

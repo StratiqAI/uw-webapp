@@ -27,9 +27,6 @@ export type WorkflowEdgeInput = {
 	targetPort?: string | null;
 };
 
-/** API input: AppSync AWSJSON scalar expects jsonSchema as a JSON string. */
-export type StructuredOutputSchemaInput = { jsonSchema: string };
-
 /**
  * Prepare definition for GraphQL mutation variables. AppSync AWSJSON expects strings:
  * each node's configuration (and options) must be JSON.stringify'd to avoid "Variable 'configuration' has an invalid value".
@@ -126,24 +123,21 @@ function categoryToKind(category: string): WorkflowNodeKind {
 export function buildWorkflowDefinitionInput(
 	gridElements: GridElement[],
 	connections: Connection[],
-	outputSchema?: Record<string, unknown> | null
-): { definition: WorkflowDefinitionInput; structuredOutputSchema?: StructuredOutputSchemaInput } {
+	jsonSchemaId?: string | null,
+	nodeJsonSchemaIds?: Record<string, string>
+): { definition: WorkflowDefinitionInput; jsonSchemaId?: string } {
 	const nodes: WorkflowNodeInput[] = gridElements.map((el) => {
 		const kind = categoryToKind(el.type.type);
 		let configuration: Record<string, unknown>;
 		if (kind === 'AI' && el.aiQueryData) {
-			const rf = el.aiQueryData.responseFormat;
-			const structuredOutputSchema =
-				rf?.type === 'json_schema' && rf && 'schema' in rf && rf.schema != null
-					? { jsonSchema: JSON.stringify(rf.schema) }
-					: undefined;
+			const nodeSchemaId = nodeJsonSchemaIds?.[el.id];
 			configuration = {
 				__typename: 'AINodeConfig',
 				prompt: el.aiQueryData.prompt,
 				model: el.aiQueryData.model,
 				topK: el.aiQueryData.maxTokens ?? undefined,
 				systemPrompt: el.aiQueryData.systemPrompt ?? undefined,
-				...(structuredOutputSchema && { structuredOutputSchema })
+				...(nodeSchemaId && { jsonSchemaId: nodeSchemaId })
 			};
 		} else if (kind === 'PROCESS' && (el.nodeOptions != null || el.output !== undefined)) {
 			configuration = {
@@ -184,12 +178,12 @@ export function buildWorkflowDefinitionInput(
 
 	const result: {
 		definition: WorkflowDefinitionInput;
-		structuredOutputSchema?: StructuredOutputSchemaInput;
+		jsonSchemaId?: string;
 	} = {
 		definition: { nodes, edges }
 	};
-	if (outputSchema != null && Object.keys(outputSchema).length > 0) {
-		result.structuredOutputSchema = { jsonSchema: JSON.stringify(outputSchema) };
+	if (jsonSchemaId) {
+		result.jsonSchemaId = jsonSchemaId;
 	}
 	return result;
 }

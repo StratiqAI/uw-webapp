@@ -1,0 +1,114 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://stratiqai.com/schemas/widget-manifest-v1.json",
+  "title": "StratiqAI Widget Manifest",
+  "description": "Declarative sidecar for a dashboard widget package. Lives at packages/widget-<kind>/widget.manifest.json. Drift-check script validates this against the defineWidget() export.",
+  "type": "object",
+  "required": [
+    "kind",
+    "schemaVersion",
+    "displayName",
+    "npmName",
+    "input"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "kind": {
+      "type": "string",
+      "pattern": "^[a-z][a-zA-Z0-9]*$",
+      "description": "Stable camelCase identifier matching defineWidget({ kind })."
+    },
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^v\\d+$",
+      "description": "Version string (e.g. 'v1'). Bump on breaking schema changes."
+    },
+    "displayName": {
+      "type": "string",
+      "description": "Human-readable label shown in the widget palette."
+    },
+    "npmName": {
+      "type": "string",
+      "pattern": "^@stratiqai/widget-",
+      "description": "npm package name, e.g. '@stratiqai/widget-metric'."
+    },
+    "capabilities": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Host services the widget requires (e.g. 'supabase', 'fetch')."
+    },
+    "input": {
+      "type": "object",
+      "required": ["schemaId", "topicPattern"],
+      "additionalProperties": false,
+      "description": "Subscribe-side contract: payloads the widget consumes.",
+      "properties": {
+        "schemaId": {
+          "type": "string",
+          "description": "Canonical schema id registered in ValidatedTopicStore, e.g. 'widget:metric-v1'."
+        },
+        "topicPattern": {
+          "type": "string",
+          "description": "Topic pattern for inbound data, e.g. 'widgets/metric/+'."
+        },
+        "jsonSchema": {
+          "type": "object",
+          "description": "JSON Schema derived from the input Zod schema. Optional here if generated at build time."
+        }
+      }
+    },
+    "output": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["schemaId", "topicPattern", "writeMode"],
+          "additionalProperties": false,
+          "properties": {
+            "schemaId": {
+              "type": "string",
+              "description": "Output schema id, e.g. 'widget:metric-out-v1'."
+            },
+            "topicPattern": {
+              "type": "string",
+              "description": "Topic pattern for published data, e.g. 'widgets/metric/+/out'."
+            },
+            "writeMode": {
+              "type": "string",
+              "enum": ["publish", "patch"],
+              "description": "'publish' for full-document replace, 'patch' for merge."
+            },
+            "jsonSchema": {
+              "type": "object",
+              "description": "JSON Schema for the output payload. Optional here if generated at build time."
+            }
+          }
+        }
+      ],
+      "description": "Publish-side contract, or null if the widget is subscribe-only."
+    },
+    "palette": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "icon": {
+          "type": "string",
+          "description": "Emoji or icon key for the Add Widget palette."
+        },
+        "category": {
+          "type": "string",
+          "description": "Grouping category (e.g. 'charts', 'data', 'content', 'financial')."
+        }
+      }
+    },
+    "defaultSize": {
+      "type": "object",
+      "required": ["colSpan", "rowSpan"],
+      "additionalProperties": false,
+      "properties": {
+        "colSpan": { "type": "integer", "minimum": 1, "maximum": 12 },
+        "rowSpan": { "type": "integer", "minimum": 1, "maximum": 12 }
+      }
+    }
+  }
+}

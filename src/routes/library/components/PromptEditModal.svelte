@@ -7,6 +7,9 @@
 		NestedSchemaPropertyNode
 	} from '$lib/schema/promptSchemaTreeTypes';
 	import SchemaNodesEditor from './SchemaNodesEditor.svelte';
+	import JsonSchemaPickerModal from '$lib/components/schemas/JsonSchemaPickerModal.svelte';
+	import { Q_GET_JSON_SCHEMA } from '$lib/graphql/jsonSchemaOperations';
+	import type { IGraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
 	import { getTemplateStrForEditor, parseTemplateToAIQueryData, type AIQueryData } from '../PromptService';
 
 	/** All valid AIModel enum values (schema) — used so 3.1 and all models pass VALID_AI_MODELS.has() */
@@ -43,20 +46,27 @@
 		darkMode = false,
 		template = null,
 		isCreating = false,
+		queryClient = null,
 		onSave,
 		onCancel
 	}: {
 		darkMode?: boolean;
 		template?: Prompt | null;
 		isCreating?: boolean;
+		queryClient?: IGraphQLQueryClient | null;
 		onSave?: (data: {
 			name: string;
 			description: string;
 			aiQueryData: AIQueryData;
-			outputSchema?: { name: string; description?: string; schemaDefinition: unknown };
+			jsonSchemaId?: string;
+			schemaData?: { name: string; description?: string; schemaDefinition: unknown };
 		}) => void | Promise<void>;
 		onCancel?: () => void;
 	} = $props();
+
+	/** Track the jsonSchemaId from the loaded template (if any) */
+	let currentJsonSchemaId = $state<string | undefined>(undefined);
+	let showSchemaPicker = $state(false);
 
 	let saving = $state(false);
 
@@ -133,6 +143,10 @@
 		if (template) {
 			templateName = template.name || '';
 			templateDescription = template.description || '';
+			currentJsonSchemaId = (template as { jsonSchemaId?: string }).jsonSchemaId ?? undefined;
+			if (currentJsonSchemaId && queryClient) {
+				loadJsonSchemaById(currentJsonSchemaId);
+			}
 
 			const templateStr = getTemplateStrForEditor(template);
 			const data = parseTemplateToAIQueryData(templateStr);
@@ -150,28 +164,7 @@
 				? data.stop.join(', ')
 				: data.stop ?? '';
 
-			// Prefer inline outputSchema from Prompt when present; else legacy template-str responseFormat
-			if (template.outputSchema?.schemaDefinition != null) {
-				const def = template.outputSchema.schemaDefinition;
-				const schema = typeof def === 'string' ? (() => { try { return JSON.parse(def); } catch { return {}; } })() : (def as Record<string, unknown>);
-				jsonSchemaText = typeof def === 'string' ? def : JSON.stringify(schema, null, 2);
-
-				responseFormatType = 'json_schema';
-				if (schema && typeof schema === 'object' && schema.properties) {
-					const props = schema.properties as Record<string, Record<string, unknown>>;
-					const next: Record<string, any> = {};
-					for (const [key, def] of Object.entries(props)) {
-						next[key] = flatFieldFromJsonSchemaFragment(def);
-					}
-					schemaProperties = next;
-					schemaRequired = Array.isArray(schema.required) ? [...(schema.required as string[])] : [];
-					fieldOrder = Object.keys(props);
-				} else {
-					schemaProperties = {};
-					schemaRequired = [];
-					fieldOrder = [];
-				}
-			} else if (data.responseFormat) {
+			if (data.responseFormat) {
 				const rf = data.responseFormat;
 				const rfType = (rf as { type: string }).type;
 				responseFormatType = (rfType === 'json_schema_nested' ? 'json_schema' : rfType) as
@@ -225,6 +218,7 @@
 			// Reset to defaults for new template
 			templateName = '';
 			templateDescription = '';
+			currentJsonSchemaId = undefined;
 			aiQueryPrompt = 'Analyze the following data and provide insights: {input}';
 			aiQueryModel = DEFAULT_AI_MODEL;
 			aiQuerySystemPrompt = DEFAULT_SYSTEM_PROMPT;
@@ -554,6 +548,53 @@
 		return base;
 	}
 
+	/** Load schema definition from a JsonSchema entity and populate the form fields. */
+	function applySchemaDefinitionToForm(schemaDefRaw: unknown) {
+		const schema = typeof schemaDefRaw === 'string'
+			? (() => { try { return JSON.parse(schemaDefRaw); } catch { return {}; } })()
+			: (schemaDefRaw as Record<string, unknown>);
+		jsonSchemaText = typeof schemaDefRaw === 'string' ? schemaDefRaw : JSON.stringify(schema, null, 2);
+
+		responseFormatType = 'json_schema';
+		if (schema && typeof schema === 'object' && schema.properties) {
+			const props = schema.properties as Record<string, Record<string, unknown>>;
+			const next: Record<string, any> = {};
+			for (const [key, def] of Object.entries(props)) {
+				next[key] = flatFieldFromJsonSchemaFragment(def);
+			}
+			schemaProperties = next;
+			schemaRequired = Array.isArray(schema.required) ? [...(schema.required as string[])] : [];
+			fieldOrder = Object.keys(props);
+		} else {
+			schemaProperties = {};
+			schemaRequired = [];
+			fieldOrder = [];
+		}
+	}
+
+	/** Fetch a JsonSchema entity by ID and populate the form. */
+	async function loadJsonSchemaById(id: string) {
+		if (!queryClient) return;
+		try {
+			const result = await queryClient.query<{ getJsonSchema: { id: string; schemaDefinition: string } | null }>(
+				Q_GET_JSON_SCHEMA,
+				{ id }
+			);
+			if (result?.getJsonSchema?.schemaDefinition) {
+				applySchemaDefinitionToForm(result.getJsonSchema.schemaDefinition);
+			}
+		} catch (e) {
+			console.error('Failed to load JsonSchema:', e);
+		}
+	}
+
+	/** Handle selection from the schema picker modal. */
+	function handleSchemaPickerSelect(schema: { id: string; schemaDefinition: string }) {
+		currentJsonSchemaId = schema.id;
+		applySchemaDefinitionToForm(schema.schemaDefinition);
+		showSchemaPicker = false;
+	}
+
 	async function handleSave() {
 		if (!templateName.trim()) {
 			alert('Please enter a template name');
@@ -627,10 +668,10 @@
 			}
 		}
 
-		let outputSchema: { name: string; description?: string; schemaDefinition: unknown } | undefined;
+		let schemaData: { name: string; description?: string; schemaDefinition: unknown } | undefined;
 		if (responseFormatType === 'json_schema') {
 			if (Object.keys(schemaProperties).length > 0) {
-				outputSchema = {
+				schemaData = {
 					name: templateName.trim() || 'Structured output',
 					description: templateDescription.trim() || undefined,
 					schemaDefinition: schemaPreview
@@ -638,13 +679,13 @@
 			} else if (jsonSchemaText.trim()) {
 				try {
 					const parsed = JSON.parse(jsonSchemaText);
-					outputSchema = {
+					schemaData = {
 						name: templateName.trim() || 'Structured output',
 						description: templateDescription.trim() || undefined,
 						schemaDefinition: parsed
 					};
 				} catch {
-					// invalid JSON schema; omit outputSchema
+					// invalid JSON schema text; omit schemaData
 				}
 			}
 		}
@@ -655,7 +696,8 @@
 				name: templateName.trim(),
 				description: templateDescription.trim(),
 				aiQueryData,
-				...(outputSchema && { outputSchema })
+				...(currentJsonSchemaId && { jsonSchemaId: currentJsonSchemaId }),
+				...(schemaData && { schemaData })
 			});
 		} catch (err) {
 			console.error('Save failed:', err);
@@ -791,6 +833,11 @@
 					</div>
 					{#if responseFormatType === 'json_schema'}
 						<div class="flex gap-1.5">
+							{#if queryClient}
+								<button type="button" onclick={() => showSchemaPicker = true}
+									class="px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors {darkMode ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200/60'}"
+								>Pick from Library</button>
+							{/if}
 							<button type="button" onclick={() => addSchemaField(true)}
 								class="px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors {darkMode ? 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/20' : 'bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200/60'}"
 							>+ Reasoning</button>
@@ -981,4 +1028,14 @@
 		</div>
 	</div>
 </div>
+
+{#if showSchemaPicker && queryClient}
+	<JsonSchemaPickerModal
+		{darkMode}
+		{queryClient}
+		selectedSchemaId={currentJsonSchemaId}
+		onselect={handleSchemaPickerSelect}
+		onclose={() => showSchemaPicker = false}
+	/>
+{/if}
 {/if}

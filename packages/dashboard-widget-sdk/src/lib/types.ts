@@ -38,11 +38,18 @@ export interface WidgetManifest<TData = unknown> {
 	 * while widget.data holds the full config validated by zodSchema.
 	 */
 	inputSchema?: z.ZodSchema;
+	/**
+	 * Zod schema for payloads this widget **publishes** to ValidatedTopicStore.
+	 * Omit or set to undefined for subscribe-only widgets.
+	 */
+	outputSchema?: z.ZodSchema;
 	component: Component<StandardWidgetProps<TData>>;
 	defaultData: TData;
 	defaultSize: { colSpan: number; rowSpan: number };
 	/** Services this widget requires from the host (informational). */
 	capabilities?: string[];
+	/** Palette metadata for the host "Add Widget" UI. */
+	palette?: { icon: string; category?: string };
 }
 
 /** Provides typed access to host-injected service instances. */
@@ -65,6 +72,11 @@ export interface DashboardWidgetHost {
 		patch(topic: string, partial: Record<string, unknown>): boolean;
 	};
 	getWidgetTopic(kind: string, widgetId: string, topicOverride?: string): string;
+	/**
+	 * Publish validated data to a widget's output topic.
+	 * Returns false if the widget kind has no registered output schema.
+	 */
+	publishWidgetOutput?(kind: string, widgetId: string, data: unknown): boolean;
 	/** Service registry -- host provides named service instances. */
 	services?: ServiceAccessor;
 }

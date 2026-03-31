@@ -60,6 +60,9 @@
 		type WorkflowDefinitionInput
 	} from '../../services/serialization/workflowSerializationService';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
+	import { Q_GET_JSON_SCHEMA } from '$lib/graphql/jsonSchemaOperations';
+	import { ensureJsonSchemaEntity } from '$lib/graphql/jsonSchemaService';
+	import { GraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
 	import WorkflowSwitcher from '$lib/dashboard/components/WorkflowSwitcher.svelte';
 	import {
 		M_CREATE_WORKFLOW,
@@ -139,6 +142,8 @@
 	let showingWorkflowJSON = $state(false);
 	let showingOutputSchema = $state(false);
 	let outputSchema = $state<Record<string, unknown> | null>(null);
+	let workflowJsonSchemaId = $state<string | null>(null);
+	let nodeJsonSchemaIds = $state<Record<string, string>>({});
 	let canvasRef: any = null;
 
 	let darkMode = $derived.by(() => darkModeStore.darkMode);
@@ -200,7 +205,7 @@
 				if (data.project) {
 					workflows = data.project.workflows?.items || [];
 				}
-				loadWorkflowIntoCanvas(data.workflow);
+				void loadWorkflowIntoCanvas(data.workflow);
 			} else {
 				// Just project ID, load workflows
 				selectedWorkflowId = null;
@@ -432,11 +437,13 @@
 		};
 	}
 
-	function loadWorkflowIntoCanvas(workflow: Workflow) {
+	async function loadWorkflowIntoCanvas(workflow: Workflow) {
 		// Clear current canvas
 		gridElements = [];
 		connections = [];
 		outputSchema = null;
+		workflowJsonSchemaId = null;
+		nodeJsonSchemaIds = {};
 
 		try {
 			// Prefer loading from ui field if available, otherwise fall back to definition
@@ -508,9 +515,8 @@
 					fromSide: e.sourcePort ?? 'right',
 					toSide: e.targetPort ?? 'left'
 				}));
-				if ((workflow as any).structuredOutputSchema?.jsonSchema != null) {
-					const raw = (workflow as any).structuredOutputSchema.jsonSchema;
-					outputSchema = typeof raw === 'string' ? (JSON.parse(raw) as Record<string, unknown>) : (raw as Record<string, unknown>);
+				if ((workflow as any).jsonSchemaId) {
+					workflowJsonSchemaId = (workflow as any).jsonSchemaId;
 				}
 			} else {
 				console.error('Workflow has no ui or definition (expected definition.nodes and definition.edges)');
@@ -567,10 +573,8 @@
 			if (workflow.ui && workflow.definition) {
 				const def = workflow.definition as { nodes?: Array<{ id: string; kind: string; configuration?: any; config?: any; aiConfig?: any; processConfig?: any; toolsConfig?: any; options?: any }>; edges?: unknown[] };
 				if (Array.isArray(def.nodes) && Array.isArray(def.edges)) {
-					const w = workflow as { structuredOutputSchema?: { jsonSchema?: unknown } };
-					if (w.structuredOutputSchema?.jsonSchema != null) {
-						const raw = w.structuredOutputSchema.jsonSchema;
-						outputSchema = typeof raw === 'string' ? (JSON.parse(raw) as Record<string, unknown>) : (raw as Record<string, unknown>);
+					if ((workflow as any).jsonSchemaId) {
+						workflowJsonSchemaId = (workflow as any).jsonSchemaId;
 					}
 					for (const node of def.nodes || []) {
 						const gridElement = newElements.find((el) => el.id === node.id);
@@ -578,21 +582,28 @@
 						const config = node.configuration ?? node.config ?? (node.aiConfig || node.processConfig || node.toolsConfig);
 						if (config && typeof config === 'object') {
 							if ('prompt' in config || 'model' in config) {
-								const rawSchema = config.structuredOutputSchema?.jsonSchema;
-								const schemaObj =
-									rawSchema != null
-										? typeof rawSchema === 'string'
-											? (JSON.parse(rawSchema) as Record<string, unknown>)
-											: (rawSchema as Record<string, unknown>)
-										: undefined;
 								gridElement.aiQueryData = {
 									prompt: config.prompt ?? '',
 									model: config.model ?? '',
-									systemPrompt: config.systemPrompt,
-									...(schemaObj && {
-										responseFormat: { type: 'json_schema' as const, schema: schemaObj }
-									})
+									systemPrompt: config.systemPrompt
 								};
+							if (config.jsonSchemaId && data.idToken) {
+								nodeJsonSchemaIds[gridElement.id] = config.jsonSchemaId;
+								try {
+									const schemaResult = await gql<{ getJsonSchema: { schemaDefinition?: string } | null }>(
+										Q_GET_JSON_SCHEMA,
+										{ id: config.jsonSchemaId },
+										data.idToken
+									);
+									const raw = schemaResult?.getJsonSchema?.schemaDefinition;
+									if (raw) {
+										const schemaObj = typeof raw === 'string' ? JSON.parse(raw) : raw;
+										gridElement.aiQueryData.responseFormat = { type: 'json_schema' as const, schema: schemaObj };
+									}
+								} catch (e) {
+									console.warn('Failed to fetch node JsonSchema:', config.jsonSchemaId, e);
+								}
+							}
 							}
 							if ('staticOutput' in config || 'options' in config) {
 								gridElement.output = config.staticOutput;
@@ -614,6 +625,22 @@
 
 			gridElements = newElements;
 			connections = newConnections;
+
+			if (workflowJsonSchemaId && data.idToken) {
+				try {
+					const schemaResult = await gql<{ getJsonSchema: { schemaDefinition?: string } | null }>(
+						Q_GET_JSON_SCHEMA,
+						{ id: workflowJsonSchemaId },
+						data.idToken
+					);
+					const raw = schemaResult?.getJsonSchema?.schemaDefinition;
+					if (raw) {
+						outputSchema = typeof raw === 'string' ? JSON.parse(raw) : raw;
+					}
+				} catch (e) {
+					console.warn('Failed to fetch workflow JsonSchema:', workflowJsonSchemaId, e);
+				}
+			}
 		} catch (error) {
 			console.error('Failed to load workflow into canvas:', error);
 			toastStore.error(`Error loading workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -626,7 +653,7 @@
 		if (workflowId) {
 			const workflow = workflows.find((w) => w.id === workflowId);
 			if (workflow) {
-				loadWorkflowIntoCanvas(workflow);
+				await loadWorkflowIntoCanvas(workflow);
 			}
 		} else {
 			gridElements = [];
@@ -796,11 +823,36 @@
 		}
 
 		try {
-			// Build typed definition (nodes + edges) and optional structuredOutputSchema for API
-			const { definition, structuredOutputSchema } = buildWorkflowDefinitionInput(
+			const queryClient = new GraphQLQueryClient(data.idToken);
+
+			// Persist workflow-level output schema as a JsonSchema entity if needed
+			if (outputSchema && Object.keys(outputSchema).length > 0) {
+				workflowJsonSchemaId = await ensureJsonSchemaEntity(
+					queryClient,
+					{ name: 'Workflow Output Schema', schemaDefinition: outputSchema },
+					workflowJsonSchemaId ?? undefined
+				);
+			}
+
+			// Persist node-level AI schemas, reusing existing entity IDs
+			const resolvedNodeSchemaIds: Record<string, string> = {};
+			for (const el of gridElements) {
+				if (el.aiQueryData?.responseFormat?.type === 'json_schema' && el.aiQueryData.responseFormat.schema) {
+					const entityId = await ensureJsonSchemaEntity(
+						queryClient,
+						{ name: `AI Node Schema (${el.type.label ?? el.id})`, schemaDefinition: el.aiQueryData.responseFormat.schema },
+						nodeJsonSchemaIds[el.id]
+					);
+					resolvedNodeSchemaIds[el.id] = entityId;
+				}
+			}
+			nodeJsonSchemaIds = { ...nodeJsonSchemaIds, ...resolvedNodeSchemaIds };
+
+			const { definition, jsonSchemaId: resolvedSchemaId } = buildWorkflowDefinitionInput(
 				gridElements,
 				connections,
-				outputSchema
+				workflowJsonSchemaId,
+				resolvedNodeSchemaIds
 			);
 
 			// Generate UI structure (layout)
@@ -815,13 +867,13 @@
 					return;
 				}
 
-				const input: { name: string; definition: ReturnType<typeof definitionToApiVariables>; ui: typeof workflowUI; structuredOutputSchema?: typeof structuredOutputSchema } = {
+				const input: { name: string; definition: ReturnType<typeof definitionToApiVariables>; ui: typeof workflowUI; jsonSchemaId?: string } = {
 					name: workflow.name,
 					definition: definitionToApiVariables(definition),
 					ui: workflowUI
 				};
-				if (structuredOutputSchema) {
-					input.structuredOutputSchema = structuredOutputSchema;
+				if (resolvedSchemaId) {
+					input.jsonSchemaId = resolvedSchemaId;
 				}
 
 				// CompositeKeyInput requires both id and parentId for child entities
@@ -856,14 +908,14 @@
 				toastStore.success('Workflow updated successfully!');
 			} else {
 				// Create new workflow
-				const input: { name: string; definition: ReturnType<typeof definitionToApiVariables>; ui: typeof workflowUI; parentId: string; structuredOutputSchema?: typeof structuredOutputSchema } = {
+				const input: { name: string; definition: ReturnType<typeof definitionToApiVariables>; ui: typeof workflowUI; parentId: string; jsonSchemaId?: string } = {
 					name: 'New Workflow',
 					definition: definitionToApiVariables(definition),
 					ui: workflowUI,
 					parentId: selectedProjectId
 				};
-				if (structuredOutputSchema) {
-					input.structuredOutputSchema = structuredOutputSchema;
+				if (resolvedSchemaId) {
+					input.jsonSchemaId = resolvedSchemaId;
 				}
 
 				console.log('[saveWorkflow] Creating new workflow:', { input });
@@ -1488,7 +1540,12 @@
 		<WorkflowOutputSchemaModal
 			{darkMode}
 			bind:outputSchema={outputSchema}
-			onSave={saveWorkflow}
+			queryClient={data.idToken ? new GraphQLQueryClient(data.idToken) : undefined}
+			selectedJsonSchemaId={workflowJsonSchemaId ?? undefined}
+			onSave={(pickedSchemaId) => {
+				if (pickedSchemaId) workflowJsonSchemaId = pickedSchemaId;
+				saveWorkflow();
+			}}
 			onClose={() => (showingOutputSchema = false)}
 		/>
 	{/if}

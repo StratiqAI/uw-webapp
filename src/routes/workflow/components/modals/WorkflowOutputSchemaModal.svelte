@@ -1,7 +1,9 @@
 <script lang="ts">
 	import WorkflowModal from './WorkflowModal.svelte';
 	import JsonSchemaFieldRow from '$lib/components/admin/JsonSchemaFieldRow.svelte';
+	import JsonSchemaPickerModal from '$lib/components/schemas/JsonSchemaPickerModal.svelte';
 	import type { JsonSchemaDefinition } from '$lib/types/models';
+	import type { IGraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
 	import Ajv from 'ajv';
 	import addFormats from 'ajv-formats';
 
@@ -11,14 +13,21 @@
 	let {
 		darkMode = false,
 		outputSchema = $bindable(null),
+		queryClient,
+		selectedJsonSchemaId,
 		onSave,
 		onClose
 	}: {
 		darkMode?: boolean;
 		outputSchema?: Record<string, unknown> | null;
-		onSave?: () => void;
+		queryClient?: IGraphQLQueryClient;
+		selectedJsonSchemaId?: string;
+		onSave?: (pickedSchemaId?: string) => void;
 		onClose?: () => void;
 	} = $props();
+
+	let showPicker = $state(false);
+	let pickedSchemaId = $state<string | undefined>(undefined);
 
 	type Tab = 'build' | 'json';
 	let activeTab = $state<Tab>('build');
@@ -164,6 +173,24 @@
 		return null;
 	}
 
+	function handlePickFromLibrary(schema: { id: string; schemaDefinition: string }) {
+		showPicker = false;
+		pickedSchemaId = schema.id;
+		try {
+			const parsed =
+				typeof schema.schemaDefinition === 'string'
+					? JSON.parse(schema.schemaDefinition)
+					: schema.schemaDefinition;
+			outputSchema = parsed as Record<string, unknown>;
+			rootSchema = normalizeToObjectSchema(parsed);
+			schemaText = JSON.stringify(parsed, null, 2);
+			schemaError = '';
+			isValid = true;
+		} catch {
+			schemaError = 'Failed to parse selected schema definition';
+		}
+	}
+
 	function handleSave() {
 		if (activeTab === 'build') schemaError = '';
 		if (activeTab === 'json' && schemaText.trim()) {
@@ -185,7 +212,7 @@
 		} else {
 			outputSchema = currentSchemaForSave ?? null;
 		}
-		onSave?.();
+		onSave?.(pickedSchemaId);
 		onClose?.();
 	}
 
@@ -314,6 +341,18 @@
 						JSON
 					</button>
 				</div>
+			<div class="flex items-center gap-2">
+				{#if queryClient}
+					<button
+						type="button"
+						onclick={() => (showPicker = true)}
+						class="text-sm font-medium px-3 py-1.5 rounded-md {darkMode
+							? 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-900/30'
+							: 'text-emerald-700 hover:bg-emerald-100'} transition-colors"
+					>
+						Pick from Library
+					</button>
+				{/if}
 				<button
 					type="button"
 					onclick={insertExample}
@@ -323,6 +362,7 @@
 				>
 					Insert example
 				</button>
+			</div>
 			</div>
 		</div>
 
@@ -455,3 +495,13 @@
 		</div>
 	</div>
 </WorkflowModal>
+
+{#if showPicker && queryClient}
+	<JsonSchemaPickerModal
+		{darkMode}
+		{queryClient}
+		selectedSchemaId={pickedSchemaId ?? selectedJsonSchemaId}
+		onselect={(schema) => handlePickFromLibrary(schema)}
+		onclose={() => (showPicker = false)}
+	/>
+{/if}

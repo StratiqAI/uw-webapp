@@ -1,0 +1,21 @@
+{
+  "$schema": "../../docs/WIDGET_MANIFEST_SCHEMA.json",
+  "kind": "metric",
+  "schemaVersion": "v1",
+  "displayName": "Metric Widget",
+  "npmName": "@stratiqai/widget-metric",
+  "capabilities": [],
+  "input": {
+    "schemaId": "widget:metric-v1",
+    "topicPattern": "widgets/metric/+"
+  },
+  "output": null,
+  "palette": {
+    "icon": "📊",
+    "category": "data"
+  },
+  "defaultSize": {
+    "colSpan": 2,
+    "rowSpan": 1
+  }
+}

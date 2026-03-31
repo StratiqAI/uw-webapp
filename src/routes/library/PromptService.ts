@@ -3,10 +3,10 @@
  *
  * Provides utilities for managing Prompt entities in the library,
  * including CRUD operations and data transformation between AIQueryData and
- * Prompt uses flat `prompt` / `systemInstruction` (API); inline outputSchema with `schemaDefinition` only on output.
+ * Prompt uses flat `prompt` / `systemInstruction` (API); references JsonSchema by jsonSchemaId.
  */
 
-import type { Prompt, Project, PromptOutputSchemaInput } from '@stratiqai/types-simple';
+import type { Prompt, Project } from '@stratiqai/types-simple';
 import { Q_GET_PROJECT_WITH_PROMPTS } from '@stratiqai/types-simple';
 import {
 	M_CREATE_PROMPT,
@@ -14,25 +14,8 @@ import {
 	M_UPDATE_PROMPT,
 	Q_LIST_PROMPTS
 } from '$lib/graphql/promptOperations';
+import { ensureJsonSchemaEntity } from '$lib/graphql/jsonSchemaService';
 import type { IGraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
-
-/** Default inline output schema when creating a prompt without a user-provided schema */
-const DEFAULT_OUTPUT_SCHEMA: PromptOutputSchemaInput = {
-	schemaDefinition: { type: 'object', properties: {} }
-};
-
-/**
- * AppSync AWSJSON expects JSON as a string. `PromptOutputSchemaInput` is `schemaDefinition` only on the wire.
- */
-function outputSchemaForApi(schema: PromptOutputSchemaInput): { schemaDefinition: string } {
-	const def = schema.schemaDefinition;
-	return {
-		schemaDefinition:
-			typeof def === 'string'
-				? def
-				: JSON.stringify(def ?? { type: 'object', properties: {} })
-	};
-}
 
 /**
  * AIQueryData interface - matches the workflow editor's data structure
@@ -156,7 +139,9 @@ export async function fetchProjectWithPromptTemplates(
 }
 
 /**
- * Create a new prompt
+ * Create a new prompt.
+ * If jsonSchemaId is provided, it references an existing JsonSchema entity.
+ * If schemaData is provided instead, a new JsonSchema entity is created first.
  */
 export async function createPromptTemplate(
 	queryClient: IGraphQLQueryClient,
@@ -164,25 +149,37 @@ export async function createPromptTemplate(
 	name: string,
 	aiQueryData: AIQueryData,
 	description?: string,
-	outputSchema?: PromptOutputSchemaInput
+	jsonSchemaId?: string,
+	schemaData?: { name: string; description?: string; schemaDefinition: unknown }
 ): Promise<Prompt> {
 	const variableNames = extractPromptVariableNames(aiQueryData.prompt);
-	const schema = outputSchema ?? DEFAULT_OUTPUT_SCHEMA;
+
+	let resolvedJsonSchemaId = jsonSchemaId;
+	if (!resolvedJsonSchemaId && schemaData && 'schemaDefinition' in schemaData) {
+		resolvedJsonSchemaId = await ensureJsonSchemaEntity(queryClient, {
+			name: schemaData.name || name,
+			description: schemaData.description,
+			schemaDefinition: schemaData.schemaDefinition
+		});
+	}
+
+	const input: Record<string, unknown> = {
+		name,
+		description: description || undefined,
+		prompt: aiQueryData.prompt,
+		systemInstruction: aiQueryData.systemPrompt ?? undefined,
+		...(variableNames.length > 0 && { inputVariables: variableNames }),
+		model: aiQueryData.model || 'GEMINI_2_5_FLASH',
+		sharingMode: 'PRIVATE'
+	};
+
+	if (resolvedJsonSchemaId) {
+		input.jsonSchemaId = resolvedJsonSchemaId;
+	}
 
 	const response = await queryClient.query<{
 		createPrompt: Prompt;
-	}>(M_CREATE_PROMPT, {
-		input: {
-			name,
-			description: description || undefined,
-			prompt: aiQueryData.prompt,
-			systemInstruction: aiQueryData.systemPrompt ?? undefined,
-			...(variableNames.length > 0 && { inputVariables: variableNames }),
-			model: aiQueryData.model || 'GEMINI_2_5_FLASH',
-			outputSchema: outputSchemaForApi(schema),
-			sharingMode: 'PRIVATE'
-		}
-	});
+	}>(M_CREATE_PROMPT, { input });
 
 	if (!response?.createPrompt) {
 		throw new Error('Failed to create prompt');
@@ -220,7 +217,9 @@ export function extractPromptVariableNames(text: string): string[] {
 }
 
 /**
- * Update an existing prompt (parentId kept for API compatibility but not used)
+ * Update an existing prompt (parentId kept for API compatibility but not used).
+ * Uses jsonSchemaId to reference JsonSchema entities.
+ * If schemaData is provided and no jsonSchemaId, a JsonSchema entity is created/updated.
  */
 export async function updatePromptTemplate(
 	queryClient: IGraphQLQueryClient,
@@ -229,7 +228,9 @@ export async function updatePromptTemplate(
 		name?: string;
 		aiQueryData?: AIQueryData;
 		description?: string;
-		outputSchema?: PromptOutputSchemaInput;
+		jsonSchemaId?: string;
+		schemaData?: { name: string; description?: string; schemaDefinition: unknown };
+		existingJsonSchemaId?: string;
 	},
 	_parentId?: string
 ): Promise<Prompt> {
@@ -250,11 +251,22 @@ export async function updatePromptTemplate(
 		input.description = updates.description;
 	}
 	if (updates.aiQueryData?.model !== undefined) {
-		// Send as string so GraphQL receives the enum value (e.g. GEMINI_3_1_PRO_PREVIEW)
 		input.model = typeof updates.aiQueryData.model === 'string' ? updates.aiQueryData.model : String(updates.aiQueryData.model);
 	}
-	if (updates.outputSchema !== undefined) {
-		input.outputSchema = outputSchemaForApi(updates.outputSchema);
+
+	if (updates.jsonSchemaId) {
+		input.jsonSchemaId = updates.jsonSchemaId;
+	} else if (updates.schemaData && 'schemaDefinition' in updates.schemaData) {
+		const resolvedId = await ensureJsonSchemaEntity(
+			queryClient,
+			{
+				name: updates.schemaData.name || (updates.name ?? 'Schema'),
+				description: updates.schemaData.description,
+				schemaDefinition: updates.schemaData.schemaDefinition
+			},
+			updates.existingJsonSchemaId
+		);
+		input.jsonSchemaId = resolvedId;
 	}
 
 	const response = await queryClient.query<{

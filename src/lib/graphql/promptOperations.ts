@@ -4,7 +4,6 @@
  */
 import { gql } from 'graphql-tag';
 
-/** Fragment for Prompt selection — matches `Prompt` / `PromptOutputSchema` output types only. */
 export const PROMPT_FIELDS = gql`
 	fragment PromptFields on Prompt {
 		id
@@ -23,9 +22,7 @@ export const PROMPT_FIELDS = gql`
 		model
 		version
 		isActive
-		outputSchema {
-			schemaDefinition
-		}
+		jsonSchemaId
 	}
 `;
 

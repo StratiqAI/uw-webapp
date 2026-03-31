@@ -46,6 +46,7 @@
 	// Get page data including idToken
 	let { data } = $props();
 	const idToken = $derived(data?.idToken);
+	const pageQueryClient = $derived(idToken ? new GraphQLQueryClient(idToken) : null);
 	
 	// Get projectId from route params
 	import { page } from '$app/stores';
@@ -376,7 +377,8 @@
 		name: string;
 		description: string;
 		aiQueryData: AIQueryData;
-		outputSchema?: { name: string; description?: string; schemaDefinition: unknown };
+		jsonSchemaId?: string;
+		schemaData?: { name: string; description?: string; schemaDefinition: unknown };
 	}) {
 		if (!idToken) {
 			alert('Unable to save: session missing. Please refresh and try again.');
@@ -396,7 +398,8 @@
 					saveData.name,
 					saveData.aiQueryData,
 					saveData.description || undefined,
-					saveData.outputSchema
+					saveData.jsonSchemaId,
+					saveData.schemaData
 				);
 				isCreatingPrompt = false;
 				promptsRefreshTrigger += 1;
@@ -408,7 +411,9 @@
 						name: saveData.name,
 						description: saveData.description,
 						aiQueryData: saveData.aiQueryData,
-						...(saveData.outputSchema && { outputSchema: saveData.outputSchema })
+						jsonSchemaId: saveData.jsonSchemaId,
+						schemaData: saveData.schemaData,
+						existingJsonSchemaId: (editingPrompt as { jsonSchemaId?: string }).jsonSchemaId
 					},
 					(editingPrompt as { parentId?: string }).parentId
 				);
@@ -670,6 +675,7 @@
 			{darkMode}
 			template={editingPrompt}
 			isCreating={isCreatingPrompt}
+			queryClient={pageQueryClient}
 			onSave={handleSavePrompt}
 			onCancel={handleCancelPrompt}
 		/>

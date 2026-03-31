@@ -46,29 +46,16 @@
 		}
 	});
 
-	// Auto-fill topic / schemaId from prompt's outputSchema when creating
 	const createPrefill = $derived.by(() => {
 		if (!prompt) return {};
-		const rawSchema = (prompt as { outputSchema?: { schemaDefinition?: unknown } }).outputSchema
-			?.schemaDefinition;
-		const schemaObj =
-			typeof rawSchema === 'string'
-				? (() => { try { return JSON.parse(rawSchema); } catch { return null; } })()
-				: rawSchema ?? null;
 
-		// Try to find a registered schema that matches the prompt's output schema
-		// by looking for an existing UI schema with matching structure
+		const promptJsonSchemaId = (prompt as { jsonSchemaId?: string }).jsonSchemaId;
 		let schemaId = '';
-		if (schemaObj) {
+
+		if (promptJsonSchemaId) {
 			const allDefs = validatedTopicStore.getAllSchemaDefinitions();
-			const match = allDefs.find((d) => {
-				try {
-					return JSON.stringify(d.jsonSchema) === JSON.stringify(schemaObj);
-				} catch {
-					return false;
-				}
-			});
-			if (match) schemaId = match.id;
+			const match = allDefs.find((d) => d.id === promptJsonSchemaId);
+			schemaId = match ? match.id : promptJsonSchemaId;
 		}
 
 		return {

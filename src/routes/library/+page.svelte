@@ -12,6 +12,7 @@
 	import UnifiedTopBar from '$lib/components/UnifiedTopBar.svelte';
 	import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
 	import PromptEditModal from './components/PromptEditModal.svelte';
+	import JsonSchemaPickerModal from '$lib/components/schemas/JsonSchemaPickerModal.svelte';
 	import ConfirmModal from '$lib/components/Dialog/ConfirmModal.svelte';
 	import { toastStore } from '$lib/stores/toastStore.svelte';
 
@@ -46,6 +47,7 @@
 	let error = $state<string | null>(null);
 	let deleteTemplateConfirm = $state<Prompt | null>(null);
 	let deleteTemplateModalOpen = $state(false);
+	let showSchemaLibrary = $state(false);
 
 	// Get projects from store or page data
 	let projects = $derived.by(() => {
@@ -180,7 +182,8 @@
 		name: string;
 		description: string;
 		aiQueryData: AIQueryData;
-		outputSchema?: { name: string; description?: string; schemaDefinition: unknown };
+		jsonSchemaId?: string;
+		schemaData?: { name: string; description?: string; schemaDefinition: unknown };
 	}) {
 		if (!queryClient) {
 			toastStore.error('Unable to save: not connected. Please refresh the page and try again.');
@@ -197,7 +200,8 @@
 					saveData.name,
 					saveData.aiQueryData,
 					saveData.description || undefined,
-					saveData.outputSchema
+					saveData.jsonSchemaId,
+					saveData.schemaData
 				);
 
 				// Publish to store
@@ -211,7 +215,9 @@
 						name: saveData.name,
 						aiQueryData: saveData.aiQueryData,
 						description: saveData.description || undefined,
-						...(saveData.outputSchema && { outputSchema: saveData.outputSchema })
+						jsonSchemaId: saveData.jsonSchemaId,
+						schemaData: saveData.schemaData,
+						existingJsonSchemaId: (editingTemplate as { jsonSchemaId?: string }).jsonSchemaId
 					}
 				);
 
@@ -324,6 +330,18 @@
 			</div>
 		{/snippet}
 		{#snippet actions()}
+			<button
+				onclick={() => showSchemaLibrary = true}
+				disabled={!queryClient}
+				class="px-3 py-1.5 text-xs font-medium {darkMode
+					? 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-900/20'
+					: 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50'} rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+			>
+				<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+				</svg>
+				Schemas
+			</button>
 			<button
 				onclick={handleCreateNew}
 				disabled={!selectedProjectId || isLoading}
@@ -534,6 +552,17 @@
 	{darkMode}
 	template={editingTemplate}
 	{isCreating}
+	{queryClient}
 	onSave={handleSaveTemplate}
 	onCancel={handleCancelEdit}
 />
+
+<!-- Schema Library Modal -->
+{#if showSchemaLibrary && queryClient}
+	<JsonSchemaPickerModal
+		{darkMode}
+		{queryClient}
+		onselect={() => showSchemaLibrary = false}
+		onclose={() => showSchemaLibrary = false}
+	/>
+{/if}

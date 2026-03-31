@@ -93,9 +93,7 @@ export const Q_GET_PROJECT = `
                   model
                   topK
                   systemPrompt
-                  structuredOutputSchema {
-                    jsonSchema
-                  }
+                  jsonSchemaId
                 }
                 ... on ToolsNodeConfig {
                   options
@@ -113,9 +111,7 @@ export const Q_GET_PROJECT = `
               targetPort
             }
           }
-          structuredOutputSchema {
-            jsonSchema
-          }
+          jsonSchemaId
           ui {
             elements {
               id
