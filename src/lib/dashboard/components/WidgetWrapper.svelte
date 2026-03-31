@@ -476,9 +476,9 @@
 			{/if}
 		</div>
 
-		<!-- Lock indicator (title bar shows lock when a header exists) -->
+		<!-- Lock indicator (title bar shows lock when a header exists; otherwise float next to the "..." button) -->
 		{#if widget.locked && !displayTitle}
-			<div class="absolute left-2 top-2 opacity-0 transition-opacity group-hover:opacity-100">
+			<div class="absolute right-12 top-2.5 opacity-0 transition-opacity group-hover:opacity-100">
 				<svg class="h-4 w-4 {darkMode ? 'text-slate-400' : 'text-gray-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path
 						stroke-linecap="round"
