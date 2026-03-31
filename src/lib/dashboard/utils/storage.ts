@@ -10,6 +10,8 @@ import {
 	type WidgetDataSnapshot as TabWidgetDataSnapshot
 } from '$lib/dashboard/types/dashboardTabs';
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
+import type { DashboardLayout } from '@stratiqai/types-simple';
+import type { DashboardSyncManager } from '$lib/realtime/websocket/syncManagers/DashboardSyncManager';
 
 const STORAGE_KEYS = {
 	WIDGETS: 'dashboard_widgets',
@@ -70,6 +72,7 @@ function isValidMultiTabState(data: unknown): data is MultiTabDashboardState {
 		if (!isValidTabSlice(tabs[t.id])) return false;
 	}
 	if (!(o.activeTabId as string) || !tabOrder.some((t: any) => t.id === o.activeTabId)) return false;
+	if (o.cloudLayoutId !== undefined && typeof o.cloudLayoutId !== 'string') return false;
 	return true;
 }
 
@@ -309,5 +312,139 @@ export class DashboardStorage {
 
 			return false;
 		} catch { return false; }
+	}
+
+	// ─── Cloud Sync Methods ─────────────────────────────────────────
+
+	/**
+	 * Parse `DashboardLayout.state` from AppSync (AWSJSON may arrive as a string or parsed object).
+	 */
+	static parseRemoteLayoutState(state: unknown): MultiTabDashboardState | null {
+		if (state == null) return null;
+		let parsed: unknown;
+		if (typeof state === 'string') {
+			const s = state.trim();
+			if (!s) return null;
+			try {
+				parsed = JSON.parse(s);
+			} catch {
+				return null;
+			}
+		} else if (typeof state === 'object') {
+			parsed = state;
+		} else {
+			return null;
+		}
+		return isValidMultiTabState(parsed) ? parsed : null;
+	}
+
+	/**
+	 * Load the dashboard layout from the cloud.
+	 * Returns null if there is no cloud entity. If the entity exists but JSON/state is invalid,
+	 * still returns `layoutId` so the UI can show which record exists.
+	 */
+	static async loadFromCloud(
+		syncManager: DashboardSyncManager,
+		projectId: string
+	): Promise<{ layoutId: string; state: MultiTabDashboardState | null } | null> {
+		try {
+			const cloudLayout = await syncManager.loadLayout();
+			if (!cloudLayout?.id) return null;
+
+			const raw = cloudLayout.state;
+			if (raw == null || raw === '') {
+				return { layoutId: cloudLayout.id, state: null };
+			}
+
+			let cloudState: unknown;
+			try {
+				cloudState = typeof raw === 'string' ? JSON.parse(raw) : raw;
+			} catch {
+				console.warn('[DashboardStorage] Cloud layout state is not valid JSON');
+				return { layoutId: cloudLayout.id, state: null };
+			}
+
+			if (!isValidMultiTabState(cloudState)) {
+				console.warn('[DashboardStorage] Cloud state failed validation');
+				return { layoutId: cloudLayout.id, state: null };
+			}
+
+			return { layoutId: cloudLayout.id, state: cloudState };
+		} catch (err) {
+			console.error('[DashboardStorage] Failed to load from cloud:', err);
+			return null;
+		}
+	}
+
+	/**
+	 * Save the dashboard state to the cloud via the sync manager.
+	 * Write-through: localStorage is written synchronously by the caller,
+	 * this handles the async AppSync mutation.
+	 */
+	static async saveToCloud(
+		syncManager: DashboardSyncManager,
+		state: MultiTabDashboardState
+	): Promise<DashboardLayout | null> {
+		try {
+			const stateJson = JSON.stringify(state);
+			const result = await syncManager.updateLayout(stateJson, DASHBOARD_STORAGE_VERSION);
+			return result;
+		} catch (err) {
+			console.error('[DashboardStorage] Failed to save to cloud:', err);
+			return null;
+		}
+	}
+
+	/**
+	 * Ensure a cloud layout exists for this project.
+	 * If one already exists, update it; otherwise create a new one.
+	 */
+	static async migrateToCloud(
+		syncManager: DashboardSyncManager,
+		state: MultiTabDashboardState
+	): Promise<DashboardLayout | null> {
+		try {
+			const existing = await syncManager.loadLayout();
+			const stateJson = JSON.stringify(state);
+
+			if (existing) {
+				console.info('[DashboardStorage] Cloud layout already exists — updating instead of creating');
+				const updated = await syncManager.updateLayout(stateJson, DASHBOARD_STORAGE_VERSION);
+				return updated ?? existing;
+			}
+
+			const layout = await syncManager.createLayout(stateJson, DASHBOARD_STORAGE_VERSION);
+			console.info('[DashboardStorage] Created cloud layout for project');
+			return layout;
+		} catch (err) {
+			console.error('[DashboardStorage] Failed to migrate to cloud:', err);
+			return null;
+		}
+	}
+
+	/**
+	 * Reconcile cloud layout with localStorage. Cloud wins if it has a newer updatedAt.
+	 * Returns the winning state (may be the existing local state).
+	 */
+	static reconcileWithCloud(
+		localState: MultiTabDashboardState | null,
+		cloudLayout: DashboardLayout,
+		projectId: string
+	): MultiTabDashboardState | null {
+		try {
+			const cloudState = JSON.parse(cloudLayout.state as string) as unknown;
+			if (!isValidMultiTabState(cloudState)) return localState;
+
+			// Cloud always wins in v1 (last-write-wins).
+			// Future: compare updatedAt timestamps for smarter merging.
+			const withLayoutId: MultiTabDashboardState = {
+				...(cloudState as MultiTabDashboardState),
+				cloudLayoutId: cloudLayout.id
+			};
+			this.saveMultiTabState(withLayoutId, projectId);
+			return withLayoutId;
+		} catch {
+			return localState;
+		}
 	}
 }

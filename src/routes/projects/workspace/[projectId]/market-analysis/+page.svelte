@@ -5,8 +5,12 @@
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
 	import type { Widget } from '$lib/dashboard/types/widget';
 	import { onMount, setContext } from 'svelte';
+	import { get } from 'svelte/store';
+	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 	import { PUBLIC_GEOAPIFY_API_KEY } from '$env/static/public';
 	import { themeStore } from '$lib/stores/themeStore.svelte';
+	import { DashboardSyncManager } from '$lib/realtime/websocket/syncManagers/DashboardSyncManager';
 
 	interface Props {
 		data: PageData;
@@ -17,6 +21,15 @@
 
 	let darkMode = $derived(themeStore.darkMode);
 	let currentTheme = $derived(themeStore.theme);
+
+	function handleProjectChangeFromBar(newProjectId: string | null) {
+		if (!newProjectId) return;
+		const p = get(page);
+		const currentPid = p.params.projectId;
+		if (!currentPid || newProjectId === currentPid) return;
+		const suffix = p.url.pathname.slice(`/projects/workspace/${currentPid}`.length) || '';
+		void goto(`/projects/workspace/${newProjectId}${suffix}`);
+	}
 
 	// Set page data context for child components (getter keeps context in sync with `data`)
 	setContext('pageData', {
@@ -286,16 +299,36 @@
 	];
 
 	onMount(() => {
-		// Try to load saved dashboard
-		const hasLoadedDashboard = dashboard.initialize();
+		async function initDashboard() {
+			const projectId = get(page).params.projectId;
+			if (!projectId) {
+				console.warn('[market-analysis] No projectId in route; skipping dashboard cloud init');
+				return;
+			}
 
-		// If no saved dashboard, load defaults
-		if (!hasLoadedDashboard) {
-			console.info('No saved dashboard found, loading defaults');
-			dashboardWidgets.forEach((widget) => {
-				dashboard.addWidget(widget);
-			});
+			if (data.idToken) {
+				try {
+					const syncManager = DashboardSyncManager.createInactive();
+					await syncManager.initialize({ idToken: data.idToken, projectId });
+					dashboard.setSyncManager(syncManager);
+				} catch (e) {
+					console.warn('Cloud sync unavailable for market-analysis dashboard:', e);
+					dashboard.setSyncManager(null);
+				}
+			} else {
+				dashboard.setSyncManager(null);
+			}
+
+			const hasLoadedDashboard = await dashboard.initialize(projectId);
+
+			if (!hasLoadedDashboard) {
+				console.info('No saved dashboard found, loading defaults');
+				dashboardWidgets.forEach((widget) => {
+					dashboard.addWidget(widget);
+				});
+			}
 		}
+		initDashboard().finally(() => { isLoading = false; });
 
 		// Handle responsive grid adjustment
 		function updateGridSize() {
@@ -342,10 +375,7 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<DashboardControls
-	{darkMode}
-	{currentTheme}
-/>
+<DashboardControls {darkMode} {currentTheme} onProjectChange={handleProjectChangeFromBar} />
 
 <main class="mx-auto max-w-7xl p-4">
 	{#if isLoading}

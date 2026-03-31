@@ -20,6 +20,8 @@
 		 */
 		onProjectChange?: (projectId: string | null) => void;
 		subtitle?: string;
+		/** DynamoDB DashboardLayout entity id (debug / multi-tab identification) */
+		dashboardLayoutId?: string | null;
 		tabs?: Snippet;
 		actions?: Snippet;
 		notificationBellProps?: { projects?: Project[]; projectName?: string };
@@ -32,6 +34,7 @@
 		selectedProjectId,
 		onProjectChange,
 		subtitle,
+		dashboardLayoutId,
 		tabs,
 		actions,
 		notificationBellProps = {}
@@ -58,13 +61,41 @@
 		: 'bg-white border-slate-200/80 shadow-sm'}"
 >
 	<!-- LEFT: Accent bar + page title -->
-	<div class="flex items-center gap-2.5 shrink-0">
-		<div class="w-1 h-6 rounded-full {darkMode ? 'bg-indigo-500' : 'bg-indigo-600'}"></div>
+	<div class="flex items-center gap-2.5 shrink-0 min-w-0">
+		<div class="w-1 h-6 shrink-0 rounded-full {darkMode ? 'bg-indigo-500' : 'bg-indigo-600'}"></div>
 		<h1
-			class="text-sm font-semibold whitespace-nowrap {darkMode ? 'text-white' : 'text-slate-900'}"
+			class="text-sm font-semibold whitespace-nowrap shrink-0 {darkMode ? 'text-white' : 'text-slate-900'}"
 		>
 			{pageTitle}
 		</h1>
+		{#if dashboardLayoutId}
+			<div
+				class="flex min-w-0 max-w-[min(100vw-12rem,14rem)] flex-col gap-0 leading-tight sm:max-w-[18rem]"
+				title="DashboardLayout id: {dashboardLayoutId}"
+			>
+				<span
+					class="text-[9px] font-medium uppercase tracking-wider {darkMode ? 'text-slate-500' : 'text-slate-400'}"
+				>
+					Layout id
+				</span>
+				<span
+					class="truncate font-mono text-[11px] {darkMode ? 'text-slate-300' : 'text-slate-600'}"
+				>
+					{dashboardLayoutId}
+				</span>
+			</div>
+		{:else if dashboardLayoutId !== undefined}
+			<div
+				class="flex items-center gap-1.5"
+				title="Connecting to the cloud — layout id will appear shortly"
+			>
+				<svg class="h-3 w-3 animate-spin {darkMode ? 'text-slate-500' : 'text-slate-400'}" fill="none" viewBox="0 0 24 24">
+					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+					<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+				</svg>
+				<span class="text-[10px] {darkMode ? 'text-slate-500' : 'text-slate-400'}">Syncing…</span>
+			</div>
+		{/if}
 	</div>
 
 	{#if subtitle}
@@ -95,7 +126,7 @@
 	<!-- Tabs slot (after project context, separated by divider) -->
 	{#if tabs}
 		<div class="h-5 w-px shrink-0 {darkMode ? 'bg-slate-600/60' : 'bg-slate-200'}"></div>
-		<div class="flex items-center gap-0.5 min-w-0 flex-1 overflow-x-auto">
+		<div class="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
 			{@render tabs()}
 		</div>
 	{/if}

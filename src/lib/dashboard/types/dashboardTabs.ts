@@ -31,6 +31,8 @@ export interface MultiTabDashboardState {
 	activeTabId: DashboardTabId;
 	tabOrder: TabInfo[];
 	tabs: Record<DashboardTabId, TabDashboardSlice>;
+	/** AppSync DashboardLayout id for this project; persisted so the top bar id survives refresh before cloud reconciliation. */
+	cloudLayoutId?: string;
 }
 
 export function createEmptyTabSlice(): TabDashboardSlice {

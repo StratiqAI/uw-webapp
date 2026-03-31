@@ -14,6 +14,7 @@
 	import { goto } from '$app/navigation';
 	import RightChatDrawer from '$lib/components/RightChatDrawer.svelte';
 	import UnifiedTopBar from '$lib/components/UnifiedTopBar.svelte';
+	import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
 
 	// ----------------------------------------------------------------------------
 	// Props + Core Reactive State
@@ -25,6 +26,8 @@
 	const isNewProject = $derived(data.isNewProject);
 	const projectFromServer = $derived(data.project ?? null);
 	const projectId = $derived(projectFromServer?.id ?? null);
+	/** URL segment — source of truth for which project this workspace route is for (may exist before client store catches up). */
+	const routeProjectId = $derived($page.params.projectId ?? null);
 
 	// Manager lifecycle + UI state
 	let projectSyncManager = $state(ProjectSyncManager.createInactive());
@@ -120,6 +123,16 @@
 		};
 	});
 
+	// Keep global project selection aligned with the workspace URL so the switcher matches the loaded project.
+	$effect(() => {
+		if (!browser || isNewProject) return;
+		const rid = routeProjectId;
+		if (!rid) return;
+		if (globalProjectStore.selectedProjectId !== rid) {
+			globalProjectStore.setSelectedProjectId(rid);
+		}
+	});
+
 	// ---------- Workspace header logic ----------
 	let darkMode = $derived.by(() => darkModeStore.darkMode);
 
@@ -156,7 +169,7 @@
 		(href === 'get-started' && currentPath === workspaceBasePath);
 
 	function handleWorkspaceProjectChange(newProjectId: string | null) {
-		if (!newProjectId || newProjectId === projectId) return;
+		if (!newProjectId || newProjectId === routeProjectId) return;
 		const subPage = currentPath.replace(workspaceBasePath, '') || '';
 		goto(`/projects/workspace/${newProjectId}${subPage}`);
 	}
@@ -171,6 +184,7 @@
 	<div class="flex w-full min-w-0 flex-1 flex-col">
 		<UnifiedTopBar
 			{pageTitle}
+			selectedProjectId={routeProjectId}
 			onProjectChange={handleWorkspaceProjectChange}
 			notificationBellProps={{ projectName: project?.name ?? projectFromServer?.name }}
 		>

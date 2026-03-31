@@ -91,7 +91,9 @@
 			? 'text-slate-300 hover:text-indigo-400 hover:bg-indigo-900/20'
 			: 'text-slate-600 hover:text-indigo-600 hover:bg-indigo-50'} rounded-md transition-colors"
 		aria-label="Notifications"
-		title="Notifications"
+		title={unreadCount > 0
+			? `Notifications — ${unreadCount} unread`
+			: 'Notifications — no unread'}
 	>
 		<svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 			<path

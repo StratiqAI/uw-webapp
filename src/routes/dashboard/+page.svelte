@@ -15,6 +15,7 @@
 	import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
 	import { createSupabaseBrowserClient } from '$lib/supabase/browser';
 	import { logSupabaseRpcSmokeTest } from '$lib/supabase/supabaseRpcSmokeTest';
+	import { DashboardSyncManager } from '$lib/realtime/websocket/syncManagers/DashboardSyncManager';
 
 	interface Props {
 		data: PageData;
@@ -43,31 +44,50 @@
 		setContext('currentTheme', currentTheme);
 	});
 
-	function handleProjectChange(projectId: string | null) {
-		// Save current dashboard before switching
-		if (dashboard.hasUnsavedChanges) {
-			dashboard.save();
-		}
-		// Initialize dashboard for the new project
-		const hasLoadedDashboard = dashboard.initialize(projectId);
-		// If no saved dashboard for this project, load defaults
-		if (!hasLoadedDashboard) {
-			console.info('No saved dashboard found for project, loading defaults');
-			try {
-				publishWidgetData(dashboardWidgets);
-			} catch (e) {
-				console.error('Error publishing widget data on project change:', e);
+	async function handleProjectChange(projectId: string | null) {
+		isLoading = true;
+		try {
+			// Save current dashboard before switching
+			if (dashboard.hasUnsavedChanges) {
+				dashboard.save();
 			}
-			dashboardWidgets.forEach((widget) => {
-				dashboard.addWidget(widget);
-			});
-		} else {
-			dashboard.mergeMissingWidgetsFromConfig('market', dashboardWidgets);
-			try {
-				publishWidgetData(dashboard.widgets, { onlyIfMissing: true });
-			} catch (e) {
-				console.error('Error publishing widget data on project change:', e);
+
+			// Set up sync manager for the new project
+			if (projectId && data.idToken) {
+				try {
+					const syncManager = DashboardSyncManager.createInactive();
+					await syncManager.initialize({ idToken: data.idToken, projectId });
+					dashboard.setSyncManager(syncManager);
+				} catch (e) {
+					console.warn('Cloud sync unavailable for dashboard:', e);
+					dashboard.setSyncManager(null);
+				}
+			} else {
+				dashboard.setSyncManager(null);
 			}
+
+			// Initialize dashboard for the new project (blocks until cloud layout id is set)
+			const hasLoadedDashboard = await dashboard.initialize(projectId);
+			if (!hasLoadedDashboard) {
+				console.info('No saved dashboard found for project, loading defaults');
+				try {
+					publishWidgetData(dashboardWidgets);
+				} catch (e) {
+					console.error('Error publishing widget data on project change:', e);
+				}
+				dashboardWidgets.forEach((widget) => {
+					dashboard.addWidget(widget);
+				});
+			} else {
+				dashboard.mergeMissingWidgetsFromConfig('market', dashboardWidgets);
+				try {
+					publishWidgetData(dashboard.widgets, { onlyIfMissing: true });
+				} catch (e) {
+					console.error('Error publishing widget data on project change:', e);
+				}
+			}
+		} finally {
+			isLoading = false;
 		}
 	}
 
@@ -75,32 +95,20 @@
 		console.log('🚀 Dashboard onMount started');
 		let unsubReset: (() => void) | undefined;
 
-		// Set loading to false immediately - widgets will render with their default/empty state
-		// and then update reactively when data is published
-		isLoading = false;
-
-
 		const supabase = createSupabaseBrowserClient();
-		console.log('000000000000000000000000000000000000000000000000000000000000000000000')
 		if (supabase) {
-		
-		console.log('111111111111111111111111111111111111111111111111111111111111111111111')
 			void logSupabaseRpcSmokeTest(supabase);
-			console.log('222222222222222222222222222222222222222222222222222222222222222222222')
 		} else {
-			console.log('333333333333333333333333333333333333333333333333333333333333333333333')
 			console.warn(
 				'[Supabase RPC smoke test] skipped — set PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY'
 			);
 		}
-	
 
-		// Handle responsive grid adjustment
 		function updateGridSize() {
 			try {
 				const width = window.innerWidth;
 				let gridColumns: number;
-				let minRows = 19; // Minimum rows to accommodate charts + gauge/sparkline/heatmap (row 16-18)
+				let minRows = 19;
 				
 				if (width < 640) {
 					gridColumns = 4;
@@ -110,90 +118,90 @@
 					gridColumns = 12;
 				}
 				
-				// Ensure grid has enough rows for all widgets
 				dashboard.ensureGridCapacity();
 				const requiredRows = Math.max(minRows, dashboard.config.gridRows);
-				
 				dashboard.updateGridConfig({ gridColumns, gridRows: requiredRows });
 			} catch (error) {
 				console.error('Error updating grid size:', error);
 			}
 		}
 
-		try {
-			// Global store already initialized with localStorage selection via root layout
+		async function initDashboard() {
+			try {
+				updateGridSize();
 
-			// Set initial grid size before loading widgets
-			updateGridSize();
-
-			// Initialize dashboard for the selected project
-			const hasLoadedDashboard = dashboard.initialize(selectedProjectId);
-
-			// If no saved dashboard, load defaults
-			if (!hasLoadedDashboard) {
-				console.info('No saved dashboard found, loading defaults');
-				// Publish to ValidatedTopicStore first so when widgets mount they already have data
-				try {
-					publishWidgetData(dashboardWidgets);
-				} catch (error) {
-					console.error('Error publishing widget data:', error);
-				}
-				dashboardWidgets.forEach((widget) => {
+				// Set up cloud sync manager if we have a project and auth token
+				if (selectedProjectId && data.idToken) {
 					try {
-						dashboard.addWidget(widget);
+						const syncManager = DashboardSyncManager.createInactive();
+						await syncManager.initialize({ idToken: data.idToken, projectId: selectedProjectId });
+						dashboard.setSyncManager(syncManager);
+					} catch (e) {
+						console.warn('Cloud sync unavailable for dashboard:', e);
+						dashboard.setSyncManager(null);
+					}
+				}
+
+				const hasLoadedDashboard = await dashboard.initialize(selectedProjectId);
+
+				if (!hasLoadedDashboard) {
+					console.info('No saved dashboard found, loading defaults');
+					try {
+						publishWidgetData(dashboardWidgets);
 					} catch (error) {
-						console.error(`Failed to add widget ${widget.id}:`, error);
+						console.error('Error publishing widget data:', error);
 					}
-				});
-			} else {
-				// Ensure Market tab has all config widgets (other tabs stay user-controlled)
-				dashboard.mergeMissingWidgetsFromConfig('market', dashboardWidgets);
-				try {
-					publishWidgetData(dashboard.widgets, { onlyIfMissing: true });
-				} catch (error) {
-					console.error('Error publishing widget data:', error);
+					dashboardWidgets.forEach((widget) => {
+						try {
+							dashboard.addWidget(widget);
+						} catch (error) {
+							console.error(`Failed to add widget ${widget.id}:`, error);
+						}
+					});
+				} else {
+					dashboard.mergeMissingWidgetsFromConfig('market', dashboardWidgets);
+					try {
+						publishWidgetData(dashboard.widgets, { onlyIfMissing: true });
+					} catch (error) {
+						console.error('Error publishing widget data:', error);
+					}
 				}
+
+				dashboard.ensureGridCapacity();
+				updateGridSize();
+				console.log('✅ Dashboard initialization complete');
+			} catch (error) {
+				console.error('Error initializing dashboard:', error);
+			} finally {
+				isLoading = false;
 			}
-
-			// Ensure grid has enough capacity for all widgets (after loading)
-			dashboard.ensureGridCapacity();
-			
-			// Update grid size again after widgets are loaded to ensure proper sizing
-			updateGridSize();
-			
-			// Update grid size again after widgets are loaded to ensure proper sizing
-			updateGridSize();
-			window.addEventListener('resize', updateGridSize);
-
-			// When user resets to default, publish widget data for the new default layout
-			unsubReset = dashboard.on('dashboard:reset', () => {
-				try {
-					publishWidgetData(dashboard.widgets);
-				} catch (e) {
-					console.error('Error publishing widget data after reset:', e);
-				}
-			});
-
-			// Save dashboard before page unload if there are unsaved changes
-			window.addEventListener('beforeunload', (e) => {
-				try {
-					if (dashboard.hasUnsavedChanges && dashboard.autoSaveEnabled) {
-						dashboard.save();
-					}
-				} catch (error) {
-					console.error('Error saving dashboard on beforeunload:', error);
-				}
-			});
-			
-			console.log('✅ Dashboard initialization complete');
-		} catch (error) {
-			console.error('Error initializing dashboard:', error);
 		}
+
+		initDashboard();
+
+		window.addEventListener('resize', updateGridSize);
+
+		unsubReset = dashboard.on('dashboard:reset', () => {
+			try {
+				publishWidgetData(dashboard.widgets);
+			} catch (e) {
+				console.error('Error publishing widget data after reset:', e);
+			}
+		});
+
+		window.addEventListener('beforeunload', () => {
+			try {
+				if (dashboard.hasUnsavedChanges && dashboard.autoSaveEnabled) {
+					dashboard.save();
+				}
+			} catch (error) {
+				console.error('Error saving dashboard on beforeunload:', error);
+			}
+		});
 
 		return () => {
 			unsubReset?.();
 			window.removeEventListener('resize', updateGridSize);
-			// Save any pending changes
 			try {
 				if (dashboard.hasUnsavedChanges && dashboard.autoSaveEnabled) {
 					dashboard.save();

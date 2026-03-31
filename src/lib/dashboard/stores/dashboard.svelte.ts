@@ -23,6 +23,9 @@ import { isValidPosition, findAvailablePosition, resolveCollisions, repairOverla
 import type { WidgetRect } from '$lib/dashboard/utils/grid';
 import { DashboardStorage } from '$lib/dashboard/utils/storage';
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
+import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
+import type { DashboardSyncManager } from '$lib/realtime/websocket/syncManagers/DashboardSyncManager';
+import type { DashboardLayout } from '@stratiqai/types-simple';
 
 const DEFAULT_CONFIG: DashboardConfig = structuredClone(DEFAULT_DASHBOARD_CONFIG);
 
@@ -110,6 +113,15 @@ class DashboardStore {
 	#eventListeners = new Map<keyof DashboardEvents, Set<Function>>();
 	#suspendAutoSave = false;
 
+	// Cloud sync state
+	#syncManager: DashboardSyncManager | null = null;
+	#cloudLayoutId = $state<string | null>(null);
+	#cloudSaveTimeout: ReturnType<typeof setTimeout> | null = null;
+	#isReconciling = false;
+	#cloudSyncStatus: 'idle' | 'syncing' | 'synced' | 'error' | 'unavailable' = $state('unavailable');
+	/** AppSync `updatedAt` from our last successful mutation — skip subscription echo for same timestamp */
+	#lastCloudPushUpdatedAt: string | null = null;
+
 	// Undo / redo stacks (layout-only snapshots — lightweight)
 	#undoStack: LayoutSnapshot[] = [];
 	#redoStack: LayoutSnapshot[] = [];
@@ -130,6 +142,7 @@ class DashboardStore {
 	tabOrder = $derived(this.#tabOrder);
 	fullscreenWidgetId = $derived(this.#fullscreenWidgetId);
 	displacementPreview = $derived(this.#displacementPreview);
+	cloudSyncStatus = $derived(this.#cloudSyncStatus);
 	get tabIds(): DashboardTabId[] { return this.#tabOrder.map(t => t.id); }
 	get isInitialized() { return this.#initialized; }
 	get canUndo(): boolean { return this.#undoStack.length > 0; }
@@ -169,9 +182,9 @@ class DashboardStore {
 	}
 	
 	// Initialization
-	initialize(projectId: string | null = null): boolean {
+	async initialize(projectId: string | null = null): Promise<boolean> {
 		if (this.#initialized && this.#projectId === projectId) {
-			console.warn('Dashboard already initialized for this project');
+			if (projectId) globalProjectStore.setSelectedProjectId(projectId);
 			return true;
 		}
 		
@@ -187,6 +200,9 @@ class DashboardStore {
 		this.#nextZIndex = 1;
 		this.#hasUnsavedChanges = false;
 		this.#projectId = projectId;
+		if (projectId) {
+			globalProjectStore.setSelectedProjectId(projectId);
+		}
 		this.#initialized = false;
 		this.#activeTabId = DEFAULT_ACTIVE_TAB;
 		const fresh = cloneEmptyMultiTab();
@@ -203,22 +219,52 @@ class DashboardStore {
 				return false;
 			}
 			
+			// Step 1: Load from localStorage immediately (instant UI)
 			const savedState = DashboardStorage.loadDashboard(projectId);
 			if (savedState) {
 				this.#loadFromSavedState(savedState);
 				this.#emit('dashboard:loaded', undefined);
-				return true;
+			} else {
+				this.#applyTabSlice(fresh.tabs[DEFAULT_ACTIVE_TAB]);
+				this.#initialized = true;
+			}
+
+			// Step 2: Cloud reconciliation (blocking — ensures layout id exists before UI renders)
+			if (projectId && this.#syncManager) {
+				try {
+					await this.#reconcileWithCloud(projectId, savedState);
+				} catch (err) {
+					console.error('[Dashboard] Cloud reconciliation failed:', err);
+				}
 			}
 			
-			this.#applyTabSlice(fresh.tabs[DEFAULT_ACTIVE_TAB]);
-			this.#initialized = true;
-			return false;
+			return !!savedState;
 		} catch (error) {
 			console.error('Failed to initialize dashboard:', error);
 			this.#initialized = true;
 			return false;
 		}
 	}
+
+	/**
+	 * Attach a DashboardSyncManager for cloud persistence.
+	 * Must be called before initialize() for cloud sync to work.
+	 */
+	setSyncManager(manager: DashboardSyncManager | null): void {
+		if (this.#syncManager && this.#syncManager !== manager) {
+			this.#syncManager.cleanup();
+		}
+		this.#lastCloudPushUpdatedAt = null;
+		this.#syncManager = manager;
+		this.#cloudLayoutId = manager?.currentLayoutId ?? null;
+		this.#cloudSyncStatus = manager ? 'idle' : 'unavailable';
+	}
+
+	get syncManager(): DashboardSyncManager | null {
+		return this.#syncManager;
+	}
+
+	cloudLayoutId = $derived(this.#cloudLayoutId);
 	
 	// Save operations
 	save(): boolean {
@@ -229,22 +275,147 @@ class DashboardStore {
 		
 		try {
 			this.#flushActiveTabIntoSlices();
-			const state: MultiTabDashboardState = {
-				version: DASHBOARD_STORAGE_VERSION,
-				activeTabId: this.#activeTabId,
-				tabOrder: $state.snapshot(this.#tabOrder) as TabInfo[],
-				tabs: $state.snapshot(this.#tabSlices) as MultiTabDashboardState['tabs']
-			};
+			const state = this.#snapshotMultiTabState();
+
+			// Synchronous localStorage write (instant)
 			const success = DashboardStorage.saveMultiTabState(state, this.#projectId);
 			if (success) {
 				this.#hasUnsavedChanges = false;
 				this.#emit('dashboard:saved', undefined);
-				console.info('💾 Dashboard saved');
 			}
+
+			// Debounced async cloud save (real-time subscribers receive AppSync subscription events)
+			if (this.#syncManager && this.#projectId) {
+				this.#scheduleCloudSave(state);
+			}
+
 			return success;
 		} catch (error) {
 			console.error('Failed to save dashboard:', error);
 			return false;
+		}
+	}
+
+	/**
+	 * Immediately save the current dashboard state to the cloud (non-debounced).
+	 * Also writes to localStorage first.
+	 */
+	async syncToCloud(): Promise<boolean> {
+		if (!this.#syncManager || !this.#projectId) {
+			this.#cloudSyncStatus = 'unavailable';
+			return false;
+		}
+
+		// Cancel any pending debounced cloud save
+		if (this.#cloudSaveTimeout) {
+			clearTimeout(this.#cloudSaveTimeout);
+			this.#cloudSaveTimeout = null;
+		}
+
+		this.#cloudSyncStatus = 'syncing';
+		try {
+			this.#flushActiveTabIntoSlices();
+			const state = this.#snapshotMultiTabState();
+
+			DashboardStorage.saveMultiTabState(state, this.#projectId);
+			this.#hasUnsavedChanges = false;
+
+			const layout = await DashboardStorage.saveToCloud(this.#syncManager, state);
+			if (layout) {
+				this.#cloudLayoutId = layout.id;
+				this.#syncManager!.currentLayoutId = layout.id;
+				if (layout.updatedAt) this.#lastCloudPushUpdatedAt = layout.updatedAt;
+				this.#cloudSyncStatus = 'synced';
+				if (this.#projectId) this.#bindCloudRealtime(this.#projectId);
+				return true;
+			}
+
+			this.#cloudSyncStatus = 'error';
+			return false;
+		} catch (err) {
+			console.error('[Dashboard] Manual cloud sync failed:', err);
+			this.#cloudSyncStatus = 'error';
+			return false;
+		}
+	}
+
+	/**
+	 * Clear this project's dashboard keys in localStorage, then load the latest layout from AppSync.
+	 * Returns true if a cloud layout existed (with or without usable state); false if none.
+	 */
+	async reloadFromCloud(): Promise<boolean> {
+		if (!this.#syncManager || !this.#projectId) {
+			this.#cloudSyncStatus = 'unavailable';
+			return false;
+		}
+
+		const projectId = this.#projectId;
+
+		if (this.#cloudSaveTimeout) {
+			clearTimeout(this.#cloudSaveTimeout);
+			this.#cloudSaveTimeout = null;
+		}
+
+		this.#lastCloudPushUpdatedAt = null;
+		this.#cloudSyncStatus = 'syncing';
+
+		this.#isReconciling = true;
+		try {
+			DashboardStorage.clearDashboard(projectId);
+			validatedTopicStore.clearAllAt('widgets');
+
+			const cloudResult = await DashboardStorage.loadFromCloud(this.#syncManager, projectId);
+
+			if (!cloudResult) {
+				const fresh = cloneEmptyMultiTab();
+				this.#tabOrder = fresh.tabOrder;
+				this.#tabSlices = fresh.tabs;
+				this.#activeTabId = fresh.activeTabId;
+				this.#applyTabSlice(fresh.tabs[this.#activeTabId]);
+				this.#initialized = true;
+				this.#cloudLayoutId = null;
+				this.#syncManager.currentLayoutId = null;
+				this.#hasUnsavedChanges = false;
+				this.clearUndoHistory();
+				DashboardStorage.saveMultiTabState(fresh, projectId);
+				this.#wireCloudSubscriptions(projectId);
+				this.#cloudSyncStatus = 'idle';
+				return false;
+			}
+
+			this.#cloudLayoutId = cloudResult.layoutId;
+			this.#syncManager.currentLayoutId = cloudResult.layoutId;
+
+			if (cloudResult.state) {
+				const persisted: MultiTabDashboardState = {
+					...cloudResult.state,
+					cloudLayoutId: cloudResult.layoutId
+				};
+				DashboardStorage.saveMultiTabState(persisted, projectId);
+				this.#loadFromSavedState(persisted);
+				this.#emit('dashboard:loaded', undefined);
+			} else {
+				const fresh = cloneEmptyMultiTab();
+				this.#tabOrder = fresh.tabOrder;
+				this.#tabSlices = fresh.tabs;
+				this.#activeTabId = fresh.activeTabId;
+				this.#applyTabSlice(fresh.tabs[this.#activeTabId]);
+				this.#initialized = true;
+				const statePayload = this.#snapshotMultiTabState();
+				DashboardStorage.saveMultiTabState(statePayload, projectId);
+			}
+
+			this.#hasUnsavedChanges = false;
+			this.clearUndoHistory();
+			this.#wireCloudSubscriptions(projectId);
+			this.#cloudSyncStatus = 'synced';
+			return true;
+		} catch (err) {
+			console.error('[Dashboard] reloadFromCloud failed:', err);
+			this.#cloudSyncStatus = 'error';
+			return false;
+		} finally {
+			this.#isReconciling = false;
 		}
 	}
 
@@ -765,6 +936,12 @@ class DashboardStore {
 			this.#nextZIndex = 1;
 			this.#config = structuredClone(DEFAULT_CONFIG);
 			this.#hasUnsavedChanges = false;
+			this.#cloudLayoutId = null;
+			this.#lastCloudPushUpdatedAt = null;
+			if (this.#cloudSaveTimeout) {
+				clearTimeout(this.#cloudSaveTimeout);
+				this.#cloudSaveTimeout = null;
+			}
 			console.log('✅ Dashboard cleared');
 		}
 		
@@ -866,6 +1043,19 @@ class DashboardStore {
 	}
 
 	// Private methods
+	#snapshotMultiTabState(): MultiTabDashboardState {
+		const state: MultiTabDashboardState = {
+			version: DASHBOARD_STORAGE_VERSION,
+			activeTabId: this.#activeTabId,
+			tabOrder: $state.snapshot(this.#tabOrder) as TabInfo[],
+			tabs: $state.snapshot(this.#tabSlices) as MultiTabDashboardState['tabs']
+		};
+		if (this.#cloudLayoutId) {
+			state.cloudLayoutId = this.#cloudLayoutId;
+		}
+		return state;
+	}
+
 	#flushActiveTabIntoSlices(): void {
 		this.#tabSlices = {
 			...$state.snapshot(this.#tabSlices),
@@ -915,6 +1105,12 @@ class DashboardStore {
 		this.#activeTabId = savedState.activeTabId;
 		this.#applyTabSlice(slices[this.#activeTabId]);
 		this.#initialized = true;
+
+		const persistedLayoutId = savedState.cloudLayoutId;
+		if (typeof persistedLayoutId === 'string' && persistedLayoutId.length > 0 && this.#syncManager) {
+			this.#cloudLayoutId = persistedLayoutId;
+			this.#syncManager.currentLayoutId = persistedLayoutId;
+		}
 	}
 	
 	#scheduleAutoSave(): void {
@@ -1043,6 +1239,159 @@ class DashboardStore {
 		const listeners = this.#eventListeners.get(event);
 		if (listeners) {
 			listeners.forEach(callback => callback(data));
+		}
+	}
+
+	// ─── Cloud Sync ──────────────────────────────────────────────────
+
+	static readonly CLOUD_SAVE_DEBOUNCE_MS = 1200;
+
+	#bindCloudRealtime(projectId: string): void {
+		if (!this.#syncManager || !this.#cloudLayoutId) return;
+		this.#syncManager.currentLayoutId = this.#cloudLayoutId;
+		this.#syncManager.setupUpdateSubscription((remoteLayout: DashboardLayout) => {
+			this.#handleRemoteUpdate(remoteLayout, projectId);
+		});
+	}
+
+	#wireCloudSubscriptions(projectId: string): void {
+		if (!this.#syncManager) return;
+		if (this.#cloudLayoutId) {
+			this.#bindCloudRealtime(projectId);
+		} else {
+			this.#syncManager.setupCreateSubscription((newLayout: DashboardLayout) => {
+				this.#cloudLayoutId = newLayout.id;
+				this.#syncManager!.currentLayoutId = newLayout.id;
+				this.#handleRemoteUpdate(newLayout, projectId);
+				this.#bindCloudRealtime(projectId);
+			});
+		}
+	}
+
+	#scheduleCloudSave(state: MultiTabDashboardState): void {
+		if (this.#cloudSaveTimeout) clearTimeout(this.#cloudSaveTimeout);
+		this.#cloudSaveTimeout = setTimeout(() => {
+			this.#cloudSaveTimeout = null;
+			if (!this.#syncManager) return;
+			this.#cloudSyncStatus = 'syncing';
+			const pid = this.#projectId;
+			DashboardStorage.saveToCloud(this.#syncManager, state).then((layout) => {
+				if (layout) {
+					this.#cloudLayoutId = layout.id;
+					this.#syncManager!.currentLayoutId = layout.id;
+					if (layout.updatedAt) this.#lastCloudPushUpdatedAt = layout.updatedAt;
+					this.#cloudSyncStatus = 'synced';
+					if (pid) this.#bindCloudRealtime(pid);
+				} else {
+					this.#cloudSyncStatus = 'error';
+				}
+			}).catch(() => {
+				this.#cloudSyncStatus = 'error';
+			});
+		}, DashboardStore.CLOUD_SAVE_DEBOUNCE_MS);
+	}
+
+	async #reconcileWithCloud(
+		projectId: string,
+		localState: MultiTabDashboardState | null
+	): Promise<void> {
+		if (!this.#syncManager) return;
+
+		this.#isReconciling = true;
+		try {
+			const cloudResult = await DashboardStorage.loadFromCloud(this.#syncManager, projectId);
+
+			if (cloudResult) {
+				this.#cloudLayoutId = cloudResult.layoutId;
+				this.#syncManager.currentLayoutId = cloudResult.layoutId;
+
+				if (cloudResult.state) {
+					// Cloud has usable state -- reconcile (cloud wins in v1)
+					const reconciled = DashboardStorage.reconcileWithCloud(
+						localState,
+						{
+							id: cloudResult.layoutId,
+							state: JSON.stringify(cloudResult.state)
+						} as DashboardLayout,
+						projectId
+					);
+					if (reconciled && reconciled !== localState) {
+						this.#loadFromSavedState(reconciled);
+						this.#emit('dashboard:loaded', undefined);
+						console.info('[Dashboard] Loaded newer state from cloud');
+					}
+				} else {
+					// Cloud entity exists but state is empty or unusable — keep in-memory dashboard, persist layout id.
+					this.#flushActiveTabIntoSlices();
+					DashboardStorage.saveMultiTabState(this.#snapshotMultiTabState(), projectId);
+				}
+			} else if (localState) {
+				// No cloud data but localStorage has state: migrate to cloud
+				const layout = await DashboardStorage.migrateToCloud(this.#syncManager, localState);
+				if (layout) {
+					this.#cloudLayoutId = layout.id;
+					this.#syncManager.currentLayoutId = layout.id;
+					DashboardStorage.saveMultiTabState(
+						{ ...localState, cloudLayoutId: layout.id },
+						projectId
+					);
+				}
+			} else {
+				// No cloud row and no saved local snapshot (e.g. first open of this project):
+				// create cloud layout from the current in-memory default so layout id appears immediately.
+				this.#flushActiveTabIntoSlices();
+				const freshState = this.#snapshotMultiTabState();
+				const layout = await DashboardStorage.migrateToCloud(this.#syncManager, freshState);
+				if (layout) {
+					this.#cloudLayoutId = layout.id;
+					this.#syncManager.currentLayoutId = layout.id;
+					DashboardStorage.saveMultiTabState(
+						{ ...freshState, cloudLayoutId: layout.id },
+						projectId
+					);
+				}
+			}
+
+			this.#wireCloudSubscriptions(projectId);
+		} finally {
+			this.#isReconciling = false;
+		}
+	}
+
+	#handleRemoteUpdate(remoteLayout: DashboardLayout, projectId: string): void {
+		if (this.#isReconciling) return;
+
+		try {
+			if (
+				remoteLayout.updatedAt &&
+				this.#lastCloudPushUpdatedAt &&
+				remoteLayout.updatedAt === this.#lastCloudPushUpdatedAt
+			) {
+				return;
+			}
+
+			if (remoteLayout.id) {
+				this.#cloudLayoutId = remoteLayout.id;
+				if (this.#syncManager) this.#syncManager.currentLayoutId = remoteLayout.id;
+			}
+
+			const mts = DashboardStorage.parseRemoteLayoutState(remoteLayout.state);
+			if (!mts) return;
+
+			const persisted: MultiTabDashboardState = { ...mts };
+			const layoutEntityId = remoteLayout.id ?? this.#cloudLayoutId;
+			if (layoutEntityId) persisted.cloudLayoutId = layoutEntityId;
+
+			DashboardStorage.saveMultiTabState(persisted, projectId);
+
+			this.#isReconciling = true;
+			this.#loadFromSavedState(persisted);
+			this.#emit('dashboard:loaded', undefined);
+			console.info('[Dashboard] Applied remote update via AppSync subscription');
+		} catch (err) {
+			console.error('[Dashboard] Failed to apply remote update:', err);
+		} finally {
+			this.#isReconciling = false;
 		}
 	}
 }
