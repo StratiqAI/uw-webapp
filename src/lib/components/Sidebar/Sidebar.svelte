@@ -1,6 +1,7 @@
 <script lang="ts">
 	import UserDropdown from './UserDropdown.svelte';
 	import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
+	import TourLauncher from '$lib/tour/components/TourLauncher.svelte';
 	import type { CurrentUser } from '$lib/types/auth';
 	import { themeStore } from '$lib/stores/themeStore.svelte';
 	import { page } from '$app/stores';
@@ -14,6 +15,8 @@
 		icon: string;
 		/** If true, row is non-navigable and shows a coming-soon treatment */
 		disabled?: boolean;
+		/** Identifier used for the guided tour system (data-tour attribute). */
+		tourKey?: string;
 	};
 
 	let active = $state('upload');
@@ -53,18 +56,21 @@
 				label: 'Projects',
 				href: '/projects',
 				activeKey: '/project',
+				tourKey: 'sidebar-projects',
 				icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776"/>`
 			},
 			{
 				label: 'Document Analysis',
 				href: documentAnalysisHref,
 				activeKey: 'document-analysis',
+				tourKey: 'sidebar-doc-analysis',
 				icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Zm3.75 11.625a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/>`
 			},
 			{
 				label: 'Dashboard',
 				href: '/dashboard',
 				activeKey: '/dashboard',
+				tourKey: 'sidebar-dashboard',
 				icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z"/>`
 			},
 			{
@@ -78,6 +84,7 @@
 				label: 'Prompt Library',
 				href: '/library',
 				activeKey: '/library',
+				tourKey: 'sidebar-library',
 				icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"/>`
 			},
 			{
@@ -231,22 +238,23 @@
 					{/if}
 				</div>
 			{:else}
-				<a
-					href={item.href}
-					class={`group flex rounded-lg py-2.5 text-sm font-medium transition-all
-					${isSidebarOpen ? 'items-center gap-3 px-3' : 'justify-center items-center px-3'}
-					${
-						navItemIsActive(item)
-							? isDarkTheme
-								? 'bg-primary-900/50 text-primary-100 shadow-sm'
-								: 'bg-primary-100 text-primary-800 shadow-sm'
-							: isDarkTheme
-								? 'text-slate-300 hover:bg-primary-900/40 hover:text-primary-200'
-								: 'text-slate-700 hover:bg-primary-100/60 hover:text-primary-900'
-					}
-				`}
-					onclick={() => (active = item.activeKey)}
-				>
+			<a
+				href={item.href}
+				data-tour={item.tourKey ?? undefined}
+				class={`group flex rounded-lg py-2.5 text-sm font-medium transition-all
+				${isSidebarOpen ? 'items-center gap-3 px-3' : 'justify-center items-center px-3'}
+				${
+					navItemIsActive(item)
+						? isDarkTheme
+							? 'bg-primary-900/50 text-primary-100 shadow-sm'
+							: 'bg-primary-100 text-primary-800 shadow-sm'
+						: isDarkTheme
+							? 'text-slate-300 hover:bg-primary-900/40 hover:text-primary-200'
+							: 'text-slate-700 hover:bg-primary-100/60 hover:text-primary-900'
+				}
+			`}
+				onclick={() => (active = item.activeKey)}
+			>
 					<svg
 						class={`shrink-0 transition-colors ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6'} ${
 							navItemIsActive(item)
@@ -287,9 +295,12 @@
 	<div class="{isSidebarOpen ? 'p-4' : 'p-3'} border-t {isDarkTheme ? 'border-primary-800/40 bg-slate-900' : 'border-primary-200/60 bg-white'} relative z-50 overflow-visible">
 		<div class="flex flex-col {isSidebarOpen ? 'gap-3' : 'gap-2 items-center'}">
 			<div class="flex {isSidebarOpen ? 'justify-start' : 'justify-center'}">
+				<TourLauncher darkMode={isDarkTheme} collapsed={!isSidebarOpen} />
+			</div>
+			<div class="flex {isSidebarOpen ? 'justify-start' : 'justify-center'}" data-tour="theme-switcher">
 				<ThemeSwitcher collapsed={!isSidebarOpen} />
 			</div>
-			<div class="flex items-center {isSidebarOpen ? 'justify-start gap-3' : 'justify-center'} relative">
+			<div class="flex items-center {isSidebarOpen ? 'justify-start gap-3' : 'justify-center'} relative" data-tour="user-menu">
 				<UserDropdown {currentUser} darkMode={isDarkTheme} {isSidebarOpen} />
 			</div>
 		</div>

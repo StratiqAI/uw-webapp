@@ -213,6 +213,7 @@
 
 <!-- Drawer Shell (fixed overlay on the right) -->
 <div
+	data-tour="workspace-chat"
 	class="fixed inset-y-0 right-0 z-40 flex flex-col border-l border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
 	class:hidden={!ui.sidebarOpen}
 	style={`width:${ui.sidebarWidth}px`}

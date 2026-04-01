@@ -55,6 +55,7 @@
 </script>
 
 <header
+	data-tour="workspace-topbar"
 	class="unified-topbar flex h-12 shrink-0 items-center gap-3 border-b px-4 sm:px-5
 		{darkMode
 		? 'bg-slate-800 border-slate-700/60 shadow-sm shadow-black/20'
@@ -108,12 +109,14 @@
 	<!-- Project context -->
 	{#if showProjectSwitcher}
 		<div class="h-5 w-px shrink-0 {darkMode ? 'bg-slate-600/60' : 'bg-slate-200'}"></div>
-		<ProjectSwitcher
-			projects={resolvedProjects}
-			selectedProjectId={resolvedSelectedId}
-			{darkMode}
-			onProjectChange={handleProjectChange}
-		/>
+		<div data-tour="workspace-project-selector">
+			<ProjectSwitcher
+				projects={resolvedProjects}
+				selectedProjectId={resolvedSelectedId}
+				{darkMode}
+				onProjectChange={handleProjectChange}
+			/>
+		</div>
 	{:else if showProjectName}
 		<div class="h-5 w-px shrink-0 {darkMode ? 'bg-slate-600/60' : 'bg-slate-200'}"></div>
 		<span

@@ -24,6 +24,8 @@
 	import { streamCatalog } from '$lib/stores/streamCatalog.svelte';
 	import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
 	import ToastContainer from '$lib/components/Toast/ToastContainer.svelte';
+	import TourProvider from '$lib/tour/components/TourProvider.svelte';
+	import { registerAllTours } from '$lib/tour/tours';
 
 	// Register package-based widgets before schema initialization
 	registerWidget(metricWidget);
@@ -53,6 +55,8 @@
 	// This runs BEFORE child onMount callbacks (e.g. dashboard page), so the
 	// sync layer's restored data is already in the store when the dashboard loads.
 	if (browser) {
+		registerAllTours();
+
 		try {
 			initializeWidgetSchemas();
 		} catch (error) {
@@ -136,4 +140,5 @@
 		{@render children()}
 	</main>
 	<ToastContainer darkMode={themeStore.darkMode} />
+	<TourProvider darkMode={themeStore.darkMode} />
 </div>
