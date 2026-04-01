@@ -22,6 +22,8 @@
 	import { DocumentEntitiesSyncManager } from '$lib/realtime/websocket/syncManagers/DocumentEntitiesSyncManager';
 	
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
+	import { authStore } from '$lib/stores/auth.svelte';
+	import DocumentUpload from '$lib/components/DocumentUpload/DocumentUpload.svelte';
 	
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Import Application Defined Components
@@ -47,6 +49,8 @@
 	let { data } = $props();
 	const idToken = $derived(data?.idToken);
 	const pageQueryClient = $derived(idToken ? new GraphQLQueryClient(idToken) : null);
+	const currentUser = $derived(data?.currentUser ?? authStore.currentUser);
+	const isNewProject = $derived(data?.isNewProject);
 	
 	// Get projectId from route params
 	import { page } from '$app/stores';
@@ -54,6 +58,21 @@
 
 	// Dark mode support
 	const darkMode = $derived(darkModeStore.darkMode);
+
+	// Upload section: collapsed by default when documents exist, expanded when empty
+	let uploadExpanded = $state(false);
+
+	// File metadata for S3 uploads
+	const fileMetadata = $derived.by(() => {
+		const hasOwnerId = !!currentUser?.sub;
+		const hasProjectId = !!projectId;
+		if (!hasOwnerId || !hasProjectId) return null;
+		return {
+			tenantId: project?.tenantId || currentUser.tenant || authStore.currentUser?.tenant || 'default',
+			ownerId: currentUser.sub,
+			parentId: projectId
+		};
+	});
 	
 	// Document entities sync manager instance
 	let documentEntitiesManager = $state<DocumentEntitiesSyncManager | null>(null);
@@ -540,13 +559,65 @@
 			<div class="flex items-center gap-3 mb-3">
 				<div class="w-1 h-8 {darkMode ? 'bg-indigo-500' : 'bg-indigo-600'} rounded-full"></div>
 				<h2 class="text-xl font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">
-					Document <span class="{darkMode ? 'text-indigo-400' : 'text-indigo-600'}">Analysis</span>
+					Document <span class="{darkMode ? 'text-indigo-400' : 'text-indigo-600'}">Workspace</span>
 				</h2>
 			</div>
 			<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-600'} ml-4">
-				View discovered text, tables, and images from your uploaded documents.
+				Upload, view, and analyze your documents.
 			</p>
 		</div>
+
+		<!-- Upload Section -->
+		{#if documents.length === 0}
+			<!-- Expanded upload when no documents -->
+			<div class="mb-8 {darkMode ? 'bg-gradient-to-br from-slate-800 via-slate-800 to-indigo-900/20 border-indigo-500/30' : 'bg-gradient-to-br from-white via-indigo-50/50 to-white border-indigo-200'} rounded-lg border-2 shadow-lg">
+				<div class="p-6">
+					<DocumentUpload
+						{idToken}
+						{projectId}
+						metadata={fileMetadata}
+					/>
+				</div>
+			</div>
+		{:else}
+			<!-- Compact collapsible upload bar when documents exist -->
+			<div class="mb-8 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg border shadow-sm">
+				<button
+					type="button"
+					onclick={() => uploadExpanded = !uploadExpanded}
+					class="w-full flex items-center justify-between px-6 py-3 text-left transition-colors {darkMode ? 'hover:bg-slate-700/50' : 'hover:bg-slate-50'}"
+				>
+					<div class="flex items-center gap-3">
+						<svg class="w-5 h-5 {darkMode ? 'text-indigo-400' : 'text-indigo-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+						</svg>
+						<span class="text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'}">
+							Upload more documents
+						</span>
+						<span class="text-xs {darkMode ? 'text-slate-500' : 'text-slate-400'}">
+							{documents.length} document{documents.length !== 1 ? 's' : ''} uploaded
+						</span>
+					</div>
+					<svg
+						class="w-4 h-4 transition-transform {uploadExpanded ? 'rotate-180' : ''} {darkMode ? 'text-slate-400' : 'text-slate-500'}"
+						fill="none" stroke="currentColor" viewBox="0 0 24 24"
+					>
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+					</svg>
+				</button>
+				{#if uploadExpanded}
+					<div class="px-6 pb-6 border-t {darkMode ? 'border-slate-700' : 'border-slate-200'}">
+						<div class="pt-4">
+							<DocumentUpload
+								{idToken}
+								{projectId}
+								metadata={fileMetadata}
+							/>
+						</div>
+					</div>
+				{/if}
+			</div>
+		{/if}
 
 		<!-- Structured query result (CRE sidebar vision query) -->
 		{#if visionQueryLoading}
@@ -640,7 +711,7 @@
 		{/if}
 
 		<!-- Document Entities Display -->
-		{#if projectId}
+		{#if projectId && documents.length > 0}
 			<div class="{darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg border shadow-sm">
 				<div class="p-6">
 					{#if isLoadingEntities}
@@ -682,55 +753,18 @@
 			</div>
 		{/if}
 
-		<!-- Empty State -->
-		{#if documents.length === 0 || !selectedDocId}
-			<div class="{darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg border shadow-sm">
-				<div class="text-center py-12 px-6">
-					<div class="mb-4">
-						<svg
-							class="mx-auto h-16 w-16 {darkMode ? 'text-slate-400' : 'text-slate-300'}"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-							></path>
-						</svg>
-					</div>
-					<h3 class="text-lg font-semibold {darkMode ? 'text-white' : 'text-slate-900'} mb-2">
-						No documents uploaded yet
-					</h3>
-					<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-600'} mb-4">
-						Upload your first document to get started with document analysis.
-					</p>
-					{#if projectId}
-						<a
-							href="/projects/workspace/{projectId}/get-started"
-							class="inline-flex items-center gap-2 px-4 py-2 {darkMode ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'} rounded-lg font-medium transition-colors"
-						>
-							<svg
-								class="w-5 h-5"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-								></path>
-							</svg>
-							Go to Get Started
-						</a>
-					{/if}
-				</div>
-			</div>
-		{/if}
+		<!-- Help Link -->
+		<div class="mt-6 text-center">
+			<a
+				href="/blog/uploading-your-first-property"
+				class="text-sm {darkMode ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-700'} font-medium hover:underline transition-colors inline-flex items-center gap-2 group"
+			>
+				<span>Learn more about uploading documents</span>
+				<svg class="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+				</svg>
+			</a>
+		</div>
 	</div>
 	</div>
 

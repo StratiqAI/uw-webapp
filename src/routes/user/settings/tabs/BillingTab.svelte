@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { gql } from '$lib/realtime/graphql/requestHandler';
+	import { Q_LIST_USAGE_RECORDS } from '@stratiqai/types-simple';
 	import type { CurrentUser } from '$lib/types/auth';
 
 	let { currentUser, darkMode = false } = $props<{
@@ -8,7 +11,6 @@
 
 	let displayTenant = $derived(currentUser?.tenant ?? 'default');
 
-	// Phase 1: Static display. Phase 3 will wire to AccountCredits / BillingInvoice / UsageRecord queries.
 	let creditBalance = $state<number | null>(null);
 	let planName = $state('Free Tier');
 	let invoices = $state<
@@ -20,18 +22,127 @@
 		}>
 	>([]);
 
-	let usageSummary = $state<
-		Array<{
-			label: string;
-			used: number;
-			limit: number | null;
-			unit: string;
-		}>
-	>([
-		{ label: 'AI Tokens', used: 0, limit: null, unit: 'tokens' },
-		{ label: 'Document Analyses', used: 0, limit: null, unit: 'analyses' },
-		{ label: 'API Calls', used: 0, limit: null, unit: 'calls' }
+	interface UsageRecord {
+		id: string;
+		tenantId: string;
+		ownerId: string;
+		reportableObjectId: string;
+		quantity: number;
+		unit: string;
+		metadata: string;
+		timestamp: string;
+		createdAt: string;
+	}
+
+	interface ParsedUsageRecord extends UsageRecord {
+		parsedMeta: Record<string, unknown>;
+	}
+
+	let usageRecords = $state<ParsedUsageRecord[]>([]);
+	let usageLoading = $state(false);
+	let usageError = $state<string | null>(null);
+
+	let tokenTotal = $derived(
+		usageRecords
+			.filter((r) => r.unit === 'TOKENS')
+			.reduce((sum, r) => sum + r.quantity, 0)
+	);
+
+	let embeddingCallTotal = $derived(
+		usageRecords
+			.filter((r) => r.unit === 'API_CALLS' && r.parsedMeta.service === 'vertex-embedding')
+			.reduce((sum, r) => sum + r.quantity, 0)
+	);
+
+	let pineconeQueryTotal = $derived(
+		usageRecords
+			.filter((r) => r.unit === 'API_CALLS' && r.parsedMeta.service === 'pinecone-query')
+			.reduce((sum, r) => sum + r.quantity, 0)
+	);
+
+	let usageSummary = $derived([
+		{ label: 'AI Tokens', used: tokenTotal, limit: null as number | null, unit: 'tokens' },
+		{
+			label: 'Embedding Calls',
+			used: embeddingCallTotal,
+			limit: null as number | null,
+			unit: 'calls'
+		},
+		{
+			label: 'Pinecone Queries',
+			used: pineconeQueryTotal,
+			limit: null as number | null,
+			unit: 'queries'
+		}
 	]);
+
+	let recentRecords = $derived(
+		[...usageRecords]
+			.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+			.slice(0, 50)
+	);
+
+	function parseMetadata(raw: string): Record<string, unknown> {
+		if (!raw) return {};
+		try {
+			return typeof raw === 'string' ? JSON.parse(raw) : (raw as Record<string, unknown>);
+		} catch {
+			return {};
+		}
+	}
+
+	function formatTimestamp(ts: string): string {
+		try {
+			return new Date(ts).toLocaleString(undefined, {
+				month: 'short',
+				day: 'numeric',
+				hour: '2-digit',
+				minute: '2-digit'
+			});
+		} catch {
+			return ts;
+		}
+	}
+
+	function serviceLabel(meta: Record<string, unknown>): string {
+		const s = meta.service as string | undefined;
+		switch (s) {
+			case 'vertex-embedding':
+				return 'Vertex Embedding';
+			case 'pinecone-query':
+				return 'Pinecone Query';
+			case 'gemini':
+				return 'Gemini';
+			case 'anthropic':
+				return 'Anthropic';
+			default:
+				return s ?? 'Unknown';
+		}
+	}
+
+	async function fetchUsageRecords() {
+		if (!currentUser?.idToken || !currentUser?.tenant) return;
+		usageLoading = true;
+		usageError = null;
+		try {
+			const res = await gql<{
+				listUsageRecords: { items: UsageRecord[]; nextToken: string | null };
+			}>(Q_LIST_USAGE_RECORDS, { tenantId: currentUser.tenant, limit: 200 }, currentUser.idToken);
+
+			usageRecords = (res.listUsageRecords?.items ?? []).map((r) => ({
+				...r,
+				parsedMeta: parseMetadata(r.metadata)
+			}));
+		} catch (err) {
+			usageError = err instanceof Error ? err.message : 'Failed to load usage data';
+		} finally {
+			usageLoading = false;
+		}
+	}
+
+	onMount(() => {
+		fetchUsageRecords();
+	});
 </script>
 
 <div class="space-y-6">
@@ -105,9 +216,19 @@
 			? 'bg-slate-800 border-slate-700'
 			: 'bg-white border-slate-200'} shadow-sm"
 	>
-		<h3 class="text-lg font-semibold {darkMode ? 'text-white' : 'text-slate-900'} mb-4">
-			Usage Summary
-		</h3>
+		<div class="mb-4 flex items-center justify-between">
+			<h3 class="text-lg font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">
+				Usage Summary
+			</h3>
+			{#if usageLoading}
+				<span class="text-xs {darkMode ? 'text-slate-500' : 'text-slate-400'}">Loading...</span>
+			{/if}
+		</div>
+
+		{#if usageError}
+			<p class="mb-4 text-sm text-red-500">{usageError}</p>
+		{/if}
+
 		<div class="space-y-4">
 			{#each usageSummary as usage}
 				<div>
@@ -140,16 +261,86 @@
 								? 'bg-slate-700'
 								: 'bg-slate-200'}"
 						>
-							<div class="h-full w-0 rounded-full bg-primary-500"></div>
+							<div
+								class="h-full rounded-full bg-primary-500 transition-all"
+								style="width: {usage.used > 0 ? '100%' : '0%'}"
+							></div>
 						</div>
 					{/if}
 				</div>
 			{/each}
 		</div>
-		<p class="mt-4 text-xs {darkMode ? 'text-slate-500' : 'text-slate-400'}">
-			Usage data will be populated once backend integration is complete.
-		</p>
 	</div>
+
+	<!-- Usage Detail Table -->
+	{#if recentRecords.length > 0}
+		<div
+			class="rounded-lg border p-6 {darkMode
+				? 'bg-slate-800 border-slate-700'
+				: 'bg-white border-slate-200'} shadow-sm"
+		>
+			<h3 class="text-lg font-semibold {darkMode ? 'text-white' : 'text-slate-900'} mb-4">
+				Usage Detail
+			</h3>
+			<div class="overflow-x-auto">
+				<table class="w-full text-sm">
+					<thead>
+						<tr
+							class="border-b {darkMode
+								? 'border-slate-700 text-slate-400'
+								: 'border-slate-200 text-slate-500'}"
+						>
+							<th class="pb-3 text-left font-medium">Timestamp</th>
+							<th class="pb-3 text-left font-medium">Service</th>
+							<th class="pb-3 text-right font-medium">Quantity</th>
+							<th class="pb-3 text-left font-medium">Unit</th>
+							<th class="pb-3 text-left font-medium">Model</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each recentRecords as record}
+							<tr class="border-b {darkMode ? 'border-slate-700/50' : 'border-slate-100'}">
+								<td class="py-2.5 {darkMode ? 'text-slate-300' : 'text-slate-700'}">
+									{formatTimestamp(record.timestamp)}
+								</td>
+								<td class="py-2.5">
+									<span
+										class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium
+										{record.parsedMeta.service === 'gemini' || record.parsedMeta.service === 'anthropic'
+											? darkMode
+												? 'bg-violet-900/30 text-violet-400'
+												: 'bg-violet-100 text-violet-700'
+											: record.parsedMeta.service === 'vertex-embedding'
+												? darkMode
+													? 'bg-sky-900/30 text-sky-400'
+													: 'bg-sky-100 text-sky-700'
+												: darkMode
+													? 'bg-teal-900/30 text-teal-400'
+													: 'bg-teal-100 text-teal-700'}"
+									>
+										{serviceLabel(record.parsedMeta)}
+									</span>
+								</td>
+								<td
+									class="py-2.5 text-right font-mono {darkMode
+										? 'text-white'
+										: 'text-slate-900'}"
+								>
+									{record.quantity.toLocaleString()}
+								</td>
+								<td class="py-2.5 {darkMode ? 'text-slate-400' : 'text-slate-500'}">
+									{record.unit}
+								</td>
+								<td class="py-2.5 {darkMode ? 'text-slate-400' : 'text-slate-500'}">
+									{(record.parsedMeta.model as string) ?? '—'}
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	{/if}
 
 	<!-- Invoice History -->
 	<div

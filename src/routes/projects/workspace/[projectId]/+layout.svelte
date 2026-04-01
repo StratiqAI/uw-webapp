@@ -134,8 +134,6 @@
 	});
 
 	// ---------- Workspace header logic ----------
-	let darkMode = $derived.by(() => darkModeStore.darkMode);
-
 	const currentPath = $derived($page.url.pathname);
 
 	const workspaceBasePath = $derived.by(() => {
@@ -147,26 +145,12 @@
 	});
 
 	const pageTitle = $derived.by(() => {
-		if (currentPath.includes('get-started')) return 'Get Started';
-		if (currentPath.includes('document-analysis')) return 'Document Analysis';
+		if (currentPath.includes('document-analysis')) return 'Document Workspace';
 		if (currentPath.includes('deal-room')) return 'Deal Room';
 		if (currentPath.includes('financial-analysis')) return 'Financial Analysis';
 		if (currentPath.includes('investment-analysis')) return 'Investment Analysis';
 		return 'Workspace';
 	});
-
-	const workspaceTabs = [
-		{ href: 'get-started', label: 'Get Started' },
-		{ href: 'document-analysis', label: 'Document Analysis' }
-	];
-
-	function tabHref(href: string): string {
-		return href === 'get-started' ? workspaceBasePath : `${workspaceBasePath}/${href}`;
-	}
-
-	const isTabActive = (href: string) =>
-		currentPath === `${workspaceBasePath}/${href}` ||
-		(href === 'get-started' && currentPath === workspaceBasePath);
 
 	function handleWorkspaceProjectChange(newProjectId: string | null) {
 		if (!newProjectId || newProjectId === routeProjectId) return;
@@ -187,25 +171,7 @@
 			selectedProjectId={routeProjectId}
 			onProjectChange={handleWorkspaceProjectChange}
 			notificationBellProps={{ projectName: project?.name ?? projectFromServer?.name }}
-		>
-			{#snippet tabs()}
-				{#each workspaceTabs as tab}
-					<a
-						href={tabHref(tab.href)}
-						class="px-3 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap
-							{isTabActive(tab.href)
-								? (darkMode
-									? 'text-white bg-indigo-600 hover:bg-indigo-700'
-									: 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100 font-semibold')
-								: (darkMode
-									? 'text-slate-400 hover:text-indigo-300 hover:bg-indigo-900/20'
-									: 'text-slate-600 hover:text-indigo-600 hover:bg-indigo-50/50')}"
-					>
-						{tab.label}
-					</a>
-				{/each}
-			{/snippet}
-		</UnifiedTopBar>
+		/>
 
 		<div class="flex-1 overflow-auto {darkModeStore.darkMode ? 'bg-slate-900' : 'bg-slate-50'}">
 			{@render children()}
