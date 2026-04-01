@@ -42,8 +42,10 @@ export async function calculateExecutionId(params: {
 	documentIds: readonly string[];
 	promptId: string;
 	inputValues: string | Record<string, unknown>;
+	jsonSchemaId?: string | null;
+	model?: string | null;
 }): Promise<string> {
-	const { projectId, documentIds, promptId, inputValues } = params;
+	const { projectId, documentIds, promptId, inputValues, jsonSchemaId, model } = params;
 	const sortedDocIds = [...documentIds].map(String).sort();
 	const inputValuesCanonical =
 		typeof inputValues === 'string'
@@ -54,7 +56,9 @@ export async function calculateExecutionId(params: {
 		projectId: String(projectId),
 		documentIds: sortedDocIds,
 		promptId: String(promptId),
-		inputValues: inputValuesCanonical
+		inputValues: inputValuesCanonical,
+		jsonSchemaId: String(jsonSchemaId ?? ''),
+		model: String(model ?? '')
 	});
 
 	return sha256HexUtf8(payload);
@@ -83,6 +87,8 @@ export async function computeExecutionIdForSubmitInput(input: {
 	promptId: string;
 	inputValues: unknown;
 	documentIds?: readonly (string | null | undefined)[] | undefined;
+	jsonSchemaId?: string | null;
+	model?: string | null;
 }): Promise<string> {
 	const inputValuesStr = normalizeInputValuesForExecutionId(input.inputValues);
 	const documentIds = normalizeDocumentIdsForExecutionId(input.documentIds);
@@ -90,6 +96,8 @@ export async function computeExecutionIdForSubmitInput(input: {
 		projectId: input.projectId,
 		documentIds,
 		promptId: input.promptId,
-		inputValues: inputValuesStr
+		inputValues: inputValuesStr,
+		jsonSchemaId: input.jsonSchemaId,
+		model: input.model
 	});
 }

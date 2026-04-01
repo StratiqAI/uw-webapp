@@ -365,7 +365,9 @@
 				projectId,
 				promptId: prompt.id,
 				inputValues,
-				documentIds
+				documentIds,
+				jsonSchemaId: prompt.jsonSchemaId,
+				model: prompt.model
 			});
 
 			const client = getAppSyncWsClient() ?? initAppSyncWsClient({
