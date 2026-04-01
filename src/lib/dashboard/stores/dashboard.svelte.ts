@@ -55,6 +55,17 @@ const DEFAULT_RESIZE_STATE: ResizeState = {
 const GRID_BUFFER_ROWS = 2;
 const AUTO_SAVE_DELAY_MS = 1000;
 const UNDO_STACK_LIMIT = 40;
+const CLOUD_OPERATION_TIMEOUT_MS = 10_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+	return new Promise<T>((resolve, reject) => {
+		const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+		promise.then(
+			(v) => { clearTimeout(timer); resolve(v); },
+			(e) => { clearTimeout(timer); reject(e); }
+		);
+	});
+}
 
 type LayoutSnapshot = Array<{
 	id: string;
@@ -232,7 +243,11 @@ class DashboardStore {
 			// Step 2: Cloud reconciliation (blocking — ensures layout id exists before UI renders)
 			if (projectId && this.#syncManager) {
 				try {
-					await this.#reconcileWithCloud(projectId, savedState);
+					await withTimeout(
+						this.#reconcileWithCloud(projectId, savedState),
+						CLOUD_OPERATION_TIMEOUT_MS,
+						'Cloud reconciliation'
+					);
 				} catch (err) {
 					console.error('[Dashboard] Cloud reconciliation failed:', err);
 				}

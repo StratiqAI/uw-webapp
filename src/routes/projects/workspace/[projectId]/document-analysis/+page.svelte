@@ -34,7 +34,7 @@
 	import { updatePromptTemplate, createPromptTemplate, type AIQueryData } from '../../../../library/PromptService';
 	import { GraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
-	import { M_SUBMIT_AI_QUERY, S_ON_UPDATE_AI_QUERY_EXECUTION_BY_EXECUTION_ID } from '@stratiqai/types-simple';
+	import { M_SUBMIT_AI_QUERY, S_ON_UPDATE_AI_QUERY_EXECUTION_BY_EXECUTION_ID, Q_GET_AI_QUERY_EXECUTION } from '@stratiqai/types-simple';
 	import { streamCatalog } from '$lib/stores/streamCatalog.svelte';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import SendToDashboardModal from './components/SendToDashboardModal.svelte';
@@ -83,6 +83,7 @@
 	/** AppSync subscription cleanup for AI query execution (by deterministic executionId hash). */
 	let aiQueryExecutionUnsub: (() => void) | null = null;
 	let aiQueryExecutionTimeoutId: ReturnType<typeof setTimeout> | null = null;
+	let aiQueryPollingIntervalId: ReturnType<typeof setInterval> | null = null;
 
 	/** "Send to Dashboard" modal state */
 	let showSendToDashboard = $state(false);
@@ -91,6 +92,10 @@
 		if (aiQueryExecutionTimeoutId != null) {
 			clearTimeout(aiQueryExecutionTimeoutId);
 			aiQueryExecutionTimeoutId = null;
+		}
+		if (aiQueryPollingIntervalId != null) {
+			clearInterval(aiQueryPollingIntervalId);
+			aiQueryPollingIntervalId = null;
 		}
 		aiQueryExecutionUnsub?.();
 		aiQueryExecutionUnsub = null;
@@ -224,9 +229,35 @@
 
 	type AIQueryExecPayload = {
 		status: string;
+		statusMessage?: string | null;
 		rawOutput?: string | null;
 		errorMessage?: string | null;
+		errorCode?: string | null;
+		retryCount?: number | null;
+		model?: string | null;
 	};
+
+	/** Human-friendly messages for machine error codes from the backend. */
+	const ERROR_CODE_MESSAGES: Record<string, string> = {
+		PROMPT_NOT_FOUND: 'The selected prompt no longer exists.',
+		SCHEMA_PARSE_ERROR: 'The JSON schema is malformed. Edit the schema and try again.',
+		MISSING_INPUT: 'Required input variables are missing.',
+		RATE_LIMITED: 'The AI service is busy. Please try again in a moment.',
+		GEMINI_ERROR: 'The AI model returned an error. Try again or use a different model.',
+		VISION_CONFIG_MISSING: 'Server is not configured for document analysis.',
+		API_KEY_MISSING: 'Server AI key is not configured. Contact your administrator.',
+		TIMEOUT: 'The request took too long. Try with a simpler prompt or fewer documents.',
+		INTERNAL_ERROR: 'An unexpected error occurred. Please try again.',
+	};
+
+	function friendlyErrorMessage(exec: AIQueryExecPayload): string {
+		if (exec.errorCode && ERROR_CODE_MESSAGES[exec.errorCode]) {
+			return ERROR_CODE_MESSAGES[exec.errorCode];
+		}
+		return exec.errorMessage ?? 'Execution failed';
+	}
+
+	let executionStatusMessage = $state<string | null>(null);
 
 	/**
 	 * Subscribe by deterministic executionId (SHA-256 hash), then submit.
@@ -252,17 +283,47 @@
 		visionQueryError = null;
 		visionQueryResult = null;
 		lastSelectedPrompt = prompt;
+		executionStatusMessage = 'Submitting...';
 
 		let settled = false;
 		const finishLoading = () => {
 			visionQueryLoading = false;
 		};
 
+		/** Reset the adaptive timeout on every subscription event (server is alive). */
+		const resetAdaptiveTimeout = () => {
+			if (aiQueryExecutionTimeoutId != null) {
+				clearTimeout(aiQueryExecutionTimeoutId);
+			}
+			aiQueryExecutionTimeoutId = setTimeout(() => {
+				if (!settled) {
+					settled = true;
+					cleanupAiQueryExecutionSubscription();
+					visionQueryError = 'Timed out waiting for result.';
+					visionQueryResult = null;
+					executionStatusMessage = null;
+					finishLoading();
+				}
+			}, 120_000);
+		};
+
 		const applyExecutionResult = (exec: AIQueryExecPayload) => {
 			if (settled) return;
+
+			resetAdaptiveTimeout();
+
+			if (exec.status === 'QUEUED' || exec.status === 'PROCESSING') {
+				executionStatusMessage = exec.statusMessage ?? (exec.status === 'QUEUED' ? 'Queued...' : 'AI is processing...');
+				if (exec.retryCount && exec.retryCount > 0) {
+					executionStatusMessage = `Retrying (${exec.retryCount})...`;
+				}
+				return;
+			}
+
 			if (exec.status === 'SUCCESS') {
 				settled = true;
 				cleanupAiQueryExecutionSubscription();
+				executionStatusMessage = null;
 				let structuredOutput: unknown = undefined;
 				if (exec.rawOutput) {
 					try {
@@ -278,7 +339,6 @@
 					matchCount: documentIds.length
 				};
 
-				// Auto-publish to any bound stream for this prompt
 				if (prompt.id) {
 					const stream = streamCatalog.getStreamByPromptId(prompt.id);
 					if (stream && structuredOutput !== undefined) {
@@ -293,7 +353,8 @@
 			} else if (exec.status === 'ERROR') {
 				settled = true;
 				cleanupAiQueryExecutionSubscription();
-				visionQueryError = exec.errorMessage ?? 'Execution failed';
+				executionStatusMessage = null;
+				visionQueryError = friendlyErrorMessage(exec);
 				visionQueryResult = null;
 				finishLoading();
 			}
@@ -312,6 +373,32 @@
 				auth: { mode: 'cognito', idToken }
 			});
 
+			/** Polling fallback: if subscription fails, poll getAIQueryExecution every 4 seconds. */
+			let submittedExecId: string | null = null;
+
+			const startPollingFallback = () => {
+				if (aiQueryPollingIntervalId != null || settled || !submittedExecId) return;
+				executionStatusMessage = 'Polling for updates...';
+				aiQueryPollingIntervalId = setInterval(async () => {
+					if (settled || !submittedExecId || !idToken) {
+						if (aiQueryPollingIntervalId != null) clearInterval(aiQueryPollingIntervalId);
+						aiQueryPollingIntervalId = null;
+						return;
+					}
+					try {
+						const pollRes = await gql<{ getAIQueryExecution: AIQueryExecPayload | null }>(
+							Q_GET_AI_QUERY_EXECUTION,
+							{ id: submittedExecId },
+							idToken
+						);
+						const exec = pollRes.getAIQueryExecution;
+						if (exec) applyExecutionResult(exec);
+					} catch {
+						/* polling errors are non-fatal; will retry next interval */
+					}
+				}, 4_000);
+			};
+
 			const subHandle = client.subscribe({
 				query: S_ON_UPDATE_AI_QUERY_EXECUTION_BY_EXECUTION_ID,
 				variables: { executionId: executionIdHash },
@@ -323,27 +410,15 @@
 					if (exec) applyExecutionResult(exec);
 				},
 				error: (e: unknown) => {
-					console.error('[document-analysis] onUpdateAIQueryExecutionByExecutionId', e);
-					if (!settled) {
-						settled = true;
-						cleanupAiQueryExecutionSubscription();
-						visionQueryError = 'Lost connection to live updates; try again.';
-						visionQueryResult = null;
-						finishLoading();
-					}
+					console.error('[document-analysis] subscription error, falling back to polling', e);
+					aiQueryExecutionUnsub?.();
+					aiQueryExecutionUnsub = null;
+					startPollingFallback();
 				}
 			});
 			aiQueryExecutionUnsub = () => subHandle.unsubscribe();
 
-			aiQueryExecutionTimeoutId = setTimeout(() => {
-				if (!settled) {
-					settled = true;
-					cleanupAiQueryExecutionSubscription();
-					visionQueryError = 'Timed out waiting for result.';
-					visionQueryResult = null;
-					finishLoading();
-				}
-			}, 120_000);
+			resetAdaptiveTimeout();
 
 			const submitRes = await gql<{ submitAIQuery: AIQueryExecPayload & { id: string } }>(
 				M_SUBMIT_AI_QUERY,
@@ -361,12 +436,12 @@
 			);
 
 			const immediate = submitRes.submitAIQuery;
-			if (immediate && (immediate.status === 'SUCCESS' || immediate.status === 'ERROR')) {
-				applyExecutionResult(immediate);
-			}
+			if (immediate?.id) submittedExecId = immediate.id;
+			if (immediate) applyExecutionResult(immediate);
 		} catch (err) {
 			settled = true;
 			cleanupAiQueryExecutionSubscription();
+			executionStatusMessage = null;
 			visionQueryError = err instanceof Error ? err.message : 'Vision query failed';
 			visionQueryResult = null;
 			finishLoading();
@@ -479,7 +554,7 @@
 						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
 						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
 					</svg>
-					<span class="{darkMode ? 'text-slate-300' : 'text-slate-600'}">Running structured query...</span>
+					<span class="{darkMode ? 'text-slate-300' : 'text-slate-600'}">{executionStatusMessage ?? 'Running structured query...'}</span>
 				</div>
 			</div>
 		{:else if visionQueryError}

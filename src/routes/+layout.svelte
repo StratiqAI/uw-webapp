@@ -80,11 +80,17 @@
 		// Immediately persist sync-restored data to DashboardStorage so the
 		// two persistence layers start in sync.
 		DashboardStorage.saveWidgetDataNow();
+
+		// Initialize globalProjectStore synchronously so selectedProjectId is
+		// available before any child onMount (e.g. dashboard page) fires.
+		if (data.projects) {
+			globalProjectStore.initialize(data.projects);
+		}
 	}
 
 	$effect(() => {
 		if (browser && data.projects) {
-			globalProjectStore.initialize(data.projects);
+			globalProjectStore.setProjects(data.projects);
 		}
 	});
 

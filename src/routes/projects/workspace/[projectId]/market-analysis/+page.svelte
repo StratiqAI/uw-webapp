@@ -12,6 +12,18 @@
 	import { themeStore } from '$lib/stores/themeStore.svelte';
 	import { DashboardSyncManager } from '$lib/realtime/websocket/syncManagers/DashboardSyncManager';
 
+	const SYNC_INIT_TIMEOUT_MS = 8_000;
+
+	function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+		return new Promise<T>((resolve, reject) => {
+			const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+			promise.then(
+				(v) => { clearTimeout(timer); resolve(v); },
+				(e) => { clearTimeout(timer); reject(e); }
+			);
+		});
+	}
+
 	interface Props {
 		data: PageData;
 	}
@@ -309,7 +321,11 @@
 			if (data.idToken) {
 				try {
 					const syncManager = DashboardSyncManager.createInactive();
-					await syncManager.initialize({ idToken: data.idToken, projectId });
+					await withTimeout(
+						syncManager.initialize({ idToken: data.idToken, projectId }),
+						SYNC_INIT_TIMEOUT_MS,
+						'SyncManager init'
+					);
 					dashboard.setSyncManager(syncManager);
 				} catch (e) {
 					console.warn('Cloud sync unavailable for market-analysis dashboard:', e);

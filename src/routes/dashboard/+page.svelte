@@ -17,6 +17,18 @@
 	import { logSupabaseRpcSmokeTest } from '$lib/supabase/supabaseRpcSmokeTest';
 	import { DashboardSyncManager } from '$lib/realtime/websocket/syncManagers/DashboardSyncManager';
 
+	const SYNC_INIT_TIMEOUT_MS = 8_000;
+
+	function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+		return new Promise<T>((resolve, reject) => {
+			const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+			promise.then(
+				(v) => { clearTimeout(timer); resolve(v); },
+				(e) => { clearTimeout(timer); reject(e); }
+			);
+		});
+	}
+
 	interface Props {
 		data: PageData;
 	}
@@ -56,7 +68,11 @@
 			if (projectId && data.idToken) {
 				try {
 					const syncManager = DashboardSyncManager.createInactive();
-					await syncManager.initialize({ idToken: data.idToken, projectId });
+					await withTimeout(
+						syncManager.initialize({ idToken: data.idToken, projectId }),
+						SYNC_INIT_TIMEOUT_MS,
+						'SyncManager init'
+					);
 					dashboard.setSyncManager(syncManager);
 				} catch (e) {
 					console.warn('Cloud sync unavailable for dashboard:', e);
@@ -126,23 +142,40 @@
 			}
 		}
 
-		async function initDashboard() {
-			try {
-				updateGridSize();
+	async function initDashboard() {
+		try {
+			updateGridSize();
 
-				// Set up cloud sync manager if we have a project and auth token
-				if (selectedProjectId && data.idToken) {
-					try {
-						const syncManager = DashboardSyncManager.createInactive();
-						await syncManager.initialize({ idToken: data.idToken, projectId: selectedProjectId });
-						dashboard.setSyncManager(syncManager);
-					} catch (e) {
-						console.warn('Cloud sync unavailable for dashboard:', e);
-						dashboard.setSyncManager(null);
-					}
+			// Resolve the project id with fallbacks: store → localStorage → first from server data.
+			// Guards against the edge case where globalProjectStore hasn't populated yet.
+			let projectId = selectedProjectId;
+			if (!projectId) {
+				projectId = DashboardStorage.getSelectedProjectId();
+			}
+			if (!projectId && data.projects?.length) {
+				projectId = data.projects[0].id;
+			}
+			if (projectId && !selectedProjectId) {
+				globalProjectStore.setSelectedProjectId(projectId);
+			}
+
+			// Set up cloud sync manager if we have a project and auth token
+			if (projectId && data.idToken) {
+				try {
+					const syncManager = DashboardSyncManager.createInactive();
+					await withTimeout(
+						syncManager.initialize({ idToken: data.idToken, projectId }),
+						SYNC_INIT_TIMEOUT_MS,
+						'SyncManager init'
+					);
+					dashboard.setSyncManager(syncManager);
+				} catch (e) {
+					console.warn('Cloud sync unavailable for dashboard:', e);
+					dashboard.setSyncManager(null);
 				}
+			}
 
-				const hasLoadedDashboard = await dashboard.initialize(selectedProjectId);
+			const hasLoadedDashboard = await dashboard.initialize(projectId);
 
 				if (!hasLoadedDashboard) {
 					console.info('No saved dashboard found, loading defaults');
