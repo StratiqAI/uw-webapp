@@ -86,6 +86,7 @@
 		"json5": "^2.2.3",
 		"jssha": "^3.3.1",
 		"jwt-decode": "^4.0.0",
+		"mapbox-gl": "^3.21.0",
 		"marked": "^16.2.0",
 		"openai": "^5.20.2",
 		"runes-meta-tags": "^0.4.4",

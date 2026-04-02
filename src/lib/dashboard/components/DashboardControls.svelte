@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
 	import type { Widget, WidgetType } from '../types/widget';
 	import { findAvailablePosition } from '../utils/grid';
-	import { PUBLIC_GEOAPIFY_API_KEY } from '$env/static/public';
+	import { PUBLIC_GEOAPIFY_API_KEY, PUBLIC_MAPBOX_ACCESS_TOKEN } from '$env/static/public';
 	import type { DashboardTabId } from '$lib/dashboard/types/dashboardTabs';
 	import type { AppTheme } from '$lib/stores/themeStore.svelte';
 	import UnifiedTopBar from '$lib/components/UnifiedTopBar.svelte';
@@ -154,47 +154,57 @@
 		};
 	});
 
+	// #region agent log
+	let _h1Count = 0;
+	let _h1First = 0;
+	// #endregion
 	$effect(() => {
 		const outer = tabStripOuterEl;
 		const scroll = tabScrollEl;
 		const measure = tabMeasureEl;
 		if (!outer) return;
 
-		const tryExpandToInline = () => {
-			if (!compactTabs || !measure) return;
-			// Reserve a few pixels for rounding and the adjacent "+" control.
-			if (measure.offsetWidth <= outer.clientWidth - 6) {
+		// #region agent log
+		_h1Count++;
+		if (!_h1First) _h1First = Date.now();
+		if (_h1Count <= 5 || _h1Count % 100 === 0) {
+			fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f4c93f'},body:JSON.stringify({sessionId:'f4c93f',location:'DashboardControls:compactEffect:157',message:'compactTabs effect run',data:{count:_h1Count,compactTabs,elapsed:Date.now()-_h1First,outerW:outer?.clientWidth,scrollW:scroll?.scrollWidth,scrollCW:scroll?.clientWidth,measureW:measure?.offsetWidth},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+		}
+		// #endregion
+
+		const check = () => {
+			if (!compactTabs && scroll && scroll.scrollWidth > scroll.clientWidth + 1) {
+				compactTabs = true;
+			} else if (compactTabs && measure && measure.offsetWidth <= outer.clientWidth - 6) {
 				compactTabs = false;
 			}
 		};
 
-		const tryCompact = () => {
-			if (compactTabs || !scroll) return;
-			if (scroll.scrollWidth > scroll.clientWidth + 1) {
-				compactTabs = true;
-			}
-		};
-
-		const ro = new ResizeObserver(() => {
-			tryCompact();
-			tryExpandToInline();
-		});
+		const ro = new ResizeObserver(check);
 
 		ro.observe(outer);
 		if (scroll) ro.observe(scroll);
 		if (measure) ro.observe(measure);
 
-		tryCompact();
-		tryExpandToInline();
+		untrack(check);
 
 		return () => ro.disconnect();
 	});
 
 	// Re-check overflow when tab set / labels change (ResizeObserver may not fire for text-only reflow).
+	// #region agent log
+	let _h2Count = 0;
+	// #endregion
 	$effect(() => {
 		dashboard.tabOrder;
 		dashboard.activeTabId;
 		renamingTabId;
+		// #region agent log
+		_h2Count++;
+		if (_h2Count <= 5 || _h2Count % 100 === 0) {
+			fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f4c93f'},body:JSON.stringify({sessionId:'f4c93f',location:'DashboardControls:tabReflow:194',message:'tabReflow effect run',data:{count:_h2Count,compactTabs,tabCount:dashboard.tabOrder?.length},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+		}
+		// #endregion
 		queueMicrotask(() => {
 			const scroll = tabScrollEl;
 			const outer = tabStripOuterEl;
@@ -337,7 +347,11 @@
 			proFormaUnleveredCf: { colSpan: 12, rowSpan: 3 },
 			proFormaLeveredCf: { colSpan: 12, rowSpan: 3 },
 			proFormaUnleveredReturns: { colSpan: 12, rowSpan: 2 },
-			proFormaLeveredReturns: { colSpan: 12, rowSpan: 2 }
+			proFormaLeveredReturns: { colSpan: 12, rowSpan: 2 },
+			econBaseMultiplier: { colSpan: 8, rowSpan: 4 },
+			industryTrendScorecard: { colSpan: 12, rowSpan: 6 },
+			lfprDashboard: { colSpan: 12, rowSpan: 5 },
+			mapbox3d: { colSpan: 8, rowSpan: 5 }
 		};
 
 		const { colSpan, rowSpan } = defaultSizes[type];
@@ -565,6 +579,106 @@
 						leveredDiscountRate: 0.12
 					}
 				} as Widget;
+			case 'econBaseMultiplier':
+				return {
+					...baseWidget,
+					type: 'econBaseMultiplier',
+					data: {
+						regionLabel: 'Sample Region',
+						industries: [
+							{ name: 'Finance & Insurance', naicsCode: '52', localEmp: 14200, nationalEmp: 6800000 },
+							{ name: 'Professional Services', naicsCode: '54', localEmp: 22100, nationalEmp: 9200000 },
+							{ name: 'Health Care', naicsCode: '62', localEmp: 31400, nationalEmp: 16800000 },
+							{ name: 'Retail Trade', naicsCode: '44-45', localEmp: 18700, nationalEmp: 15400000 },
+							{ name: 'Accommodation & Food', naicsCode: '72', localEmp: 21500, nationalEmp: 13200000 },
+							{ name: 'Construction', naicsCode: '23', localEmp: 9800, nationalEmp: 7400000 },
+							{ name: 'Manufacturing', naicsCode: '31-33', localEmp: 7200, nationalEmp: 12700000 },
+							{ name: 'Information', naicsCode: '51', localEmp: 4100, nationalEmp: 3100000 }
+						]
+					}
+				} as Widget;
+			case 'industryTrendScorecard':
+				return {
+					...baseWidget,
+					type: 'industryTrendScorecard',
+					data: {
+						quarters: ['Q1 2024', 'Q2 2024', 'Q3 2024'],
+						industries: [
+							{ name: 'Professional Services', naicsCode: '54', color: '#22d3ee', lqTrend: 'rising', data: [{ empYoy: 3.8, lqValue: 1.52, wageYoy: 3.5, estabYoy: 2.8 }, { empYoy: 4.1, lqValue: 1.55, wageYoy: 3.7, estabYoy: 3.0 }, { empYoy: 4.4, lqValue: 1.58, wageYoy: 3.9, estabYoy: 3.1 }] },
+							{ name: 'Finance & Insurance', naicsCode: '52', color: '#3b82f6', lqTrend: 'rising', data: [{ empYoy: 2.2, lqValue: 1.30, wageYoy: 4.8, estabYoy: 1.5 }, { empYoy: 2.8, lqValue: 1.33, wageYoy: 5.0, estabYoy: 1.6 }, { empYoy: 3.2, lqValue: 1.37, wageYoy: 5.2, estabYoy: 1.8 }] },
+							{ name: 'Construction', naicsCode: '23', color: '#ef4444', lqTrend: 'stable', data: [{ empYoy: 4.0, lqValue: 1.22, wageYoy: 5.0, estabYoy: 2.2 }, { empYoy: 3.8, lqValue: 1.23, wageYoy: 5.2, estabYoy: 2.4 }, { empYoy: 3.5, lqValue: 1.25, wageYoy: 5.4, estabYoy: 2.6 }] },
+							{ name: 'Health Care', naicsCode: '62', color: '#a855f7', lqTrend: 'stable', data: [{ empYoy: 2.0, lqValue: 1.18, wageYoy: 5.7, estabYoy: 0.9 }, { empYoy: 2.3, lqValue: 1.20, wageYoy: 5.9, estabYoy: 1.0 }, { empYoy: 2.5, lqValue: 1.23, wageYoy: 6.1, estabYoy: 1.1 }] },
+							{ name: 'Information', naicsCode: '51', color: '#10b981', lqTrend: 'stable', data: [{ empYoy: 1.2, lqValue: 0.95, wageYoy: 7.5, estabYoy: 0.0 }, { empYoy: 1.3, lqValue: 0.93, wageYoy: 7.8, estabYoy: 0.1 }, { empYoy: 1.4, lqValue: 0.87, wageYoy: 8.1, estabYoy: 0.2 }] },
+							{ name: 'Accommodation & Food', naicsCode: '72', color: '#eab308', lqTrend: 'stable', data: [{ empYoy: 1.5, lqValue: 1.05, wageYoy: 3.5, estabYoy: -0.5 }, { empYoy: 1.0, lqValue: 1.06, wageYoy: 3.7, estabYoy: -0.7 }, { empYoy: 0.6, lqValue: 1.07, wageYoy: 3.9, estabYoy: -0.9 }] },
+							{ name: 'Manufacturing', naicsCode: '31-33', color: '#1d4ed8', lqTrend: 'stable', data: [{ empYoy: -1.0, lqValue: 0.40, wageYoy: 1.0, estabYoy: -0.8 }, { empYoy: -1.3, lqValue: 0.38, wageYoy: 1.2, estabYoy: -1.0 }, { empYoy: -1.6, lqValue: 0.37, wageYoy: 1.4, estabYoy: -1.2 }] },
+							{ name: 'Retail Trade', naicsCode: '44-45', color: '#f97316', lqTrend: 'stable', data: [{ empYoy: -0.8, lqValue: 0.82, wageYoy: 1.4, estabYoy: -1.7 }, { empYoy: -1.1, lqValue: 0.81, wageYoy: 1.6, estabYoy: -1.9 }, { empYoy: -1.4, lqValue: 0.80, wageYoy: 1.8, estabYoy: -2.1 }] }
+						],
+						weights: { emp: 35, lq: 30, wage: 20, estab: 15 }
+					}
+				} as Widget;
+			case 'lfprDashboard':
+				return {
+					...baseWidget,
+					type: 'lfprDashboard',
+					data: {
+						title: 'Labor Force Participation Rate (LFPR)',
+						adultPopulation: 268.1,
+						adultPopYoy: 0.6,
+						laborForce: 168.1,
+						laborForceYoy: 0.5,
+						lfpr: 62.7,
+						lfprDirection: 'down',
+						trendData: [
+							{ year: '2020', rate: 60.2 },
+							{ year: '2021', rate: 61.7 },
+							{ year: '2022', rate: 62.4 },
+							{ year: '2023', rate: 63.1 },
+							{ year: '2024', rate: 62.7 }
+						],
+						growthDrivers: [
+							{ label: 'Prime-Age Workers (25-54)', impact: 'high', description: 'Participating at 84.1%, the strongest driver of labor force growth' },
+							{ label: 'Immigration', impact: 'moderate', description: 'New entrants consistently joining the workforce' }
+						],
+						dragDrivers: [
+							{ label: 'Retirements (Aging Population)', impact: 'high', description: 'Baby Boomer generation leaving the workforce at accelerating rates' },
+							{ label: 'Long-Term Sickness / Disability', impact: 'moderate', description: 'Structural barrier keeping a consistent segment out of the workforce' }
+						]
+					}
+				} as Widget;
+			case 'mapbox3d':
+				return {
+					...baseWidget,
+					type: 'mapbox3d',
+					data: {
+						accessToken: PUBLIC_MAPBOX_ACCESS_TOKEN ?? '',
+						center: [-0.126326, 51.533582],
+						zoom: 15.27,
+						pitch: 42,
+						bearing: -50,
+						minZoom: 15,
+						maxZoom: 16,
+						style: 'mapbox://styles/mapbox/standard',
+						lightPreset: 'dusk',
+						clipPolygon: [
+							[
+								[-0.12573, 51.53222],
+								[-0.12458, 51.53219],
+								[-0.12358, 51.53492],
+								[-0.12701, 51.53391],
+								[-0.12573, 51.53222]
+							]
+						],
+						model: {
+							uri: 'https://docs.mapbox.com/mapbox-gl-js/assets/tower.glb',
+							coordinates: [-0.12501974, 51.5332374],
+							rotation: [0.0, 0.0, 35.0],
+							scale: [0.8, 0.8, 1.2],
+							opacity: 1,
+							emissiveStrength: 0.8,
+							castShadows: true
+						}
+					}
+				} as Widget;
 			default:
 				return null;
 		}
@@ -572,6 +686,9 @@
 
 	function handleAddWidget(type: WidgetType) {
 		const widget = createDefaultWidget(type);
+		// #region agent log
+		if (type === 'mapbox3d') { fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0cb43b'},body:JSON.stringify({sessionId:'0cb43b',location:'DashboardControls.svelte:handleAddWidget',message:'Creating mapbox3d widget',data:{envToken:typeof PUBLIC_MAPBOX_ACCESS_TOKEN === 'string' ? PUBLIC_MAPBOX_ACCESS_TOKEN.substring(0,12) : String(PUBLIC_MAPBOX_ACCESS_TOKEN),widgetDataToken:widget?.data ? ((widget.data as any).accessToken ?? 'MISSING').toString().substring(0,12) : 'NO_WIDGET'},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{}); }
+		// #endregion
 		if (widget) {
 			const success = dashboard.addWidget(widget);
 			if (success) {
@@ -608,13 +725,16 @@
 		{ type: 'proFormaUnleveredCf', label: 'Pro Forma Unlevered CF', icon: '💵' },
 		{ type: 'proFormaLeveredCf', label: 'Pro Forma Levered CF', icon: '🏦' },
 		{ type: 'proFormaUnleveredReturns', label: 'Pro Forma Unlevered Returns', icon: '📈' },
-		{ type: 'proFormaLeveredReturns', label: 'Pro Forma Levered Returns', icon: '📊' }
+		{ type: 'proFormaLeveredReturns', label: 'Pro Forma Levered Returns', icon: '📊' },
+		{ type: 'econBaseMultiplier', label: 'Econ Base Multiplier', icon: '📊' },
+		{ type: 'industryTrendScorecard', label: 'Industry Trend Scorecard', icon: '📈' },
+		{ type: 'lfprDashboard', label: 'LFPR Dashboard', icon: '👥' },
+		{ type: 'mapbox3d', label: 'Mapbox 3D Model', icon: '🗺' }
 	];
 </script>
 
 <UnifiedTopBar
 	pageTitle="Dashboard"
-	dashboardLayoutId={dashboard.cloudLayoutId}
 	{onProjectChange}
 >
 	{#snippet tabs()}
@@ -943,48 +1063,6 @@
 
 		<button
 			type="button"
-			onclick={handleSave}
-			disabled={!dashboard.hasUnsavedChanges}
-			class="rounded-md p-1.5 transition-colors {darkMode
-				? 'text-slate-400 hover:text-white hover:bg-slate-700'
-				: 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'} disabled:opacity-30 disabled:pointer-events-none"
-			title="Save dashboard to this browser (Ctrl+S or Cmd+S)"
-			aria-label="Save dashboard to browser storage"
-		>
-			<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
-			</svg>
-		</button>
-
-		<button
-			type="button"
-			onclick={handleReloadFromCloud}
-			disabled={dashboard.cloudSyncStatus === 'unavailable' || isReloadingFromCloud || isPushingToCloud}
-			class="rounded-md p-1.5 transition-colors {darkMode
-				? 'text-slate-400 hover:text-white hover:bg-slate-700'
-				: 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'} disabled:opacity-30 disabled:pointer-events-none"
-			title={dashboard.cloudSyncStatus === 'unavailable'
-				? 'Reload from cloud unavailable (no project or connection)'
-				: isReloadingFromCloud
-					? 'Reloading from cloud…'
-					: 'Clear local dashboard cache and reload the latest layout from the cloud'}
-			aria-label="Reload dashboard from cloud"
-		>
-			{#if isReloadingFromCloud}
-				<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
-					<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-				</svg>
-			{:else}
-				<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M12 8l0 8m0 0l-3-3m3 3l3-3"/>
-					<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 16.5A5.002 5.002 0 008 7.5a7 7 0 0113.5 2.5 4.5 4.5 0 01-2 8.5H6.5"/>
-				</svg>
-			{/if}
-		</button>
-
-		<button
-			type="button"
 			onclick={handlePushToCloud}
 			disabled={dashboard.cloudSyncStatus === 'unavailable' || isPushingToCloud || isReloadingFromCloud}
 			class="relative rounded-md p-1.5 transition-colors {darkMode
@@ -995,11 +1073,11 @@
 				: isPushingToCloud
 					? 'Saving to cloud…'
 					: dashboard.cloudSyncStatus === 'synced'
-						? 'Push current dashboard to the cloud now (edits also sync automatically for other viewers)'
+						? 'Push current dashboard to the cloud now'
 						: dashboard.cloudSyncStatus === 'error'
 							? 'Last cloud save failed — click to retry'
 							: 'Push current dashboard to the cloud'}
-			aria-label="Push dashboard to cloud"
+			aria-label="Export dashboard layout to cloud"
 		>
 			{#if isPushingToCloud}
 				<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -1008,8 +1086,7 @@
 				</svg>
 			{:else}
 				<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M12 16l0-8m0 0l-3 3m3-3l3 3"/>
-					<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 16.5A5.002 5.002 0 008 7.5a7 7 0 0113.5 2.5 4.5 4.5 0 01-2 8.5H6.5"/>
+					<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
 				</svg>
 			{/if}
 			{#if dashboard.cloudSyncStatus === 'synced' && !isPushingToCloud}
@@ -1021,30 +1098,28 @@
 
 		<button
 			type="button"
-			onclick={handleExport}
+			onclick={handleReloadFromCloud}
+			disabled={dashboard.cloudSyncStatus === 'unavailable' || isReloadingFromCloud || isPushingToCloud}
 			class="rounded-md p-1.5 transition-colors {darkMode
 				? 'text-slate-400 hover:text-white hover:bg-slate-700'
-				: 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}"
-			title="Export dashboard layout as JSON"
-			aria-label="Export dashboard layout as JSON"
+				: 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'} disabled:opacity-30 disabled:pointer-events-none"
+			title={dashboard.cloudSyncStatus === 'unavailable'
+				? 'Import from cloud unavailable (no project or connection)'
+				: isReloadingFromCloud
+					? 'Importing from cloud…'
+					: 'Clear local cache and import the latest layout from the cloud'}
+			aria-label="Import dashboard layout from cloud"
 		>
-			<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-			</svg>
-		</button>
-
-		<button
-			type="button"
-			onclick={() => (showImportDialog = true)}
-			class="rounded-md p-1.5 transition-colors {darkMode
-				? 'text-slate-400 hover:text-white hover:bg-slate-700'
-				: 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}"
-			title="Import dashboard layout from JSON"
-			aria-label="Import dashboard layout from JSON"
-		>
-			<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L9 8m4-4v12"/>
-			</svg>
+			{#if isReloadingFromCloud}
+				<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+					<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+				</svg>
+			{:else}
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L9 8m4-4v12"/>
+				</svg>
+			{/if}
 		</button>
 
 		<button

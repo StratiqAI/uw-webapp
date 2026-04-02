@@ -42,7 +42,11 @@ const WIDGET_NAMES: Record<WidgetType, string> = {
 	proFormaUnleveredCf: 'Pro Forma Unlevered CF',
 	proFormaLeveredCf: 'Pro Forma Levered CF',
 	proFormaUnleveredReturns: 'Pro Forma Unlevered Returns',
-	proFormaLeveredReturns: 'Pro Forma Levered Returns'
+	proFormaLeveredReturns: 'Pro Forma Levered Returns',
+	econBaseMultiplier: 'Economic Base Multiplier',
+	industryTrendScorecard: 'Industry Trend Scorecard',
+	lfprDashboard: 'LFPR Dashboard',
+	mapbox3d: 'Mapbox 3D Model'
 };
 
 export const WIDGET_TYPES: WidgetType[] = [

@@ -1,0 +1,19 @@
+{
+	"compilerOptions": {
+		"target": "ESNext",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"strict": true,
+		"declaration": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"isolatedModules": true,
+		"outDir": "dist",
+		"paths": {
+			"@stratiqai/dashboard-widget-sdk": ["../../node_modules/@stratiqai/dashboard-widget-sdk/dist"]
+		}
+	},
+	"include": ["src/lib"]
+}

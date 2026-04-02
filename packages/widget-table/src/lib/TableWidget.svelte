@@ -14,14 +14,21 @@
 	const host = getDashboardWidgetHost();
 	const topic = $derived(host.getWidgetTopic('table', widgetId, topicOverride));
 	const dataStream = useReactiveValidatedTopic<TableWidgetData>(() => topic);
-	let widgetData = $derived<TableWidgetData>(dataStream.current || data);
+	const EMPTY_ROWS: Record<string, unknown>[] = [];
+	let widgetData = $derived<TableWidgetData>({
+		rows: EMPTY_ROWS,
+		sortable: false,
+		paginated: false,
+		pageSize: 10,
+		searchable: false,
+		...(dataStream.current || data)
+	});
 
 	let sortColumn = $state<string | null>(null);
 	let sortDirection = $state<'asc' | 'desc'>('asc');
 	let currentPage = $state(1);
 	let searchQuery = $state('');
 
-	// Priority: columns > headers > auto-detect from rows
 	let resolvedColumns = $derived.by((): ColumnDef[] => {
 		if (widgetData.columns && widgetData.columns.length > 0) {
 			return widgetData.columns;
@@ -29,8 +36,9 @@
 		if (widgetData.headers && widgetData.headers.length > 0) {
 			return widgetData.headers.map((h) => ({ key: h }));
 		}
+		const rows = widgetData.rows ?? EMPTY_ROWS;
 		const keySet = new Set<string>();
-		for (const row of widgetData.rows) {
+		for (const row of rows) {
 			for (const key of Object.keys(row)) {
 				keySet.add(key);
 			}

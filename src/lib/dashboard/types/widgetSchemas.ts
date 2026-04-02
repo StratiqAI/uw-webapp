@@ -15,6 +15,14 @@ import type { BrokerCardWidgetData } from '@stratiqai/widget-broker-card';
 import { brokerCardWidgetDataSchema as BrokerCardWidgetDataSchema } from '@stratiqai/widget-broker-card';
 import type { LqAnalysisConfig } from '@stratiqai/widget-lq-analysis';
 import { lqAnalysisConfigSchema as LqAnalysisConfigSchema } from '@stratiqai/widget-lq-analysis';
+import type { EconBaseMultiplierConfig } from '@stratiqai/widget-econ-base-multiplier';
+import { econBaseMultiplierConfigSchema as EconBaseMultiplierConfigSchema } from '@stratiqai/widget-econ-base-multiplier';
+import type { IndustryTrendScorecardConfig } from '@stratiqai/widget-industry-trend-scorecard';
+import { industryTrendScorecardConfigSchema as IndustryTrendScorecardConfigSchema } from '@stratiqai/widget-industry-trend-scorecard';
+import type { LfprDashboardConfig } from '@stratiqai/widget-lfpr-dashboard';
+import { lfprDashboardConfigSchema as LfprDashboardConfigSchema } from '@stratiqai/widget-lfpr-dashboard';
+import type { Mapbox3dConfig } from '@stratiqai/widget-mapbox-3d';
+import { mapbox3dConfigSchema as Mapbox3dConfigSchema } from '@stratiqai/widget-mapbox-3d';
 
 export type { MetricWidgetData, JsonViewerWidgetData, BrokerCardWidgetData };
 
@@ -172,7 +180,11 @@ export const WidgetDataSchemas = {
 	locationQuotient: LocationQuotientWidgetDataSchema,
 	jsonViewer: JsonViewerWidgetDataSchema,
 	brokerCard: BrokerCardWidgetDataSchema,
-	lqAnalysis: LqAnalysisConfigSchema
+	lqAnalysis: LqAnalysisConfigSchema,
+	econBaseMultiplier: EconBaseMultiplierConfigSchema,
+	industryTrendScorecard: IndustryTrendScorecardConfigSchema,
+	lfprDashboard: LfprDashboardConfigSchema,
+	mapbox3d: Mapbox3dConfigSchema
 } as const;
 
 // ===== Inferred Types from Schemas =====
@@ -193,6 +205,10 @@ export type MapWidgetData = z.infer<typeof MapWidgetDataSchema>;
 export type SchemaWidgetData = z.infer<typeof SchemaWidgetDataSchema>;
 export type LocationQuotientWidgetData = z.infer<typeof LocationQuotientWidgetDataSchema>;
 export type LqAnalysisWidgetData = z.infer<typeof LqAnalysisConfigSchema>;
+export type EconBaseMultiplierWidgetData = z.infer<typeof EconBaseMultiplierConfigSchema>;
+export type IndustryTrendScorecardWidgetData = z.infer<typeof IndustryTrendScorecardConfigSchema>;
+export type LfprDashboardWidgetData = z.infer<typeof LfprDashboardConfigSchema>;
+export type Mapbox3dWidgetData = z.infer<typeof Mapbox3dConfigSchema>;
 
 // Union type of all widget data
 export type WidgetData =
@@ -214,7 +230,11 @@ export type WidgetData =
 	| LocationQuotientWidgetData
 	| JsonViewerWidgetData
 	| BrokerCardWidgetData
-	| LqAnalysisWidgetData;
+	| LqAnalysisWidgetData
+	| EconBaseMultiplierWidgetData
+	| IndustryTrendScorecardWidgetData
+	| LfprDashboardWidgetData
+	| Mapbox3dWidgetData;
 
 // ===== Type-safe Widget Data Mapping =====
 
@@ -238,6 +258,10 @@ export interface WidgetDataTypeMap {
 	jsonViewer: JsonViewerWidgetData;
 	brokerCard: BrokerCardWidgetData;
 	lqAnalysis: LqAnalysisConfig;
+	econBaseMultiplier: EconBaseMultiplierConfig;
+	industryTrendScorecard: IndustryTrendScorecardConfig;
+	lfprDashboard: LfprDashboardConfig;
+	mapbox3d: Mapbox3dConfig;
 }
 
 // ===== Widget Channel Configuration =====
@@ -666,6 +690,34 @@ export const WidgetChannels = {
 		widgetType: 'lqAnalysis',
 		schema: LqAnalysisConfigSchema,
 		description: description || `LQ analysis channel: ${channelId}`
+	}),
+
+	econBaseMultiplier: (channelId: string, description?: string): WidgetChannelConfig<'econBaseMultiplier'> => ({
+		channelId,
+		widgetType: 'econBaseMultiplier',
+		schema: EconBaseMultiplierConfigSchema,
+		description: description || `Economic base multiplier channel: ${channelId}`
+	}),
+
+	industryTrendScorecard: (channelId: string, description?: string): WidgetChannelConfig<'industryTrendScorecard'> => ({
+		channelId,
+		widgetType: 'industryTrendScorecard',
+		schema: IndustryTrendScorecardConfigSchema,
+		description: description || `Industry trend scorecard channel: ${channelId}`
+	}),
+
+	lfprDashboard: (channelId: string, description?: string): WidgetChannelConfig<'lfprDashboard'> => ({
+		channelId,
+		widgetType: 'lfprDashboard',
+		schema: LfprDashboardConfigSchema,
+		description: description || `LFPR dashboard channel: ${channelId}`
+	}),
+
+	mapbox3d: (channelId: string, description?: string): WidgetChannelConfig<'mapbox3d'> => ({
+		channelId,
+		widgetType: 'mapbox3d',
+		schema: Mapbox3dConfigSchema,
+		description: description || `Mapbox 3D channel: ${channelId}`
 	})
 } as const;
 

@@ -18,6 +18,10 @@
 	import { proFormaUnleveredReturnsWidget } from '@stratiqai/widget-pro-forma-unlevered-returns';
 	import { proFormaLeveredReturnsWidget } from '@stratiqai/widget-pro-forma-levered-returns';
 	import { tableWidget } from '@stratiqai/widget-table';
+	import { econBaseMultiplierWidget } from '@stratiqai/widget-econ-base-multiplier';
+	import { industryTrendScorecardWidget } from '@stratiqai/widget-industry-trend-scorecard';
+	import { lfprDashboardWidget } from '@stratiqai/widget-lfpr-dashboard';
+	import { mapbox3dWidget } from '@stratiqai/widget-mapbox-3d';
 	import { browser } from '$app/environment';
 	import { initTopicStoreSync } from '$lib/stores/topicStoreSync';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
@@ -39,6 +43,10 @@
 	registerWidget(proFormaUnleveredReturnsWidget);
 	registerWidget(proFormaLeveredReturnsWidget);
 	registerWidget(tableWidget);
+	registerWidget(econBaseMultiplierWidget);
+	registerWidget(industryTrendScorecardWidget);
+	registerWidget(lfprDashboardWidget);
+	registerWidget(mapbox3dWidget);
 
 	let { children, data } = $props<{ children: any; data: LayoutData }>();
 
@@ -55,6 +63,16 @@
 	// This runs BEFORE child onMount callbacks (e.g. dashboard page), so the
 	// sync layer's restored data is already in the store when the dashboard loads.
 	if (browser) {
+		// #region agent log
+		const _dbgEndpoint = 'http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f';
+		const _dbgHeaders = {'Content-Type':'application/json','X-Debug-Session-Id':'f4c93f'};
+		const _dbgLog = (loc: string, msg: string, d: any, hyp: string) => fetch(_dbgEndpoint,{method:'POST',headers:_dbgHeaders,body:JSON.stringify({sessionId:'f4c93f',location:loc,message:msg,data:d,timestamp:Date.now(),hypothesisId:hyp})}).catch(()=>{});
+		let _errCount = 0;
+		window.addEventListener('error', (ev) => { _errCount++; if (_errCount <= 3 || _errCount % 500 === 0) _dbgLog('window:error',ev.message,{filename:ev.filename,lineno:ev.lineno,colno:ev.colno,error:String(ev.error),errCount:_errCount},'L'); });
+		window.addEventListener('unhandledrejection', (ev) => { _dbgLog('window:unhandledrejection','Unhandled rejection',{reason:String(ev.reason)},'L'); });
+		_dbgLog('+layout.svelte:browser:init','Layout browser init START',{url:window.location.href},'K');
+		// #endregion
+
 		try {
 			initializeWidgetSchemas();
 		} catch (error) {
@@ -85,6 +103,9 @@
 
 		// Initialize globalProjectStore synchronously so selectedProjectId is
 		// available before any child onMount (e.g. dashboard page) fires.
+		// #region agent log
+		fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f4c93f'},body:JSON.stringify({sessionId:'f4c93f',location:'+layout.svelte:88',message:'Layout init - data.projects',data:{hasProjects:!!data.projects,projectCount:data.projects?.length??0,projectIds:data.projects?.map((p: any)=>p.id)??[]},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
+		// #endregion
 		if (data.projects) {
 			globalProjectStore.initialize(data.projects);
 		}
@@ -92,6 +113,9 @@
 
 	$effect(() => {
 		if (browser && data.projects) {
+			// #region agent log
+			fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f4c93f'},body:JSON.stringify({sessionId:'f4c93f',location:'+layout.svelte:$effect',message:'$effect setProjects fired',data:{projectCount:data.projects?.length??0},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+			// #endregion
 			globalProjectStore.setProjects(data.projects);
 		}
 	});

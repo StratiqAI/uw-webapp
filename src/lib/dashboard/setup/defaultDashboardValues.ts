@@ -13,6 +13,11 @@ import { metricWidget } from '@stratiqai/widget-metric';
 import { jsonViewerWidget } from '@stratiqai/widget-json-viewer';
 import { brokerCardWidget } from '@stratiqai/widget-broker-card';
 import { lqAnalysisWidget } from '@stratiqai/widget-lq-analysis';
+import { econBaseMultiplierWidget } from '@stratiqai/widget-econ-base-multiplier';
+import { industryTrendScorecardWidget } from '@stratiqai/widget-industry-trend-scorecard';
+import { lfprDashboardWidget } from '@stratiqai/widget-lfpr-dashboard';
+import { mapbox3dWidget } from '@stratiqai/widget-mapbox-3d';
+import { PUBLIC_MAPBOX_ACCESS_TOKEN } from '$env/static/public';
 
 /**
  * Default data for each widget type. Values conform to the Zod schemas
@@ -126,7 +131,11 @@ export const DEFAULT_WIDGET_DATA: Record<WidgetType, Record<string, unknown>> = 
 		localBandLow: 0.92,
 		localBandHigh: 1.08
 	},
-	lqAnalysis: { ...(lqAnalysisWidget.defaultData as Record<string, unknown>) }
+	lqAnalysis: { ...(lqAnalysisWidget.defaultData as Record<string, unknown>) },
+	econBaseMultiplier: { ...(econBaseMultiplierWidget.defaultData as Record<string, unknown>) },
+	industryTrendScorecard: { ...(industryTrendScorecardWidget.defaultData as Record<string, unknown>) },
+	lfprDashboard: { ...(lfprDashboardWidget.defaultData as Record<string, unknown>) },
+	mapbox3d: { ...(mapbox3dWidget.defaultData as Record<string, unknown>), accessToken: typeof PUBLIC_MAPBOX_ACCESS_TOKEN === 'string' ? PUBLIC_MAPBOX_ACCESS_TOKEN : '' }
 };
 
 /**
@@ -152,7 +161,11 @@ export const DEFAULT_WIDGET_SIZES: Record<WidgetType, { colSpan: number; rowSpan
 	divergingBarChart: { colSpan: 6, rowSpan: 3 },
 	schema: { colSpan: 6, rowSpan: 3 },
 	locationQuotient: { colSpan: 12, rowSpan: 4 },
-	lqAnalysis: { ...lqAnalysisWidget.defaultSize }
+	lqAnalysis: { ...lqAnalysisWidget.defaultSize },
+	econBaseMultiplier: { ...econBaseMultiplierWidget.defaultSize },
+	industryTrendScorecard: { ...industryTrendScorecardWidget.defaultSize },
+	lfprDashboard: { ...lfprDashboardWidget.defaultSize },
+	mapbox3d: { ...mapbox3dWidget.defaultSize }
 };
 
 /**

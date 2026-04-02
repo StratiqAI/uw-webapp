@@ -11,6 +11,10 @@ import type { ProFormaUnleveredCfConfig } from '@stratiqai/widget-pro-forma-unle
 import type { ProFormaLeveredCfConfig } from '@stratiqai/widget-pro-forma-levered-cf';
 import type { ProFormaUnleveredReturnsConfig } from '@stratiqai/widget-pro-forma-unlevered-returns';
 import type { ProFormaLeveredReturnsConfig } from '@stratiqai/widget-pro-forma-levered-returns';
+import type { EconBaseMultiplierConfig } from '@stratiqai/widget-econ-base-multiplier';
+import type { IndustryTrendScorecardConfig } from '@stratiqai/widget-industry-trend-scorecard';
+import type { LfprDashboardConfig } from '@stratiqai/widget-lfpr-dashboard';
+import type { Mapbox3dConfig } from '@stratiqai/widget-mapbox-3d';
 export type WidgetType =
 	| 'table'
 	| 'title'
@@ -37,7 +41,11 @@ export type WidgetType =
 	| 'proFormaUnleveredCf'
 	| 'proFormaLeveredCf'
 	| 'proFormaUnleveredReturns'
-	| 'proFormaLeveredReturns';
+	| 'proFormaLeveredReturns'
+	| 'econBaseMultiplier'
+	| 'industryTrendScorecard'
+	| 'lfprDashboard'
+	| 'mapbox3d';
 
 export interface Position {
 	gridColumn: number;
@@ -325,6 +333,26 @@ export interface ProFormaLeveredReturnsWidgetDef extends BaseWidget {
 	data: ProFormaLeveredReturnsConfig;
 }
 
+export interface EconBaseMultiplierWidgetDef extends BaseWidget {
+	type: 'econBaseMultiplier';
+	data: EconBaseMultiplierConfig;
+}
+
+export interface IndustryTrendScorecardWidgetDef extends BaseWidget {
+	type: 'industryTrendScorecard';
+	data: IndustryTrendScorecardConfig;
+}
+
+export interface LfprDashboardWidgetDef extends BaseWidget {
+	type: 'lfprDashboard';
+	data: LfprDashboardConfig;
+}
+
+export interface Mapbox3dWidgetDef extends BaseWidget {
+	type: 'mapbox3d';
+	data: Mapbox3dConfig;
+}
+
 export type Widget =
 	| TableWidget
 	| TitleWidget
@@ -351,7 +379,11 @@ export type Widget =
 	| ProFormaUnleveredCfWidgetDef
 	| ProFormaLeveredCfWidgetDef
 	| ProFormaUnleveredReturnsWidgetDef
-	| ProFormaLeveredReturnsWidgetDef;
+	| ProFormaLeveredReturnsWidgetDef
+	| EconBaseMultiplierWidgetDef
+	| IndustryTrendScorecardWidgetDef
+	| LfprDashboardWidgetDef
+	| Mapbox3dWidgetDef;
 
 export interface DashboardConfig {
 	gridColumns: number;
