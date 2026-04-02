@@ -14,7 +14,6 @@
 	import WidgetDropdown from './WidgetDropdown.svelte';
 	import TitleWidget from '$lib/dashboard/components/widgets/TitleWidget.svelte';
 	import ParagraphWidget from '$lib/dashboard/components/widgets/ParagraphWidget.svelte';
-	import TableWidget from '$lib/dashboard/components/widgets/TableWidget.svelte';
 	import ImageWidget from '$lib/dashboard/components/widgets/ImageWidget.svelte';
 	import LineChartWidget from '$lib/dashboard/components/widgets/LineChartWidget.svelte';
 	import BarChartWidget from '$lib/dashboard/components/widgets/BarChartWidget.svelte';
@@ -439,8 +438,6 @@
 					onAIGenerationReady={handleAIGenerationReady}
 					onFlipControlReady={handleFlipControlReady}
 				/>
-			{:else if widget.type === 'table'}
-				<TableWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
 			{:else if widget.type === 'image'}
 				<ImageWidget data={widget.data} widgetId={widget.id} topicOverride={widget.topicOverride} {darkMode} />
 			{:else if widget.type === 'lineChart'}

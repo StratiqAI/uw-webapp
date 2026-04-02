@@ -1,0 +1,21 @@
+{
+  "$schema": "../../docs/WIDGET_MANIFEST_SCHEMA.json",
+  "kind": "table",
+  "schemaVersion": "v1",
+  "displayName": "Table",
+  "npmName": "@stratiqai/widget-table",
+  "capabilities": [],
+  "input": {
+    "schemaId": "widget:table-v1",
+    "topicPattern": "widgets/table/+"
+  },
+  "output": null,
+  "palette": {
+    "icon": "📋",
+    "category": "data"
+  },
+  "defaultSize": {
+    "colSpan": 6,
+    "rowSpan": 3
+  }
+}

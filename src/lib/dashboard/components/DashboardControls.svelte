@@ -315,7 +315,7 @@
 			title: { colSpan: 12, rowSpan: 1 },
 			metric: { colSpan: 2, rowSpan: 1 },
 			paragraph: { colSpan: 6, rowSpan: 2 },
-			table: { colSpan: 6, rowSpan: 4 },
+			table: { colSpan: 6, rowSpan: 3 },
 			image: { colSpan: 6, rowSpan: 4 },
 			map: { colSpan: 8, rowSpan: 4 },
 			lineChart: { colSpan: 6, rowSpan: 3 },
@@ -375,7 +375,7 @@
 			case 'paragraph':
 				return { ...baseWidget, type: 'paragraph', data: { title: 'New Paragraph', content: 'Enter your content here...', markdown: false } } as Widget;
 			case 'table':
-				return { ...baseWidget, type: 'table', data: { title: 'New Table', headers: ['Column 1', 'Column 2'], rows: [{ 'Column 1': 'Row 1', 'Column 2': 'Data' }, { 'Column 1': 'Row 2', 'Column 2': 'Data' }], sortable: true, paginated: false } } as Widget;
+				return { ...baseWidget, type: 'table', data: { rows: [], sortable: true, paginated: true, pageSize: 10, searchable: true } } as Widget;
 			case 'image':
 				return { ...baseWidget, type: 'image', data: { title: 'New Image', src: 'https://via.placeholder.com/800x600', alt: 'Placeholder image', objectFit: 'cover' } } as Widget;
 			case 'map':

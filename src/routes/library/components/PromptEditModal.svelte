@@ -9,6 +9,7 @@
 	import SchemaNodesEditor from './SchemaNodesEditor.svelte';
 	import JsonSchemaPickerModal from '$lib/components/schemas/JsonSchemaPickerModal.svelte';
 	import { Q_GET_JSON_SCHEMA } from '$lib/graphql/jsonSchemaOperations';
+	import { M_GENERATE_PROMPT_DRAFT } from '$lib/graphql/promptOperations';
 	import type { IGraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
 	import { getTemplateStrForEditor, parseTemplateToAIQueryData, type AIQueryData } from '../PromptService';
 
@@ -109,6 +110,16 @@
 
 	// UI state
 	let showAdvanced = $state(false);
+
+	// AI Generate state
+	let aiGenerateDescription = $state('');
+	let aiGenerating = $state(false);
+	let aiGenerateError = $state('');
+
+	// Paste JSON Schema state
+	let showPasteJson = $state(false);
+	let pasteJsonText = $state('');
+	let pasteJsonError = $state('');
 
 	// Extract input variables from prompt text: {{name}} and {name} (single-brace for e.g. {input})
 	function extractPromptVariables(text: string): { name: string; syntax: string }[] {
@@ -555,6 +566,10 @@
 			: (schemaDefRaw as Record<string, unknown>);
 		jsonSchemaText = typeof schemaDefRaw === 'string' ? schemaDefRaw : JSON.stringify(schema, null, 2);
 
+		// #region agent log
+		fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'02ed34'},body:JSON.stringify({sessionId:'02ed34',location:'PromptEditModal.svelte:applySchemaDefinitionToForm',message:'parsed schema inside apply',data:{rawType:typeof schemaDefRaw,parsedType:typeof schema,hasProperties:!!(schema&&typeof schema==='object'&&schema.properties),parsedKeys:schema&&typeof schema==='object'?Object.keys(schema):null,parsedPreview:JSON.stringify(schema)?.substring(0,600)},timestamp:Date.now(),hypothesisId:'H1,H3'})}).catch(()=>{});
+		// #endregion
+
 		responseFormatType = 'json_schema';
 		if (schema && typeof schema === 'object' && schema.properties) {
 			const props = schema.properties as Record<string, Record<string, unknown>>;
@@ -593,6 +608,72 @@
 		currentJsonSchemaId = schema.id;
 		applySchemaDefinitionToForm(schema.schemaDefinition);
 		showSchemaPicker = false;
+	}
+
+	async function handleAiGenerate() {
+		if (!queryClient || !aiGenerateDescription.trim() || aiGenerating) return;
+		aiGenerating = true;
+		aiGenerateError = '';
+		try {
+			const result = await queryClient.query<{
+				generatePromptDraft: {
+					prompt: string;
+					systemInstruction: string | null;
+					jsonSchema: string | null;
+					suggestedName: string | null;
+				} | null;
+			}>(M_GENERATE_PROMPT_DRAFT, { input: { description: aiGenerateDescription.trim() } });
+
+			const draft = result?.generatePromptDraft;
+			if (!draft) {
+				aiGenerateError = 'No result returned from AI';
+				return;
+			}
+
+			// #region agent log
+			fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'02ed34'},body:JSON.stringify({sessionId:'02ed34',location:'PromptEditModal.svelte:handleAiGenerate',message:'draft received from mutation',data:{hasJsonSchema:draft.jsonSchema!=null,jsonSchemaType:typeof draft.jsonSchema,jsonSchemaValue:typeof draft.jsonSchema==='string'?draft.jsonSchema.substring(0,500):JSON.stringify(draft.jsonSchema)?.substring(0,500),suggestedName:draft.suggestedName,promptLength:draft.prompt?.length},timestamp:Date.now(),hypothesisId:'H1,H2,H5'})}).catch(()=>{});
+			// #endregion
+
+			if (draft.suggestedName) templateName = draft.suggestedName;
+			aiQueryPrompt = draft.prompt;
+			if (draft.systemInstruction) aiQuerySystemPrompt = draft.systemInstruction;
+
+			if (draft.jsonSchema) {
+				applySchemaDefinitionToForm(draft.jsonSchema);
+			}
+
+			// #region agent log
+			fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'02ed34'},body:JSON.stringify({sessionId:'02ed34',location:'PromptEditModal.svelte:handleAiGenerate:afterApply',message:'state after applySchemaDefinitionToForm',data:{responseFormatType,schemaPropertiesKeys:Object.keys(schemaProperties),schemaRequired,fieldOrderLength:fieldOrder.length,jsonSchemaTextLength:jsonSchemaText.length},timestamp:Date.now(),hypothesisId:'H3,H4'})}).catch(()=>{});
+			// #endregion
+
+			aiGenerateDescription = '';
+		} catch (e) {
+			console.error('AI generate failed:', e);
+			aiGenerateError = e instanceof Error ? e.message : 'Generation failed';
+		} finally {
+			aiGenerating = false;
+		}
+	}
+
+	function handlePasteJsonApply() {
+		pasteJsonError = '';
+		const text = pasteJsonText.trim();
+		if (!text) {
+			pasteJsonError = 'Please paste a JSON schema';
+			return;
+		}
+		try {
+			const parsed = JSON.parse(text);
+			if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+				pasteJsonError = 'Must be a JSON object';
+				return;
+			}
+			applySchemaDefinitionToForm(parsed);
+			pasteJsonText = '';
+			showPasteJson = false;
+		} catch {
+			pasteJsonError = 'Invalid JSON — check syntax and try again';
+		}
 	}
 
 	async function handleSave() {
@@ -777,6 +858,50 @@
 		<!-- ═══ Scrollable Body ═══ -->
 		<div class="flex-1 overflow-y-auto px-6 py-5 space-y-6">
 
+			<!-- ── Section: AI Generate (new prompts only) ── -->
+			{#if isCreating && queryClient}
+				<div class="rounded-xl border {darkMode ? 'border-violet-500/20 bg-violet-500/5' : 'border-violet-200/80 bg-violet-50/40'} overflow-hidden">
+					<div class="px-4 pt-3 pb-1 flex items-center gap-2">
+						<svg class="w-3.5 h-3.5 {darkMode ? 'text-violet-400' : 'text-violet-500'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+						</svg>
+						<span class="text-[11px] font-semibold uppercase tracking-wider {darkMode ? 'text-violet-400' : 'text-violet-500'}">
+							Generate with AI
+						</span>
+					</div>
+					<div class="px-4 pb-4 pt-1 space-y-2">
+						<textarea
+							bind:value={aiGenerateDescription}
+							placeholder="Describe what you want to extract, e.g. 'Get property address, square footage, lease terms, and tenant info from offering memorandums'"
+							class="w-full px-3 py-2 text-sm rounded-lg border resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500 {darkMode ? 'bg-slate-800/80 text-white border-slate-600/80 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-200 placeholder-slate-400'}"
+							rows="2"
+							disabled={aiGenerating}
+						></textarea>
+						<div class="flex items-center gap-2">
+							<button
+								type="button"
+								onclick={handleAiGenerate}
+								disabled={aiGenerating || !aiGenerateDescription.trim()}
+								class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed
+									{darkMode ? 'bg-violet-600 hover:bg-violet-500 text-white' : 'bg-violet-600 hover:bg-violet-700 text-white'}"
+							>
+								{#if aiGenerating}
+									<span class="inline-flex items-center gap-1.5">
+										<svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+										Generating...
+									</span>
+								{:else}
+									Generate
+								{/if}
+							</button>
+							{#if aiGenerateError}
+								<span class="text-xs {darkMode ? 'text-red-400' : 'text-red-500'}">{aiGenerateError}</span>
+							{/if}
+						</div>
+					</div>
+				</div>
+			{/if}
+
 			<!-- ── Section: Identity ── -->
 			<div class="space-y-3">
 				<div class="grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-3">
@@ -844,13 +969,39 @@
 							<button type="button" onclick={() => addSchemaField(false)}
 								class="px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors {darkMode ? 'bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200/60'}"
 							>+ Field</button>
+							<button type="button" onclick={() => { showPasteJson = !showPasteJson; pasteJsonError = ''; }}
+								class="px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors {darkMode ? 'bg-slate-500/10 text-slate-400 hover:bg-slate-500/20 border border-slate-500/20' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200/60'}"
+							>{showPasteJson ? 'Cancel Paste' : 'Paste JSON'}</button>
 						</div>
 					{/if}
 				</div>
 
-				{#if responseFormatType === 'json_schema'}
-					<div class="space-y-2">
-						{#each orderedFieldEntries as [fieldName, fieldSchema] (fieldName)}
+			{#if responseFormatType === 'json_schema'}
+				{#if showPasteJson}
+					<div class="rounded-xl border {darkMode ? 'border-slate-600/60 bg-slate-800/40' : 'border-slate-200 bg-slate-50'} p-3 space-y-2">
+						<textarea
+							bind:value={pasteJsonText}
+							placeholder={'Paste a JSON Schema here, e.g.\n{\n  "type": "object",\n  "properties": {\n    "address": { "type": "string", "description": "Property address" }\n  },\n  "required": ["address"],\n  "additionalProperties": false\n}'}
+							class="w-full px-3 py-2 text-xs font-mono rounded-lg border resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 {darkMode ? 'bg-slate-900/60 text-slate-300 border-slate-700/60 placeholder-slate-600' : 'bg-white text-slate-800 border-slate-200 placeholder-slate-400'}"
+							rows="6"
+						></textarea>
+						<div class="flex items-center gap-2">
+							<button
+								type="button"
+								onclick={handlePasteJsonApply}
+								disabled={!pasteJsonText.trim()}
+								class="px-3 py-1 text-[11px] font-semibold rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed
+									{darkMode ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}"
+							>Apply Schema</button>
+							{#if pasteJsonError}
+								<span class="text-[11px] {darkMode ? 'text-red-400' : 'text-red-500'}">{pasteJsonError}</span>
+							{/if}
+						</div>
+					</div>
+				{/if}
+
+				<div class="space-y-2">
+					{#each orderedFieldEntries as [fieldName, fieldSchema] (fieldName)}
 							<div class="rounded-xl border {darkMode ? 'border-slate-700/50 bg-slate-800/30' : 'border-slate-200/80 bg-white'} overflow-hidden">
 								<div class="px-3.5 py-2.5">
 									<!-- Field header row -->

@@ -85,10 +85,20 @@ export interface TableWidget extends BaseWidget {
 	type: 'table';
 	data: {
 		title?: string;
-		headers: string[];
+		description?: string;
+		headers?: string[];
+		columns?: Array<{
+			key: string;
+			label?: string;
+			type?: 'text' | 'number' | 'currency' | 'percent';
+			align?: 'left' | 'center' | 'right';
+			width?: string;
+		}>;
 		rows: Array<Record<string, any>>;
 		sortable?: boolean;
 		paginated?: boolean;
+		pageSize?: number;
+		searchable?: boolean;
 	};
 }
 

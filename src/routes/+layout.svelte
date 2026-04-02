@@ -17,6 +17,7 @@
 	import { proFormaLeveredCfWidget } from '@stratiqai/widget-pro-forma-levered-cf';
 	import { proFormaUnleveredReturnsWidget } from '@stratiqai/widget-pro-forma-unlevered-returns';
 	import { proFormaLeveredReturnsWidget } from '@stratiqai/widget-pro-forma-levered-returns';
+	import { tableWidget } from '@stratiqai/widget-table';
 	import { browser } from '$app/environment';
 	import { initTopicStoreSync } from '$lib/stores/topicStoreSync';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
@@ -37,6 +38,7 @@
 	registerWidget(proFormaLeveredCfWidget);
 	registerWidget(proFormaUnleveredReturnsWidget);
 	registerWidget(proFormaLeveredReturnsWidget);
+	registerWidget(tableWidget);
 
 	let { children, data } = $props<{ children: any; data: LayoutData }>();
 

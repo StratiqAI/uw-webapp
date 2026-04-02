@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Prompt } from '@stratiqai/types-simple';
+	import ResultRenderer from './ResultRenderer.svelte';
 
 	interface VisionQueryResult {
 		answer: string;
@@ -70,28 +71,32 @@
 		execution != null && (execution.loading || execution.error != null || execution.result != null)
 	);
 
-	type ResultDisplay = { mode: 'json'; body: string } | { mode: 'text'; body: string };
+	type ResultDisplay =
+		| { mode: 'structured'; data: unknown; copyText: string }
+		| { mode: 'text'; body: string };
 
 	const resultDisplay = $derived.by((): ResultDisplay | null => {
 		if (!execution?.result) return null;
 		const { answer, structuredOutput } = execution.result;
 		if (structuredOutput !== undefined && structuredOutput !== null && typeof structuredOutput === 'object') {
-			return { mode: 'json', body: JSON.stringify(structuredOutput, null, 2) };
+			return { mode: 'structured', data: structuredOutput, copyText: JSON.stringify(structuredOutput, null, 2) };
 		}
 		const raw = (answer ?? '').trim();
 		if (!raw) return { mode: 'text', body: '' };
 		try {
 			const parsed = JSON.parse(raw);
-			return { mode: 'json', body: JSON.stringify(parsed, null, 2) };
+			return { mode: 'structured', data: parsed, copyText: JSON.stringify(parsed, null, 2) };
 		} catch {
 			return { mode: 'text', body: answer };
 		}
 	});
 
+	$inspect("resultDisplay", resultDisplay);
 	async function copyResult() {
 		if (!resultDisplay) return;
+		const text = resultDisplay.mode === 'structured' ? resultDisplay.copyText : resultDisplay.body;
 		try {
-			await navigator.clipboard.writeText(resultDisplay.body);
+			await navigator.clipboard.writeText(text);
 			copyFeedback = true;
 			setTimeout(() => copyFeedback = false, 1500);
 		} catch {}
@@ -286,11 +291,13 @@
 									{execution.result.matchCount} image{execution.result.matchCount !== 1 ? 's' : ''}
 								</p>
 							</div>
-							{#if resultDisplay.mode === 'json'}
-								<pre class="max-h-80 overflow-auto text-xs leading-relaxed font-mono p-2.5 rounded border {darkMode ? 'bg-slate-950 text-slate-200 border-slate-700' : 'bg-slate-50 text-slate-800 border-slate-200'}">{resultDisplay.body}</pre>
-							{:else}
-								<p class="whitespace-pre-wrap text-sm {darkMode ? 'text-slate-200' : 'text-slate-800'}">{resultDisplay.body}</p>
-							{/if}
+						{#if resultDisplay.mode === 'structured'}
+							<div class="max-h-80 overflow-auto">
+								<ResultRenderer value={resultDisplay.data} {darkMode} />
+							</div>
+						{:else}
+							<p class="whitespace-pre-wrap text-sm {darkMode ? 'text-slate-200' : 'text-slate-800'}">{resultDisplay.body}</p>
+						{/if}
 							<!-- Result actions -->
 							<div class="mt-3 flex flex-wrap items-center gap-2">
 								<button

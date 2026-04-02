@@ -100,3 +100,14 @@ export const S_ON_DELETE_PROMPT = gql`
 	}
 	${PROMPT_FIELDS}
 `;
+
+export const M_GENERATE_PROMPT_DRAFT = gql`
+	mutation GeneratePromptDraft($input: GeneratePromptDraftInput!) {
+		generatePromptDraft(input: $input) {
+			prompt
+			systemInstruction
+			jsonSchema
+			suggestedName
+		}
+	}
+`;

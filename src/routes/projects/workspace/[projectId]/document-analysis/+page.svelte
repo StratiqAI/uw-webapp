@@ -399,11 +399,21 @@
 				cleanupExecution(pid);
 				entry.statusMessage = null;
 				let structuredOutput: unknown = undefined;
+				// #region agent log
+				fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'281c62'},body:JSON.stringify({sessionId:'281c62',location:'+page.svelte:exec.SUCCESS',message:'rawOutput received from API',data:{rawOutputType:typeof exec.rawOutput,rawOutputSlice:typeof exec.rawOutput==='string'?exec.rawOutput.slice(0,500):String(exec.rawOutput).slice(0,500),rawOutputLength:exec.rawOutput?.length,startsWithBrace:typeof exec.rawOutput==='string'&&exec.rawOutput.trimStart().startsWith('{'),firstChar:typeof exec.rawOutput==='string'?exec.rawOutput.trimStart().charAt(0):'N/A'},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+				// #endregion
 				if (exec.rawOutput) {
 					try {
 						const parsed = JSON.parse(exec.rawOutput);
+						// #region agent log
+						fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'281c62'},body:JSON.stringify({sessionId:'281c62',location:'+page.svelte:JSON.parse.success',message:'rawOutput parsed as JSON successfully',data:{parsedType:typeof parsed,isObject:typeof parsed==='object'&&parsed!==null,parsedKeys:typeof parsed==='object'&&parsed!==null?Object.keys(parsed):null},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+						// #endregion
 						structuredOutput = typeof parsed === 'object' && parsed !== null ? parsed : undefined;
-					} catch { /* plain text */ }
+					} catch (parseErr) {
+						// #region agent log
+						fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'281c62'},body:JSON.stringify({sessionId:'281c62',location:'+page.svelte:JSON.parse.failed',message:'rawOutput failed JSON.parse - THIS IS THE BUG PATH',data:{error:String(parseErr),rawOutputSlice:typeof exec.rawOutput==='string'?exec.rawOutput.slice(0,500):'N/A'},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+						// #endregion
+					}
 				}
 				entry.result = {
 					answer: exec.rawOutput ?? '',
