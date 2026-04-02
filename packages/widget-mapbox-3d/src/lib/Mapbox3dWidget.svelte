@@ -38,19 +38,10 @@
 	let mapError = $state<string | null>(null);
 
 	onMount(async () => {
-		// #region agent log
-		fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0cb43b'},body:JSON.stringify({sessionId:'0cb43b',location:'Mapbox3dWidget.svelte:onMount',message:'Widget mount token debug',data:{dataKeys:Object.keys(data),dataAccessToken:typeof data.accessToken === 'string' ? data.accessToken.substring(0,12) : String(data.accessToken),cfgAccessToken:typeof cfg.accessToken === 'string' ? cfg.accessToken.substring(0,12) : String(cfg.accessToken),hasToken,demoToken:DEMO_MAPBOX_3D_CONFIG.accessToken.substring(0,12),topicDataCurrent:topicData.current ? 'has-value' : 'null'},timestamp:Date.now(),hypothesisId:'A,B,C,D,E'})}).catch(()=>{});
-		// #endregion
-		// #region agent log
-		fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0cb43b'},body:JSON.stringify({sessionId:'0cb43b',location:'Mapbox3dWidget.svelte:guard',message:'Pre-guard check',data:{hasToken,hasContainer:!!containerEl,containerW:containerEl?.offsetWidth??-1,containerH:containerEl?.offsetHeight??-1},timestamp:Date.now(),runId:'post-fix',hypothesisId:'F,H'})}).catch(()=>{});
-		// #endregion
 		if (!hasToken || !containerEl) return;
 
 		try {
 			const mapboxgl = (await import('mapbox-gl')).default;
-			// #region agent log
-			fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0cb43b'},body:JSON.stringify({sessionId:'0cb43b',location:'Mapbox3dWidget.svelte:import',message:'mapbox-gl imported',data:{hasDefault:!!mapboxgl,type:typeof mapboxgl},timestamp:Date.now(),runId:'post-fix',hypothesisId:'G'})}).catch(()=>{});
-			// #endregion
 			(mapboxgl as any).accessToken = cfg.accessToken;
 
 			const map = new mapboxgl.Map({
@@ -65,16 +56,9 @@
 				attributionControl: false
 			});
 
-			// #region agent log
-			fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0cb43b'},body:JSON.stringify({sessionId:'0cb43b',location:'Mapbox3dWidget.svelte:mapCreated',message:'Map instance created',data:{mapExists:!!map},timestamp:Date.now(),runId:'post-fix',hypothesisId:'G,I'})}).catch(()=>{});
-			// #endregion
-
 			map.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
 			map.on('style.load', () => {
-				// #region agent log
-				fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0cb43b'},body:JSON.stringify({sessionId:'0cb43b',location:'Mapbox3dWidget.svelte:styleLoad',message:'style.load fired',data:{containerW:containerEl?.offsetWidth??-1,containerH:containerEl?.offsetHeight??-1},timestamp:Date.now(),runId:'post-fix',hypothesisId:'H,I'})}).catch(()=>{});
-				// #endregion
 				if (cfg.lightPreset) {
 					map.setConfigProperty('basemap', 'lightPreset', cfg.lightPreset);
 				}
@@ -152,9 +136,6 @@
 
 			mapInstance = map;
 		} catch (err: any) {
-			// #region agent log
-			fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0cb43b'},body:JSON.stringify({sessionId:'0cb43b',location:'Mapbox3dWidget.svelte:catch',message:'Map init error',data:{error:err?.message??String(err)},timestamp:Date.now(),runId:'post-fix',hypothesisId:'G,I'})}).catch(()=>{});
-			// #endregion
 			mapError = err.message ?? 'Failed to load Mapbox GL';
 			console.error('Mapbox init error:', err);
 		}

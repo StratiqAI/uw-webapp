@@ -8,10 +8,8 @@
 	import { dashboardWidgets } from './config';
 	import { publishWidgetData } from '$lib/dashboard/setup/widgetDataPublishers';
 
-	import { dev } from '$app/environment';
 	import { onMount, setContext } from 'svelte';
 	import { themeStore } from '$lib/stores/themeStore.svelte';
-	import type { Project } from '@stratiqai/types-simple';
 	import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
 	import { createSupabaseBrowserClient } from '$lib/supabase/browser';
 	import { logSupabaseRpcSmokeTest } from '$lib/supabase/supabaseRpcSmokeTest';
@@ -35,20 +33,6 @@
 
 	let { data }: Props = $props();
 	let isLoading = $state(true);
-	// #region agent log
-	const _pageScriptT0 = Date.now();
-	const _runId = 'run_' + Math.random().toString(36).slice(2,8);
-	const _ep = 'http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f';
-	const _hd = {'Content-Type':'application/json','X-Debug-Session-Id':'f4c93f'};
-	const _dl = (loc: string, msg: string, d: any, hyp: string) => fetch(_ep,{method:'POST',headers:_hd,body:JSON.stringify({sessionId:'f4c93f',runId:_runId,location:loc,message:msg,data:d,timestamp:Date.now(),hypothesisId:hyp})}).catch(()=>{});
-	_dl('+page.svelte:script:top','Page script TOP-LEVEL start',{hasData:!!data,hasIdToken:!!data?.idToken,projectCount:data?.projects?.length??0,url:typeof window!=='undefined'?window.location.href:'SSR'},'K');
-	// #endregion
-
-	// #region agent log
-	$effect(() => {
-		_dl('+page.svelte:isLoading:$effect','isLoading changed',{isLoading},'J,K');
-	});
-	// #endregion
 
 	// Use unified theme store
 	let darkMode = $derived.by(() => themeStore.darkMode);
@@ -65,24 +49,12 @@
 	});
 	
 	// Update context when theme changes
-	// #region agent log
-	let _h3Count = 0;
-	// #endregion
 	$effect(() => {
-		// #region agent log
-		_h3Count++;
-		if (_h3Count <= 5 || _h3Count % 100 === 0) {
-			fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f4c93f'},body:JSON.stringify({sessionId:'f4c93f',location:'+page.svelte:setContext:68',message:'setContext effect run',data:{count:_h3Count,darkMode,currentTheme},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
-		}
-		// #endregion
 		setContext('darkMode', darkMode);
 		setContext('currentTheme', currentTheme);
 	});
 
 	async function handleProjectChange(projectId: string | null) {
-		// #region agent log
-		_dl('+page.svelte:handleProjectChange','handleProjectChange called',{projectId,currentSelectedProjectId:selectedProjectId},'K');
-		// #endregion
 		isLoading = true;
 		try {
 			// Save current dashboard before switching
@@ -134,9 +106,6 @@
 	}
 
 	onMount(() => {
-		// #region agent log
-		_dl('+page.svelte:onMount:start','onMount START',{scriptToMountGap:Date.now()-_pageScriptT0,isLoading},'K');
-		// #endregion
 		console.log('🚀 Dashboard onMount started');
 		let unsubReset: (() => void) | undefined;
 
@@ -172,10 +141,6 @@
 		}
 
 	async function initDashboard() {
-		// #region agent log
-		const _t0 = Date.now();
-		_dl('+page.svelte:initDashboard:start','initDashboard START',{hasIdToken:!!data.idToken,projectsCount:data.projects?.length??0,selectedProjectId},'K,M');
-		// #endregion
 		try {
 			updateGridSize();
 
@@ -193,33 +158,19 @@
 			// Set up cloud sync manager if we have a project and auth token
 			if (projectId && data.idToken) {
 				try {
-					// #region agent log
-					const _tSync0 = Date.now();
-					_dl('+page.svelte:syncManager:start','SyncManager init START',{projectId},'M');
-					// #endregion
 					const syncManager = DashboardSyncManager.createInactive();
 					await withTimeout(
 						syncManager.initialize({ idToken: data.idToken, projectId }),
 						SYNC_INIT_TIMEOUT_MS,
 						'SyncManager init'
 					);
-					// #region agent log
-					_dl('+page.svelte:syncManager:done','SyncManager init DONE',{projectId,elapsed:Date.now()-_tSync0},'M');
-					// #endregion
 					dashboard.setSyncManager(syncManager);
 				} catch (e) {
-					// #region agent log
-					_dl('+page.svelte:syncManager:error','SyncManager init FAILED',{error:String(e)},'M');
-					// #endregion
 					console.warn('Cloud sync unavailable for dashboard:', e);
 					dashboard.setSyncManager(null);
 				}
 			}
 
-			// #region agent log
-			const _tDashInit0 = Date.now();
-			_dl('+page.svelte:dashboard.init:start','dashboard.initialize START',{projectId,dashInitialized:dashboard.isInitialized},'M');
-			// #endregion
 			const hasLoadedDashboard = await dashboard.initialize(projectId);
 
 				if (!hasLoadedDashboard) {
@@ -247,19 +198,10 @@
 
 				dashboard.ensureGridCapacity();
 				updateGridSize();
-				// #region agent log
-				_dl('+page.svelte:initDashboard:complete','initDashboard COMPLETE',{totalElapsed:Date.now()-_t0,dashInitElapsed:Date.now()-_tDashInit0,widgetCount:dashboard.widgets?.length??0},'K,M');
-				// #endregion
 				console.log('✅ Dashboard initialization complete');
 			} catch (error) {
-				// #region agent log
-				_dl('+page.svelte:initDashboard:error','initDashboard ERROR',{error:String(error),totalElapsed:Date.now()-_t0},'K,M');
-				// #endregion
 				console.error('Error initializing dashboard:', error);
 			} finally {
-				// #region agent log
-				_dl('+page.svelte:initDashboard:finally','finally block - setting isLoading=false',{wasLoading:isLoading},'K');
-				// #endregion
 				isLoading = false;
 			}
 		}
@@ -311,7 +253,7 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div class="flex h-screen w-full overflow-hidden {darkMode ? 'bg-gradient-to-br from-slate-900 via-primary-950/20 to-slate-900' : 'bg-primary-100/30'}">
+<div class="flex h-screen w-full overflow-hidden {darkMode ? 'bg-linear-to-br from-slate-900 via-primary-950/20 to-slate-900' : 'bg-primary-100/30'}">
 	<!-- Main Content Area -->
 	<div class="flex-1 flex flex-col overflow-hidden {darkMode ? 'bg-slate-900/80' : 'bg-primary-50/40'}">
 		<DashboardControls
@@ -356,7 +298,7 @@
 	</div> -->
 
 		<!-- Dashboard Canvas -->
-		<div class="flex-1 relative {darkMode ? 'bg-gradient-to-b from-slate-900/90 via-slate-900/80 to-primary-950/20' : 'bg-primary-50/30'} overflow-auto">
+		<div class="flex-1 relative {darkMode ? 'bg-linear-to-b from-slate-900/90 via-slate-900/80 to-primary-950/20' : 'bg-primary-50/30'} overflow-auto">
 			<div class="p-6">
 				{#if isLoading}
 					<div class="flex h-64 items-center justify-center">

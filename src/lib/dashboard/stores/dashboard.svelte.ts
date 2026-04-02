@@ -230,13 +230,7 @@ class DashboardStore {
 				return false;
 			}
 			
-			// #region agent log
-			const _lsT0 = Date.now();
-			// #endregion
 			const savedState = DashboardStorage.loadDashboard(projectId);
-			// #region agent log
-			fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f4c93f'},body:JSON.stringify({sessionId:'f4c93f',location:'dashboard.svelte.ts:init:localStorage',message:'localStorage load',data:{hasSavedState:!!savedState,elapsed:Date.now()-_lsT0,tabCount:savedState?.tabOrder?.length??0,widgetCount:savedState?.tabs?.[savedState?.activeTabId??'']?.widgets?.length??0},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
-			// #endregion
 			if (savedState) {
 				this.#loadFromSavedState(savedState);
 				this.#emit('dashboard:loaded', undefined);
@@ -247,22 +241,12 @@ class DashboardStore {
 
 			if (projectId && this.#syncManager) {
 				try {
-					// #region agent log
-					const _crT0 = Date.now();
-					fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f4c93f'},body:JSON.stringify({sessionId:'f4c93f',location:'dashboard.svelte.ts:init:cloudReconcile:start',message:'Cloud reconciliation START',data:{projectId},timestamp:_crT0,hypothesisId:'C'})}).catch(()=>{});
-					// #endregion
 					await withTimeout(
 						this.#reconcileWithCloud(projectId, savedState),
 						CLOUD_OPERATION_TIMEOUT_MS,
 						'Cloud reconciliation'
 					);
-					// #region agent log
-					fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f4c93f'},body:JSON.stringify({sessionId:'f4c93f',location:'dashboard.svelte.ts:init:cloudReconcile:done',message:'Cloud reconciliation DONE',data:{elapsed:Date.now()-_crT0},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
-					// #endregion
 				} catch (err) {
-					// #region agent log
-					fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f4c93f'},body:JSON.stringify({sessionId:'f4c93f',location:'dashboard.svelte.ts:init:cloudReconcile:error',message:'Cloud reconciliation FAILED',data:{error:String(err)},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
-					// #endregion
 					console.error('[Dashboard] Cloud reconciliation failed:', err);
 				}
 			}

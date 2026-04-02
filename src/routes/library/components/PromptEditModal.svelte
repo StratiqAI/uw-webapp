@@ -566,10 +566,6 @@
 			: (schemaDefRaw as Record<string, unknown>);
 		jsonSchemaText = typeof schemaDefRaw === 'string' ? schemaDefRaw : JSON.stringify(schema, null, 2);
 
-		// #region agent log
-		fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'02ed34'},body:JSON.stringify({sessionId:'02ed34',location:'PromptEditModal.svelte:applySchemaDefinitionToForm',message:'parsed schema inside apply',data:{rawType:typeof schemaDefRaw,parsedType:typeof schema,hasProperties:!!(schema&&typeof schema==='object'&&schema.properties),parsedKeys:schema&&typeof schema==='object'?Object.keys(schema):null,parsedPreview:JSON.stringify(schema)?.substring(0,600)},timestamp:Date.now(),hypothesisId:'H1,H3'})}).catch(()=>{});
-		// #endregion
-
 		responseFormatType = 'json_schema';
 		if (schema && typeof schema === 'object' && schema.properties) {
 			const props = schema.properties as Record<string, Record<string, unknown>>;
@@ -630,10 +626,6 @@
 				return;
 			}
 
-			// #region agent log
-			fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'02ed34'},body:JSON.stringify({sessionId:'02ed34',location:'PromptEditModal.svelte:handleAiGenerate',message:'draft received from mutation',data:{hasJsonSchema:draft.jsonSchema!=null,jsonSchemaType:typeof draft.jsonSchema,jsonSchemaValue:typeof draft.jsonSchema==='string'?draft.jsonSchema.substring(0,500):JSON.stringify(draft.jsonSchema)?.substring(0,500),suggestedName:draft.suggestedName,promptLength:draft.prompt?.length},timestamp:Date.now(),hypothesisId:'H1,H2,H5'})}).catch(()=>{});
-			// #endregion
-
 			if (draft.suggestedName) templateName = draft.suggestedName;
 			aiQueryPrompt = draft.prompt;
 			if (draft.systemInstruction) aiQuerySystemPrompt = draft.systemInstruction;
@@ -641,10 +633,6 @@
 			if (draft.jsonSchema) {
 				applySchemaDefinitionToForm(draft.jsonSchema);
 			}
-
-			// #region agent log
-			fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'02ed34'},body:JSON.stringify({sessionId:'02ed34',location:'PromptEditModal.svelte:handleAiGenerate:afterApply',message:'state after applySchemaDefinitionToForm',data:{responseFormatType,schemaPropertiesKeys:Object.keys(schemaProperties),schemaRequired,fieldOrderLength:fieldOrder.length,jsonSchemaTextLength:jsonSchemaText.length},timestamp:Date.now(),hypothesisId:'H3,H4'})}).catch(()=>{});
-			// #endregion
 
 			aiGenerateDescription = '';
 		} catch (e) {

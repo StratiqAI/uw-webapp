@@ -154,23 +154,11 @@
 		};
 	});
 
-	// #region agent log
-	let _h1Count = 0;
-	let _h1First = 0;
-	// #endregion
 	$effect(() => {
 		const outer = tabStripOuterEl;
 		const scroll = tabScrollEl;
 		const measure = tabMeasureEl;
 		if (!outer) return;
-
-		// #region agent log
-		_h1Count++;
-		if (!_h1First) _h1First = Date.now();
-		if (_h1Count <= 5 || _h1Count % 100 === 0) {
-			fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f4c93f'},body:JSON.stringify({sessionId:'f4c93f',location:'DashboardControls:compactEffect:157',message:'compactTabs effect run',data:{count:_h1Count,compactTabs,elapsed:Date.now()-_h1First,outerW:outer?.clientWidth,scrollW:scroll?.scrollWidth,scrollCW:scroll?.clientWidth,measureW:measure?.offsetWidth},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
-		}
-		// #endregion
 
 		const check = () => {
 			if (!compactTabs && scroll && scroll.scrollWidth > scroll.clientWidth + 1) {
@@ -192,19 +180,10 @@
 	});
 
 	// Re-check overflow when tab set / labels change (ResizeObserver may not fire for text-only reflow).
-	// #region agent log
-	let _h2Count = 0;
-	// #endregion
 	$effect(() => {
 		dashboard.tabOrder;
 		dashboard.activeTabId;
 		renamingTabId;
-		// #region agent log
-		_h2Count++;
-		if (_h2Count <= 5 || _h2Count % 100 === 0) {
-			fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f4c93f'},body:JSON.stringify({sessionId:'f4c93f',location:'DashboardControls:tabReflow:194',message:'tabReflow effect run',data:{count:_h2Count,compactTabs,tabCount:dashboard.tabOrder?.length},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
-		}
-		// #endregion
 		queueMicrotask(() => {
 			const scroll = tabScrollEl;
 			const outer = tabStripOuterEl;
@@ -686,9 +665,6 @@
 
 	function handleAddWidget(type: WidgetType) {
 		const widget = createDefaultWidget(type);
-		// #region agent log
-		if (type === 'mapbox3d') { fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0cb43b'},body:JSON.stringify({sessionId:'0cb43b',location:'DashboardControls.svelte:handleAddWidget',message:'Creating mapbox3d widget',data:{envToken:typeof PUBLIC_MAPBOX_ACCESS_TOKEN === 'string' ? PUBLIC_MAPBOX_ACCESS_TOKEN.substring(0,12) : String(PUBLIC_MAPBOX_ACCESS_TOKEN),widgetDataToken:widget?.data ? ((widget.data as any).accessToken ?? 'MISSING').toString().substring(0,12) : 'NO_WIDGET'},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{}); }
-		// #endregion
 		if (widget) {
 			const success = dashboard.addWidget(widget);
 			if (success) {

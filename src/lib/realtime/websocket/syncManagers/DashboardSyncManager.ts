@@ -78,14 +78,7 @@ export class DashboardSyncManager {
 						auth: { mode: 'cognito', idToken }
 					});
 
-				// #region agent log
-				const _wsT0 = Date.now();
-				fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f4c93f'},body:JSON.stringify({sessionId:'f4c93f',location:'DashboardSyncManager:wsReady:start',message:'WS ready() START',data:{hasExistingClient:!!existingClient,endpoint:PUBLIC_GRAPHQL_HTTP_ENDPOINT},timestamp:_wsT0,hypothesisId:'A'})}).catch(()=>{});
-				// #endregion
 				await this.subscriptionClient.ready();
-				// #region agent log
-				fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f4c93f'},body:JSON.stringify({sessionId:'f4c93f',location:'DashboardSyncManager:wsReady:done',message:'WS ready() DONE',data:{elapsed:Date.now()-_wsT0},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-				// #endregion
 				this._status = 'ready';
 			} catch (err: unknown) {
 				const msg = err instanceof Error ? err.message : 'Failed to initialize DashboardSyncManager';

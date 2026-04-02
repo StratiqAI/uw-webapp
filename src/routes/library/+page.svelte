@@ -36,7 +36,7 @@
 	// Sync managers
 	let promptSyncManager: PromptSyncManager | null = null;
 	let projectSyncManager: ProjectSyncManager | null = null;
-	let queryClient: GraphQLQueryClient | null = null;
+	let queryClient = $state<GraphQLQueryClient | null>(null);
 
 	// UI State
 	let selectedProjectId = $derived(globalProjectStore.selectedProjectId);
@@ -485,7 +485,7 @@
 
 							<div class="flex items-start gap-3 pr-6">
 								<div
-									class="w-10 h-10 flex-shrink-0 {darkMode
+									class="w-10 h-10 shrink-0 {darkMode
 										? 'bg-emerald-900'
 										: 'bg-emerald-100'} rounded-lg flex items-center justify-center"
 								>

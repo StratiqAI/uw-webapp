@@ -337,8 +337,6 @@
 		clearInterval(interval);
 		clearInterval(secondInterval);
 	});
-
-	export { onPrevPage, onNextPage };
 </script>
 
 <svelte:window onkeydown={handleKeyDown} onclick={handleClickOutside} />

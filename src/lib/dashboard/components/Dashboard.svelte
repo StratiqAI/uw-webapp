@@ -14,9 +14,6 @@
 	import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
 	import { createSupabaseBrowserClient } from '$lib/supabase/browser';
 
-	// #region agent log
-	fetch('http://127.0.0.1:7574/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f4c93f'},body:JSON.stringify({sessionId:'f4c93f',location:'Dashboard.svelte:script:top',message:'Dashboard component script START',data:{widgetCount:dashboard.widgets?.length??0,isInitialized:dashboard.isInitialized,widgetTypes:dashboard.widgets?.map((w: any)=>w.type)??[]},timestamp:Date.now(),hypothesisId:'J,K'})}).catch(()=>{});
-	// #endregion
 	const serviceMap = new Map<string, unknown>();
 	const sbClient = createSupabaseBrowserClient();
 	if (sbClient) serviceMap.set('supabase', sbClient);
