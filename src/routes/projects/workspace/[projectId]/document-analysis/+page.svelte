@@ -31,9 +31,9 @@
 	import type { Prompt } from '@stratiqai/types-simple';
 	import ProjectEntitiesDisplay from '$lib/components/ProjectEntities/ProjectEntitiesDisplay.svelte';
 	import PDFViewer from '$lib/components/PDFViewer/PDFViewer.svelte';
-	import DocumentAnalysisPromptsSidebar from './components/DocumentAnalysisPromptsSidebar.svelte';
+	import PromptsSidebar from './components/PromptsSidebar.svelte';
 	import PromptEditModal from '../../../../library/components/PromptEditModal.svelte';
-	import { updatePromptTemplate, createPromptTemplate, type AIQueryData } from '../../../../library/PromptService';
+	import { updatePromptTemplate, createPromptTemplate, deletePromptTemplate, type AIQueryData } from '../../../../library/PromptService';
 	import { GraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
 	import { M_SUBMIT_AI_QUERY, S_ON_UPDATE_AI_QUERY_EXECUTION_BY_EXECUTION_ID, Q_GET_AI_QUERY_EXECUTION } from '@stratiqai/types-simple';
@@ -61,18 +61,6 @@
 
 	// Upload section: collapsed by default when documents exist, expanded when empty
 	let uploadExpanded = $state(false);
-
-	// File metadata for S3 uploads
-	const fileMetadata = $derived.by(() => {
-		const hasOwnerId = !!currentUser?.sub;
-		const hasProjectId = !!projectId;
-		if (!hasOwnerId || !hasProjectId) return null;
-		return {
-			tenantId: project?.tenantId || currentUser.tenant || authStore.currentUser?.tenant || 'default',
-			ownerId: currentUser.sub,
-			parentId: projectId
-		};
-	});
 	
 	// Document entities sync manager instance
 	let documentEntitiesManager = $state<DocumentEntitiesSyncManager | null>(null);
@@ -131,6 +119,18 @@
 	const project = $derived.by(() => {
 		if (!projectId) return null;
 		return store.at<Project>(`projects/${projectId}`) ?? null;
+	});
+
+	// File metadata for S3 uploads (must be after `project` derivation)
+	const fileMetadata = $derived.by(() => {
+		const hasOwnerId = !!currentUser?.sub;
+		const hasProjectId = !!projectId;
+		if (!hasOwnerId || !hasProjectId) return null;
+		return {
+			tenantId: project?.tenantId || currentUser.tenant || authStore.currentUser?.tenant || 'default',
+			ownerId: currentUser.sub,
+			parentId: projectId
+		};
 	});
 
 	// Get doclinks from project (these link to documents)
@@ -235,8 +235,11 @@
 		};
 	});
 
-	// When user clicks a prompt in the sidebar: open the same edit dialog as the library
-	function handleSelectPrompt(prompt: Prompt) {
+	const selectedDocFilename = $derived(
+		documents.find(d => d.id === selectedDocId)?.filename ?? null
+	);
+
+	function handleEditPrompt(prompt: Prompt) {
 		editingPrompt = prompt;
 		isCreatingPrompt = false;
 	}
@@ -244,6 +247,20 @@
 	function handleCreatePrompt() {
 		editingPrompt = null;
 		isCreatingPrompt = true;
+	}
+
+	async function handleDeletePrompt(prompt: Prompt) {
+		if (!idToken) return;
+		const queryClient = new GraphQLQueryClient(idToken);
+		await deletePromptTemplate(queryClient, prompt.id);
+		promptsRefreshTrigger += 1;
+	}
+
+	function handleClearResult() {
+		visionQueryResult = null;
+		visionQueryError = null;
+		lastSelectedPrompt = null;
+		executionStatusMessage = null;
 	}
 
 	type AIQueryExecPayload = {
@@ -528,27 +545,6 @@
 		isCreatingPrompt = false;
 	}
 
-	type QueryResultDisplay = { mode: 'json'; body: string } | { mode: 'text'; body: string };
-
-	function formatQueryResultDisplay(answer: string, structured: unknown | undefined): QueryResultDisplay {
-		if (structured !== undefined && structured !== null && typeof structured === 'object') {
-			return { mode: 'json', body: JSON.stringify(structured, null, 2) };
-		}
-		const raw = (answer ?? '').trim();
-		if (!raw) return { mode: 'text', body: '' };
-		try {
-			const parsed = JSON.parse(raw);
-			return { mode: 'json', body: JSON.stringify(parsed, null, 2) };
-		} catch {
-			return { mode: 'text', body: answer };
-		}
-	}
-
-	const queryResultDisplay = $derived.by((): QueryResultDisplay | null => {
-		const r = visionQueryResult;
-		if (r == null) return null;
-		return formatQueryResultDisplay(r.answer, r.structuredOutput);
-	});
 </script>
 
 <div class="flex h-full w-full overflow-hidden">
@@ -616,80 +612,6 @@
 						</div>
 					</div>
 				{/if}
-			</div>
-		{/if}
-
-		<!-- Structured query result (CRE sidebar vision query) -->
-		{#if visionQueryLoading}
-			<div class="mb-8 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg border shadow-sm p-6">
-				<div class="flex items-center gap-3">
-					<svg class="animate-spin h-5 w-5 {darkMode ? 'text-indigo-400' : 'text-indigo-600'}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-					</svg>
-					<span class="{darkMode ? 'text-slate-300' : 'text-slate-600'}">{executionStatusMessage ?? 'Running structured query...'}</span>
-				</div>
-			</div>
-		{:else if visionQueryError}
-			<div class="mb-8 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg border shadow-sm p-6">
-				<div class="flex items-center justify-between gap-4">
-					<div class="flex items-center gap-2 {darkMode ? 'text-red-400' : 'text-red-600'}">
-						<svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-						</svg>
-						<span class="font-medium">Query failed</span>
-					</div>
-					<button
-						type="button"
-						onclick={() => { visionQueryError = null; }}
-						class="rounded border px-2 py-1 text-sm {darkMode ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-700 hover:bg-slate-100'}"
-					>Dismiss</button>
-				</div>
-				<p class="mt-2 text-sm {darkMode ? 'text-slate-400' : 'text-slate-600'}">{visionQueryError}</p>
-			</div>
-		{:else if visionQueryResult != null}
-			<div class="mb-8 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg border shadow-sm">
-				<div class="flex items-center justify-between gap-4 p-4 border-b {darkMode ? 'border-slate-700' : 'border-slate-200'}">
-					<h3 class="text-lg font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">
-						Query result
-						{#if lastSelectedPrompt}
-							<span class="text-sm font-normal {darkMode ? 'text-slate-400' : 'text-slate-500'}"> — {lastSelectedPrompt.name}</span>
-						{/if}
-					</h3>
-					<div class="flex items-center gap-2">
-						<button
-								type="button"
-								onclick={() => showSendToDashboard = true}
-								class="flex items-center gap-1.5 rounded border px-3 py-1.5 text-sm font-medium transition-colors
-									{darkMode ? 'border-indigo-600 bg-indigo-900/20 text-indigo-300 hover:bg-indigo-900/40' : 'border-indigo-400 bg-indigo-50 text-indigo-700 hover:bg-indigo-100'}"
-							>
-								<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-								</svg>
-								Send to Dashboard
-							</button>
-						<button
-							type="button"
-							onclick={() => { visionQueryResult = null; lastSelectedPrompt = null; }}
-							class="rounded border px-2 py-1 text-sm {darkMode ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-700 hover:bg-slate-100'}"
-						>Clear</button>
-					</div>
-				</div>
-				<div class="p-6 space-y-4">
-					{#if queryResultDisplay}
-						<div>
-							<p class="text-sm font-medium {darkMode ? 'text-slate-400' : 'text-slate-500'} mb-1">Result</p>
-							{#if queryResultDisplay.mode === 'json'}
-								<pre
-									class="max-h-[min(70vh,32rem)] overflow-auto text-xs leading-relaxed font-mono p-3 rounded border {darkMode ? 'bg-slate-950 text-slate-200 border-slate-700' : 'bg-slate-50 text-slate-800 border-slate-200'}"
-								>{queryResultDisplay.body}</pre>
-							{:else}
-								<p class="whitespace-pre-wrap text-sm {darkMode ? 'text-slate-200' : 'text-slate-800'}">{queryResultDisplay.body}</p>
-							{/if}
-						</div>
-					{/if}
-					<p class="text-xs {darkMode ? 'text-slate-500' : 'text-slate-500'}">Based on {visionQueryResult.matchCount} image(s)</p>
-				</div>
 			</div>
 		{/if}
 
@@ -768,16 +690,24 @@
 	</div>
 	</div>
 
-	<!-- Prompts sidebar (right) - same prompts as library -->
-	<DocumentAnalysisPromptsSidebar
+	<!-- Prompts sidebar (right) -->
+	<PromptsSidebar
 		{idToken}
 		{darkMode}
-		isLoading={visionQueryLoading}
+		queryLoading={visionQueryLoading}
+		queryError={visionQueryError}
+		queryResult={visionQueryResult}
+		{executionStatusMessage}
+		lastRunPrompt={lastSelectedPrompt}
 		canRunPrompt={!!selectedDocId}
-		refreshTrigger={promptsRefreshTrigger}
-		onSelectPrompt={handleSelectPrompt}
+		{selectedDocFilename}
 		onRunPrompt={runVisionQueryWithPrompt}
+		onEditPrompt={handleEditPrompt}
 		onCreatePrompt={handleCreatePrompt}
+		onDeletePrompt={handleDeletePrompt}
+		onClearResult={handleClearResult}
+		onSendToDashboard={() => showSendToDashboard = true}
+		refreshTrigger={promptsRefreshTrigger}
 	/>
 
 	<!-- Same edit dialog as Prompt library: open when editing or creating a prompt -->
