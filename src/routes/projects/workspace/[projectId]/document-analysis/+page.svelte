@@ -70,16 +70,41 @@
 	// Track which document IDs we've already fetched to prevent re-fetching
 	let lastFetchedDocIds = $state<string>('');
 
-	// Vision query (CRE structured output sidebar): state and result
+	// Per-prompt execution state: supports multiple concurrent AI queries
 	interface VisionQueryResult {
 		answer: string;
 		structuredOutput?: unknown;
 		matchCount: number;
 	}
-	let visionQueryResult = $state<VisionQueryResult | null>(null);
-	let visionQueryLoading = $state(false);
-	let visionQueryError = $state<string | null>(null);
-	let lastSelectedPrompt = $state<Prompt | null>(null);
+
+	interface PromptExecution {
+		loading: boolean;
+		error: string | null;
+		result: VisionQueryResult | null;
+		statusMessage: string | null;
+		_unsub: (() => void) | null;
+		_timeoutId: ReturnType<typeof setTimeout> | null;
+		_pollingId: ReturnType<typeof setInterval> | null;
+	}
+
+	let executions = $state<Map<string, PromptExecution>>(new Map());
+
+	function cleanupExecution(promptId: string) {
+		const entry = executions.get(promptId);
+		if (!entry) return;
+		if (entry._timeoutId != null) clearTimeout(entry._timeoutId);
+		if (entry._pollingId != null) clearInterval(entry._pollingId);
+		entry._unsub?.();
+		entry._timeoutId = null;
+		entry._pollingId = null;
+		entry._unsub = null;
+	}
+
+	function clearExecution(promptId: string) {
+		cleanupExecution(promptId);
+		executions.delete(promptId);
+		executions = new Map(executions);
+	}
 
 	// Prompt edit modal: edit existing (click in sidebar) or create new
 	let editingPrompt = $state<Prompt | null>(null);
@@ -87,28 +112,16 @@
 	let promptSaveLoading = $state(false);
 	let promptsRefreshTrigger = $state(0);
 
-	/** AppSync subscription cleanup for AI query execution (by deterministic executionId hash). */
-	let aiQueryExecutionUnsub: (() => void) | null = null;
-	let aiQueryExecutionTimeoutId: ReturnType<typeof setTimeout> | null = null;
-	let aiQueryPollingIntervalId: ReturnType<typeof setInterval> | null = null;
+	/** "Send to Dashboard" modal: tracks which prompt's result to show */
+	let sendToDashboardPromptId = $state<string | null>(null);
+	let sendToDashboardPromptRef = $state<Prompt | null>(null);
+	const showSendToDashboard = $derived(sendToDashboardPromptId != null);
 
-	/** "Send to Dashboard" modal state */
-	let showSendToDashboard = $state(false);
-
-	function cleanupAiQueryExecutionSubscription() {
-		if (aiQueryExecutionTimeoutId != null) {
-			clearTimeout(aiQueryExecutionTimeoutId);
-			aiQueryExecutionTimeoutId = null;
+	onDestroy(() => {
+		for (const promptId of executions.keys()) {
+			cleanupExecution(promptId);
 		}
-		if (aiQueryPollingIntervalId != null) {
-			clearInterval(aiQueryPollingIntervalId);
-			aiQueryPollingIntervalId = null;
-		}
-		aiQueryExecutionUnsub?.();
-		aiQueryExecutionUnsub = null;
-	}
-
-	onDestroy(() => cleanupAiQueryExecutionSubscription());
+	});
 
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	// Component Variables that are Derived from the Stores
@@ -251,16 +264,24 @@
 
 	async function handleDeletePrompt(prompt: Prompt) {
 		if (!idToken) return;
+		clearExecution(prompt.id);
 		const queryClient = new GraphQLQueryClient(idToken);
 		await deletePromptTemplate(queryClient, prompt.id);
 		promptsRefreshTrigger += 1;
 	}
 
-	function handleClearResult() {
-		visionQueryResult = null;
-		visionQueryError = null;
-		lastSelectedPrompt = null;
-		executionStatusMessage = null;
+	function handleClearResult(promptId: string) {
+		clearExecution(promptId);
+	}
+
+	function handleSendToDashboard(prompt: Prompt) {
+		sendToDashboardPromptRef = prompt;
+		sendToDashboardPromptId = prompt.id;
+	}
+
+	function closeSendToDashboard() {
+		sendToDashboardPromptId = null;
+		sendToDashboardPromptRef = null;
 	}
 
 	type AIQueryExecPayload = {
@@ -273,7 +294,6 @@
 		model?: string | null;
 	};
 
-	/** Human-friendly messages for machine error codes from the backend. */
 	const ERROR_CODE_MESSAGES: Record<string, string> = {
 		PROMPT_NOT_FOUND: 'The selected prompt no longer exists.',
 		SCHEMA_PARSE_ERROR: 'The JSON schema is malformed. Edit the schema and try again.',
@@ -293,51 +313,69 @@
 		return exec.errorMessage ?? 'Execution failed';
 	}
 
-	let executionStatusMessage = $state<string | null>(null);
+	/** Trigger reactive re-render when mutating a map entry in-place. */
+	function touchExecutions() {
+		executions = new Map(executions);
+	}
 
 	/**
-	 * Subscribe by deterministic executionId (SHA-256 hash), then submit.
-	 * documentIds must match selected PDF only so the hash aligns with submitAIQuery on the server.
+	 * Per-prompt execution: each prompt gets its own subscription, polling, and timeout.
+	 * Multiple prompts can run concurrently without interfering with each other.
 	 */
 	async function runVisionQueryWithPrompt(prompt: Prompt) {
-		cleanupAiQueryExecutionSubscription();
+		const pid = prompt.id;
 
 		if (!idToken || !projectId) {
-			visionQueryError = 'Missing session or project.';
+			executions.set(pid, {
+				loading: false, error: 'Missing session or project.', result: null,
+				statusMessage: null, _unsub: null, _timeoutId: null, _pollingId: null
+			});
+			touchExecutions();
 			return;
 		}
 		if (!selectedDocId) {
-			visionQueryError = 'Select a document in the viewer to run this prompt.';
+			executions.set(pid, {
+				loading: false, error: 'Select a document in the viewer to run this prompt.', result: null,
+				statusMessage: null, _unsub: null, _timeoutId: null, _pollingId: null
+			});
+			touchExecutions();
 			return;
 		}
 
+		// If re-running the same prompt, clean up previous lifecycle
+		cleanupExecution(pid);
+
 		const documentIds = [selectedDocId];
-		/** AppSync `AWSJSON` must be sent as a JSON string; Lambda keeps it as "{}" for hashing. */
 		const inputValues = '{}';
 
-		visionQueryLoading = true;
-		visionQueryError = null;
-		visionQueryResult = null;
-		lastSelectedPrompt = prompt;
-		executionStatusMessage = 'Submitting...';
+		const entry: PromptExecution = {
+			loading: true,
+			error: null,
+			result: null,
+			statusMessage: 'Submitting...',
+			_unsub: null,
+			_timeoutId: null,
+			_pollingId: null
+		};
+		executions.set(pid, entry);
+		touchExecutions();
 
 		let settled = false;
+
 		const finishLoading = () => {
-			visionQueryLoading = false;
+			entry.loading = false;
+			touchExecutions();
 		};
 
-		/** Reset the adaptive timeout on every subscription event (server is alive). */
 		const resetAdaptiveTimeout = () => {
-			if (aiQueryExecutionTimeoutId != null) {
-				clearTimeout(aiQueryExecutionTimeoutId);
-			}
-			aiQueryExecutionTimeoutId = setTimeout(() => {
+			if (entry._timeoutId != null) clearTimeout(entry._timeoutId);
+			entry._timeoutId = setTimeout(() => {
 				if (!settled) {
 					settled = true;
-					cleanupAiQueryExecutionSubscription();
-					visionQueryError = 'Timed out waiting for result.';
-					visionQueryResult = null;
-					executionStatusMessage = null;
+					cleanupExecution(pid);
+					entry.error = 'Timed out waiting for result.';
+					entry.result = null;
+					entry.statusMessage = null;
 					finishLoading();
 				}
 			}, 120_000);
@@ -345,31 +383,29 @@
 
 		const applyExecutionResult = (exec: AIQueryExecPayload) => {
 			if (settled) return;
-
 			resetAdaptiveTimeout();
 
 			if (exec.status === 'QUEUED' || exec.status === 'PROCESSING') {
-				executionStatusMessage = exec.statusMessage ?? (exec.status === 'QUEUED' ? 'Queued...' : 'AI is processing...');
+				entry.statusMessage = exec.statusMessage ?? (exec.status === 'QUEUED' ? 'Queued...' : 'AI is processing...');
 				if (exec.retryCount && exec.retryCount > 0) {
-					executionStatusMessage = `Retrying (${exec.retryCount})...`;
+					entry.statusMessage = `Retrying (${exec.retryCount})...`;
 				}
+				touchExecutions();
 				return;
 			}
 
 			if (exec.status === 'SUCCESS') {
 				settled = true;
-				cleanupAiQueryExecutionSubscription();
-				executionStatusMessage = null;
+				cleanupExecution(pid);
+				entry.statusMessage = null;
 				let structuredOutput: unknown = undefined;
 				if (exec.rawOutput) {
 					try {
 						const parsed = JSON.parse(exec.rawOutput);
 						structuredOutput = typeof parsed === 'object' && parsed !== null ? parsed : undefined;
-					} catch {
-						/* rawOutput is plain text */
-					}
+					} catch { /* plain text */ }
 				}
-				visionQueryResult = {
+				entry.result = {
 					answer: exec.rawOutput ?? '',
 					structuredOutput,
 					matchCount: documentIds.length
@@ -388,10 +424,10 @@
 				finishLoading();
 			} else if (exec.status === 'ERROR') {
 				settled = true;
-				cleanupAiQueryExecutionSubscription();
-				executionStatusMessage = null;
-				visionQueryError = friendlyErrorMessage(exec);
-				visionQueryResult = null;
+				cleanupExecution(pid);
+				entry.statusMessage = null;
+				entry.error = friendlyErrorMessage(exec);
+				entry.result = null;
 				finishLoading();
 			}
 		};
@@ -411,16 +447,16 @@
 				auth: { mode: 'cognito', idToken }
 			});
 
-			/** Polling fallback: if subscription fails, poll getAIQueryExecution every 4 seconds. */
 			let submittedExecId: string | null = null;
 
 			const startPollingFallback = () => {
-				if (aiQueryPollingIntervalId != null || settled || !submittedExecId) return;
-				executionStatusMessage = 'Polling for updates...';
-				aiQueryPollingIntervalId = setInterval(async () => {
+				if (entry._pollingId != null || settled || !submittedExecId) return;
+				entry.statusMessage = 'Polling for updates...';
+				touchExecutions();
+				entry._pollingId = setInterval(async () => {
 					if (settled || !submittedExecId || !idToken) {
-						if (aiQueryPollingIntervalId != null) clearInterval(aiQueryPollingIntervalId);
-						aiQueryPollingIntervalId = null;
+						if (entry._pollingId != null) clearInterval(entry._pollingId);
+						entry._pollingId = null;
 						return;
 					}
 					try {
@@ -431,9 +467,7 @@
 						);
 						const exec = pollRes.getAIQueryExecution;
 						if (exec) applyExecutionResult(exec);
-					} catch {
-						/* polling errors are non-fatal; will retry next interval */
-					}
+					} catch { /* non-fatal */ }
 				}, 4_000);
 			};
 
@@ -449,12 +483,12 @@
 				},
 				error: (e: unknown) => {
 					console.error('[document-analysis] subscription error, falling back to polling', e);
-					aiQueryExecutionUnsub?.();
-					aiQueryExecutionUnsub = null;
+					entry._unsub?.();
+					entry._unsub = null;
 					startPollingFallback();
 				}
 			});
-			aiQueryExecutionUnsub = () => subHandle.unsubscribe();
+			entry._unsub = () => subHandle.unsubscribe();
 
 			resetAdaptiveTimeout();
 
@@ -478,10 +512,10 @@
 			if (immediate) applyExecutionResult(immediate);
 		} catch (err) {
 			settled = true;
-			cleanupAiQueryExecutionSubscription();
-			executionStatusMessage = null;
-			visionQueryError = err instanceof Error ? err.message : 'Vision query failed';
-			visionQueryResult = null;
+			cleanupExecution(pid);
+			entry.statusMessage = null;
+			entry.error = err instanceof Error ? err.message : 'Vision query failed';
+			entry.result = null;
 			finishLoading();
 		}
 	}
@@ -617,18 +651,13 @@
 
 		<!-- PDF Viewer -->
 		{#if documents.length > 0 && selectedDocId}
-			<div class="mb-8 {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-lg border shadow-sm">
-				<div class="p-6">
-					<h3 class="text-lg font-semibold {darkMode ? 'text-white' : 'text-slate-900'} mb-4">
-						Documents ({documents.length})
-					</h3>
-					<PDFViewer
-						documents={documents}
-						bind:currentDocHash={selectedDocId}
-						bind:currentPage={currentPage}
-						showButtons={['navigation', 'zoom', 'rotate', 'download']}
-					/>
-				</div>
+			<div class="mb-8">
+				<PDFViewer
+					documents={documents}
+					bind:currentDocHash={selectedDocId}
+					bind:currentPage={currentPage}
+					showButtons={['navigation', 'zoom', 'rotate', 'download']}
+				/>
 			</div>
 		{/if}
 
@@ -694,11 +723,7 @@
 	<PromptsSidebar
 		{idToken}
 		{darkMode}
-		queryLoading={visionQueryLoading}
-		queryError={visionQueryError}
-		queryResult={visionQueryResult}
-		{executionStatusMessage}
-		lastRunPrompt={lastSelectedPrompt}
+		{executions}
 		canRunPrompt={!!selectedDocId}
 		{selectedDocFilename}
 		onRunPrompt={runVisionQueryWithPrompt}
@@ -706,7 +731,7 @@
 		onCreatePrompt={handleCreatePrompt}
 		onDeletePrompt={handleDeletePrompt}
 		onClearResult={handleClearResult}
-		onSendToDashboard={() => showSendToDashboard = true}
+		onSendToDashboard={handleSendToDashboard}
 		refreshTrigger={promptsRefreshTrigger}
 	/>
 
@@ -723,13 +748,14 @@
 	{/if}
 
 	<!-- Send to Dashboard modal -->
-	{#if showSendToDashboard}
+	{#if showSendToDashboard && sendToDashboardPromptId}
+		{@const dashExec = executions.get(sendToDashboardPromptId)}
 		<SendToDashboardModal
 			{darkMode}
-			prompt={lastSelectedPrompt}
-			result={visionQueryResult?.structuredOutput ?? visionQueryResult?.answer}
-			onclose={() => showSendToDashboard = false}
-			onpublished={() => showSendToDashboard = false}
+			prompt={sendToDashboardPromptRef}
+			result={dashExec?.result?.structuredOutput ?? dashExec?.result?.answer}
+			onclose={closeSendToDashboard}
+			onpublished={closeSendToDashboard}
 		/>
 	{/if}
 </div>

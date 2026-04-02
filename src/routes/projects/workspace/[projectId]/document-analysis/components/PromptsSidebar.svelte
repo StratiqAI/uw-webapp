@@ -11,33 +11,35 @@
 		matchCount: number;
 	}
 
+	interface PromptExecution {
+		loading: boolean;
+		error: string | null;
+		result: VisionQueryResult | null;
+		statusMessage: string | null;
+		_unsub: (() => void) | null;
+		_timeoutId: ReturnType<typeof setTimeout> | null;
+		_pollingId: ReturnType<typeof setInterval> | null;
+	}
+
 	interface Props {
 		idToken: string | undefined;
 		darkMode?: boolean;
-		queryLoading?: boolean;
-		queryError?: string | null;
-		queryResult?: VisionQueryResult | null;
-		executionStatusMessage?: string | null;
-		lastRunPrompt?: Prompt | null;
+		executions?: Map<string, PromptExecution>;
 		canRunPrompt?: boolean;
 		selectedDocFilename?: string | null;
 		onRunPrompt?: (prompt: Prompt) => void;
 		onEditPrompt?: (prompt: Prompt) => void;
 		onCreatePrompt?: () => void;
 		onDeletePrompt?: (prompt: Prompt) => Promise<void>;
-		onClearResult?: () => void;
-		onSendToDashboard?: () => void;
+		onClearResult?: (promptId: string) => void;
+		onSendToDashboard?: (prompt: Prompt) => void;
 		refreshTrigger?: number;
 	}
 
 	let {
 		idToken,
 		darkMode = true,
-		queryLoading = false,
-		queryError = null,
-		queryResult = null,
-		executionStatusMessage = null,
-		lastRunPrompt = null,
+		executions = new Map(),
 		canRunPrompt = true,
 		selectedDocFilename = null,
 		onRunPrompt,
@@ -296,19 +298,15 @@
 				<PromptDetailPanel
 					prompt={selectedPrompt}
 					{darkMode}
-					{queryLoading}
-					{queryError}
-					{queryResult}
-					{executionStatusMessage}
-					{lastRunPrompt}
+					execution={executions.get(selectedPrompt.id) ?? null}
 					{canRunPrompt}
 					{selectedDocFilename}
 					onBack={backToList}
 					onRun={(p) => onRunPrompt?.(p)}
 					onEdit={(p) => onEditPrompt?.(p)}
 					onDelete={handleDeleteAndReturn}
-					onClear={() => onClearResult?.()}
-					onSendToDashboard={() => onSendToDashboard?.()}
+					onClear={(pid) => onClearResult?.(pid)}
+					onSendToDashboard={(p) => onSendToDashboard?.(p)}
 				/>
 			{:else}
 				<!-- List View -->
@@ -382,11 +380,37 @@
 							{/if}
 							<div class="grid grid-cols-1 gap-1.5">
 								{#each group.prompts as prompt (prompt.id)}
+								{@const exec = executions.get(prompt.id)}
+								{@const isRunning = exec?.loading === true}
+								{@const hasResult = !exec?.loading && exec?.result != null}
+								{@const hasError = !exec?.loading && exec?.error != null}
 									<button
 										type="button"
 										onclick={() => selectPrompt(prompt)}
-										class="flex w-full items-start gap-2.5 rounded-lg border p-2.5 text-left transition-colors {darkMode ? 'border-slate-700 bg-slate-800/40 hover:border-indigo-500/40 hover:bg-slate-800' : 'border-slate-200 bg-white hover:border-indigo-300 hover:bg-indigo-50/30'}"
+										class="relative flex w-full items-start gap-2.5 rounded-lg border p-2.5 text-left transition-colors {isRunning ? (darkMode ? 'border-indigo-500/50 bg-indigo-900/10' : 'border-indigo-300 bg-indigo-50/40') : hasResult ? (darkMode ? 'border-emerald-500/30 bg-emerald-900/5' : 'border-emerald-300 bg-emerald-50/30') : hasError ? (darkMode ? 'border-red-500/30 bg-red-900/5' : 'border-red-300 bg-red-50/30') : (darkMode ? 'border-slate-700 bg-slate-800/40 hover:border-indigo-500/40 hover:bg-slate-800' : 'border-slate-200 bg-white hover:border-indigo-300 hover:bg-indigo-50/30')}"
 									>
+										<!-- Status badge (top-right corner) -->
+										{#if isRunning}
+											<div class="absolute right-2 top-2">
+												<svg class="animate-spin h-3.5 w-3.5 {darkMode ? 'text-indigo-400' : 'text-indigo-600'}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+													<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+													<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+												</svg>
+											</div>
+										{:else if hasResult}
+											<div class="absolute right-2 top-2">
+												<svg class="h-3.5 w-3.5 {darkMode ? 'text-emerald-400' : 'text-emerald-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+												</svg>
+											</div>
+										{:else if hasError}
+											<div class="absolute right-2 top-2">
+												<svg class="h-3.5 w-3.5 {darkMode ? 'text-red-400' : 'text-red-500'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+												</svg>
+											</div>
+										{/if}
+
 										<div class="flex h-7 w-7 shrink-0 items-center justify-center rounded {darkMode ? 'bg-slate-700' : 'bg-slate-100'}">
 											<svg class="h-3.5 w-3.5 {darkMode ? 'text-slate-300' : 'text-slate-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

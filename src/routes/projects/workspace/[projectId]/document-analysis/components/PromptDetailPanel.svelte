@@ -7,32 +7,34 @@
 		matchCount: number;
 	}
 
+	interface PromptExecution {
+		loading: boolean;
+		error: string | null;
+		result: VisionQueryResult | null;
+		statusMessage: string | null;
+		_unsub: (() => void) | null;
+		_timeoutId: ReturnType<typeof setTimeout> | null;
+		_pollingId: ReturnType<typeof setInterval> | null;
+	}
+
 	interface Props {
 		prompt: Prompt;
 		darkMode?: boolean;
-		queryLoading?: boolean;
-		queryError?: string | null;
-		queryResult?: VisionQueryResult | null;
-		executionStatusMessage?: string | null;
-		lastRunPrompt?: Prompt | null;
+		execution?: PromptExecution | null;
 		canRunPrompt?: boolean;
 		selectedDocFilename?: string | null;
 		onBack?: () => void;
 		onRun?: (prompt: Prompt) => void;
 		onEdit?: (prompt: Prompt) => void;
 		onDelete?: (prompt: Prompt) => void;
-		onClear?: () => void;
-		onSendToDashboard?: () => void;
+		onClear?: (promptId: string) => void;
+		onSendToDashboard?: (prompt: Prompt) => void;
 	}
 
 	let {
 		prompt,
 		darkMode = true,
-		queryLoading = false,
-		queryError = null,
-		queryResult = null,
-		executionStatusMessage = null,
-		lastRunPrompt = null,
+		execution = null,
 		canRunPrompt = true,
 		selectedDocFilename = null,
 		onBack,
@@ -64,15 +66,15 @@
 
 	const hasStructured = $derived(!!(prompt as { jsonSchemaId?: string }).jsonSchemaId);
 
-	const isThisPromptResult = $derived(
-		lastRunPrompt?.id === prompt.id && (queryResult != null || queryLoading || queryError != null)
+	const hasExecution = $derived(
+		execution != null && (execution.loading || execution.error != null || execution.result != null)
 	);
 
 	type ResultDisplay = { mode: 'json'; body: string } | { mode: 'text'; body: string };
 
 	const resultDisplay = $derived.by((): ResultDisplay | null => {
-		if (!isThisPromptResult || !queryResult) return null;
-		const { answer, structuredOutput } = queryResult;
+		if (!execution?.result) return null;
+		const { answer, structuredOutput } = execution.result;
 		if (structuredOutput !== undefined && structuredOutput !== null && typeof structuredOutput === 'object') {
 			return { mode: 'json', body: JSON.stringify(structuredOutput, null, 2) };
 		}
@@ -230,17 +232,17 @@
 				<!-- Run button -->
 				<button
 					type="button"
-					disabled={!canRunPrompt || queryLoading}
+					disabled={!canRunPrompt || execution?.loading}
 					onclick={() => onRun?.(prompt)}
 					title={!canRunPrompt ? 'Select a document in the viewer to run' : 'Run prompt on selected document'}
 					class="mt-3 flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 {darkMode ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'}"
 				>
-					{#if queryLoading && isThisPromptResult}
+					{#if execution?.loading}
 						<svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
 							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
 							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
 						</svg>
-						{executionStatusMessage ?? 'Running...'}
+						{execution.statusMessage ?? 'Running...'}
 					{:else}
 						<svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
 							<path d="M8 5v14l11-7z" />
@@ -251,17 +253,17 @@
 			</div>
 
 			<!-- Results area -->
-			{#if isThisPromptResult}
+			{#if hasExecution}
 				<div class="border-t px-4 py-3 {darkMode ? 'border-slate-700/50' : 'border-slate-200'}">
-					{#if queryLoading}
+					{#if execution?.loading}
 						<div class="flex items-center gap-2 py-2">
 							<svg class="animate-spin h-4 w-4 {darkMode ? 'text-indigo-400' : 'text-indigo-600'}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
 								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
 								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
 							</svg>
-							<span class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'}">{executionStatusMessage ?? 'Processing...'}</span>
+							<span class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'}">{execution.statusMessage ?? 'Processing...'}</span>
 						</div>
-					{:else if queryError}
+					{:else if execution?.error}
 						<div class="rounded-lg border p-3 {darkMode ? 'bg-red-900/20 border-red-500/30' : 'bg-red-50 border-red-200'}">
 							<div class="flex items-center gap-2 {darkMode ? 'text-red-400' : 'text-red-600'}">
 								<svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -269,19 +271,19 @@
 								</svg>
 								<span class="text-xs font-medium">Query failed</span>
 							</div>
-							<p class="mt-1 text-xs {darkMode ? 'text-red-300' : 'text-red-600'}">{queryError}</p>
+							<p class="mt-1 text-xs {darkMode ? 'text-red-300' : 'text-red-600'}">{execution.error}</p>
 							<button
 								type="button"
-								onclick={onClear}
+								onclick={() => onClear?.(prompt.id)}
 								class="mt-2 text-xs font-medium {darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}"
 							>Dismiss</button>
 						</div>
-					{:else if queryResult && resultDisplay}
+					{:else if execution?.result && resultDisplay}
 						<div>
 							<div class="flex items-center justify-between mb-2">
 								<p class="text-xs font-semibold uppercase tracking-wider {darkMode ? 'text-slate-500' : 'text-slate-400'}">Result</p>
 								<p class="text-[10px] {darkMode ? 'text-slate-500' : 'text-slate-400'}">
-									{queryResult.matchCount} image{queryResult.matchCount !== 1 ? 's' : ''}
+									{execution.result.matchCount} image{execution.result.matchCount !== 1 ? 's' : ''}
 								</p>
 							</div>
 							{#if resultDisplay.mode === 'json'}
@@ -310,7 +312,7 @@
 								</button>
 								<button
 									type="button"
-									onclick={onSendToDashboard}
+									onclick={() => onSendToDashboard?.(prompt)}
 									class="flex items-center gap-1 rounded border px-2 py-1 text-xs font-medium transition-colors {darkMode ? 'border-indigo-600 bg-indigo-900/20 text-indigo-300 hover:bg-indigo-900/40' : 'border-indigo-400 bg-indigo-50 text-indigo-700 hover:bg-indigo-100'}"
 								>
 									<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -320,7 +322,7 @@
 								</button>
 								<button
 									type="button"
-									onclick={onClear}
+									onclick={() => onClear?.(prompt.id)}
 									class="text-xs font-medium {darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}"
 								>Clear</button>
 							</div>

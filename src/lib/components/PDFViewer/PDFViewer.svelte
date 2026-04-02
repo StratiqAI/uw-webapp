@@ -1,12 +1,5 @@
 <script lang="ts">
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	// Import Environment Variables
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	import { PUBLIC_DOCUMENTS_BUCKET, PUBLIC_REGION } from '$env/static/public';
-
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	// Import Component Types
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	import type {
 		PDFViewerProps,
 		PDFAnnotation,
@@ -17,13 +10,10 @@
 		DownloadOptions
 	} from './types';
 
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	// Import Component Props
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	let {
 		data,
 		documents,
-		scale = 1.0,
+		scale = $bindable(1.0),
 		pageNum = 1,
 		flipTime = 120,
 		showButtons = ['navigation', 'zoom', 'rotate', 'download'],
@@ -36,44 +26,28 @@
 		externalLinksTarget
 	}: PDFViewerProps = $props();
 
-	import { ButtonGroup, Button, Dropdown, DropdownItem } from 'flowbite-svelte';
-	import {
-		ArrowLeftOutline,
-		ArrowRightOutline,
-		ZoomOutOutline,
-		ZoomInOutline,
-		ChevronDownOutline
-	} from 'flowbite-svelte-icons';
-
 	import * as pdfjs from 'pdfjs-dist';
 	import { onDestroy, tick } from 'svelte';
 	import { calcRT, getPageText, onPrint, savePDF } from './utils/Helper.svelte';
-	import Tooltip from './utils/Tooltip.svelte';
 
-	import RotateRight from './RotateRight.svelte';
-	import RotateLeft from './RotateLeft.svelte';
-
-	// Svelte 5 rune for reactive state
-	let openDropdown = $state(false);
+	import { darkModeStore } from '$lib/stores/darkMode.svelte';
+	const darkMode = $derived(darkModeStore.darkMode);
 
 	let docs = $derived(documents ?? []);
-
 	let url = $derived(
 		`https://${PUBLIC_DOCUMENTS_BUCKET}.s3.${PUBLIC_REGION}.amazonaws.com/${currentDocHash}/document.pdf`
 	);
-	$inspect('URL ====================================================: ', url);
 	let currentDocFilename = $derived(docs.find((doc) => doc.id === currentDocHash)?.filename ?? '');
-
 	let hasDocuments: boolean = $derived((documents?.length ?? 0) > 0);
 
-	$inspect('documents ====================================================: ', docs);
 	pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 		'pdfjs-dist/build/pdf.worker.mjs',
 		import.meta.url
 	).toString();
 
-	// Internal state variables with proper typing
 	let canvas: HTMLCanvasElement | undefined = $state();
+	let viewerContainer: HTMLDivElement | undefined = $state();
+	let canvasWrapper: HTMLDivElement | undefined = $state();
 
 	let pageCount: number = 0;
 	let pdfDoc: PDFDocument | null = null;
@@ -85,18 +59,37 @@
 	let autoFlip: boolean = false;
 	let interval: NodeJS.Timeout | undefined;
 	let secondInterval: NodeJS.Timeout | undefined;
-	// svelte-ignore state_referenced_locally (countdown resets use current `flipTime` in handlers)
+	// svelte-ignore state_referenced_locally
 	let seconds: number = flipTime;
 	let pages: HTMLCanvasElement[] = [];
 	let password = $state('');
 	let passwordError = $state(false);
 	let passwordMessage = $state('');
 	let isInitialized: boolean = false;
-	const minScale: number = 1.0;
-	const maxScale: number = 2.3;
+
+	let isLoading = $state(true);
+	let docSelectorOpen = $state(false);
+	let pageSelectorOpen = $state(false);
+	let pageInputValue = $state('');
+
+	const minScale: number = 0.5;
+	const maxScale: number = 3.0;
+	const zoomPercent = $derived(Math.round(scale * 100));
+
+	const ZOOM_PRESETS = [50, 75, 100, 125, 150, 200, 300];
+
+	function fitToWidth() {
+		if (!viewerContainer || !pdfDoc) return;
+		pdfDoc.getPage(currentPage).then((page) => {
+			const unscaledViewport = page.getViewport({ scale: 1.0, rotation });
+			const containerWidth = viewerContainer!.clientWidth - 48;
+			const newScale = containerWidth / unscaledViewport.width;
+			scale = Math.min(Math.max(newScale, minScale), maxScale);
+			queueRenderPage(currentPage);
+		});
+	}
 
 	const renderPage = async (num: number): Promise<void> => {
-		console.log('renderPage ====================================================: ', num);
 		if (num < 1 || num > pageCount || !pdfDoc || !canvas) return;
 		pageRendering = true;
 		try {
@@ -108,17 +101,13 @@
 			canvas.height = viewport.height;
 			canvas.width = viewport.width;
 
-			const renderContext: RenderContext = {
-				canvasContext,
-				viewport
-			};
+			const renderContext: RenderContext = { canvasContext, viewport };
 			await page.render(renderContext).promise;
-
-			// Handle PDF links
 			await handlePageLinks(page, viewport);
 
 			pageRendering = false;
 			currentPage = num;
+
 			if (pageNumPending !== null) {
 				if (pageNum < pdfDoc.numPages) {
 					pages[pageNum - 1] = canvas.cloneNode(true) as HTMLCanvasElement;
@@ -132,8 +121,7 @@
 				}
 				pageNumPending = null;
 			}
-			// Update page counters
-			showButtons.length ? (pageNum = num) : null;
+			if (showButtons.length) pageNum = num;
 		} catch (error) {
 			console.error('Error rendering page:', error);
 			pageRendering = false;
@@ -143,9 +131,7 @@
 	const handlePageLinks = async (page: PDFPage, viewport: Viewport): Promise<void> => {
 		try {
 			const annotations = await page.getAnnotations();
-
-			// Remove existing link overlays for this page
-			const existingLinks = canvas?.parentNode?.querySelectorAll('.pdf-link-overlay');
+			const existingLinks = canvasWrapper?.querySelectorAll('.pdf-link-overlay');
 			existingLinks?.forEach((link) => link.remove());
 
 			annotations.forEach((annotation) => {
@@ -159,7 +145,7 @@
 	};
 
 	const createLinkOverlay = (annotation: PDFAnnotation, viewport: Viewport): void => {
-		if (!canvas?.parentNode || !annotation.url) return;
+		if (!canvasWrapper || !annotation.url) return;
 
 		const linkElement = document.createElement('a');
 		linkElement.className = 'pdf-link-overlay';
@@ -167,14 +153,10 @@
 		linkElement.target = externalLinksTarget || '_blank';
 		linkElement.rel = 'noopener noreferrer';
 
-		// Convert PDF coordinates to canvas coordinates
 		const rect = annotation.rect;
 		const [x1, y1, x2, y2] = rect;
-
-		// Transform coordinates using viewport
 		const canvasRect = viewport.convertToViewportRectangle([x1, y1, x2, y2]);
 
-		// Position the overlay
 		linkElement.style.position = 'absolute';
 		linkElement.style.left = `${Math.min(canvasRect[0], canvasRect[2])}px`;
 		linkElement.style.top = `${Math.min(canvasRect[1], canvasRect[3])}px`;
@@ -183,18 +165,14 @@
 		linkElement.style.zIndex = '10';
 		linkElement.style.background = 'transparent';
 		linkElement.style.border = 'none';
+		linkElement.style.cursor = 'pointer';
 
-		// Make the canvas container relative if it isn't already
-		if (!(canvas.parentNode as HTMLElement).style.position) {
-			(canvas.parentNode as HTMLElement).style.position = 'relative';
-		}
-
-		canvas.parentNode.appendChild(linkElement);
+		canvasWrapper.appendChild(linkElement);
 	};
 
 	const queueRenderPage = (num: number): void => {
 		if (pageRendering) {
-			pdfDoc?.getPage(num).then((page) => {
+			pdfDoc?.getPage(num).then(() => {
 				if (!pageRendering) renderPage(num);
 			});
 		} else {
@@ -213,23 +191,24 @@
 	};
 
 	const onZoomIn = (): void => {
-		if (scale <= maxScale) {
-			scale += 0.1;
+		if (scale < maxScale) {
+			const nextPreset = ZOOM_PRESETS.find((p) => p > zoomPercent);
+			scale = Math.min((nextPreset ?? zoomPercent + 25) / 100, maxScale);
 			queueRenderPage(pageNum);
 		}
 	};
 
 	const onZoomOut = (): void => {
-		if (scale >= minScale) {
-			scale -= 0.1;
+		if (scale > minScale) {
+			const prevPreset = [...ZOOM_PRESETS].reverse().find((p) => p < zoomPercent);
+			scale = Math.max((prevPreset ?? zoomPercent - 25) / 100, minScale);
 			queueRenderPage(pageNum);
 		}
 	};
 
-	const printPdf = (url: string | undefined): void => {
-		if (url) {
-			onPrint(url);
-		}
+	const setZoom = (percent: number): void => {
+		scale = Math.min(Math.max(percent / 100, minScale), maxScale);
+		queueRenderPage(pageNum);
 	};
 
 	const clockwiseRotate = (): void => {
@@ -247,15 +226,14 @@
 	};
 
 	const initialLoad = async (): Promise<void> => {
+		isLoading = true;
 		try {
 			const loadingTask = pdfjs.getDocument({
 				...(url && { url }),
 				...(data && { data }),
 				...(password && { password })
 			});
-			if (onProgress) {
-				loadingTask.onProgress = onProgress;
-			}
+			if (onProgress) loadingTask.onProgress = onProgress;
 
 			pdfDoc = await loadingTask.promise;
 			passwordError = false;
@@ -274,8 +252,12 @@
 			}
 
 			isInitialized = true;
-			renderPage(currentPage);
+			isLoading = false;
+
+			await tick();
+			fitToWidth();
 		} catch (error) {
+			isLoading = false;
 			passwordError = true;
 			passwordMessage = (error as Error).message;
 		}
@@ -283,135 +265,387 @@
 
 	initialLoad();
 
-	// Watch for changes to currentPage prop and render the page
 	$effect(() => {
 		if (isInitialized && currentPage !== pageNum) {
 			queueRenderPage(currentPage);
 		}
 	});
 
-	const onPageTurn = (): void => {
-		autoFlip = !autoFlip;
-		clearInterval(interval);
-		clearInterval(secondInterval);
-
-		if (autoFlip && pageNum <= totalPage) {
-			seconds = flipTime; // Reset seconds immediately
-			secondInterval = setInterval(() => {
-				seconds--;
-			}, 1000);
-
-			interval = setInterval(() => {
-				clearInterval(secondInterval); // Clear the seconds counter interval
-				seconds = flipTime; // Reset seconds *before* going to the next page
-				onNextPage();
-				if (currentPage > totalPage) {
-					onPageTurn();
-				} else {
-					secondInterval = setInterval(() => {
-						seconds--;
-					}, 1000);
-				}
-			}, flipTime * 1000);
-		}
-	};
-
 	const downloadPdf = ({ url: fileUrl, data }: DownloadOptions): void => {
 		const fileName =
 			downloadFileName ||
 			(fileUrl && fileUrl.substring(fileUrl.lastIndexOf('/') + 1)) ||
-			'download.pdf'; // Provide a default file name
+			'download.pdf';
 		(savePDF as any)({ fileUrl, data, name: fileName });
 	};
+
+	const onDocumentChange = (documentId: string): void => {
+		currentDocHash = documentId;
+		currentPage = 1;
+		docSelectorOpen = false;
+		initialLoad();
+	};
+
+	const goToPage = (num: number): void => {
+		const clamped = Math.max(1, Math.min(num, totalPage));
+		pageSelectorOpen = false;
+		queueRenderPage(clamped);
+	};
+
+	const handlePageInput = (e: KeyboardEvent): void => {
+		if (e.key === 'Enter') {
+			const val = parseInt(pageInputValue);
+			if (!isNaN(val)) goToPage(val);
+			pageInputValue = '';
+		}
+	};
+
+	function handleKeyDown(event: KeyboardEvent): void {
+		if ((event.target as HTMLElement).tagName === 'INPUT') return;
+		switch (event.key) {
+			case 'ArrowLeft':
+				event.preventDefault();
+				onPrevPage();
+				break;
+			case 'ArrowRight':
+				event.preventDefault();
+				onNextPage();
+				break;
+			case '+':
+			case '=':
+				if (event.ctrlKey || event.metaKey) {
+					event.preventDefault();
+					onZoomIn();
+				}
+				break;
+			case '-':
+				if (event.ctrlKey || event.metaKey) {
+					event.preventDefault();
+					onZoomOut();
+				}
+				break;
+		}
+	}
+
+	function handleClickOutside(event: MouseEvent): void {
+		const target = event.target as HTMLElement;
+		if (!target.closest('.doc-selector')) docSelectorOpen = false;
+		if (!target.closest('.page-selector')) pageSelectorOpen = false;
+	}
 
 	onDestroy(() => {
 		clearInterval(interval);
 		clearInterval(secondInterval);
 	});
 
-	const onDocumentChange = (documentId: string): void => {
-		currentDocHash = documentId;
-		currentPage = 1
-		openDropdown = false;
-		initialLoad();
-	};
-
-	// Window dimensions
-	let pageWidth = $state(0);
-	let pageHeight = $state(0);
-
-	// Event handler types
-	const handleKeyDown = (event: KeyboardEvent): void => {
-		if (event.key === 'Enter' || event.key === ' ') {
-			event.preventDefault();
-			(event.target as HTMLElement).click();
-		}
-	};
-
-	// Export functions for parent component to call
 	export { onPrevPage, onNextPage };
 </script>
 
-<svelte:window bind:innerWidth={pageWidth} bind:innerHeight={pageHeight} />
-<div class="mb-2 flex items-center">
-	<ButtonGroup>
-		<Button outline color="dark">
-			{currentDocFilename}
-			<ChevronDownOutline class="text-primary ms-2 h-6 w-6 text-gray-700 dark:text-gray-300" />
-		</Button>
-		<Dropdown class="list-none">
-			{#each docs as document}
-				<DropdownItem class="text-gray-700 dark:text-gray-300" onclick={() => onDocumentChange(document.id)}>
-					{document.filename}
-				</DropdownItem>
-			{/each}
-		</Dropdown>
-		<Button outline color="dark" onclick={() => onPrevPage()}>
-			<ArrowLeftOutline class="h-6 w-6 shrink-0" />
-		</Button>
-		<Button outline color="dark" onclick={() => onNextPage()}>
-			<ArrowRightOutline class="h-6 w-6 shrink-0" />
-		</Button>
-		<Button outline color="dark" onclick={() => onZoomIn()}>
-			<ZoomInOutline class="h-6 w-6 shrink-0" />
-		</Button>
-		<Button outline color="dark" onclick={() => onZoomOut()}>
-			<ZoomOutOutline class="h-6 w-6 shrink-0" />
-		</Button>
-		<Button outline color="dark" onclick={() => clockwiseRotate()}>
-			<RotateRight />
-		</Button>
-		<Button outline color="dark" onclick={() => antiClockwiseRotate()}>
-			<RotateLeft />
-		</Button>
-		<Button outline color="dark">
-			Page {currentPage} of {totalPage}<ChevronDownOutline
-				class="text-primary ms-2 h-6 w-6 dark:text-gray-200"
-			/>
-			<Dropdown class="list-none">
-				{#each Array(totalPage)
-					.fill(0)
-					.map((_, i) => i + 1) as num}
-					<DropdownItem class="text-gray-700 dark:text-gray-300" onclick={() => queueRenderPage(num)}>
-						Page {num}
-					</DropdownItem>
-				{/each}
-			</Dropdown>
-		</Button>
-	</ButtonGroup>
-</div>
+<svelte:window onkeydown={handleKeyDown} onclick={handleClickOutside} />
 
-<div>
-	{#if passwordError === true}
-		<div>
-			<p>This document requires a password to open:</p>
-			<p>{passwordMessage}</p>
-			<div>
-				<input type="password" bind:value={password} />
-				<button onclick={onPasswordSubmit}> Submit </button>
+<div
+	class="flex flex-col rounded-lg overflow-hidden border
+		{darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}"
+>
+	<!-- Toolbar -->
+	<div
+		class="flex items-center gap-1 px-3 py-2 border-b flex-wrap
+			{darkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-slate-50 border-slate-200'}"
+	>
+		<!-- Document Selector -->
+		{#if docs.length > 0}
+			<div class="doc-selector relative">
+				<button
+					type="button"
+					onclick={() => (docSelectorOpen = !docSelectorOpen)}
+					class="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors max-w-[220px]
+						{darkMode
+							? 'text-slate-200 hover:bg-slate-700'
+							: 'text-slate-700 hover:bg-slate-200'}"
+				>
+					<svg class="h-4 w-4 shrink-0 {darkMode ? 'text-indigo-400' : 'text-indigo-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+					</svg>
+					<span class="truncate">{currentDocFilename || 'Select document'}</span>
+					{#if docs.length > 1}
+						<svg class="h-3.5 w-3.5 shrink-0 transition-transform {docSelectorOpen ? 'rotate-180' : ''} {darkMode ? 'text-slate-400' : 'text-slate-500'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+						</svg>
+					{/if}
+				</button>
+				{#if docSelectorOpen && docs.length > 1}
+					<div
+						class="absolute left-0 top-full z-30 mt-1 min-w-[240px] max-w-[360px] rounded-lg border shadow-lg py-1
+							{darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}"
+					>
+						{#each docs as document}
+							<button
+								type="button"
+								onclick={() => onDocumentChange(document.id)}
+								class="flex w-full items-center gap-2 px-3 py-2 text-sm text-left transition-colors
+									{document.id === currentDocHash
+										? (darkMode ? 'bg-indigo-600/20 text-indigo-300' : 'bg-indigo-50 text-indigo-700')
+										: (darkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-700 hover:bg-slate-50')}"
+							>
+								{#if document.id === currentDocHash}
+									<svg class="h-3.5 w-3.5 shrink-0 {darkMode ? 'text-indigo-400' : 'text-indigo-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+									</svg>
+								{:else}
+									<span class="w-3.5"></span>
+								{/if}
+								<span class="truncate">{document.filename}</span>
+							</button>
+						{/each}
+					</div>
+				{/if}
 			</div>
+		{/if}
+
+		<!-- Divider -->
+		<div class="h-5 w-px mx-1 {darkMode ? 'bg-slate-600' : 'bg-slate-300'}"></div>
+
+		<!-- Page Navigation -->
+		<div class="flex items-center gap-0.5">
+			<button
+				type="button"
+				onclick={onPrevPage}
+				disabled={currentPage <= 1}
+				class="rounded-md p-1.5 transition-colors
+					{currentPage <= 1
+						? (darkMode ? 'text-slate-600 cursor-not-allowed' : 'text-slate-300 cursor-not-allowed')
+						: (darkMode ? 'text-slate-300 hover:bg-slate-700 hover:text-white' : 'text-slate-600 hover:bg-slate-200 hover:text-slate-900')}"
+				title="Previous page (←)"
+			>
+				<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+				</svg>
+			</button>
+
+			<div class="page-selector relative flex items-center">
+				<button
+					type="button"
+					onclick={() => (pageSelectorOpen = !pageSelectorOpen)}
+					class="flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium tabular-nums transition-colors
+						{darkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-200'}"
+				>
+					<span>{currentPage}</span>
+					<span class="{darkMode ? 'text-slate-500' : 'text-slate-400'}">/</span>
+					<span class="{darkMode ? 'text-slate-500' : 'text-slate-400'}">{totalPage}</span>
+				</button>
+				{#if pageSelectorOpen}
+					<div
+						class="absolute left-1/2 -translate-x-1/2 top-full z-30 mt-1 rounded-lg border shadow-lg p-2
+							{darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}"
+					>
+						<div class="flex items-center gap-2">
+							<label for="pdf-page-input" class="text-xs whitespace-nowrap {darkMode ? 'text-slate-400' : 'text-slate-500'}">Go to</label>
+							<input
+								id="pdf-page-input"
+								type="number"
+								min="1"
+								max={totalPage}
+								bind:value={pageInputValue}
+								onkeydown={handlePageInput}
+								placeholder={String(currentPage)}
+								class="w-16 rounded border px-2 py-1 text-sm text-center
+									{darkMode
+										? 'bg-slate-700 border-slate-600 text-white placeholder-slate-500'
+										: 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'}"
+							/>
+							<button
+								type="button"
+								onclick={() => {
+									const val = parseInt(pageInputValue);
+									if (!isNaN(val)) goToPage(val);
+									pageInputValue = '';
+								}}
+								class="rounded-md px-2 py-1 text-xs font-medium transition-colors
+									{darkMode ? 'bg-indigo-600 text-white hover:bg-indigo-500' : 'bg-indigo-600 text-white hover:bg-indigo-700'}"
+							>
+								Go
+							</button>
+						</div>
+					</div>
+				{/if}
+			</div>
+
+			<button
+				type="button"
+				onclick={onNextPage}
+				disabled={currentPage >= totalPage}
+				class="rounded-md p-1.5 transition-colors
+					{currentPage >= totalPage
+						? (darkMode ? 'text-slate-600 cursor-not-allowed' : 'text-slate-300 cursor-not-allowed')
+						: (darkMode ? 'text-slate-300 hover:bg-slate-700 hover:text-white' : 'text-slate-600 hover:bg-slate-200 hover:text-slate-900')}"
+				title="Next page (→)"
+			>
+				<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+				</svg>
+			</button>
 		</div>
-	{:else}
-		<canvas bind:this={canvas}></canvas>
-	{/if}
+
+		<!-- Divider -->
+		<div class="h-5 w-px mx-1 {darkMode ? 'bg-slate-600' : 'bg-slate-300'}"></div>
+
+		<!-- Zoom Controls -->
+		<div class="flex items-center gap-0.5">
+			<button
+				type="button"
+				onclick={onZoomOut}
+				disabled={scale <= minScale}
+				class="rounded-md p-1.5 transition-colors
+					{scale <= minScale
+						? (darkMode ? 'text-slate-600 cursor-not-allowed' : 'text-slate-300 cursor-not-allowed')
+						: (darkMode ? 'text-slate-300 hover:bg-slate-700 hover:text-white' : 'text-slate-600 hover:bg-slate-200 hover:text-slate-900')}"
+				title="Zoom out"
+			>
+				<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
+				</svg>
+			</button>
+
+			<button
+				type="button"
+				onclick={fitToWidth}
+				class="rounded-md px-2 py-1 text-xs font-medium tabular-nums transition-colors min-w-[48px] text-center
+					{darkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-200'}"
+				title="Fit to width (click to reset)"
+			>
+				{zoomPercent}%
+			</button>
+
+			<button
+				type="button"
+				onclick={onZoomIn}
+				disabled={scale >= maxScale}
+				class="rounded-md p-1.5 transition-colors
+					{scale >= maxScale
+						? (darkMode ? 'text-slate-600 cursor-not-allowed' : 'text-slate-300 cursor-not-allowed')
+						: (darkMode ? 'text-slate-300 hover:bg-slate-700 hover:text-white' : 'text-slate-600 hover:bg-slate-200 hover:text-slate-900')}"
+				title="Zoom in"
+			>
+				<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+				</svg>
+			</button>
+		</div>
+
+		<!-- Divider -->
+		<div class="h-5 w-px mx-1 {darkMode ? 'bg-slate-600' : 'bg-slate-300'}"></div>
+
+		<!-- Rotate Controls -->
+		<div class="flex items-center gap-0.5">
+			<button
+				type="button"
+				onclick={antiClockwiseRotate}
+				class="rounded-md p-1.5 transition-colors
+					{darkMode ? 'text-slate-300 hover:bg-slate-700 hover:text-white' : 'text-slate-600 hover:bg-slate-200 hover:text-slate-900'}"
+				title="Rotate counterclockwise"
+			>
+				<svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M19.95 11a8 8 0 1 0 -.5 4m.5 5v-5h-5" />
+				</svg>
+			</button>
+			<button
+				type="button"
+				onclick={clockwiseRotate}
+				class="rounded-md p-1.5 transition-colors
+					{darkMode ? 'text-slate-300 hover:bg-slate-700 hover:text-white' : 'text-slate-600 hover:bg-slate-200 hover:text-slate-900'}"
+				title="Rotate clockwise"
+			>
+				<svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M4.05 11a8 8 0 1 1 .5 4m-.5 5v-5h5" />
+				</svg>
+			</button>
+		</div>
+
+		<!-- Spacer -->
+		<div class="flex-1"></div>
+
+		<!-- Download -->
+		{#if showButtons.includes('download')}
+			<button
+				type="button"
+				onclick={() => downloadPdf({ url, data })}
+				class="rounded-md p-1.5 transition-colors
+					{darkMode ? 'text-slate-300 hover:bg-slate-700 hover:text-white' : 'text-slate-600 hover:bg-slate-200 hover:text-slate-900'}"
+				title="Download PDF"
+			>
+				<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+				</svg>
+			</button>
+		{/if}
+	</div>
+
+	<!-- PDF Canvas Area -->
+	<div
+		bind:this={viewerContainer}
+		class="relative flex-1 overflow-auto"
+		style="min-height: 500px; max-height: calc(100vh - 280px);"
+	>
+		{#if isLoading}
+			<div class="absolute inset-0 flex flex-col items-center justify-center gap-3 z-20
+				{darkMode ? 'bg-slate-900/90' : 'bg-white/90'}">
+				<div class="relative">
+					<svg class="h-10 w-10 animate-spin {darkMode ? 'text-indigo-400' : 'text-indigo-600'}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+					</svg>
+				</div>
+				<p class="text-sm font-medium {darkMode ? 'text-slate-400' : 'text-slate-500'}">Loading document...</p>
+			</div>
+		{/if}
+
+		{#if passwordError}
+			<div class="flex flex-col items-center justify-center gap-4 py-16 px-8">
+				<svg class="h-12 w-12 {darkMode ? 'text-slate-500' : 'text-slate-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+				</svg>
+				<div class="text-center">
+					<p class="text-sm font-medium {darkMode ? 'text-white' : 'text-slate-900'}">
+						Password Protected
+					</p>
+					<p class="mt-1 text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'}">
+						This document requires a password to open
+					</p>
+				</div>
+				<div class="flex items-center gap-2">
+					<input
+						type="password"
+						bind:value={password}
+						placeholder="Enter password"
+						onkeydown={(e) => { if (e.key === 'Enter') onPasswordSubmit(); }}
+						class="rounded-lg border px-3 py-2 text-sm
+							{darkMode
+								? 'bg-slate-800 border-slate-600 text-white placeholder-slate-500'
+								: 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'}"
+					/>
+					<button
+						type="button"
+						onclick={onPasswordSubmit}
+						class="rounded-lg px-4 py-2 text-sm font-medium transition-colors
+							{darkMode ? 'bg-indigo-600 text-white hover:bg-indigo-500' : 'bg-indigo-600 text-white hover:bg-indigo-700'}"
+					>
+						Unlock
+					</button>
+				</div>
+			</div>
+		{:else}
+			<div
+				class="flex justify-center p-6
+					{darkMode ? 'bg-slate-800/30' : 'bg-slate-100/50'}"
+			>
+				<div
+					bind:this={canvasWrapper}
+					class="relative shadow-lg rounded-sm transition-shadow
+						{darkMode ? 'shadow-black/40' : 'shadow-slate-300/80'}"
+				>
+					<canvas bind:this={canvas} class="block rounded-sm"></canvas>
+				</div>
+			</div>
+		{/if}
+	</div>
 </div>
