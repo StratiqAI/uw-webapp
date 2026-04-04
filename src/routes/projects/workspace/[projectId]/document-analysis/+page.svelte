@@ -176,13 +176,15 @@
 		}
 	}
 
-	// Effect: Fetch entities when dependencies change
+	// Effect: Fetch entities when dependencies change.
+	// Reads lastFetchedDocIds via untrack to avoid writing to a tracked dependency.
 	$effect(() => {
 		const docIdsKey = documentIdsKey;
 		const token = idToken;
 		const pid = projectId;
+		const lastIds = untrack(() => lastFetchedDocIds);
 
-		if (browser && token && pid && docIdsKey && docIdsKey !== lastFetchedDocIds) {
+		if (browser && token && pid && docIdsKey && docIdsKey !== lastIds) {
 			lastFetchedDocIds = docIdsKey;
 			const documentIds = docIdsKey.split(',').filter(Boolean);
 			if (documentIds.length > 0) {
@@ -198,7 +200,7 @@
 	// ---- Project Sync & Subscription Lifecycle ----
 
 	function mergeDoclink(pid: string, newDoclink: Doclink) {
-		const current = store.at<Project>(`projects/${pid}`);
+		const current = untrack(() => store.at<Project>(`projects/${pid}`));
 		if (!current) return;
 		const existing = (current as any).doclinks;
 		const items = Array.isArray(existing) ? existing : (existing?.items || []);
@@ -206,38 +208,47 @@
 		if (items.some((d: Doclink) => d.id === newDoclink.id)) return;
 		
 		const updated = { ...current, doclinks: { items: [...items, newDoclink], nextToken: null } } as Project;
-		store.publish(`projects/${pid}`, updated);
+		untrack(() => store.publish(`projects/${pid}`, updated));
 		project = updated;
 	}
 
-	// Single Effect handling GraphQL Fetch + WS Subscription
+	// Seed project from store + fetch from GraphQL if needed.
+	// Uses untrack() for store access so store mutations don't re-trigger this effect.
 	$effect(() => {
 		const pid = projectId;
 		const token = idToken;
-		
+
 		if (!browser || !pid || !token) {
 			project = null;
 			return;
 		}
 
-		let isActive = true;
+		let cancelled = false;
 
-		// 1. Initial Local Sync
-		project = store.at<Project>(`projects/${pid}`) ?? null;
+		const storeProject = untrack(() => store.at<Project>(`projects/${pid}`));
+		project = storeProject ?? null;
 
-		// 2. Fetch from GraphQL if doclinks are missing
-		if (!project || !(project as any).doclinks) {
+		if (!storeProject || !(storeProject as any).doclinks) {
 			gql<{ getProject: Project }>(Q_GET_PROJECT, { id: pid }, token)
 				.then((res) => {
-					if (isActive && res?.getProject) {
-						store.publish(`projects/${pid}`, res.getProject);
+					if (!cancelled && res?.getProject) {
+						untrack(() => store.publish(`projects/${pid}`, res.getProject));
 						project = res.getProject;
 					}
 				})
 				.catch((err) => console.error('Failed to fetch project doclinks:', err));
 		}
 
-		// 3. Setup WebSocket Subscription
+		return () => { cancelled = true; };
+	});
+
+	// Doclink subscription — isolated so store mutations don't tear it down and recreate it.
+	$effect(() => {
+		const pid = projectId;
+		const token = idToken;
+
+		if (!browser || !pid || !token) return;
+
 		const spec: SubscriptionSpec<Doclink> = {
 			query: print(S_ON_CREATE_DOCLINK),
 			variables: { parentId: pid },
@@ -248,11 +259,7 @@
 
 		addSubscription(token, spec).catch(err => console.error('Failed to add doclink subscription:', err));
 
-		// Cleanup for both fetch and WS
-		return () => {
-			isActive = false;
-			removeSubscription(spec);
-		};
+		return () => { removeSubscription(spec); };
 	});
 </script>
 
@@ -381,13 +388,11 @@
 				</div>
 
 				<div class="shrink-0 overflow-y-auto max-h-[40%] p-4">
-					{#key projectId}
-						<DocumentUpload
-							{idToken}
-							{projectId}
-							metadata={fileMetadata}
-						/>
-					{/key}
+					<DocumentUpload
+						{idToken}
+						{projectId}
+						metadata={fileMetadata}
+					/>
 				</div>
 
 				{#if projectId}

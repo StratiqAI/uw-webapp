@@ -108,6 +108,18 @@ export function getProjectImagesStore(projectId: string): Readable<Image[]> {
 }
 
 /**
+ * Batch-set all entities for a project in a single store update.
+ * Avoids N individual store.update() calls that each trigger re-renders.
+ */
+export function setProjectEntities(
+	projectId: string,
+	entities: { texts: Text[]; tables: Table[]; images: Image[] }
+): void {
+	const store = getProjectEntitiesStore(projectId);
+	store.set(entities);
+}
+
+/**
  * Clear entities for a project (useful when switching projects)
  */
 export function clearProjectEntities(projectId: string): void {

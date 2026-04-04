@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { fly } from 'svelte/transition';
+	import { untrack } from 'svelte';
 	import { getProjectTextsStore, getProjectTablesStore, getProjectImagesStore } from '$lib/stores/projectEntitiesStore';
 	import { notificationStore } from '$lib/stores/notifications.svelte';
 	import type { Text, Table, Image, Notification } from '@stratiqai/types-simple';
@@ -273,49 +274,76 @@
 		}
 	});
 
-	// Watch text count changes (real-time only, after initial load)
+	// Debounced entity watchers: accumulate rapid arrivals into a single feed entry.
+	const ENTITY_DEBOUNCE_MS = 300;
+	let textDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+	let tableDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+	let imageDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
 	$effect(() => {
 		const count = $texts.length;
-		if (initialized && count > prevTextCount && prevTextCount > 0) {
-			const delta = count - prevTextCount;
-			const newest = $texts[0] as Text | undefined;
-			const pageInfo = newest?.pageNum ? ` on page ${newest.pageNum}` : '';
-			const msg = delta === 1
-				? pick(TEXT_MESSAGES_SINGLE)(pageInfo)
-				: pick(TEXT_MESSAGES_MULTI)(delta, pageInfo);
-			addEntry(AGENTS.textAgent, msg, 'text', newest ? textPreview(newest) : null);
+		const newest = $texts[0] as Text | undefined;
+		const prev = untrack(() => prevTextCount);
+		if (initialized && count > prev && prev > 0) {
+			if (textDebounceTimer) clearTimeout(textDebounceTimer);
+			const snapshot = { count, newest };
+			textDebounceTimer = setTimeout(() => {
+				const delta = snapshot.count - untrack(() => prevTextCount);
+				if (delta <= 0) return;
+				const pageInfo = snapshot.newest?.pageNum ? ` on page ${snapshot.newest.pageNum}` : '';
+				const msg = delta === 1
+					? pick(TEXT_MESSAGES_SINGLE)(pageInfo)
+					: pick(TEXT_MESSAGES_MULTI)(delta, pageInfo);
+				addEntry(AGENTS.textAgent, msg, 'text', snapshot.newest ? textPreview(snapshot.newest) : null);
+				prevTextCount = snapshot.count;
+			}, ENTITY_DEBOUNCE_MS);
+		} else {
+			prevTextCount = count;
 		}
-		prevTextCount = count;
 	});
 
-	// Watch table count changes
 	$effect(() => {
 		const count = $tables.length;
-		if (initialized && count > prevTableCount && prevTableCount > 0) {
-			const delta = count - prevTableCount;
-			const newest = $tables[0] as Table | undefined;
-			const pageInfo = newest?.pageNum ? ` on page ${newest.pageNum}` : '';
-			const msg = delta === 1
-				? pick(TABLE_MESSAGES_SINGLE)(pageInfo)
-				: pick(TABLE_MESSAGES_MULTI)(delta, pageInfo);
-			addEntry(AGENTS.tableAgent, msg, 'table', newest ? tablePreview(newest) : null);
+		const newest = $tables[0] as Table | undefined;
+		const prev = untrack(() => prevTableCount);
+		if (initialized && count > prev && prev > 0) {
+			if (tableDebounceTimer) clearTimeout(tableDebounceTimer);
+			const snapshot = { count, newest };
+			tableDebounceTimer = setTimeout(() => {
+				const delta = snapshot.count - untrack(() => prevTableCount);
+				if (delta <= 0) return;
+				const pageInfo = snapshot.newest?.pageNum ? ` on page ${snapshot.newest.pageNum}` : '';
+				const msg = delta === 1
+					? pick(TABLE_MESSAGES_SINGLE)(pageInfo)
+					: pick(TABLE_MESSAGES_MULTI)(delta, pageInfo);
+				addEntry(AGENTS.tableAgent, msg, 'table', snapshot.newest ? tablePreview(snapshot.newest) : null);
+				prevTableCount = snapshot.count;
+			}, ENTITY_DEBOUNCE_MS);
+		} else {
+			prevTableCount = count;
 		}
-		prevTableCount = count;
 	});
 
-	// Watch image count changes
 	$effect(() => {
 		const count = $images.length;
-		if (initialized && count > prevImageCount && prevImageCount > 0) {
-			const delta = count - prevImageCount;
-			const newest = $images[0] as Image | undefined;
-			const pageInfo = newest?.pageNum ? ` on page ${newest.pageNum}` : '';
-			const msg = delta === 1
-				? pick(IMAGE_MESSAGES_SINGLE)(pageInfo)
-				: pick(IMAGE_MESSAGES_MULTI)(delta, pageInfo);
-			addEntry(AGENTS.visionAgent, msg, 'image', newest ? imagePreview(newest) : null);
+		const newest = $images[0] as Image | undefined;
+		const prev = untrack(() => prevImageCount);
+		if (initialized && count > prev && prev > 0) {
+			if (imageDebounceTimer) clearTimeout(imageDebounceTimer);
+			const snapshot = { count, newest };
+			imageDebounceTimer = setTimeout(() => {
+				const delta = snapshot.count - untrack(() => prevImageCount);
+				if (delta <= 0) return;
+				const pageInfo = snapshot.newest?.pageNum ? ` on page ${snapshot.newest.pageNum}` : '';
+				const msg = delta === 1
+					? pick(IMAGE_MESSAGES_SINGLE)(pageInfo)
+					: pick(IMAGE_MESSAGES_MULTI)(delta, pageInfo);
+				addEntry(AGENTS.visionAgent, msg, 'image', snapshot.newest ? imagePreview(snapshot.newest) : null);
+				prevImageCount = snapshot.count;
+			}, ENTITY_DEBOUNCE_MS);
+		} else {
+			prevImageCount = count;
 		}
-		prevImageCount = count;
 	});
 
 	const activeAgentCount = $derived.by(() => {

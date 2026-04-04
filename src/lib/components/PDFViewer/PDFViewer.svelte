@@ -14,7 +14,7 @@
 		data,
 		documents,
 		scale = $bindable(1.0),
-		pageNum: _unusedPageNumProp = 1,
+		pageNum = 1,
 		flipTime = 120,
 		showButtons = ['navigation', 'zoom', 'rotate', 'download'],
 		currentPage = $bindable(1),
@@ -68,8 +68,6 @@
 	let isInitialized: boolean = false;
 
 	let isLoading = $state(true);
-	/** Last page we successfully rendered; keeps $effect in sync without mutating the pageNum prop */
-	let lastRenderedPageNum = $state(1);
 	let docSelectorOpen = $state(false);
 	let pageSelectorOpen = $state(false);
 	let pageInputValue = $state('');
@@ -111,11 +109,10 @@
 			currentPage = num;
 
 			if (pageNumPending !== null) {
-				let batchPage = pageNumPending;
-				if (batchPage < pdfDoc.numPages) {
-					pages[batchPage - 1] = canvas.cloneNode(true) as HTMLCanvasElement;
-					batchPage++;
-					await renderPage(batchPage);
+				if (pageNum < pdfDoc.numPages) {
+					pages[pageNum - 1] = canvas.cloneNode(true) as HTMLCanvasElement;
+					pageNum++;
+					await renderPage(pageNum);
 				} else {
 					for (let i = 0; i < pages.length; i++) {
 						canvas.parentNode?.insertBefore(pages[i], canvas);
@@ -124,7 +121,7 @@
 				}
 				pageNumPending = null;
 			}
-			lastRenderedPageNum = num;
+			if (showButtons.length) pageNum = num;
 		} catch (error) {
 			console.error('Error rendering page:', error);
 			pageRendering = false;
@@ -197,7 +194,7 @@
 		if (scale < maxScale) {
 			const nextPreset = ZOOM_PRESETS.find((p) => p > zoomPercent);
 			scale = Math.min((nextPreset ?? zoomPercent + 25) / 100, maxScale);
-			queueRenderPage(currentPage);
+			queueRenderPage(pageNum);
 		}
 	};
 
@@ -205,23 +202,23 @@
 		if (scale > minScale) {
 			const prevPreset = [...ZOOM_PRESETS].reverse().find((p) => p < zoomPercent);
 			scale = Math.max((prevPreset ?? zoomPercent - 25) / 100, minScale);
-			queueRenderPage(currentPage);
+			queueRenderPage(pageNum);
 		}
 	};
 
 	const setZoom = (percent: number): void => {
 		scale = Math.min(Math.max(percent / 100, minScale), maxScale);
-		queueRenderPage(currentPage);
+		queueRenderPage(pageNum);
 	};
 
 	const clockwiseRotate = (): void => {
 		rotation += 90;
-		queueRenderPage(currentPage);
+		queueRenderPage(pageNum);
 	};
 
 	const antiClockwiseRotate = (): void => {
 		rotation -= 90;
-		queueRenderPage(currentPage);
+		queueRenderPage(pageNum);
 	};
 
 	const onPasswordSubmit = (): void => {
@@ -284,13 +281,12 @@
 			isInitialized = false;
 			pdfDoc = null;
 			currentPage = 1;
-			lastRenderedPageNum = 1;
 			initialLoad();
 		}
 	});
 
 	$effect(() => {
-		if (isInitialized && currentPage !== lastRenderedPageNum) {
+		if (isInitialized && currentPage !== pageNum) {
 			queueRenderPage(currentPage);
 		}
 	});

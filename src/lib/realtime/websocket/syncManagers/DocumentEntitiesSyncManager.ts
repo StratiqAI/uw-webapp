@@ -15,6 +15,7 @@ import {
 	addProjectText,
 	addProjectTable,
 	addProjectImage,
+	setProjectEntities,
 	clearProjectEntities
 } from '$lib/stores/projectEntitiesStore';
 import { addSubscription, removeSubscription, ensureConnection } from '$lib/stores/appSyncClientStore';
@@ -267,36 +268,33 @@ export class DocumentEntitiesSyncManager {
 		this._error = null;
 
 		try {
-			// Tear down any previous subscriptions before re-fetching
 			this.teardownSubscriptions();
 
-			// Clear existing entities before fetching fresh data
-			clearProjectEntities(projectId);
-
 			if (documentIds.length === 0) {
+				clearProjectEntities(projectId);
 				this._status = 'ready';
 				return;
 			}
 
-			// Fetch entities for all documents in parallel
 			const results = await Promise.all(
 				documentIds.map(docId => this.fetchEntitiesForDocument(docId))
 			);
 
-			// Add all fetched entities to the store
+			// Batch all fetched entities into a single store write
+			const allTexts: Text[] = [];
+			const allTables: Table[] = [];
+			const allImages: Image[] = [];
 			for (const result of results) {
-				for (const text of result.texts) {
-					addProjectText(projectId, text);
-				}
-				for (const table of result.tables) {
-					addProjectTable(projectId, table);
-				}
-				for (const image of result.images) {
-					addProjectImage(projectId, image);
-				}
+				allTexts.push(...result.texts);
+				allTables.push(...result.tables);
+				allImages.push(...result.images);
 			}
+			setProjectEntities(projectId, {
+				texts: allTexts,
+				tables: allTables,
+				images: allImages
+			});
 
-			// Set up real-time subscriptions so new entities stream in automatically
 			await Promise.all(
 				documentIds.map(docId => this.setupSubscriptionsForDocument(docId))
 			);
