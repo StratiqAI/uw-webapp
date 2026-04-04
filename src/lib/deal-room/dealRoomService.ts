@@ -2,7 +2,7 @@
  * Deal Room (Investor VDR) service: GraphQL operations with fallbacks for demo when backend is unavailable.
  */
 
-import { gql } from '$lib/realtime/graphql/requestHandler';
+import { gql } from '$lib/services/realtime/graphql/requestHandler';
 import type {
   NDAAgreement,
   Invitation,

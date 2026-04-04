@@ -1,8 +1,8 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types';
 import type { Project } from '@stratiqai/types-simple';
-import { gql } from '$lib/realtime/graphql/requestHandler';
-import { Q_GET_PROJECT } from '$lib/realtime/graphql/queries/Project';
+import { gql } from '$lib/services/realtime/graphql/requestHandler';
+import { Q_GET_PROJECT } from '$lib/services/realtime/graphql/queries/Project';
 
 type GraphQLProjectResponse = {
 	getProject: Project | null;

@@ -13,9 +13,9 @@ import {
 	M_DELETE_PROMPT,
 	M_UPDATE_PROMPT,
 	Q_LIST_PROMPTS
-} from '$lib/graphql/promptOperations';
-import { ensureJsonSchemaEntity } from '$lib/graphql/jsonSchemaService';
-import type { IGraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
+} from '$lib/services/graphql/promptOperations';
+import { ensureJsonSchemaEntity } from '$lib/services/graphql/jsonSchemaService';
+import type { IGraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
 
 /**
  * AIQueryData interface - matches the workflow editor's data structure

@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import type { MCPServerConfig } from '$lib/mcp/client';
+import type { MCPServerConfig } from '$lib/services/mcp/client';
 
 interface MCPConfig {
 	mcpServers: Record<string, {

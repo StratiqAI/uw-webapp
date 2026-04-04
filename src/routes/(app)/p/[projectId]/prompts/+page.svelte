@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import type { Prompt, Project } from '@stratiqai/types-simple';
-	import { PromptSyncManager } from '$lib/realtime/websocket/syncManagers/PromptSyncManager';
-	import { ProjectSyncManager } from '$lib/realtime/websocket/syncManagers/ProjectSyncManager';
+	import { PromptSyncManager } from '$lib/services/realtime/websocket/sync-managers/PromptSyncManager';
+	import { ProjectSyncManager } from '$lib/services/realtime/websocket/sync-managers/ProjectSyncManager';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
-	import { GraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
-	import { toTopicPath } from '$lib/realtime/store/TopicMapper';
+	import { GraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
+	import { toTopicPath } from '$lib/services/realtime/store/TopicMapper';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 
 	import TopBar from '$lib/components/layout/TopBar.svelte';

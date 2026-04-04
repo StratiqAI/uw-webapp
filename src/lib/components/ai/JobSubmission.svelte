@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	import { gql } from '$lib/realtime/graphql/requestHandler';
+	import { gql } from '$lib/services/realtime/graphql/requestHandler';
 	import { addSubscription, removeSubscription, ensureConnection } from '$lib/stores/appSyncClientStore';
-	import { S_JOB_UPDATE } from '$lib/realtime/graphql/subscriptions/Job';
+	import { S_JOB_UPDATE } from '$lib/services/realtime/graphql/subscriptions/Job';
 	import { jobUpdateStore, type JobUpdate } from '$lib/stores/jobUpdateStore.svelte';
-	import type { SubscriptionSpec } from '$lib/realtime/websocket/types';
+	import type { SubscriptionSpec } from '$lib/services/realtime/websocket/types';
 
 	// ===== Type and Variables Related to Job Status =====
 

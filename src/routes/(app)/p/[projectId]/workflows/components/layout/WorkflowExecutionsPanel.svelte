@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { WorkflowExecutionListItem } from '../../services/backend/workflowExecutionService';
-	import type { WorkflowSyncManager } from '$lib/realtime/websocket/syncManagers/WorkflowSyncManager';
+	import type { WorkflowSyncManager } from '$lib/services/realtime/websocket/sync-managers/WorkflowSyncManager';
 	import type { WorkflowExecution, WorkflowNodeExecution } from '@stratiqai/types-simple';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 

@@ -11,7 +11,7 @@ import {
 } from '$lib/dashboard/types/dashboardTabs';
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 import type { DashboardLayout } from '@stratiqai/types-simple';
-import type { DashboardSyncManager } from '$lib/realtime/websocket/syncManagers/DashboardSyncManager';
+import type { DashboardSyncManager } from '$lib/services/realtime/websocket/sync-managers/DashboardSyncManager';
 
 const STORAGE_KEYS = {
 	WIDGETS: 'dashboard_widgets',

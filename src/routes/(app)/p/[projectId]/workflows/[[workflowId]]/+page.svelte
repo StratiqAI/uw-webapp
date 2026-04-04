@@ -59,10 +59,10 @@
 		definitionToApiVariables,
 		type WorkflowDefinitionInput
 	} from '../services/serialization/workflowSerializationService';
-	import { gql } from '$lib/realtime/graphql/requestHandler';
-	import { Q_GET_JSON_SCHEMA } from '$lib/graphql/jsonSchemaOperations';
-	import { ensureJsonSchemaEntity } from '$lib/graphql/jsonSchemaService';
-	import { GraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
+	import { gql } from '$lib/services/realtime/graphql/requestHandler';
+	import { Q_GET_JSON_SCHEMA } from '$lib/services/graphql/jsonSchemaOperations';
+	import { ensureJsonSchemaEntity } from '$lib/services/graphql/jsonSchemaService';
+	import { GraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
 	import WorkflowSwitcher from '$lib/dashboard/components/WorkflowSwitcher.svelte';
 	import {
 		M_CREATE_WORKFLOW,
@@ -74,18 +74,18 @@
 		type UpdateWorkflowMutation,
 		type DeleteWorkflowMutation
 	} from '@stratiqai/types-simple';
-	import { Q_GET_PROJECT } from '$lib/realtime/graphql/queries/Project';
+	import { Q_GET_PROJECT } from '$lib/services/realtime/graphql/queries/Project';
 	import { fetchWorkflowExecutions } from '../services/backend/workflowExecutionService';
 	import type { WorkflowExecutionListItem } from '../services/backend/workflowExecutionService';
-	import { getAppSyncWsClient, initAppSyncWsClient } from '$lib/realtime/websocket/wsClient';
+	import { getAppSyncWsClient, initAppSyncWsClient } from '$lib/services/realtime/websocket/wsClient';
 	import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from '$env/static/public';
 	import type { ElementType, GridElement, Connection } from '../types';
 	import { isExecutableNode } from '../types/node';
 	import type { PageData } from './$types';
 	import type { Project, Workflow, WorkflowExecution, WorkflowNodeExecution } from '@stratiqai/types-simple';
-	import { WorkflowSyncManager } from '$lib/realtime/websocket/syncManagers/WorkflowSyncManager';
+	import { WorkflowSyncManager } from '$lib/services/realtime/websocket/sync-managers/WorkflowSyncManager';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
-	import { toTopicPath } from '$lib/realtime/store/TopicMapper';
+	import { toTopicPath } from '$lib/services/realtime/store/TopicMapper';
 	import { onMount, onDestroy, tick } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';

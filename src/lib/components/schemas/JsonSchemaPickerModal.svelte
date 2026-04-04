@@ -5,8 +5,8 @@
 		M_CREATE_JSON_SCHEMA,
 		M_UPDATE_JSON_SCHEMA,
 		M_DELETE_JSON_SCHEMA
-	} from '$lib/graphql/jsonSchemaOperations';
-	import type { IGraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
+	} from '$lib/services/graphql/jsonSchemaOperations';
+	import type { IGraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
 
 	interface JsonSchemaItem {
 		id: string;

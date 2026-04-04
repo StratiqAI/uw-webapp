@@ -3,7 +3,7 @@
 	import { M_UPDATE_PROJECT } from '@stratiqai/types-simple';
 	import { print } from 'graphql';
 	import { goto } from '$app/navigation';
-	import { gql } from '$lib/realtime/graphql/requestHandler';
+	import { gql } from '$lib/services/realtime/graphql/requestHandler';
 
 	interface Props {
 		projects: Project[];

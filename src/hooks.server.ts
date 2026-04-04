@@ -1,7 +1,7 @@
 // src/hooks.server.ts
 import '$lib/server/retainSubscriptionDocumentsForSsr';
 import { type CurrentUser } from '$lib/types/auth';
-import { createSupabaseServerClient } from '$lib/supabase/server';
+import { createSupabaseServerClient } from '$lib/services/supabase/server';
 import type { Handle } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';

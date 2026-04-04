@@ -11,9 +11,9 @@
 	import { onMount, setContext } from 'svelte';
 	import { themeStore } from '$lib/stores/themeStore.svelte';
 	import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
-	import { createSupabaseBrowserClient } from '$lib/supabase/browser';
-	import { logSupabaseRpcSmokeTest } from '$lib/supabase/supabaseRpcSmokeTest';
-	import { DashboardSyncManager } from '$lib/realtime/websocket/syncManagers/DashboardSyncManager';
+	import { createSupabaseBrowserClient } from '$lib/services/supabase/browser';
+	import { logSupabaseRpcSmokeTest } from '$lib/services/supabase/supabaseRpcSmokeTest';
+	import { DashboardSyncManager } from '$lib/services/realtime/websocket/sync-managers/DashboardSyncManager';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 

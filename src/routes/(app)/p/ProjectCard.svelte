@@ -2,7 +2,7 @@
 	import type { Project } from '@stratiqai/types-simple';
 	import { M_UPDATE_PROJECT } from '@stratiqai/types-simple';
 	import { print } from 'graphql';
-	import { gql } from '$lib/realtime/graphql/requestHandler';
+	import { gql } from '$lib/services/realtime/graphql/requestHandler';
 	import { timeAgo } from '$lib/utils/dateFormat';
 
 	interface Props {

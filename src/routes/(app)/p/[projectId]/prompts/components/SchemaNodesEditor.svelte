@@ -7,7 +7,7 @@
 		NestedItemSchema,
 		NestedSchemaNodeType,
 		NestedSchemaPropertyNode
-	} from '$lib/schema/promptSchemaTreeTypes';
+	} from '$lib/types/promptSchemaTree';
 	import Self from './SchemaNodesEditor.svelte';
 
 	interface Props {

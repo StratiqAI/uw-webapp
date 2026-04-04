@@ -11,7 +11,7 @@
 	}
 	import { Button, Modal } from 'flowbite-svelte';
 	import { ExclamationCircleOutline } from 'flowbite-svelte-icons';
-	import { gql } from '$lib/realtime/graphql/requestHandler';
+	import { gql } from '$lib/services/realtime/graphql/requestHandler';
 	import type { Project } from '@stratiqai/types-simple';
 	let {
 		open = $bindable(true),

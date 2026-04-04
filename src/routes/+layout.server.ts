@@ -1,6 +1,6 @@
 // src/routes/+layout.server.ts
 import type { LayoutServerLoad } from './$types';
-import { gql } from '$lib/realtime/graphql/requestHandler';
+import { gql } from '$lib/services/realtime/graphql/requestHandler';
 import { Q_LIST_PROJECTS } from '@stratiqai/types-simple';
 import type { Project } from '@stratiqai/types-simple';
 

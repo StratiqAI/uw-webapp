@@ -1,4 +1,4 @@
-import { gql } from '$lib/realtime/graphql/requestHandler';
+import { gql } from '$lib/services/realtime/graphql/requestHandler';
 import { Q_GET_WORKFLOW_EXECUTION, Q_LIST_WORKFLOW_EXECUTIONS } from '@stratiqai/types-simple';
 import type { WorkflowExecution } from '@stratiqai/types-simple';
 

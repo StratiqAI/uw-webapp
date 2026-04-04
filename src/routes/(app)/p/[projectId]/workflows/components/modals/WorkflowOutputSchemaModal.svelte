@@ -3,7 +3,7 @@
 	import JsonSchemaFieldRow from '$lib/components/schemas/JsonSchemaFieldRow.svelte';
 	import JsonSchemaPickerModal from '$lib/components/schemas/JsonSchemaPickerModal.svelte';
 	import type { JsonSchemaDefinition } from '$lib/types/models';
-	import type { IGraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
+	import type { IGraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
 	import Ajv from 'ajv';
 	import addFormats from 'ajv-formats';
 

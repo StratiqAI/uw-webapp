@@ -5,12 +5,12 @@
 		NestedItemSchema,
 		NestedSchemaNodeType,
 		NestedSchemaPropertyNode
-	} from '$lib/schema/promptSchemaTreeTypes';
+	} from '$lib/types/promptSchemaTree';
 	import SchemaNodesEditor from './SchemaNodesEditor.svelte';
 	import JsonSchemaPickerModal from '$lib/components/schemas/JsonSchemaPickerModal.svelte';
-	import { Q_GET_JSON_SCHEMA } from '$lib/graphql/jsonSchemaOperations';
-	import { M_GENERATE_PROMPT_DRAFT } from '$lib/graphql/promptOperations';
-	import type { IGraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';
+	import { Q_GET_JSON_SCHEMA } from '$lib/services/graphql/jsonSchemaOperations';
+	import { M_GENERATE_PROMPT_DRAFT } from '$lib/services/graphql/promptOperations';
+	import type { IGraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
 	import { getTemplateStrForEditor, parseTemplateToAIQueryData, type AIQueryData } from '../PromptService';
 
 	/** All valid AIModel enum values (schema) — used so 3.1 and all models pass VALID_AI_MODELS.has() */

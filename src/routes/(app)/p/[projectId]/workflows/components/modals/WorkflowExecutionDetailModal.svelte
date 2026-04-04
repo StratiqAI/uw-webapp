@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from '$env/static/public';
-	import { getAppSyncWsClient, initAppSyncWsClient } from '$lib/realtime/websocket/wsClient';
+	import { getAppSyncWsClient, initAppSyncWsClient } from '$lib/services/realtime/websocket/wsClient';
 	import {
 		S_ON_UPDATE_WORKFLOW_EXECUTION,
 		S_ON_WORKFLOW_NODE_EXECUTION_STATUS_CHANGE

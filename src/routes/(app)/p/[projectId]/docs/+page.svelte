@@ -3,23 +3,23 @@
 	import { browser } from '$app/environment';
 	import { fade } from 'svelte/transition';
 	import { untrack, onDestroy } from 'svelte';
-	import { store } from '$lib/realtime/websocket/projectSync';
-	import { DocumentEntitiesSyncManager } from '$lib/realtime/websocket/syncManagers/DocumentEntitiesSyncManager';
+	import { store } from '$lib/services/realtime/websocket/projectSync';
+	import { DocumentEntitiesSyncManager } from '$lib/services/realtime/websocket/sync-managers/DocumentEntitiesSyncManager';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import { authStore } from '$lib/stores/auth.svelte';
-	import { DocumentUpload } from '$lib/components/documents/upload';
-	import type { ExistingDocument, DocumentListItem } from '$lib/components/documents/upload';
-	import DocumentProcessingModal from '$lib/components/documents/processing/DocumentProcessingModal.svelte';
-	import { ProjectEntitiesDisplay } from '$lib/components/documents/discovery';
-	import PDFViewer from '$lib/components/documents/viewer/PDFViewer.svelte';
+	import { DocumentUpload } from '$lib/documents/upload';
+	import type { ExistingDocument, DocumentListItem } from '$lib/documents/upload';
+	import DocumentProcessingModal from '$lib/documents/processing/DocumentProcessingModal.svelte';
+	import { ProjectEntitiesDisplay } from '$lib/documents/discovery';
+	import PDFViewer from '$lib/documents/viewer/PDFViewer.svelte';
 	import AgentActivityFeed from '$lib/components/ai/AgentActivityFeed.svelte';
 	import { page } from '$app/stores';
 	import { M_DELETE_DOCLINK, S_ON_CREATE_DOCLINK } from '@stratiqai/types-simple';
 	import { addSubscription, removeSubscription } from '$lib/stores/appSyncClientStore';
 	import { print } from 'graphql';
-	import { gql } from '$lib/realtime/graphql/requestHandler';
-	import { Q_GET_PROJECT } from '$lib/realtime/graphql/queries/Project';
-	import type { SubscriptionSpec } from '$lib/realtime/websocket/types';
+	import { gql } from '$lib/services/realtime/graphql/requestHandler';
+	import { Q_GET_PROJECT } from '$lib/services/realtime/graphql/queries/Project';
+	import type { SubscriptionSpec } from '$lib/services/realtime/websocket/types';
 
 	interface ProjectDocument {
 		id: string;

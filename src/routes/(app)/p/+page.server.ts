@@ -8,7 +8,7 @@ import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
 // AppSync GraphQL request helper
-import { gql } from '$lib/realtime/graphql/requestHandler';
+import { gql } from '$lib/services/realtime/graphql/requestHandler';
 
 // GraphQL operation
 import { Q_LIST_PROJECTS } from '@stratiqai/types-simple';

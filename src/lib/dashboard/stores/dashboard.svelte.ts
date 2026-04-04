@@ -24,7 +24,7 @@ import type { WidgetRect } from '$lib/dashboard/utils/grid';
 import { DashboardStorage } from '$lib/dashboard/utils/storage';
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
-import type { DashboardSyncManager } from '$lib/realtime/websocket/syncManagers/DashboardSyncManager';
+import type { DashboardSyncManager } from '$lib/services/realtime/websocket/sync-managers/DashboardSyncManager';
 import type { DashboardLayout } from '@stratiqai/types-simple';
 
 const DEFAULT_CONFIG: DashboardConfig = structuredClone(DEFAULT_DASHBOARD_CONFIG);

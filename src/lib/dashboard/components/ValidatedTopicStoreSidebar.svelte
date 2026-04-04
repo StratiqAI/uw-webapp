@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import { getWidgetTopicsByType, WIDGET_TYPES } from '$lib/dashboard/setup/widgetSchemaRegistration';
-	import { topicDragStore, TOPIC_DROP_MIME } from '$lib/dashboard/stores/topicDragStore';
+	import { topicDragStore, TOPIC_DROP_MIME } from '$lib/dashboard/stores/topicDragStore.svelte';
 	import type { WidgetType } from '$lib/dashboard/types/widget';
 
 	interface Props {

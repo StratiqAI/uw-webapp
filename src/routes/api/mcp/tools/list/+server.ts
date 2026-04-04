@@ -1,9 +1,9 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { mcpClientManager } from '$lib/mcp/client';
+import { mcpClientManager } from '$lib/services/mcp/client';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import type { MCPServerConfig } from '$lib/mcp/client';
+import type { MCPServerConfig } from '$lib/services/mcp/client';
 
 interface ListToolsRequest {
 	server: string;

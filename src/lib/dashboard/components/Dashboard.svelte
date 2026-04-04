@@ -1,18 +1,18 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
-	import { topicDragStore, TOPIC_DROP_MIME } from '$lib/dashboard/stores/topicDragStore';
+	import { topicDragStore, TOPIC_DROP_MIME } from '$lib/dashboard/stores/topicDragStore.svelte';
 	import GridContainer from '$lib/dashboard/components/GridContainer.svelte';
 	import WidgetWrapper from '$lib/dashboard/components/WidgetWrapper.svelte';
 	import GhostIndicator from '$lib/dashboard/components/GhostIndicator.svelte';
 	import { getGridPositionFromCoordinates } from '$lib/dashboard/utils/grid';
-	import { createDropHandlers } from '$lib/dashboard/utils/drag-drop';
+	import { createDropHandlers } from '$lib/dashboard/utils/dragDrop';
 	import { DEFAULT_WIDGET_SIZES, getDefaultDataForWidget } from '$lib/dashboard/setup/defaultDashboardValues';
 	import type { Widget, WidgetType } from '$lib/dashboard/types/widget';
 	import { setDashboardWidgetHost } from '@stratiqai/dashboard-widget-sdk';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
-	import { createSupabaseBrowserClient } from '$lib/supabase/browser';
+	import { createSupabaseBrowserClient } from '$lib/services/supabase/browser';
 
 	const serviceMap = new Map<string, unknown>();
 	const sbClient = createSupabaseBrowserClient();

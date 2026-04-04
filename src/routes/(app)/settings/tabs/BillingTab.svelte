@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { gql } from '$lib/realtime/graphql/requestHandler';
+	import { gql } from '$lib/services/realtime/graphql/requestHandler';
 	import { Q_LIST_USAGE_RECORDS } from '@stratiqai/types-simple';
 	import type { CurrentUser } from '$lib/types/auth';
 

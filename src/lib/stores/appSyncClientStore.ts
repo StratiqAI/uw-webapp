@@ -11,9 +11,9 @@
  * @see {@link ../../docs/application_stores/appSyncClientStore.md}
  */
 
-import { AppSyncWsClient } from '$lib/realtime/websocket/AppSyncWsClient';
+import { AppSyncWsClient } from '$lib/services/realtime/websocket/AppSyncWsClient';
 import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from '$env/static/public';
-import type { SubscriptionSpec } from '$lib/realtime/websocket/types';
+import type { SubscriptionSpec } from '$lib/services/realtime/websocket/types';
 
 interface ClientState {
 	client: AppSyncWsClient | null;

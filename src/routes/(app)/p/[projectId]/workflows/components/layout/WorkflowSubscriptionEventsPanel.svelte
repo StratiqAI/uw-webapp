@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { WorkflowSyncManager, SubscriptionEvent } from '$lib/realtime/websocket/syncManagers/WorkflowSyncManager';
+	import type { WorkflowSyncManager, SubscriptionEvent } from '$lib/services/realtime/websocket/sync-managers/WorkflowSyncManager';
 	import { onMount, onDestroy } from 'svelte';
 
 	const {

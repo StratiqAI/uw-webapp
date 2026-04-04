@@ -30,7 +30,7 @@
 	import ProjectCard from './ProjectCard.svelte';
 	import MetaTag from './MetaTag.svelte';
 	import TopBar from '$lib/components/layout/TopBar.svelte';
-	import { gql } from '$lib/realtime/graphql/requestHandler';
+	import { gql } from '$lib/services/realtime/graphql/requestHandler';
 
 	// ----------------------------------------------------------------------------
 	// Props + Core Reactive State

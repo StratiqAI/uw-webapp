@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Button, Input, Label, Modal, Textarea, Checkbox, Select } from 'flowbite-svelte';
 	import type { UserModalProps } from '../../../../uw-ai-plane/types';
-	import { gql } from '$lib/realtime/graphql/requestHandler';
+	import { gql } from '$lib/services/realtime/graphql/requestHandler';
 	import { M_CREATE_PROJECT, M_UPDATE_PROJECT } from '@stratiqai/types-simple';
 	import { print } from 'graphql';
 	import { goto } from '$app/navigation';
@@ -94,7 +94,7 @@
 			};
 
 			// Import detail mutations
-			const { M_CREATE_PROJECT_DETAIL, M_UPDATE_PROJECT_DETAIL } = await import('$lib/realtime/graphql/mutations/Project');
+			const { M_CREATE_PROJECT_DETAIL, M_UPDATE_PROJECT_DETAIL } = await import('$lib/services/realtime/graphql/mutations/Project');
 			
 			if (data?.details?.id) {
 				await gql<{ updateProjectDetail: any }>(M_UPDATE_PROJECT_DETAIL, { input: detailInput }, idToken);

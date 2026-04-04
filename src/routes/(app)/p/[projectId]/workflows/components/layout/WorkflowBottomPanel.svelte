@@ -2,7 +2,7 @@
 	import WorkflowExecutionsPanel from './WorkflowExecutionsPanel.svelte';
 	import WorkflowSubscriptionEventsPanel from './WorkflowSubscriptionEventsPanel.svelte';
 	import type { WorkflowExecutionListItem } from '../../services/backend/workflowExecutionService';
-	import type { WorkflowSyncManager } from '$lib/realtime/websocket/syncManagers/WorkflowSyncManager';
+	import type { WorkflowSyncManager } from '$lib/services/realtime/websocket/sync-managers/WorkflowSyncManager';
 	import { onMount } from 'svelte';
 
 	type TabId = 'executions' | 'subscriptions';

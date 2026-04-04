@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import type { LayoutProps } from './$types';
-	import { ProjectSyncManager, store } from '$lib/realtime/websocket/projectSync';
+	import { ProjectSyncManager, store } from '$lib/services/realtime/websocket/projectSync';
 	import { addSubscription, removeSubscription } from '$lib/stores/appSyncClientStore';
 	import { notificationStore, S_ON_CREATE_NOTIFICATION, type Notification } from '$lib/stores/notifications.svelte';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
