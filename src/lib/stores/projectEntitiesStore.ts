@@ -108,15 +108,32 @@ export function getProjectImagesStore(projectId: string): Readable<Image[]> {
 }
 
 /**
+ * Deduplicate an array of entities by `id`, keeping the first occurrence.
+ */
+function dedup<T extends { id: string }>(items: T[]): T[] {
+	const seen = new Set<string>();
+	return items.filter((item) => {
+		if (seen.has(item.id)) return false;
+		seen.add(item.id);
+		return true;
+	});
+}
+
+/**
  * Batch-set all entities for a project in a single store update.
  * Avoids N individual store.update() calls that each trigger re-renders.
+ * Deduplicates by id to guard against duplicate entries from the API.
  */
 export function setProjectEntities(
 	projectId: string,
 	entities: { texts: Text[]; tables: Table[]; images: Image[] }
 ): void {
 	const store = getProjectEntitiesStore(projectId);
-	store.set(entities);
+	store.set({
+		texts: dedup(entities.texts),
+		tables: dedup(entities.tables),
+		images: dedup(entities.images)
+	});
 }
 
 /**
