@@ -31,7 +31,7 @@
 
 	function handleNotificationClick(notification: Notification) {
 		if (notification.parentId) {
-			goto(`/projects/workspace/${notification.parentId}/get-started`);
+			goto(`/p/${notification.parentId}/docs`);
 			notificationStore.setPanel(false);
 		}
 	}

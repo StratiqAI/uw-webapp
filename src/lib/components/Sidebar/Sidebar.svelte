@@ -32,76 +32,76 @@
 	/** Matches app chrome: dark sidebar only when theme is `dark` (light/warm use non-dark branch + CSS tokens). */
 	let isDarkTheme = $derived(themeStore.theme === 'dark');
 
-	/** Project id from workspace URL, else last dashboard-selected project (localStorage). */
-	const workspaceProjectId = $derived.by(() => {
+	const activeProjectId = $derived.by(() => {
 		const path = $page.url.pathname;
-		const m = path.match(/^\/projects\/workspace\/([^/]+)/);
+		const m = path.match(/^\/p\/([^/]+)/);
 		if (m?.[1]) return m[1];
 		return browser ? DashboardStorage.getSelectedProjectId() : null;
 	});
 
 	const navItems = $derived.by((): NavItem[] => {
-		const pid = workspaceProjectId;
-		const projectWorkspaceBase = pid ? `/projects/workspace/${pid}` : null;
-		const documentAnalysisHref = projectWorkspaceBase
-			? `${projectWorkspaceBase}/document-analysis`
-			: '/projects';
-		const dealRoomHref = projectWorkspaceBase ? `${projectWorkspaceBase}/deal-room` : '/projects';
+		const pid = activeProjectId;
+		const projectBase = pid ? `/p/${pid}` : null;
+		const docsHref = projectBase ? `${projectBase}/docs` : '/p';
+		const dashboardHref = projectBase ? `${projectBase}/dashboard` : '/p';
+		const workflowsHref = projectBase ? `${projectBase}/workflows` : '/p';
+		const promptsHref = projectBase ? `${projectBase}/prompts` : '/p';
+		const dealroomHref = projectBase ? `${projectBase}/dealroom` : '/p';
 
 		return [
 			{
 				label: 'Projects',
-				href: '/projects',
-				activeKey: '/project',
+				href: '/p',
+				activeKey: '/p',
 				icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776"/>`
 			},
 			{
 				label: 'Documents',
-				href: documentAnalysisHref,
-				activeKey: 'document-analysis',
+				href: docsHref,
+				activeKey: '/docs',
 				icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Zm3.75 11.625a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/>`
 			},
 			{
 				label: 'Dashboard',
-				href: '/dashboard',
+				href: dashboardHref,
 				activeKey: '/dashboard',
 				icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z"/>`
 			},
 			{
 				label: 'Workflows',
-				href: '/workflow',
-				activeKey: '/workflow',
+				href: workflowsHref,
+				activeKey: '/workflows',
 				disabled: true,
 				icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/>`
 			},
 			{
 				label: 'Prompt Library',
-				href: '/library',
-				activeKey: '/library',
+				href: promptsHref,
+				activeKey: '/prompts',
 				icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"/>`
 			},
 			{
 				label: 'Knowledge Map',
-				href: '/admin/store',
-				activeKey: '/admin/store',
+				href: '/knowledge',
+				activeKey: '/knowledge',
 				icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z"/>`
 			},
 			{
 				label: 'Deal Room',
-				href: dealRoomHref,
-				activeKey: 'deal-room',
+				href: dealroomHref,
+				activeKey: '/dealroom',
 				icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0 1 12 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 0 1-.673-.38m0 0A2.18 2.18 0 0 1 3 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 0 1 3.413-.387m7.5 0V5.25A2.25 2.25 0 0 0 13.5 3h-3a2.25 2.25 0 0 0-2.25 2.25v.894m7.5 0a48.667 48.667 0 0 0-7.5 0M12 12.75h.008v.008H12v-.008Z"/>`
 			},
 			{
 				label: 'Learning',
-				href: '/learning',
-				activeKey: 'analysis',
+				href: '/learn',
+				activeKey: '/learn',
 				icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5"/>`
 			},
 			{
 				label: 'Support',
-				href: '/support',
-				activeKey: 'support',
+				href: '/help',
+				activeKey: '/help',
 				icon: `<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16.712 4.33a9.027 9.027 0 0 1 1.652 1.306c.51.51.944 1.064 1.306 1.652M16.712 4.33l-3.448 4.138m3.448-4.138a9.014 9.014 0 0 0-9.424 0M19.67 7.288l-4.138 3.448m4.138-3.448a9.014 9.014 0 0 1 0 9.424m-4.138-5.976a3.736 3.736 0 0 0-.88-1.388 3.737 3.737 0 0 0-1.388-.88m2.268 2.268a3.765 3.765 0 0 1 0 2.528m-2.268-4.796a3.765 3.765 0 0 0-2.528 0m4.796 4.796c-.181.506-.475.982-.88 1.388a3.736 3.736 0 0 1-1.388.88m2.268-2.268 4.138 3.448m0 0a9.027 9.027 0 0 1-1.306 1.652c-.51.51-1.064.944-1.652 1.306m0 0-3.448-4.138m3.448 4.138a9.014 9.014 0 0 1-9.424 0m5.976-4.138a3.765 3.765 0 0 1-2.528 0m0 0a3.736 3.736 0 0 1-1.388-.88 3.737 3.737 0 0 1-.88-1.388m2.268 2.268L7.288 19.67m0 0a9.024 9.024 0 0 1-1.652-1.306 9.027 9.027 0 0 1-1.306-1.652m0 0 4.138-3.448M4.33 16.712a9.014 9.014 0 0 1 0-9.424m4.138 5.976a3.765 3.765 0 0 1 0-2.528m0 0c.181-.506.475-.982.88-1.388a3.736 3.736 0 0 1 1.388-.88m-2.268 2.268L4.33 7.288m6.406 1.18L7.288 4.33m0 0a9.024 9.024 0 0 0-1.652 1.306A9.025 9.025 0 0 0 4.33 7.288"/>`
 			}
 		];
@@ -111,8 +111,7 @@
 		if (item.disabled) return false;
 		if (active === item.activeKey) return true;
 		const path = $page.url.pathname;
-		if (item.activeKey === 'document-analysis' && path.includes('/document-analysis')) return true;
-		if (item.activeKey === 'deal-room' && path.includes('/deal-room')) return true;
+		if (path.includes(item.activeKey)) return true;
 		return false;
 	}
 </script>

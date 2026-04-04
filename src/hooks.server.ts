@@ -54,10 +54,47 @@ function claimsToCurrentUser(payload: JWTPayload) {
 
 export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.supabase = createSupabaseServerClient(event.cookies);
-	// console.log("*******************************************************************************")
-	// console.log("event", event);
-	// console.log("*******************************************************************************")
-	// Don't protect the /auth/login and /auth/callback routes
+
+	// Redirect legacy routes to their new locations
+	const { pathname } = event.url;
+	const oldWorkspaceMatch = pathname.match(/^\/projects\/workspace\/([^/]+)\/?(.*)/);
+	if (oldWorkspaceMatch) {
+		const [, pid, rest] = oldWorkspaceMatch;
+		const segmentMap: Record<string, string> = {
+			'document-analysis': 'docs',
+			'deal-room': 'dealroom'
+		};
+		const mappedRest = segmentMap[rest] ?? rest;
+		throw redirect(301, `/p/${pid}/${mappedRest || 'docs'}`);
+	}
+	if (pathname === '/projects' || pathname.startsWith('/projects/')) {
+		throw redirect(301, '/p');
+	}
+	if (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) {
+		throw redirect(301, '/p');
+	}
+	if (pathname === '/library' || pathname.startsWith('/library/')) {
+		throw redirect(301, '/p');
+	}
+	if (pathname === '/workflow' || pathname.startsWith('/workflow/')) {
+		throw redirect(301, '/p');
+	}
+	if (pathname === '/admin/store' || pathname.startsWith('/admin/store/')) {
+		throw redirect(301, '/knowledge');
+	}
+	if (pathname === '/learning' || pathname.startsWith('/learning/')) {
+		throw redirect(301, '/learn');
+	}
+	if (pathname === '/support' || pathname.startsWith('/support/')) {
+		throw redirect(301, '/help');
+	}
+	if (pathname === '/user/settings' || pathname.startsWith('/user/settings/')) {
+		throw redirect(301, '/settings');
+	}
+	if (pathname === '/dealroom') {
+		throw redirect(301, '/p');
+	}
+
 	if (
 		// event.url.pathname.startsWith('/') ||
 		event.url.pathname.startsWith('/auth/login') ||

@@ -122,7 +122,7 @@
 				<!-- Menu items -->
 				<div class="py-1">
 				<a
-					href="/user/settings"
+					href="/settings"
 					onclick={closeMenu}
 					class="flex items-center gap-3 px-4 py-2 text-sm transition-colors
 						{darkMode ? 'text-slate-300 hover:bg-slate-700 hover:text-white' : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'}"
