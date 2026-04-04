@@ -12,13 +12,10 @@ import { getDashboardWidgetHost } from './context.svelte.js';
 export function useReactiveValidatedTopic<T = unknown>(topic: () => string) {
 	const host = getDashboardWidgetHost();
 	const store = host.validatedTopicStore;
-	let current = $state<T | undefined>(undefined);
 
-	$effect(() => {
-		// Access store.tree to establish a reactive dependency
+	const current = $derived.by(() => {
 		const _ = store.tree;
-		const currentTopic = topic();
-		current = store.at<T>(currentTopic);
+		return store.at<T>(topic());
 	});
 
 	return {

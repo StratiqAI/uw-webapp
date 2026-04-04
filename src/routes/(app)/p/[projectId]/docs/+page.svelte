@@ -7,12 +7,12 @@
 	import { DocumentEntitiesSyncManager } from '$lib/realtime/websocket/syncManagers/DocumentEntitiesSyncManager';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import { authStore } from '$lib/stores/auth.svelte';
-	import { DocumentUpload } from '$lib/components/DocumentUpload';
-	import type { ExistingDocument, DocumentListItem } from '$lib/components/DocumentUpload';
-	import DocumentProcessingModal from '$lib/components/DocumentProcessing/DocumentProcessingModal.svelte';
-	import ProjectEntitiesDisplay from '$lib/components/ProjectEntities/ProjectEntitiesDisplay.svelte';
-	import PDFViewer from '$lib/components/PDFViewer/PDFViewer.svelte';
-	import AgentActivityFeed from '$lib/components/AgentActivityFeed/AgentActivityFeed.svelte';
+	import { DocumentUpload } from '$lib/components/documents/upload';
+	import type { ExistingDocument, DocumentListItem } from '$lib/components/documents/upload';
+	import DocumentProcessingModal from '$lib/components/documents/processing/DocumentProcessingModal.svelte';
+	import ProjectEntitiesDisplay from '$lib/components/documents/ProjectEntitiesDisplay.svelte';
+	import PDFViewer from '$lib/components/documents/viewer/PDFViewer.svelte';
+	import AgentActivityFeed from '$lib/components/ai/AgentActivityFeed.svelte';
 	import { page } from '$app/stores';
 	import { M_DELETE_DOCLINK, S_ON_CREATE_DOCLINK } from '@stratiqai/types-simple';
 	import { addSubscription, removeSubscription } from '$lib/stores/appSyncClientStore';

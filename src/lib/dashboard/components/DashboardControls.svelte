@@ -6,8 +6,8 @@
 	import { PUBLIC_GEOAPIFY_API_KEY, PUBLIC_MAPBOX_ACCESS_TOKEN } from '$env/static/public';
 	import type { DashboardTabId } from '$lib/dashboard/types/dashboardTabs';
 	import type { AppTheme } from '$lib/stores/themeStore.svelte';
-	import UnifiedTopBar from '$lib/components/UnifiedTopBar.svelte';
-	import ConfirmModal from '$lib/components/Dialog/ConfirmModal.svelte';
+	import TopBar from '$lib/components/layout/TopBar.svelte';
+	import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
 	import { toastStore } from '$lib/stores/toastStore.svelte';
 
 	interface Props {
@@ -188,11 +188,15 @@
 			const scroll = tabScrollEl;
 			const outer = tabStripOuterEl;
 			const measure = tabMeasureEl;
-			if (!compactTabs && scroll && scroll.scrollWidth > scroll.clientWidth + 1) {
-				compactTabs = true;
-			} else if (compactTabs && outer && measure && measure.offsetWidth <= outer.clientWidth - 6) {
-				compactTabs = false;
-			}
+			untrack(() => {
+				const shouldCompact = !!(scroll && scroll.scrollWidth > scroll.clientWidth + 1);
+				const canExpand = !!(outer && measure && measure.offsetWidth <= outer.clientWidth - 6);
+				if (!compactTabs && shouldCompact) {
+					compactTabs = true;
+				} else if (compactTabs && canExpand) {
+					compactTabs = false;
+				}
+			});
 		});
 	});
 
@@ -709,7 +713,7 @@
 	];
 </script>
 
-<UnifiedTopBar
+<TopBar
 	pageTitle="Dashboard"
 	{onProjectChange}
 >
@@ -1175,7 +1179,7 @@
 			</button>
 		</div>
 	{/snippet}
-</UnifiedTopBar>
+</TopBar>
 
 <!-- ═══════════════════ DIALOGS ═══════════════════ -->
 

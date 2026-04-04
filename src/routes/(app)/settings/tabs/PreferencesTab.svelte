@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { themeStore, type AppTheme } from '$lib/stores/themeStore.svelte';
 
 	let { darkMode = false } = $props<{ darkMode?: boolean }>();
@@ -109,8 +110,8 @@
 		} catch {}
 	}
 
-	$effect(() => {
-		if (typeof window !== 'undefined') loadSaved();
+	onMount(() => {
+		loadSaved();
 	});
 </script>
 

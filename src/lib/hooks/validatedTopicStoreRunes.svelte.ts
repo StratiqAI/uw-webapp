@@ -34,17 +34,9 @@ import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 export function useValidatedTopic<T = unknown>(topic: string) {
 	const store = validatedTopicStore;
 	
-	// Initialize with current value from store
-	let current = $state<T | undefined>(store.at<T>(topic));
-
-	// Create reactive effect that updates when store.tree changes
-	$effect(() => {
-		// Access store.tree to create reactive dependency
-		// This ensures we re-run when any part of the tree changes
+	const current = $derived.by(() => {
 		const _ = store.tree;
-		
-		// Get the current value at the topic path
-		current = store.at<T>(topic);
+		return store.at<T>(topic);
 	});
 
 	return {
@@ -75,15 +67,10 @@ export function useValidatedTopic<T = unknown>(topic: string) {
  */
 export function useReactiveValidatedTopic<T = unknown>(topic: () => string) {
 	const store = validatedTopicStore;
-	let current = $state<T | undefined>(undefined);
 
-	$effect(() => {
-		// Access store.tree to create reactive dependency
+	const current = $derived.by(() => {
 		const _ = store.tree;
-		
-		// Get current topic and read value
-		const currentTopic = topic();
-		current = store.at<T>(currentTopic);
+		return store.at<T>(topic());
 	});
 
 	return {
@@ -161,48 +148,41 @@ export function useValidatedPublisher(topic: string) {
 export function useValidatedSync<T = unknown>(topic: string, debounceMs = 200) {
 	const store = validatedTopicStore;
 	
-	// Local mutable state
 	let localState = $state<T | undefined>(store.at<T>(topic));
 	
-	// Logic flags
-	let isRemoteUpdate = false;
+	let remoteVersion = 0;
+	let lastPublishedVersion = 0;
 	let timer: ReturnType<typeof setTimeout> | undefined;
 
-	// 1. Remote -> Local (watch store changes)
+	// Remote -> Local: bump version so the local->remote effect knows to skip
 	$effect(() => {
-		// Access store.tree to create reactive dependency
 		const _ = store.tree;
 		
 		const remoteVal = store.at<T>(topic);
 		if (remoteVal === undefined) return;
 
-		isRemoteUpdate = true;
-		// Deep clone to prevent reference pollution
+		remoteVersion++;
 		localState = structuredClone(remoteVal);
-		isRemoteUpdate = false;
 	});
 
-	// 2. Local -> Remote (watch local changes)
+	// Local -> Remote: only publish when version hasn't changed (i.e. a true local edit)
 	$effect(() => {
-		// Access localState to register dependency
 		const snapshot = localState ? structuredClone(localState) : undefined;
+		const currentRemoteVersion = remoteVersion;
 
-		// Only publish if data exists AND it is not a remote echo
-		if (snapshot && !isRemoteUpdate) {
-			if (timer) {
-				clearTimeout(timer);
-			}
+		if (snapshot && currentRemoteVersion === lastPublishedVersion) {
+			if (timer) clearTimeout(timer);
 			timer = setTimeout(() => {
+				lastPublishedVersion = remoteVersion;
 				store.publish(topic, snapshot);
 			}, debounceMs);
+		} else {
+			lastPublishedVersion = currentRemoteVersion;
 		}
 	});
 
-	// Cleanup on destroy
 	onDestroy(() => {
-		if (timer) {
-			clearTimeout(timer);
-		}
+		if (timer) clearTimeout(timer);
 	});
 
 	return {
@@ -237,12 +217,10 @@ export function useValidatedSync<T = unknown>(topic: string, debounceMs = 200) {
  */
 export function useValidatedErrors(topic: string) {
 	const store = validatedTopicStore;
-	let errors = $state<unknown>(store.errors.get(topic) || null);
 
-	$effect(() => {
-		// Access store.errors to create reactive dependency
+	const errors = $derived.by(() => {
 		const _ = store.errors;
-		errors = store.errors.get(topic) || null;
+		return store.errors.get(topic) || null;
 	});
 
 	return {
@@ -275,12 +253,10 @@ export function useValidatedErrors(topic: string) {
  */
 export function useValidatedCollection<T = unknown>(basePath: string) {
 	const store = validatedTopicStore;
-	let items = $state<Array<{ id: string; data: T }>>([]);
 
-	$effect(() => {
-		// Access store.tree to create reactive dependency
+	const items = $derived.by(() => {
 		const _ = store.tree;
-		items = store.getAllAt<T>(basePath);
+		return store.getAllAt<T>(basePath);
 	});
 
 	return {

@@ -2,7 +2,7 @@
 	import type { Project } from '@stratiqai/types-simple';
 	import type { Snippet } from 'svelte';
 	import ProjectSwitcher from '$lib/dashboard/components/ProjectSwitcher.svelte';
-	import NotificationBell from '$lib/components/Notifications/NotificationBell.svelte';
+	import NotificationBell from './NotificationBell.svelte';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
 

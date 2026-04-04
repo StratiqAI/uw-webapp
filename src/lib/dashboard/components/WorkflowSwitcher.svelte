@@ -1,5 +1,5 @@
 <script lang="ts">
-	import ConfirmModal from '$lib/components/Dialog/ConfirmModal.svelte';
+	import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
 	import { toastStore } from '$lib/stores/toastStore.svelte';
 
 	// Workflow type - defined locally since it may not be exported from types-simple

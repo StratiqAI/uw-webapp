@@ -499,13 +499,11 @@ class DashboardStore {
 	 */
 	mergeMissingWidgetsFromConfig(tabId: DashboardTabId, configWidgets: Widget[]): void {
 		const slice = $state.snapshot(this.#tabSlices[tabId]) as TabDashboardSlice;
-		let added = false;
-		for (const cw of configWidgets) {
-			if (slice.widgets.some((w) => w.id === cw.id)) continue;
-			slice.widgets.push(structuredClone(cw));
-			added = true;
-		}
-		if (!added) return;
+		const newWidgets = configWidgets
+			.filter((cw) => !slice.widgets.some((w) => w.id === cw.id))
+			.map((cw) => structuredClone(cw));
+		if (newWidgets.length === 0) return;
+		slice.widgets = [...slice.widgets, ...newWidgets];
 
 		this.#tabSlices = { ...$state.snapshot(this.#tabSlices), [tabId]: slice } as Record<DashboardTabId, TabDashboardSlice>;
 

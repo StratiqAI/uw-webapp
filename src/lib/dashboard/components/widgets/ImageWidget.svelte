@@ -18,12 +18,6 @@
 	// Subscribe to data updates using ValidatedTopicStore hook (reactive to topic changes)
 	const dataStream = useReactiveValidatedTopic<ImageWidget['data']>(() => topic);
 	let widgetData = $derived<ImageWidget['data']>(dataStream.current || data);
-
-	$effect(() => {
-		console.log(`🖼️ ImageWidget:${widgetId} - Initialized with ValidatedTopicStore`);
-		console.log(`   Topic: ${topic}`);
-		console.log(`   Initial data:`, data);
-	});
 </script>
 
 <div class="image-widget h-full">

@@ -35,7 +35,7 @@
 			
 	// UI Components
 	import { Alert, Spinner } from 'flowbite-svelte';
-	import TypeWriter from '$lib/components/TypeWriter/TypeWriter.svelte';
+	import TypeWriter from '$lib/components/ui/TypeWriter.svelte';
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 	// Component Props & State
@@ -124,12 +124,6 @@
 		if (dataStream.current) {
 			lastUpdateTime = new Date();
 		}
-	});
-
-	$effect(() => {
-		console.log(`📝 ParagraphWidget:${widgetId} - Initialized with ValidatedTopicStore`);
-		console.log(`   Topic: ${topic}`);
-		console.log(`   Initial data:`, data);
 	});
 
 	/** Lift AI connection state to WidgetWrapper title bar when the card has a header. */

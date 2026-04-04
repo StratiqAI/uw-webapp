@@ -25,11 +25,11 @@
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import { toastStore } from '$lib/stores/toastStore.svelte';
 
-	import DeleteModal from '$lib/components/Dialog/DeleteModal.svelte';
+	import DeleteModal from '$lib/components/ui/DeleteModal.svelte';
 	import ProjectModal from './ProjectModal.svelte';
 	import ProjectCard from './ProjectCard.svelte';
 	import MetaTag from './MetaTag.svelte';
-	import UnifiedTopBar from '$lib/components/UnifiedTopBar.svelte';
+	import TopBar from '$lib/components/layout/TopBar.svelte';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
 
 	// ----------------------------------------------------------------------------
@@ -218,7 +218,7 @@
 >
 	<!-- Main Content Area -->
 	<div class="flex flex-1 flex-col overflow-hidden {darkMode ? 'bg-slate-900/80' : 'bg-primary-50/40'}">
-		<UnifiedTopBar
+		<TopBar
 			pageTitle="Projects"
 			{idToken}
 			notificationBellProps={{ projects }}
@@ -325,7 +325,7 @@
 					Add Project
 				</button>
 			{/snippet}
-		</UnifiedTopBar>
+		</TopBar>
 
 		<!-- Projects Grid -->
 		<div class="flex-1 overflow-y-auto {darkMode ? 'bg-slate-900/80' : 'bg-primary-50/40'}">

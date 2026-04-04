@@ -10,8 +10,8 @@
 	import { print } from 'graphql';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import RightChatDrawer from '$lib/components/RightChatDrawer.svelte';
-	import UnifiedTopBar from '$lib/components/UnifiedTopBar.svelte';
+	import ChatDrawer from '$lib/components/layout/ChatDrawer.svelte';
+	import TopBar from '$lib/components/layout/TopBar.svelte';
 	import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
 
 	let { children, data }: LayoutProps = $props();
@@ -146,7 +146,7 @@
 >
 	<div class="flex w-full min-w-0 flex-1 flex-col">
 		{#if showLayoutTopBar}
-			<UnifiedTopBar
+			<TopBar
 				{pageTitle}
 				{idToken}
 				selectedProjectId={routeProjectId}
@@ -160,5 +160,5 @@
 		</div>
 	</div>
 
-	<RightChatDrawer />
+	<ChatDrawer />
 </div>

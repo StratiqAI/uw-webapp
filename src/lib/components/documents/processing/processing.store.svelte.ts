@@ -54,8 +54,7 @@ export function createProcessingStore(
 				tables: [],
 				images: []
 			};
-			state.pages.push(page);
-			state.pages.sort((a, b) => a.pageNumber - b.pageNumber);
+			state.pages = [...state.pages, page].sort((a, b) => a.pageNumber - b.pageNumber);
 		}
 		return page;
 	}
@@ -173,8 +172,8 @@ export function createProcessingStore(
 
 		const pageNumber = text.pageNum || 1;
 		const page = getOrCreatePage(pageNumber);
-		page.textBlocks.push(text);
-		state.statistics.textBlocks += 1;
+		page.textBlocks = [...page.textBlocks, text];
+		state.statistics = { ...state.statistics, textBlocks: state.statistics.textBlocks + 1 };
 
 		addFeedEntry({
 			type: 'text',
@@ -193,8 +192,8 @@ export function createProcessingStore(
 
 		const pageNumber = table.pageNum || 1;
 		const page = getOrCreatePage(pageNumber);
-		page.tables.push(table);
-		state.statistics.tables += 1;
+		page.tables = [...page.tables, table];
+		state.statistics = { ...state.statistics, tables: state.statistics.tables + 1 };
 
 		addFeedEntry({
 			type: 'table',
@@ -213,8 +212,8 @@ export function createProcessingStore(
 
 		const pageNumber = image.pageNum || 1;
 		const page = getOrCreatePage(pageNumber);
-		page.images.push(image);
-		state.statistics.images += 1;
+		page.images = [...page.images, image];
+		state.statistics = { ...state.statistics, images: state.statistics.images + 1 };
 
 		addFeedEntry({
 			type: 'image',

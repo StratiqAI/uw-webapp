@@ -1,6 +1,6 @@
 <script lang="ts">
 	import UserDropdown from './UserDropdown.svelte';
-	import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
+	import ThemeSwitcher from './ThemeSwitcher.svelte';
 	import type { CurrentUser } from '$lib/types/auth';
 	import { themeStore } from '$lib/stores/themeStore.svelte';
 	import { page } from '$app/stores';
@@ -16,7 +16,6 @@
 		disabled?: boolean;
 	};
 
-	let active = $state('upload');
 	let {
 		isSidebarOpen = $bindable(),
 		onclick: toggleSidebar,
@@ -109,10 +108,17 @@
 
 	function navItemIsActive(item: NavItem): boolean {
 		if (item.disabled) return false;
-		if (active === item.activeKey) return true;
 		const path = $page.url.pathname;
-		if (path.includes(item.activeKey)) return true;
-		return false;
+		if (!path.includes(item.activeKey)) return false;
+
+		const hasMoreSpecificMatch = navItems.some(
+			(n) =>
+				!n.disabled &&
+				n.activeKey !== item.activeKey &&
+				n.activeKey.length > item.activeKey.length &&
+				path.includes(n.activeKey)
+		);
+		return !hasMoreSpecificMatch;
 	}
 </script>
 
@@ -244,7 +250,7 @@
 								: 'text-slate-700 hover:bg-primary-100/60 hover:text-primary-900'
 					}
 				`}
-					onclick={() => (active = item.activeKey)}
+					
 				>
 					<svg
 						class={`shrink-0 transition-colors ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6'} ${

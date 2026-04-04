@@ -82,7 +82,7 @@ export function addProjectText(projectId: string, text: Text): void {
 	const existingIndex = state.texts.findIndex((t) => t.id === text.id);
 	if (existingIndex >= 0) {
 		// Update existing
-		state.texts[existingIndex] = text;
+		state.texts = state.texts.map((t, i) => i === existingIndex ? text : t);
 	} else {
 		// Add new (prepend for recent-first ordering)
 		state.texts = [text, ...state.texts];
@@ -101,7 +101,7 @@ export function addProjectTable(projectId: string, table: Table): void {
 	const existingIndex = state.tables.findIndex((t) => t.id === table.id);
 	if (existingIndex >= 0) {
 		// Update existing
-		state.tables[existingIndex] = table;
+		state.tables = state.tables.map((t, i) => i === existingIndex ? table : t);
 	} else {
 		// Add new (prepend for recent-first ordering)
 		state.tables = [table, ...state.tables];
@@ -120,7 +120,7 @@ export function addProjectImage(projectId: string, image: Image): void {
 	const existingIndex = state.images.findIndex((i) => i.id === image.id);
 	if (existingIndex >= 0) {
 		// Update existing
-		state.images[existingIndex] = image;
+		state.images = state.images.map((i, idx) => idx === existingIndex ? image : i);
 	} else {
 		// Add new (prepend for recent-first ordering)
 		state.images = [image, ...state.images];

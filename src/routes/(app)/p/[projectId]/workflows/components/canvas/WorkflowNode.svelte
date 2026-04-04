@@ -43,20 +43,6 @@
 	const displayStatus = $derived(nodeStatus ?? (isInputNode ? 'START' : null));
 	const showStatusBadge = $derived(labelsVisible && !!displayStatus);
 	
-	// Debug logging when status changes
-	$effect(() => {
-		if (nodeStatus) {
-			console.log('[WorkflowNode] Node status detected:', {
-				elementId: element.id,
-				elementLabel: element.type.label,
-				elementType: element.type.id,
-				nodeStatus,
-				hasStatus,
-				isExecuting
-			});
-		}
-	});
-
 	/** Border/ring, overlay, badge and arrow colors by status */
 	function statusStyles(status: string) {
 		switch (status) {

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import WorkflowModal from './WorkflowModal.svelte';
-	import JsonSchemaFieldRow from '$lib/components/admin/JsonSchemaFieldRow.svelte';
+	import JsonSchemaFieldRow from '$lib/components/schemas/JsonSchemaFieldRow.svelte';
 	import JsonSchemaPickerModal from '$lib/components/schemas/JsonSchemaPickerModal.svelte';
 	import type { JsonSchemaDefinition } from '$lib/types/models';
 	import type { IGraphQLQueryClient } from '$lib/realtime/store/GraphQLQueryClient';

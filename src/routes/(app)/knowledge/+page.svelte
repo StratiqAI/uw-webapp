@@ -9,7 +9,7 @@
 	import SchemaExplorer from './SchemaExplorer.svelte';
 	import StreamsPanel from './StreamsPanel.svelte';
 	import PublishPanel from './PublishPanel.svelte';
-	import UnifiedTopBar from '$lib/components/UnifiedTopBar.svelte';
+	import TopBar from '$lib/components/layout/TopBar.svelte';
 
 	let activeTab = $state<'topics' | 'streams'>('topics');
 
@@ -116,7 +116,7 @@
 </script>
 
 <div class="flex h-screen w-full flex-col overflow-hidden {darkMode ? 'bg-slate-900' : 'bg-slate-50'} transition-colors">
-	<UnifiedTopBar pageTitle="Knowledge Map">
+	<TopBar pageTitle="Knowledge Map">
 		{#snippet tabs()}
 			<div class="flex items-center gap-2">
 				<span class="rounded-full px-2 py-0.5 text-xs font-medium {darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'}">
@@ -162,7 +162,7 @@
 				Publish
 			</button>
 		{/snippet}
-	</UnifiedTopBar>
+	</TopBar>
 
 	<!-- Errors overlay -->
 	{#if errorsOpen && errorEntries.length > 0}

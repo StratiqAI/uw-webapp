@@ -27,7 +27,7 @@
 	import { getWidgetComponent } from '$lib/dashboard/setup/widgetRegistry';
 	import SchemaWidget from '$lib/dashboard/components/widgets/SchemaWidget.svelte';
 	import LocationQuotientWidget from '$lib/dashboard/components/widgets/LocationQuotientWidget.svelte';
-	import ConfirmModal from '$lib/components/Dialog/ConfirmModal.svelte';
+	import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
 	import { themeStore } from '$lib/stores/themeStore.svelte';
 	import StreamPicker from '$lib/components/streams/StreamPicker.svelte';
 	import { streamCatalog, type DataStream } from '$lib/stores/streamCatalog.svelte';

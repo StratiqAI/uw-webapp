@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import type { CurrentUser } from '$lib/types/auth';
 
 	let { currentUser, darkMode = false } = $props<{
@@ -119,8 +120,8 @@
 		} catch {}
 	}
 
-	$effect(() => {
-		if (typeof window !== 'undefined') loadSaved();
+	onMount(() => {
+		loadSaved();
 	});
 </script>
 

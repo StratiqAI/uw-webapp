@@ -622,20 +622,6 @@
 		}
 	});
 
-	// ===== Reactive Debugging (Dev Only) =====
-	$effect(() => {
-		if (import.meta.env.DEV && state) {
-			console.log('State update:', {
-				jobId: currentJobId,
-				connectionState: state.connectionState,
-				updatesCount: updates.length,
-				isJobComplete,
-				latestStatus: latestUpdate?.status,
-				error: state.error?.message
-			});
-		}
-	});
-
 	// ===== Accessibility Helpers =====
 	function getAriaLabel(status: JobStatus): string {
 		const labels: Record<JobStatus, string> = {

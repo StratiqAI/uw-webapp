@@ -27,7 +27,7 @@
 	import { DashboardStorage } from '$lib/dashboard/utils/storage';
 	import { streamCatalog } from '$lib/stores/streamCatalog.svelte';
 	import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
-	import ToastContainer from '$lib/components/Toast/ToastContainer.svelte';
+	import ToastContainer from '$lib/components/ui/ToastContainer.svelte';
 
 	registerWidget(metricWidget);
 	registerWidget(jsonViewerWidget);

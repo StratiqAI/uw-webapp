@@ -1,6 +1,6 @@
 import type { Component } from 'svelte';
-import AutoDataView from '$lib/components/auto/AutoDataView.svelte';
-import JsonFallback from '$lib/components/auto/JsonFallback.svelte';
+import AutoDataView from '$lib/components/dataDisplay/AutoDataView.svelte';
+import JsonFallback from '$lib/components/dataDisplay/JsonFallback.svelte';
 
 interface RegistryEntry {
 	component: Component<any>;

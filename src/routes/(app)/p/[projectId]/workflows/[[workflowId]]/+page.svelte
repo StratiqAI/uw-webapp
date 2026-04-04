@@ -207,12 +207,9 @@
 				}
 				void loadWorkflowIntoCanvas(data.workflow);
 			} else {
-				// Just project ID, load workflows
 				selectedWorkflowId = null;
 				if (data.project) {
 					workflows = data.project.workflows?.items || [];
-				} else {
-					loadWorkflowsForProject(data.projectId);
 				}
 			}
 		}
@@ -297,19 +294,12 @@
 
 	async function handleProjectChange(projectId: string | null) {
 		selectedProjectId = projectId;
-		selectedWorkflowId = null; // Clear selected workflow when project changes
+		selectedWorkflowId = null;
 		
-		// Navigate to new URL
 		if (projectId) {
 			await goto(`/p/${projectId}/workflows`, { replaceState: true });
 		} else {
 			await goto('/p', { replaceState: true });
-		}
-		
-		loadWorkflowsForProject(projectId);
-		// Update the create workflow subscription to filter by the new projectId
-		if (workflowSyncManager?.isReady) {
-			workflowSyncManager.updateCreateWorkflowSubscription(projectId ?? undefined);
 		}
 	}
 

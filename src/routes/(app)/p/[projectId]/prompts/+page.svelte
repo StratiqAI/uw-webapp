@@ -8,11 +8,11 @@
 	import { toTopicPath } from '$lib/realtime/store/TopicMapper';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 
-	import UnifiedTopBar from '$lib/components/UnifiedTopBar.svelte';
+	import TopBar from '$lib/components/layout/TopBar.svelte';
 	import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
 	import PromptEditModal from './components/PromptEditModal.svelte';
 	import JsonSchemaPickerModal from '$lib/components/schemas/JsonSchemaPickerModal.svelte';
-	import ConfirmModal from '$lib/components/Dialog/ConfirmModal.svelte';
+	import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
 	import { toastStore } from '$lib/stores/toastStore.svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
@@ -286,7 +286,7 @@
 </script>
 
 <div class="min-h-screen {darkMode ? 'bg-slate-900' : 'bg-slate-50'} transition-colors">
-	<UnifiedTopBar
+	<TopBar
 		pageTitle="Prompt Library"
 		onProjectChange={handleProjectSelect}
 	>
@@ -346,7 +346,7 @@
 				Create New
 			</button>
 		{/snippet}
-	</UnifiedTopBar>
+	</TopBar>
 
 	<!-- Main Content -->
 	<div class="max-w-7xl mx-auto px-6 py-8">

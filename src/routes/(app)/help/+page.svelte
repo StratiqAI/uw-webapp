@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
-	import UnifiedTopBar from '$lib/components/UnifiedTopBar.svelte';
+	import TopBar from '$lib/components/layout/TopBar.svelte';
 
 	let darkMode = $derived.by(() => darkModeStore.darkMode);
 
@@ -116,7 +116,7 @@
 <div class="flex h-screen w-full overflow-hidden {darkMode ? 'bg-slate-900' : 'bg-slate-50'} transition-colors">
 	<!-- Main Content Area -->
 	<div class="flex-1 flex flex-col overflow-hidden {darkMode ? 'bg-slate-900' : 'bg-white'}">
-		<UnifiedTopBar pageTitle="Support" subtitle="Help & Resources" />
+		<TopBar pageTitle="Support" subtitle="Help & Resources" />
 
 		<!-- Main Content -->
 		<div class="flex-1 overflow-y-auto {darkMode ? 'bg-slate-900' : 'bg-slate-50'}">

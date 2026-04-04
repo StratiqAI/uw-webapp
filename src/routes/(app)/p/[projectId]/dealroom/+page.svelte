@@ -9,7 +9,7 @@
 		QAndATab,
 		AnnouncementsTab,
 		AnalyticsTab
-	} from '$lib/components/deal-room';
+	} from '$lib/components/dealRoom';
 
 	let { data } = $props();
 

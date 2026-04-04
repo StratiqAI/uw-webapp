@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { v4 as uuid } from 'uuid';
 	import { marked } from 'marked';
 	import type { ChatMessage, AIAction } from '$lib/types/chat';
@@ -110,12 +111,11 @@
 		} catch {}
 	}
 
-	$effect(() => {
+	onMount(() => {
 		try {
 			const saved = localStorage.getItem('drawer.messages');
 			if (saved) {
 				const parsedMessages = JSON.parse(saved);
-				// Clean up any messages with invalid roles
 				messages = parsedMessages.filter(
 					(msg: any) => msg.role === 'system' || msg.role === 'user' || msg.role === 'assistant'
 				);

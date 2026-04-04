@@ -227,7 +227,7 @@ export function createUploader(options: UploaderOptions = {}) {
 				abortController: new AbortController(),
 				retryCount: 0
 			}));
-			files.push(...newUploads);
+			files = [...files, ...newUploads];
 			uploadQueue.push(...newUploads);
 			processQueue();
 		},

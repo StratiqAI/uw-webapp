@@ -19,12 +19,6 @@
 	const dataStream = useReactiveValidatedTopic<TableWidget['data']>(() => topic);
 	let widgetData = $derived<TableWidget['data']>(dataStream.current || data);
 
-	$effect(() => {
-		console.log(`📋 TableWidget:${widgetId} - Initialized with ValidatedTopicStore`);
-		console.log(`   Topic: ${topic}`);
-		console.log(`   Initial data:`, data);
-	});
-
 	let sortColumn = $state<string | null>(null);
 	let sortDirection = $state<'asc' | 'desc'>('asc');
 	let currentPage = $state(1);

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+
 	let { darkMode = false } = $props<{ darkMode?: boolean }>();
 
 	type NotifChannel = { inApp: boolean; email: boolean };
@@ -142,8 +144,8 @@
 		} catch {}
 	}
 
-	$effect(() => {
-		if (typeof window !== 'undefined') loadSaved();
+	onMount(() => {
+		loadSaved();
 	});
 </script>
 

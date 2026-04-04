@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import {
 		Q_LIST_JSON_SCHEMAS,
 		M_CREATE_JSON_SCHEMA,
@@ -54,7 +55,7 @@
 		);
 	});
 
-	$effect(() => {
+	onMount(() => {
 		loadSchemas();
 	});
 
