@@ -145,7 +145,7 @@
 	});
 
 	const pageTitle = $derived.by(() => {
-		if (currentPath.includes('document-analysis')) return 'Document Workspace';
+		if (currentPath.includes('document-analysis')) return 'Documents';
 		if (currentPath.includes('deal-room')) return 'Deal Room';
 		if (currentPath.includes('financial-analysis')) return 'Financial Analysis';
 		if (currentPath.includes('investment-analysis')) return 'Investment Analysis';
@@ -168,6 +168,7 @@
 	<div class="flex w-full min-w-0 flex-1 flex-col">
 		<UnifiedTopBar
 			{pageTitle}
+			{idToken}
 			selectedProjectId={routeProjectId}
 			onProjectChange={handleWorkspaceProjectChange}
 			notificationBellProps={{ projectName: project?.name ?? projectFromServer?.name }}

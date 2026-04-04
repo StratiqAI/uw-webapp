@@ -103,7 +103,7 @@
 			}
 
 			open = false;
-			await goto(`/projects/workspace/${projectId}/get-started`);
+			await goto(`/projects/workspace/${projectId}/document-analysis`);
 		} catch (err) {
 			console.error('Error saving project:', err);
 			alert('Error saving project');

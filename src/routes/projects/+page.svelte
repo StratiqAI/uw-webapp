@@ -2,17 +2,10 @@
 	// ----------------------------------------------------------------------------
 	// Imports
 	// ----------------------------------------------------------------------------
-
-	// Logging Section
-	import { logger } from '$lib/logging/debug';
-
-	// Environment Section
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 
-	// Realtime Section
-	import { ProjectSyncManager, store } from '$lib/realtime/websocket/projectSync';
 	import { addSubscription, removeSubscription } from '$lib/stores/appSyncClientStore';
 	import {
 		notificationStore,
@@ -20,18 +13,20 @@
 		type Notification
 	} from '$lib/stores/notifications.svelte';
 
-	// Types Section
-	import type { PageProps } from './$types';
 	import type { Project } from '@stratiqai/types-simple';
-	import { M_CREATE_PROJECT, M_DELETE_PROJECT } from '@stratiqai/types-simple';
+	import {
+		M_CREATE_PROJECT,
+		M_DELETE_PROJECT,
+		S_ON_CREATE_PROJECT,
+		S_ON_DELETE_PROJECT
+	} from '@stratiqai/types-simple';
 	import { print } from 'graphql';
 
-	// Dark Mode Section
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 
-	// Components
 	import DeleteModal from '$lib/components/Dialog/DeleteModal.svelte';
 	import ProjectModal from './ProjectModal.svelte';
+	import ProjectCard from './ProjectCard.svelte';
 	import MetaTag from './MetaTag.svelte';
 	import UnifiedTopBar from '$lib/components/UnifiedTopBar.svelte';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
@@ -40,16 +35,21 @@
 	// Props + Core Reactive State
 	// ----------------------------------------------------------------------------
 	const { data } = $props();
-	const serverProjects = $derived((data?.items ?? []) as Project[]);
-	const nextToken = $derived(data?.nextToken);
 	const idToken = $derived(data?.idToken);
-	const scope = $derived(data?.scope);
 	const currentUser = $derived(data?.currentUser);
-	const currentScope = $derived(scope || 'OWNED_BY_ME');
+	const currentScope = $derived(data?.scope || 'OWNED_BY_ME');
 	let darkMode = $derived.by(() => darkModeStore.darkMode);
 
-	// Manager lifecycle + UI state
-	let projectSyncManager = $state(ProjectSyncManager.createInactive());
+	// Server-loaded projects (refreshed by SvelteKit on navigation / scope change)
+	const serverItems = $derived((data?.items ?? []) as Project[]);
+
+	// Local projects list — seeded from the server, kept current by subscriptions
+	let allProjects = $state<Project[]>([]);
+
+	// Sync from server before DOM paint (initial load + scope change)
+	$effect.pre(() => {
+		allProjects = serverItems;
+	});
 
 	// UI State
 	let openProject = $state(false);
@@ -58,44 +58,16 @@
 	let showEmailInfo = $state(false);
 	let errorMsg = $state<string | null>(null);
 
-	// ----------------------------------------------------------------------------
-	// Store-backed UI Data
-	// ----------------------------------------------------------------------------
-	function isValidProject(value: unknown): value is Project {
-		return typeof value === 'object' && value !== null && 'id' in value && 'name' in value;
-	}
-
-	function matchesSearch(project: Project, searchLower: string): boolean {
-		return !!(
-			project.name?.toLowerCase().includes(searchLower) ||
-			project.description?.toLowerCase().includes(searchLower)
-		);
-	}
-
-	// Get projects from store (reactive to store changes)
-	const storeProjects = $derived.by(() =>
-		store.getAllAtArray<Project>('projects', {
-			filter: (_key, value) => isValidProject(value)
-		})
-	);
-
-	// Track hydration: once store has data, never fall back to server defaults
-	let storeHydrated = $state(false);
-	$effect(() => {
-		if (!storeHydrated && storeProjects.length > 0) {
-			storeHydrated = true;
-		}
-	});
-
-	// Use store projects once hydrated, otherwise use server projects
-	const allProjects = $derived(storeHydrated ? storeProjects : serverProjects);
-
 	// Search and filter
 	let searchFilter = $state('');
 	const projects = $derived.by(() => {
 		if (!searchFilter) return allProjects;
 		const searchLower = searchFilter.toLowerCase();
-		return allProjects.filter((project) => matchesSearch(project, searchLower));
+		return allProjects.filter(
+			(p) =>
+				p.name?.toLowerCase().includes(searchLower) ||
+				p.description?.toLowerCase().includes(searchLower)
+		);
 	});
 
 	// ----------------------------------------------------------------------------
@@ -137,107 +109,92 @@
 				return;
 			}
 
-			await goto(`/projects/workspace/${res.createProject.id}/get-started`);
+			await goto(`/projects/workspace/${res.createProject.id}/document-analysis`);
 		} catch (err) {
 			console.error('Error creating new project:', err);
 			errorMsg = 'Error creating new project';
 		}
 	}
 
-	// ----------------------------------------------------------------------------
-	// Manager Lifecycle
-	// ----------------------------------------------------------------------------
-	// Initialize manager and sync projects
-	$effect(() => {
-		let aborted = false;
-
-		async function initializeAndSync() {
-			if (!browser || !idToken) return;
-
-			try {
-				const hasInitialItems = serverProjects.length > 0;
-				await projectSyncManager.initialize({
-					idToken,
-					initialItems: hasInitialItems ? serverProjects : [],
-					setupSubscriptions: true,
-					clearExisting: false
-				});
-
-				if (aborted || !projectSyncManager.isReady) return;
-
-				// Only sync from API if we didn't have initial items
-				if (!hasInitialItems) {
-					await projectSyncManager.syncList({
-						queryVariables: { limit: 50, scope: currentScope },
-						setupSubscriptions: true,
-						clearExisting: false
-					});
-				}
-			} catch (err) {
-				if (aborted) return;
-				console.error('Error initializing project sync:', err);
-			}
+	async function handleDeleteConfirm() {
+		if (current_project?.id) {
+			allProjects = allProjects.filter((p) => p.id !== current_project.id);
 		}
+	}
 
-		initializeAndSync();
+	// ----------------------------------------------------------------------------
+	// Real-time Subscriptions
+	// ----------------------------------------------------------------------------
 
-		return () => {
-			aborted = true;
-			projectSyncManager.cleanup();
-		};
-	});
-
-	// Re-sync when scope changes (after initial load)
+	// Global "onCreate" subscription — fires when any project is created for this user
 	$effect(() => {
-		if (!browser || !projectSyncManager.isReady || !idToken) return;
+		if (!browser || !idToken) return;
 
-		projectSyncManager.syncList({
-			queryVariables: { limit: 50, scope: currentScope },
-			setupSubscriptions: true,
-			clearExisting: true
-		}).catch((err) => {
-			console.error('Error syncing projects for scope:', err);
-		});
+		const token = idToken;
+		const spec = {
+			query: print(S_ON_CREATE_PROJECT),
+			variables: {},
+			path: 'onCreateProject',
+			next: (created: Project) => {
+				if (created?.id && !allProjects.some((p) => p.id === created.id)) {
+					allProjects = [...allProjects, created];
+				}
+			},
+			error: (err: unknown) => console.error('Project create subscription error:', err)
+		};
+
+		addSubscription(token, spec).catch((err) =>
+			console.error('Failed to add project create subscription:', err)
+		);
+		return () => removeSubscription(spec);
 	});
 
-	// Set up notification subscriptions for all projects
+	// Per-project "onDelete" subscriptions — remove the project from the list in real-time
+	$effect(() => {
+		if (!browser || !idToken || !allProjects.length) return;
+
+		const token = idToken;
+		const specs = allProjects.map((project) => ({
+			query: print(S_ON_DELETE_PROJECT),
+			variables: { id: project.id },
+			path: 'onDeleteProject',
+			next: (deleted: Project) => {
+				allProjects = allProjects.filter((p) => p.id !== deleted.id);
+			},
+			error: (err: unknown) =>
+				console.error('Project delete subscription error:', project.id, err)
+		}));
+
+		specs.forEach((s) =>
+			addSubscription(token, s).catch((err) =>
+				console.error('Failed to add project delete subscription:', err)
+			)
+		);
+		return () => specs.forEach((s) => removeSubscription(s));
+	});
+
+	// Notification subscriptions for each project
 	$effect(() => {
 		if (!browser || !idToken || !projects.length) return;
 
-		const subscriptions: Array<{
-			query: string;
-			variables: { parentId: string };
-			path: string;
-			next: (notification: Notification) => void;
-			error: (err: unknown) => void;
-		}> = [];
+		const token = idToken;
+		const specs = projects.map((project) => ({
+			query: print(S_ON_CREATE_NOTIFICATION),
+			variables: { parentId: project.id },
+			path: 'onCreateNotification',
+			next: (notification: Notification) => {
+				notificationStore.addNotification(notification);
+			},
+			error: (err: unknown) =>
+				console.error('Notification subscription error for project', project.id, err)
+		}));
 
-		// Subscribe to notifications for each project
-		projects.forEach((project) => {
-			const spec = {
-				query: print(S_ON_CREATE_NOTIFICATION),
-				variables: { parentId: project.id },
-				path: 'onCreateNotification',
-				next: (notification: Notification) => {
-					console.log('Notification received for project:', project.id, notification);
-					notificationStore.addNotification(notification);
-				},
-				error: (err: unknown) => {
-					console.error('Notification subscription error for project', project.id, err);
-				}
-			};
-			subscriptions.push(spec);
-			addSubscription(idToken, spec).catch((err) => {
-				console.error('Failed to add notification subscription for project', project.id, err);
-			});
-		});
-
-		// Cleanup: remove all subscriptions when projects change or component unmounts
-		return () => {
-			subscriptions.forEach((spec) => {
-				removeSubscription(spec);
-			});
-		};
+		specs.forEach((s) =>
+			addSubscription(token, s).catch((err) =>
+				console.error('Failed to add notification subscription:', err)
+			)
+		);
+		return () => specs.forEach((s) => removeSubscription(s));
 	});
 </script>
 
@@ -252,6 +209,7 @@
 	<div class="flex flex-1 flex-col overflow-hidden {darkMode ? 'bg-slate-900/80' : 'bg-primary-50/40'}">
 		<UnifiedTopBar
 			pageTitle="Projects"
+			{idToken}
 			notificationBellProps={{ projects }}
 		>
 			{#snippet tabs()}
@@ -358,94 +316,18 @@
 			{/snippet}
 		</UnifiedTopBar>
 
-		<!-- Projects List -->
+		<!-- Projects Grid -->
 		<div class="flex-1 overflow-y-auto {darkMode ? 'bg-slate-900/80' : 'bg-primary-50/40'}">
 			<div class="px-6 py-6">
 				{#if projects.length > 0}
-					<div class="space-y-3">
+					<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
 						{#each projects as project (project.id)}
-							<div
-								class="card-enhanced {darkMode
-									? 'border-slate-700/50'
-									: 'border-primary-200/60'} group rounded-xl border p-5"
-							>
-								<div class="flex items-center justify-between">
-									<a
-										href={`/projects/workspace/${project.id}/get-started`}
-										class="group/link flex flex-1 items-center gap-4"
-									>
-										<div
-											class="h-12 w-12 flex-shrink-0 {darkMode
-												? 'bg-indigo-900'
-												: 'bg-indigo-100'} flex items-center justify-center rounded-lg"
-										>
-											<svg
-												class="h-6 w-6 {darkMode ? 'text-indigo-300' : 'text-indigo-600'}"
-												fill="none"
-												stroke="currentColor"
-												viewBox="0 0 24 24"
-											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-												></path>
-											</svg>
-										</div>
-										<div class="min-w-0 flex-1">
-											<h3
-												class="text-base font-semibold {darkMode
-													? 'text-white'
-													: 'text-slate-900'} mb-1 transition-colors group-hover/link:text-indigo-400"
-											>
-												{project.name}
-											</h3>
-											{#if project.description}
-												<p
-													class="text-sm {darkMode
-														? 'text-slate-400'
-														: 'text-slate-600'} line-clamp-2"
-												>
-													{project.description}
-												</p>
-											{/if}
-										</div>
-										<svg
-											class="h-5 w-5 {darkMode
-												? 'text-slate-500 group-hover/link:text-indigo-400'
-												: 'text-slate-400 group-hover/link:text-indigo-600'} flex-shrink-0 opacity-0 transition-colors group-hover/link:opacity-100"
-											fill="none"
-											stroke="currentColor"
-											viewBox="0 0 24 24"
-										>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M9 5l7 7-7 7"
-											></path>
-										</svg>
-									</a>
-									<button
-										onclick={() => ((current_project = project), (openDelete = true))}
-										class="ml-4 p-2 {darkMode
-											? 'text-slate-400 hover:bg-red-900/20 hover:text-red-400'
-											: 'text-slate-400 hover:bg-red-50 hover:text-red-600'} rounded-lg opacity-0 transition-colors group-hover:opacity-100"
-										aria-label="Delete project"
-										title="Delete project"
-									>
-										<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-											></path>
-										</svg>
-									</button>
-								</div>
-							</div>
+							<ProjectCard
+								{project}
+								{darkMode}
+								{idToken}
+								onDelete={(p) => { current_project = p; openDelete = true; }}
+							/>
 						{/each}
 					</div>
 				{:else if searchFilter}
@@ -499,9 +381,7 @@
 						</p>
 						<button
 							onclick={createNewProjectHandler}
-							class="px-4 py-2 text-sm font-medium {darkMode
-								? 'bg-indigo-600 hover:bg-indigo-700'
-								: 'bg-indigo-600 hover:bg-indigo-700'} inline-flex items-center gap-2 rounded-lg text-white transition-colors"
+							class="px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 inline-flex items-center gap-2 rounded-lg text-white transition-colors"
 						>
 							<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path
@@ -527,4 +407,5 @@
 	data={current_project}
 	{idToken}
 	mutation={print(M_DELETE_PROJECT)}
+	onConfirm={handleDeleteConfirm}
 />

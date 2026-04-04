@@ -101,9 +101,10 @@
 	});
 
 	$effect(() => {
-		if (browser && data.projects) {
-			globalProjectStore.setProjects(data.projects);
-		}
+		if (!browser || !data.projects) return;
+		// Avoid redundant writes when the layout re-runs with the same array reference
+		if (data.projects === globalProjectStore.projects) return;
+		globalProjectStore.setProjects(data.projects);
 	});
 
 	onMount(() => {

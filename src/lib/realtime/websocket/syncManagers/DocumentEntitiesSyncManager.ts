@@ -8,6 +8,8 @@
 
 import { browser } from '$app/environment';
 import type { Text, Table, Image } from '@stratiqai/types-simple';
+import { S_ON_CREATE_TEXT, S_ON_CREATE_TABLE, S_ON_CREATE_IMAGE } from '@stratiqai/types-simple';
+import { print } from 'graphql';
 import { gql } from '$lib/realtime/graphql/requestHandler';
 import {
 	addProjectText,
@@ -15,6 +17,8 @@ import {
 	addProjectImage,
 	clearProjectEntities
 } from '$lib/stores/projectEntitiesStore';
+import { addSubscription, removeSubscription, ensureConnection } from '$lib/stores/appSyncClientStore';
+import type { SubscriptionSpec } from '$lib/realtime/websocket/types';
 
 /**
  * GraphQL query to fetch a document with its texts, tables, and images
@@ -118,6 +122,7 @@ export class DocumentEntitiesSyncManager {
 	private idToken: string | null = null;
 	private projectId: string | null = null;
 	private documentIds: string[] = [];
+	private subscriptionSpecs: SubscriptionSpec<any>[] = [];
 
 	// --- Operational State ---
 	private _status: ManagerStatus = 'inactive';
@@ -174,6 +179,72 @@ export class DocumentEntitiesSyncManager {
 	}
 
 	/**
+	 * Sets up real-time WebSocket subscriptions for a document so new entities
+	 * created during cloud processing are pushed into the store automatically.
+	 */
+	private async setupSubscriptionsForDocument(documentId: string): Promise<void> {
+		if (!this.idToken || !this.projectId) return;
+
+		const projectId = this.projectId;
+
+		const specs: SubscriptionSpec<any>[] = [
+			{
+				query: print(S_ON_CREATE_TEXT),
+				variables: { parentId: documentId },
+				path: 'onCreateText',
+				next: (text: Text) => {
+					if (projectId) addProjectText(projectId, text);
+				},
+				error: (err: any) => {
+					console.error(`[DocumentEntitiesSyncManager] Text subscription error for ${documentId}:`, err);
+				}
+			},
+			{
+				query: print(S_ON_CREATE_TABLE),
+				variables: { parentId: documentId },
+				path: 'onCreateTable',
+				next: (table: Table) => {
+					if (projectId) addProjectTable(projectId, table);
+				},
+				error: (err: any) => {
+					console.error(`[DocumentEntitiesSyncManager] Table subscription error for ${documentId}:`, err);
+				}
+			},
+			{
+				query: print(S_ON_CREATE_IMAGE),
+				variables: { parentId: documentId },
+				path: 'onCreateImage',
+				next: (image: Image) => {
+					if (projectId) addProjectImage(projectId, image);
+				},
+				error: (err: any) => {
+					console.error(`[DocumentEntitiesSyncManager] Image subscription error for ${documentId}:`, err);
+				}
+			}
+		];
+
+		try {
+			await ensureConnection(this.idToken);
+			for (const spec of specs) {
+				await addSubscription(this.idToken, spec);
+			}
+			this.subscriptionSpecs.push(...specs);
+		} catch (err) {
+			console.error(`[DocumentEntitiesSyncManager] Failed to set up subscriptions for ${documentId}:`, err);
+		}
+	}
+
+	/**
+	 * Removes all active subscriptions.
+	 */
+	private teardownSubscriptions(): void {
+		for (const spec of this.subscriptionSpecs) {
+			removeSubscription(spec);
+		}
+		this.subscriptionSpecs = [];
+	}
+
+	/**
 	 * Fetches all entities for all documents and populates the store.
 	 */
 	async fetchAll(options: DocumentEntitiesManagerOptions): Promise<void> {
@@ -196,6 +267,9 @@ export class DocumentEntitiesSyncManager {
 		this._error = null;
 
 		try {
+			// Tear down any previous subscriptions before re-fetching
+			this.teardownSubscriptions();
+
 			// Clear existing entities before fetching fresh data
 			clearProjectEntities(projectId);
 
@@ -221,6 +295,11 @@ export class DocumentEntitiesSyncManager {
 					addProjectImage(projectId, image);
 				}
 			}
+
+			// Set up real-time subscriptions so new entities stream in automatically
+			await Promise.all(
+				documentIds.map(docId => this.setupSubscriptionsForDocument(docId))
+			);
 
 			this._status = 'ready';
 		} catch (err) {
@@ -272,6 +351,8 @@ export class DocumentEntitiesSyncManager {
 			for (const image of result.images) {
 				addProjectImage(this.projectId, image);
 			}
+
+			await this.setupSubscriptionsForDocument(documentId);
 		} catch (err) {
 			console.error(`Failed to fetch entities for document ${documentId}:`, err);
 			throw err;
@@ -282,6 +363,7 @@ export class DocumentEntitiesSyncManager {
 	 * Cleans up resources.
 	 */
 	cleanup(): void {
+		this.teardownSubscriptions();
 		if (this.projectId) {
 			clearProjectEntities(this.projectId);
 		}

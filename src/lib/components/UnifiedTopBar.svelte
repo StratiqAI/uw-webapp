@@ -19,6 +19,8 @@
 		 * Use for page-specific side effects (e.g. reinitializing dashboard).
 		 */
 		onProjectChange?: (projectId: string | null) => void;
+		/** Auth token for mutations (rename) inside the project switcher */
+		idToken?: string | null;
 		subtitle?: string;
 		tabs?: Snippet;
 		actions?: Snippet;
@@ -31,6 +33,7 @@
 		projects,
 		selectedProjectId,
 		onProjectChange,
+		idToken,
 		subtitle,
 		tabs,
 		actions,
@@ -81,6 +84,7 @@
 			projects={resolvedProjects}
 			selectedProjectId={resolvedSelectedId}
 			{darkMode}
+			{idToken}
 			onProjectChange={handleProjectChange}
 		/>
 	{:else if showProjectName}

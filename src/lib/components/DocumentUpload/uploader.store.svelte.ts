@@ -259,7 +259,8 @@ export function createUploader(
 				abortController: new AbortController(),
 				retryCount: 0
 			}));
-			files.push(...newUploads);
+			// Reassign so Svelte 5 runes notify subscribers (in-place .push does not).
+			files = [...files, ...newUploads];
 			uploadQueue.push(...newUploads);
 			processQueue();
 		},

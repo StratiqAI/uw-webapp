@@ -198,6 +198,73 @@
 	const tableCount = $derived($tables.length + extractedTables.length);
 	const imageCount = $derived($images.length);
 
+	// --- Animated count change tracking ---
+	let prevDocCount = $state(0);
+	let prevTextCount = $state(0);
+	let prevTableCount = $state(0);
+	let prevImageCount = $state(0);
+
+	let docDelta = $state(0);
+	let textDelta = $state(0);
+	let tableDelta = $state(0);
+	let imageDelta = $state(0);
+
+	let docPulse = $state(false);
+	let textPulse = $state(false);
+	let tablePulse = $state(false);
+	let imagePulse = $state(false);
+
+	let docTimer: ReturnType<typeof setTimeout> | null = null;
+	let textTimer: ReturnType<typeof setTimeout> | null = null;
+	let tableTimer: ReturnType<typeof setTimeout> | null = null;
+	let imageTimer: ReturnType<typeof setTimeout> | null = null;
+
+	const PULSE_MS = 1800;
+
+	function triggerPulse(
+		category: 'doc' | 'text' | 'table' | 'image',
+		delta: number
+	) {
+		if (category === 'doc') {
+			docDelta = delta; docPulse = true;
+			if (docTimer) clearTimeout(docTimer);
+			docTimer = setTimeout(() => { docPulse = false; docDelta = 0; }, PULSE_MS);
+		} else if (category === 'text') {
+			textDelta = delta; textPulse = true;
+			if (textTimer) clearTimeout(textTimer);
+			textTimer = setTimeout(() => { textPulse = false; textDelta = 0; }, PULSE_MS);
+		} else if (category === 'table') {
+			tableDelta = delta; tablePulse = true;
+			if (tableTimer) clearTimeout(tableTimer);
+			tableTimer = setTimeout(() => { tablePulse = false; tableDelta = 0; }, PULSE_MS);
+		} else {
+			imageDelta = delta; imagePulse = true;
+			if (imageTimer) clearTimeout(imageTimer);
+			imageTimer = setTimeout(() => { imagePulse = false; imageDelta = 0; }, PULSE_MS);
+		}
+	}
+
+	$effect(() => {
+		const cur = documentCount;
+		if (cur > prevDocCount && prevDocCount > 0) triggerPulse('doc', cur - prevDocCount);
+		prevDocCount = cur;
+	});
+	$effect(() => {
+		const cur = textCount;
+		if (cur > prevTextCount && prevTextCount > 0) triggerPulse('text', cur - prevTextCount);
+		prevTextCount = cur;
+	});
+	$effect(() => {
+		const cur = tableCount;
+		if (cur > prevTableCount && prevTableCount > 0) triggerPulse('table', cur - prevTableCount);
+		prevTableCount = cur;
+	});
+	$effect(() => {
+		const cur = imageCount;
+		if (cur > prevImageCount && prevImageCount > 0) triggerPulse('image', cur - prevImageCount);
+		prevImageCount = cur;
+	});
+
 	// Derived counts of included (non-excluded) items
 	const includedTextCount = $derived($texts.length - excludedTexts.size);
 	const includedTableCount = $derived(tableCount - excludedTables.size);
@@ -338,12 +405,18 @@
 		<!-- Documents Box -->
 		<button
 			onclick={() => selectCategory('documents')}
-			class="p-4 rounded-lg border transition-all hover:scale-105 cursor-pointer text-left
+			class="relative p-4 rounded-lg border cursor-pointer text-left transition-all duration-300
+				{docPulse ? 'scale-105 ring-2 ring-slate-400 shadow-lg' : 'hover:scale-105'}
 				{selectedCategory === 'documents' 
 					? (darkMode ? 'bg-slate-600 border-slate-400 ring-2 ring-slate-400' : 'bg-slate-100 border-slate-400 ring-2 ring-slate-400')
 					: (darkMode ? 'bg-slate-700/50 border-slate-600 hover:border-slate-500' : 'bg-slate-50 border-slate-200 hover:border-slate-300')
 				}"
 		>
+			{#if docDelta > 0}
+				<span class="absolute -top-2 -right-2 flex items-center justify-center min-w-6 h-6 px-1.5 rounded-full bg-slate-500 text-white text-xs font-bold shadow-md animate-bounce">
+					+{docDelta}
+				</span>
+			{/if}
 			<div class="text-3xl font-bold {darkMode ? 'text-slate-200' : 'text-slate-700'} mb-1">{documentCount}</div>
 			<div class="text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-600'}">Documents</div>
 			<div class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1">📁 Uploaded</div>
@@ -352,12 +425,18 @@
 		<!-- Text Blocks Box -->
 		<button
 			onclick={() => selectCategory('texts')}
-			class="p-4 rounded-lg border transition-all hover:scale-105 cursor-pointer text-left
+			class="relative p-4 rounded-lg border cursor-pointer text-left transition-all duration-300
+				{textPulse ? 'scale-105 ring-2 ring-blue-400 shadow-lg shadow-blue-500/20' : 'hover:scale-105'}
 				{selectedCategory === 'texts'
 					? (darkMode ? 'bg-blue-800/40 border-blue-400 ring-2 ring-blue-400' : 'bg-blue-100 border-blue-400 ring-2 ring-blue-400')
 					: (darkMode ? 'bg-blue-900/20 border-blue-500/30 hover:border-blue-400/50' : 'bg-blue-50 border-blue-200 hover:border-blue-300')
 				}"
 		>
+			{#if textDelta > 0}
+				<span class="absolute -top-2 -right-2 flex items-center justify-center min-w-6 h-6 px-1.5 rounded-full bg-blue-500 text-white text-xs font-bold shadow-md animate-bounce">
+					+{textDelta}
+				</span>
+			{/if}
 			<div class="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-1">{textCount}</div>
 			<div class="text-sm font-medium {darkMode ? 'text-blue-300' : 'text-blue-700'}">Text Blocks</div>
 			<div class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1">
@@ -368,12 +447,18 @@
 		<!-- Tables Box -->
 		<button
 			onclick={() => selectCategory('tables')}
-			class="p-4 rounded-lg border transition-all hover:scale-105 cursor-pointer text-left
+			class="relative p-4 rounded-lg border cursor-pointer text-left transition-all duration-300
+				{tablePulse ? 'scale-105 ring-2 ring-green-400 shadow-lg shadow-green-500/20' : 'hover:scale-105'}
 				{selectedCategory === 'tables'
 					? (darkMode ? 'bg-green-800/40 border-green-400 ring-2 ring-green-400' : 'bg-green-100 border-green-400 ring-2 ring-green-400')
 					: (darkMode ? 'bg-green-900/20 border-green-500/30 hover:border-green-400/50' : 'bg-green-50 border-green-200 hover:border-green-300')
 				}"
 		>
+			{#if tableDelta > 0}
+				<span class="absolute -top-2 -right-2 flex items-center justify-center min-w-6 h-6 px-1.5 rounded-full bg-green-500 text-white text-xs font-bold shadow-md animate-bounce">
+					+{tableDelta}
+				</span>
+			{/if}
 			<div class="text-3xl font-bold text-green-600 dark:text-green-400 mb-1">{tableCount}</div>
 			<div class="text-sm font-medium {darkMode ? 'text-green-300' : 'text-green-700'}">Tables</div>
 			<div class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1">
@@ -384,12 +469,18 @@
 		<!-- Images Box -->
 		<button
 			onclick={() => selectCategory('images')}
-			class="p-4 rounded-lg border transition-all hover:scale-105 cursor-pointer text-left
+			class="relative p-4 rounded-lg border cursor-pointer text-left transition-all duration-300
+				{imagePulse ? 'scale-105 ring-2 ring-purple-400 shadow-lg shadow-purple-500/20' : 'hover:scale-105'}
 				{selectedCategory === 'images'
 					? (darkMode ? 'bg-purple-800/40 border-purple-400 ring-2 ring-purple-400' : 'bg-purple-100 border-purple-400 ring-2 ring-purple-400')
 					: (darkMode ? 'bg-purple-900/20 border-purple-500/30 hover:border-purple-400/50' : 'bg-purple-50 border-purple-200 hover:border-purple-300')
 				}"
 		>
+			{#if imageDelta > 0}
+				<span class="absolute -top-2 -right-2 flex items-center justify-center min-w-6 h-6 px-1.5 rounded-full bg-purple-500 text-white text-xs font-bold shadow-md animate-bounce">
+					+{imageDelta}
+				</span>
+			{/if}
 			<div class="text-3xl font-bold text-purple-600 dark:text-purple-400 mb-1">{imageCount}</div>
 			<div class="text-sm font-medium {darkMode ? 'text-purple-300' : 'text-purple-700'}">Images</div>
 			<div class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} mt-1">

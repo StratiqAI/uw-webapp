@@ -14,7 +14,7 @@
 		data,
 		documents,
 		scale = $bindable(1.0),
-		pageNum = 1,
+		pageNum: _unusedPageNumProp = 1,
 		flipTime = 120,
 		showButtons = ['navigation', 'zoom', 'rotate', 'download'],
 		currentPage = $bindable(1),
@@ -68,6 +68,8 @@
 	let isInitialized: boolean = false;
 
 	let isLoading = $state(true);
+	/** Last page we successfully rendered; keeps $effect in sync without mutating the pageNum prop */
+	let lastRenderedPageNum = $state(1);
 	let docSelectorOpen = $state(false);
 	let pageSelectorOpen = $state(false);
 	let pageInputValue = $state('');
@@ -76,7 +78,7 @@
 	const maxScale: number = 3.0;
 	const zoomPercent = $derived(Math.round(scale * 100));
 
-	const ZOOM_PRESETS = [50, 75, 100, 125, 150, 200, 300];
+	const ZOOM_PRESETS = [50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 175, 200, 250, 300];
 
 	function fitToWidth() {
 		if (!viewerContainer || !pdfDoc) return;
@@ -109,10 +111,11 @@
 			currentPage = num;
 
 			if (pageNumPending !== null) {
-				if (pageNum < pdfDoc.numPages) {
-					pages[pageNum - 1] = canvas.cloneNode(true) as HTMLCanvasElement;
-					pageNum++;
-					await renderPage(pageNum);
+				let batchPage = pageNumPending;
+				if (batchPage < pdfDoc.numPages) {
+					pages[batchPage - 1] = canvas.cloneNode(true) as HTMLCanvasElement;
+					batchPage++;
+					await renderPage(batchPage);
 				} else {
 					for (let i = 0; i < pages.length; i++) {
 						canvas.parentNode?.insertBefore(pages[i], canvas);
@@ -121,7 +124,7 @@
 				}
 				pageNumPending = null;
 			}
-			if (showButtons.length) pageNum = num;
+			lastRenderedPageNum = num;
 		} catch (error) {
 			console.error('Error rendering page:', error);
 			pageRendering = false;
@@ -194,7 +197,7 @@
 		if (scale < maxScale) {
 			const nextPreset = ZOOM_PRESETS.find((p) => p > zoomPercent);
 			scale = Math.min((nextPreset ?? zoomPercent + 25) / 100, maxScale);
-			queueRenderPage(pageNum);
+			queueRenderPage(currentPage);
 		}
 	};
 
@@ -202,23 +205,23 @@
 		if (scale > minScale) {
 			const prevPreset = [...ZOOM_PRESETS].reverse().find((p) => p < zoomPercent);
 			scale = Math.max((prevPreset ?? zoomPercent - 25) / 100, minScale);
-			queueRenderPage(pageNum);
+			queueRenderPage(currentPage);
 		}
 	};
 
 	const setZoom = (percent: number): void => {
 		scale = Math.min(Math.max(percent / 100, minScale), maxScale);
-		queueRenderPage(pageNum);
+		queueRenderPage(currentPage);
 	};
 
 	const clockwiseRotate = (): void => {
 		rotation += 90;
-		queueRenderPage(pageNum);
+		queueRenderPage(currentPage);
 	};
 
 	const antiClockwiseRotate = (): void => {
 		rotation -= 90;
-		queueRenderPage(pageNum);
+		queueRenderPage(currentPage);
 	};
 
 	const onPasswordSubmit = (): void => {
@@ -226,6 +229,12 @@
 	};
 
 	const initialLoad = async (): Promise<void> => {
+		if (!currentDocHash && !data) {
+			isLoading = false;
+			passwordError = false;
+			return;
+		}
+
 		isLoading = true;
 		try {
 			const loadingTask = pdfjs.getDocument({
@@ -265,8 +274,23 @@
 
 	initialLoad();
 
+	// Reload when the selected document changes (e.g. first doclink arrives via subscription)
+	let prevDocHash = currentDocHash;
 	$effect(() => {
-		if (isInitialized && currentPage !== pageNum) {
+		const hash = currentDocHash;
+		if (hash && hash !== prevDocHash) {
+			prevDocHash = hash;
+			passwordError = false;
+			isInitialized = false;
+			pdfDoc = null;
+			currentPage = 1;
+			lastRenderedPageNum = 1;
+			initialLoad();
+		}
+	});
+
+	$effect(() => {
+		if (isInitialized && currentPage !== lastRenderedPageNum) {
 			queueRenderPage(currentPage);
 		}
 	});
@@ -356,7 +380,7 @@
 				<button
 					type="button"
 					onclick={() => (docSelectorOpen = !docSelectorOpen)}
-					class="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors max-w-[220px]
+					class="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors max-w-[400px]
 						{darkMode
 							? 'text-slate-200 hover:bg-slate-700'
 							: 'text-slate-700 hover:bg-slate-200'}"
@@ -597,41 +621,55 @@
 			</div>
 		{/if}
 
-		{#if passwordError}
-			<div class="flex flex-col items-center justify-center gap-4 py-16 px-8">
-				<svg class="h-12 w-12 {darkMode ? 'text-slate-500' : 'text-slate-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-				</svg>
-				<div class="text-center">
-					<p class="text-sm font-medium {darkMode ? 'text-white' : 'text-slate-900'}">
-						Password Protected
-					</p>
-					<p class="mt-1 text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'}">
-						This document requires a password to open
-					</p>
-				</div>
-				<div class="flex items-center gap-2">
-					<input
-						type="password"
-						bind:value={password}
-						placeholder="Enter password"
-						onkeydown={(e) => { if (e.key === 'Enter') onPasswordSubmit(); }}
-						class="rounded-lg border px-3 py-2 text-sm
-							{darkMode
-								? 'bg-slate-800 border-slate-600 text-white placeholder-slate-500'
-								: 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'}"
-					/>
-					<button
-						type="button"
-						onclick={onPasswordSubmit}
-						class="rounded-lg px-4 py-2 text-sm font-medium transition-colors
-							{darkMode ? 'bg-indigo-600 text-white hover:bg-indigo-500' : 'bg-indigo-600 text-white hover:bg-indigo-700'}"
-					>
-						Unlock
-					</button>
-				</div>
+	{#if !hasDocuments && !data && !passwordError}
+		<div class="flex flex-col items-center justify-center gap-3 py-16 px-8">
+			<svg class="h-12 w-12 {darkMode ? 'text-slate-600' : 'text-slate-300'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+			</svg>
+			<div class="text-center">
+				<p class="text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'}">
+					No Document Uploaded Yet
+				</p>
+				<p class="mt-1 text-xs {darkMode ? 'text-slate-500' : 'text-slate-400'}">
+					Upload a PDF to view it here
+				</p>
 			</div>
-		{:else}
+		</div>
+	{:else if passwordError}
+		<div class="flex flex-col items-center justify-center gap-4 py-16 px-8">
+			<svg class="h-12 w-12 {darkMode ? 'text-slate-500' : 'text-slate-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+			</svg>
+			<div class="text-center">
+				<p class="text-sm font-medium {darkMode ? 'text-white' : 'text-slate-900'}">
+					Password Protected
+				</p>
+				<p class="mt-1 text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'}">
+					This document requires a password to open
+				</p>
+			</div>
+			<div class="flex items-center gap-2">
+				<input
+					type="password"
+					bind:value={password}
+					placeholder="Enter password"
+					onkeydown={(e) => { if (e.key === 'Enter') onPasswordSubmit(); }}
+					class="rounded-lg border px-3 py-2 text-sm
+						{darkMode
+							? 'bg-slate-800 border-slate-600 text-white placeholder-slate-500'
+							: 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'}"
+				/>
+				<button
+					type="button"
+					onclick={onPasswordSubmit}
+					class="rounded-lg px-4 py-2 text-sm font-medium transition-colors
+						{darkMode ? 'bg-indigo-600 text-white hover:bg-indigo-500' : 'bg-indigo-600 text-white hover:bg-indigo-700'}"
+				>
+					Unlock
+				</button>
+			</div>
+		</div>
+	{:else}
 			<div
 				class="flex justify-center p-6
 					{darkMode ? 'bg-slate-800/30' : 'bg-slate-100/50'}"
