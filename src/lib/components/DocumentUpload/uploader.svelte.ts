@@ -1,4 +1,4 @@
-// src/lib/components/DocumentUpload/uploader.store.svelte.ts
+// src/lib/components/DocumentUpload/uploader.svelte.ts
 
 import {
 	MAX_RETRY_ATTEMPTS,
@@ -9,25 +9,33 @@ import {
 	PROGRESS_GETTING_URL,
 	PROGRESS_UPLOADING_MAX,
 	PROGRESS_COMPLETE,
-	LOG_PREFIX
+	LOG_PREFIX,
+	DEFAULT_PRESIGNED_URL_ENDPOINT
 } from './constants';
-import type { UploadFile, PresignedUrlResponse, FileMetadata } from './types';
-import { logger } from '$lib/logging/debug';
+import type { UploadFile, PresignedUrlResponse, FileMetadata, LoggerFn } from './types';
 
-// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-// Uploader Store - Encapsulates all upload logic
-// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-export function createUploader(
-	idToken: string | null = null,
-	projectId: string | null = null,
-	metadata: FileMetadata | null = null
-) {
+export interface UploaderOptions {
+	idToken?: string | null;
+	projectId?: string | null;
+	metadata?: FileMetadata | null;
+	logger?: LoggerFn;
+	presignedUrlEndpoint?: string;
+	onUploadComplete?: (file: UploadFile) => void;
+}
+
+const noop: LoggerFn = () => {};
+
+export function createUploader(options: UploaderOptions = {}) {
 	let files = $state<UploadFile[]>([]);
 	let uploadQueue: UploadFile[] = [];
 	let activeUploads = $state(0);
-	let token = $state(idToken);
-	let project = $state(projectId);
-	let fileMetadata = $state(metadata);
+	let token = $state(options.idToken ?? null);
+	let project = $state(options.projectId ?? null);
+	let fileMetadata = $state(options.metadata ?? null);
+
+	const log: LoggerFn = options.logger ?? noop;
+	const endpoint = options.presignedUrlEndpoint ?? DEFAULT_PRESIGNED_URL_ENDPOINT;
+	const onUploadComplete = options.onUploadComplete;
 
 	function updateFile(fileId: string, updates: Partial<UploadFile>) {
 		files = files.map((f) => (f.id === fileId ? { ...f, ...updates } : f));
@@ -38,7 +46,7 @@ export function createUploader(
 			const fileToUpload = uploadQueue.shift();
 			if (fileToUpload) {
 				activeUploads++;
-				uploadFile(fileToUpload).finally(() => {
+				performUpload(fileToUpload).finally(() => {
 					activeUploads--;
 					processQueue();
 				});
@@ -46,9 +54,9 @@ export function createUploader(
 		}
 	}
 
-	async function uploadFile(upload: UploadFile): Promise<void> {
+	async function performUpload(upload: UploadFile): Promise<void> {
 		try {
-			console.log(`${LOG_PREFIX} [UPLOAD_START] Starting upload for:`, {
+			log(`${LOG_PREFIX} [UPLOAD_START] Starting upload for:`, {
 				fileName: upload.file.name,
 				fileSize: upload.file.size,
 				hasToken: !!token,
@@ -58,11 +66,11 @@ export function createUploader(
 				projectId: project,
 				timestamp: new Date().toISOString()
 			});
-			
+
 			updateFile(upload.id, { status: 'hashing', progress: PROGRESS_HASHING });
 			const sha256 = await calculateSHA256(upload.file);
-			
-			console.log(`${LOG_PREFIX} [UPLOAD_STEP] SHA256 calculated:`, {
+
+			log(`${LOG_PREFIX} [UPLOAD_STEP] SHA256 calculated:`, {
 				fileName: upload.file.name,
 				sha256: sha256.substring(0, 16) + '...',
 				hasMetadata: !!fileMetadata,
@@ -70,85 +78,64 @@ export function createUploader(
 			});
 
 			updateFile(upload.id, { progress: PROGRESS_GETTING_URL });
-			
-			// Wait for metadata to become available (with timeout)
-			// This handles the case where metadata is set reactively after the upload starts
+
+			// Wait for metadata to become available (with timeout).
+			// Handles the case where metadata is set reactively after upload starts.
 			let metadataAtRequestTime = fileMetadata;
-			console.log(`${LOG_PREFIX} [UPLOAD_STEP] Checking metadata before presigned URL:`, {
+			log(`${LOG_PREFIX} [UPLOAD_STEP] Checking metadata before presigned URL:`, {
 				fileName: upload.file.name,
-				metadataAtRequestTime: metadataAtRequestTime,
-				hasMetadata: !!metadataAtRequestTime,
-				fileMetadataState: fileMetadata,
-				hasFileMetadataState: !!fileMetadata
+				hasMetadata: !!metadataAtRequestTime
 			});
-			
+
 			if (!metadataAtRequestTime) {
-				console.warn(`${LOG_PREFIX} [UPLOAD_WAIT] Metadata not immediately available, waiting up to 2 seconds...`, {
-					fileName: upload.file.name,
-					currentMetadata: fileMetadata,
-					hasToken: !!token,
-					hasProject: !!project,
-					projectId: project
-				});
-				
-				const maxWaitTime = 2000; // 2 seconds
-				const checkInterval = 100; // Check every 100ms
+				console.warn(
+					`${LOG_PREFIX} [UPLOAD_WAIT] Metadata not immediately available, waiting up to 2 seconds...`,
+					{ fileName: upload.file.name }
+				);
+
+				const maxWaitTime = 2000;
+				const checkInterval = 100;
 				const startTime = Date.now();
 				let checkCount = 0;
-				
-				while (!metadataAtRequestTime && (Date.now() - startTime) < maxWaitTime) {
-					await new Promise(resolve => setTimeout(resolve, checkInterval));
+
+				while (!metadataAtRequestTime && Date.now() - startTime < maxWaitTime) {
+					await new Promise((resolve) => setTimeout(resolve, checkInterval));
 					metadataAtRequestTime = fileMetadata;
 					checkCount++;
-					
-					if (checkCount % 5 === 0) { // Log every 500ms
-						console.log(`${LOG_PREFIX} [UPLOAD_WAIT] Still waiting for metadata (check ${checkCount}):`, {
+
+					if (checkCount % 5 === 0) {
+						log(`${LOG_PREFIX} [UPLOAD_WAIT] Still waiting for metadata (check ${checkCount}):`, {
 							fileName: upload.file.name,
 							elapsed: Date.now() - startTime,
-							hasMetadata: !!metadataAtRequestTime,
-							metadata: metadataAtRequestTime,
-							fileMetadataState: fileMetadata
+							hasMetadata: !!metadataAtRequestTime
 						});
 					}
 				}
-				
-				const elapsed = Date.now() - startTime;
-				console.log(`${LOG_PREFIX} [UPLOAD_WAIT] Wait complete:`, {
+
+				log(`${LOG_PREFIX} [UPLOAD_WAIT] Wait complete:`, {
 					fileName: upload.file.name,
-					elapsed,
+					elapsed: Date.now() - startTime,
 					hasMetadata: !!metadataAtRequestTime,
-					metadata: metadataAtRequestTime,
 					checks: checkCount
 				});
 			}
-			
-			// Capture metadata at the time of presigned URL request
-			// This ensures metadata is included in the presigned URL signature
+
 			if (!metadataAtRequestTime) {
-				const errorMsg = `Metadata is required for upload but was not available after waiting. Token: ${token ? 'present' : 'null'}, Project: ${project ? 'present' : 'null'}, Metadata state: ${fileMetadata ? 'present' : 'null'}. Please ensure the project is fully loaded before uploading.`;
+				const errorMsg = `Metadata is required for upload but was not available after waiting. Token: ${token ? 'present' : 'null'}, Project: ${project ? 'present' : 'null'}. Please ensure the project is fully loaded before uploading.`;
 				console.error(`${LOG_PREFIX} [UPLOAD_ERROR] ${errorMsg}`, {
 					fileName: upload.file.name,
-					token: token ? 'present' : 'null',
-					project: project ? 'present' : 'null',
-					fileMetadata: fileMetadata,
-					metadataAtRequestTime: metadataAtRequestTime,
-					uploaderState: {
-						token: !!token,
-						project: !!project,
-						fileMetadata: fileMetadata,
-						hasFileMetadata: !!fileMetadata
-					},
 					stackTrace: new Error().stack
 				});
 				throw new Error(errorMsg);
 			}
-			
-			console.log(`${LOG_PREFIX} [UPLOAD_STEP] Using metadata for presigned URL:`, {
+
+			log(`${LOG_PREFIX} [UPLOAD_STEP] Using metadata for presigned URL:`, {
 				fileName: upload.file.name,
 				metadata: metadataAtRequestTime
 			});
-			
-			const { url, key } = await getPresignedUrl(
+
+			const { url } = await getPresignedUrl(
+				endpoint,
 				upload.file.name,
 				upload.file.type,
 				sha256,
@@ -158,9 +145,7 @@ export function createUploader(
 			);
 
 			updateFile(upload.id, { status: 'uploading' });
-			// IMPORTANT: Only send metadata headers if metadata was included in the presigned URL
-			// Using metadataAtRequestTime ensures headers match what was signed
-			await uploadToS3(url, upload, metadataAtRequestTime, (progress) => {
+			await uploadToS3(url, upload, log, (progress) => {
 				const newProgress = Math.round(
 					PROGRESS_GETTING_URL + (PROGRESS_UPLOADING_MAX - PROGRESS_GETTING_URL) * progress
 				);
@@ -172,6 +157,9 @@ export function createUploader(
 				progress: PROGRESS_COMPLETE,
 				result: { success: true, message: 'Upload successful' }
 			});
+
+			const completedFile = files.find((f) => f.id === upload.id);
+			if (completedFile) onUploadComplete?.(completedFile);
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
 			if (errorMessage.includes('cancelled')) {
@@ -182,11 +170,10 @@ export function createUploader(
 			if (currentRetryCount < MAX_RETRY_ATTEMPTS) {
 				const newRetryCount = currentRetryCount + 1;
 				updateFile(upload.id, { retryCount: newRetryCount });
-				
-				// Get the updated file from the array to ensure we have the latest retryCount
+
 				const updatedFile = files.find((f) => f.id === upload.id);
 				if (updatedFile) {
-					setTimeout(() => uploadFile(updatedFile), RETRY_DELAY_MS * newRetryCount);
+					setTimeout(() => performUpload(updatedFile), RETRY_DELAY_MS * newRetryCount);
 				} else {
 					updateFile(upload.id, {
 						status: 'error',
@@ -202,7 +189,6 @@ export function createUploader(
 		}
 	}
 
-	// Public interface of the store
 	return {
 		get files() {
 			return files;
@@ -210,8 +196,7 @@ export function createUploader(
 		get activeUploads() {
 			return activeUploads;
 		},
-		updateMetadata: (newMetadata: FileMetadata) => {
-			// Only update if values actually changed to prevent unnecessary updates
+		updateMetadata(newMetadata: FileMetadata) {
 			if (
 				fileMetadata?.tenantId !== newMetadata?.tenantId ||
 				fileMetadata?.ownerId !== newMetadata?.ownerId ||
@@ -220,22 +205,19 @@ export function createUploader(
 				fileMetadata = newMetadata;
 			}
 		},
-		updateToken: (newToken: string | null) => {
-			// Only update if token actually changed
+		updateToken(newToken: string | null) {
 			if (token !== newToken) {
 				token = newToken;
 			}
 		},
-		add: (filesToAdd: File[]) => {
-			// Warn if metadata is not available when files are added
+		add(filesToAdd: File[]) {
 			if (!fileMetadata) {
-				console.warn(`${LOG_PREFIX} Files added but metadata is not available yet. Upload will wait for metadata or fail if it doesn't become available.`, {
-					hasToken: !!token,
-					hasProject: !!project,
-					hasMetadata: !!fileMetadata
-				});
+				console.warn(
+					`${LOG_PREFIX} Files added but metadata is not available yet. Upload will wait for metadata or fail if it doesn't become available.`,
+					{ hasToken: !!token, hasProject: !!project, hasMetadata: !!fileMetadata }
+				);
 			}
-			
+
 			const newUploads: UploadFile[] = filesToAdd.map((file) => ({
 				id: `${file.name}-${Date.now()}`,
 				file,
@@ -249,7 +231,7 @@ export function createUploader(
 			uploadQueue.push(...newUploads);
 			processQueue();
 		},
-		remove: (fileId: string) => {
+		remove(fileId: string) {
 			const fileToRemove = files.find((f) => f.id === fileId);
 			if (!fileToRemove) return;
 
@@ -259,7 +241,7 @@ export function createUploader(
 			files = files.filter((f) => f.id !== fileId);
 			uploadQueue = uploadQueue.filter((f) => f.id !== fileId);
 		},
-		retry: (fileId: string) => {
+		retry(fileId: string) {
 			const fileToRetry = files.find((f) => f.id === fileId);
 			if (!fileToRetry) return;
 
@@ -270,10 +252,10 @@ export function createUploader(
 				retryCount: 0,
 				abortController: new AbortController()
 			});
-			uploadQueue.unshift(fileToRetry); // Prioritize retry
+			uploadQueue.unshift(fileToRetry);
 			processQueue();
 		},
-		cancelAll: () => {
+		cancelAll() {
 			files.forEach((f) => {
 				if (['uploading', 'hashing', 'pending'].includes(f.status)) {
 					f.abortController.abort();
@@ -284,9 +266,10 @@ export function createUploader(
 	};
 }
 
-// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-// API & Helper Functions
-// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// ---------------------------------------------------------------------------
+// Pure helpers (no external deps)
+// ---------------------------------------------------------------------------
+
 async function calculateSHA256(file: File): Promise<string> {
 	const arrayBuffer = await file.arrayBuffer();
 	const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
@@ -295,6 +278,7 @@ async function calculateSHA256(file: File): Promise<string> {
 }
 
 async function getPresignedUrl(
+	endpoint: string,
 	filename: string,
 	contentType: string,
 	fileHash: string,
@@ -306,13 +290,13 @@ async function getPresignedUrl(
 	if (idToken) {
 		headers['Authorization'] = `Bearer ${idToken}`;
 	}
-	
+
 	if (!projectId) {
 		const errorMsg = 'Project ID is required for upload';
 		console.error(`${LOG_PREFIX} ${errorMsg}. ProjectId: ${projectId}`);
 		throw new Error(errorMsg);
 	}
-	
+
 	const requestBody: {
 		filename: string;
 		contentType: string;
@@ -320,12 +304,12 @@ async function getPresignedUrl(
 		projectId: string;
 		metadata?: FileMetadata;
 	} = { filename, contentType, fileHash, projectId };
-	
+
 	if (metadata) {
 		requestBody.metadata = metadata;
 	}
-	
-	const response = await fetch('/api/s3-presigned', {
+
+	const response = await fetch(endpoint, {
 		method: 'POST',
 		headers,
 		body: JSON.stringify(requestBody)
@@ -347,7 +331,7 @@ async function getPresignedUrl(
 function uploadToS3(
 	url: string,
 	upload: UploadFile,
-	metadata: FileMetadata | null,
+	log: LoggerFn,
 	onProgress: (progress: number) => void
 ): Promise<void> {
 	return new Promise((resolve, reject) => {
@@ -362,11 +346,8 @@ function uploadToS3(
 		xhr.open('PUT', url);
 		xhr.setRequestHeader('Content-Type', upload.file.type || 'application/pdf');
 
-		// NOTE: Metadata is included in the presigned URL query parameters, not as headers
-		// When Metadata is included in PutObjectCommand, AWS SDK includes it in the URL
-		// but doesn't automatically sign the headers. Since the metadata is already in the URL,
-		// we don't need to (and shouldn't) send it as headers to avoid signature mismatch errors.
-		// The metadata will be attached to the S3 object from the URL parameters.
+		// Metadata is included in the presigned URL query parameters, not as headers.
+		// Sending metadata headers would cause a signature mismatch.
 
 		xhr.upload.onprogress = (e) => {
 			if (e.lengthComputable) onProgress(e.loaded / e.total);
@@ -374,7 +355,7 @@ function uploadToS3(
 
 		xhr.onload = () => {
 			if (xhr.status >= 200 && xhr.status < 300) {
-				logger(`${LOG_PREFIX} Upload successful for ${upload.file.name}`);
+				log(`${LOG_PREFIX} Upload successful for ${upload.file.name}`);
 				resolve();
 			} else {
 				const errorMsg = `Upload failed with status ${xhr.status}${xhr.responseText ? `: ${xhr.responseText}` : ''}`;
@@ -390,8 +371,7 @@ function uploadToS3(
 
 		xhr.onerror = () => reject(new Error('Network error during upload'));
 		xhr.ontimeout = () => reject(new Error('Upload timed out'));
-		
+
 		xhr.send(upload.file);
 	});
 }
-

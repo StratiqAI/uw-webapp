@@ -6,10 +6,20 @@ export const MAX_RETRY_ATTEMPTS = 1;
 export const RETRY_DELAY_MS = 1000;
 export const CONCURRENT_UPLOAD_LIMIT = 3;
 export const LOG_PREFIX = '[DocumentUpload]';
+export const DEFAULT_PRESIGNED_URL_ENDPOINT = '/api/s3-presigned';
 
-// Progress constants for clear, readable steps in the upload process
 export const PROGRESS_PENDING = 0;
 export const PROGRESS_HASHING = 5;
 export const PROGRESS_GETTING_URL = 10;
 export const PROGRESS_UPLOADING_MAX = 95;
 export const PROGRESS_COMPLETE = 100;
+
+/** Aggregated defaults exposed for consumer introspection / overrides. */
+export const DEFAULTS = {
+	supportedFileTypes: SUPPORTED_FILE_TYPES,
+	maxFileSize: MAX_FILE_SIZE,
+	maxRetryAttempts: MAX_RETRY_ATTEMPTS,
+	retryDelayMs: RETRY_DELAY_MS,
+	concurrentUploadLimit: CONCURRENT_UPLOAD_LIMIT,
+	presignedUrlEndpoint: DEFAULT_PRESIGNED_URL_ENDPOINT
+} as const;

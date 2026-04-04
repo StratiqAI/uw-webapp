@@ -11,7 +11,7 @@ export interface UploadResult {
 
 /** Represents a file being managed by the uploader. */
 export interface UploadFile {
-	id: string; // Unique ID for the file instance
+	id: string;
 	file: File;
 	status: UploadStatus;
 	progress: number;
@@ -33,12 +33,52 @@ export interface FileMetadata {
 	parentId: string;
 }
 
-/** Unified list item that can represent either an upload file or an existing ProjectDocumentLink */
+/**
+ * Minimal interface for documents that already exist in the system.
+ * The host app maps its own document type (e.g. Doclink) to this shape.
+ * Extra fields are preserved via the index signature so the host can
+ * read them back in callbacks.
+ */
+export interface ExistingDocument {
+	id: string;
+	filename: string;
+	parentId?: string;
+	[key: string]: unknown;
+}
+
+/** Unified list item: either an in-flight upload or an existing document. */
 export interface DocumentListItem {
 	id: string;
 	filename: string;
-	size?: number; // File size in bytes (only available for uploads)
-	status: 'upload' | 'existing'; // 'upload' for files being uploaded, 'existing' for ProjectDocumentLinks
-	uploadFile?: UploadFile; // Present if status is 'upload'
-	documentLink?: import('$lib/types/cloud/app').ProjectDocumentLink; // Present if status is 'existing'
+	size?: number;
+	status: 'upload' | 'existing';
+	uploadFile?: UploadFile;
+	documentLink?: ExistingDocument;
+}
+
+/** Optional configuration overrides for the component. */
+export interface DocumentUploadConfig {
+	supportedFileTypes?: string;
+	maxFileSize?: number;
+	maxRetryAttempts?: number;
+	retryDelayMs?: number;
+	concurrentUploadLimit?: number;
+}
+
+/** Logger function signature accepted by the component. */
+export type LoggerFn = (...args: unknown[]) => void;
+
+/** Props accepted by the root DocumentUpload component. */
+export interface DocumentUploadProps {
+	idToken: string | null;
+	projectId: string | null;
+	metadata?: FileMetadata | null;
+	existingDocuments?: ExistingDocument[];
+	onDeleteDocument?: (doc: ExistingDocument) => Promise<void>;
+	onDocumentClick?: (item: DocumentListItem) => void;
+	onUploadComplete?: (item: UploadFile) => void;
+	onError?: (errors: string[]) => void;
+	presignedUrlEndpoint?: string;
+	logger?: LoggerFn;
+	config?: DocumentUploadConfig;
 }

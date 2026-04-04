@@ -2,10 +2,15 @@
 <script lang="ts">
 	import { MAX_FILE_SIZE, SUPPORTED_FILE_TYPES } from './constants';
 
-	// Props to make the component configurable
-	const { acceptedFileTypes, maxFileSize, children, onFilesAdded, onError } = $props<{
-		acceptedFileTypes: string;
-		maxFileSize: number;
+	const {
+		acceptedFileTypes = SUPPORTED_FILE_TYPES,
+		maxFileSize = MAX_FILE_SIZE,
+		children,
+		onFilesAdded,
+		onError
+	} = $props<{
+		acceptedFileTypes?: string;
+		maxFileSize?: number;
 		children?: import('svelte').Snippet;
 		onFilesAdded?: (event: { validFiles: File[] }) => void;
 		onError?: (event: { errors: string[] }) => void;

@@ -7,12 +7,14 @@
 	import { DocumentEntitiesSyncManager } from '$lib/realtime/websocket/syncManagers/DocumentEntitiesSyncManager';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import { authStore } from '$lib/stores/auth.svelte';
-	import DocumentUpload from '$lib/components/DocumentUpload/DocumentUpload.svelte';
+	import { DocumentUpload } from '$lib/components/DocumentUpload';
+	import type { ExistingDocument, DocumentListItem } from '$lib/components/DocumentUpload';
+	import DocumentProcessingModal from '$lib/components/DocumentProcessing/DocumentProcessingModal.svelte';
 	import ProjectEntitiesDisplay from '$lib/components/ProjectEntities/ProjectEntitiesDisplay.svelte';
 	import PDFViewer from '$lib/components/PDFViewer/PDFViewer.svelte';
 	import AgentActivityFeed from '$lib/components/AgentActivityFeed/AgentActivityFeed.svelte';
 	import { page } from '$app/stores';
-	import { S_ON_CREATE_DOCLINK } from '@stratiqai/types-simple';
+	import { M_DELETE_DOCLINK, S_ON_CREATE_DOCLINK } from '@stratiqai/types-simple';
 	import { addSubscription, removeSubscription } from '$lib/stores/appSyncClientStore';
 	import { print } from 'graphql';
 	import { gql } from '$lib/realtime/graphql/requestHandler';
@@ -111,14 +113,71 @@
 		return Array.isArray(links) ? links : ((links as any).items || []);
 	});
 
+	// One row per documentId (prefer primary Doclink with linkType NONE)
+	type DoclinkWithLinkType = Doclink & { linkType?: string };
+	const doclinksByDocument = $derived.by(() => {
+		const byDoc = new Map<string, Doclink>();
+		for (const link of doclinks as DoclinkWithLinkType[]) {
+			if (!link.documentId) continue;
+			const existing = byDoc.get(link.documentId);
+			if (!existing || link.linkType === 'NONE') byDoc.set(link.documentId, link);
+		}
+		return Array.from(byDoc.values());
+	});
+
+	const existingDocuments: ExistingDocument[] = $derived(
+		doclinksByDocument.map((link) => ({
+			id: link.id,
+			filename: link.filename,
+			parentId: link.parentId,
+			documentId: link.documentId
+		} as ExistingDocument))
+	);
+
 	const documents = $derived.by(() => {
 		return doclinks
-			.filter((link) => link.documentId && link.filename)
-			.map((link) => ({
+			.filter((link: Doclink) => link.documentId && link.filename)
+			.map((link: Doclink) => ({
 				id: link.documentId!,
 				filename: link.filename
 			})) as ProjectDocument[];
 	});
+
+	// ---- DocumentUpload callbacks ----
+	async function handleDeleteDocument(doc: ExistingDocument): Promise<void> {
+		if (!idToken) throw new Error('Not authenticated');
+		await gql(
+			print(M_DELETE_DOCLINK),
+			{ key: { id: doc.id, parentId: doc.parentId } },
+			idToken
+		);
+	}
+
+	let selectedDocument = $state<{
+		documentId: string;
+		projectId: string;
+		filename: string;
+	} | null>(null);
+	let isModalOpen = $derived(selectedDocument !== null);
+
+	function handleDocumentClick(item: DocumentListItem) {
+		let documentId: string | null = null;
+		const pid = projectId;
+
+		if (item.status === 'existing' && item.documentLink) {
+			documentId = item.documentLink.id;
+		} else if (item.status === 'upload' && item.uploadFile?.result?.success) {
+			documentId = `doc-${item.id}`;
+		}
+
+		if (documentId && pid) {
+			selectedDocument = { documentId, projectId: pid, filename: item.filename };
+		}
+	}
+
+	function handleModalClose() {
+		selectedDocument = null;
+	}
 
 	let selectedDocId = $state<string>('');
 	let currentPage = $state(1);
@@ -387,13 +446,16 @@
 					</div>
 				</div>
 
-				<div class="shrink-0 overflow-y-auto max-h-[40%] p-4">
-					<DocumentUpload
-						{idToken}
-						{projectId}
-						metadata={fileMetadata}
-					/>
-				</div>
+			<div class="shrink-0 overflow-y-auto max-h-[40%] p-4">
+				<DocumentUpload
+					{idToken}
+					{projectId}
+					metadata={fileMetadata}
+					{existingDocuments}
+					onDeleteDocument={handleDeleteDocument}
+					onDocumentClick={handleDocumentClick}
+				/>
+			</div>
 
 				{#if projectId}
 					<div class="flex-1 overflow-hidden flex flex-col min-h-0">
@@ -404,3 +466,13 @@
 		{/if}
 	</div>
 </div>
+
+{#if selectedDocument}
+	<DocumentProcessingModal
+		documentId={selectedDocument.documentId}
+		projectId={selectedDocument.projectId}
+		filename={selectedDocument.filename}
+		isOpen={isModalOpen}
+		onClose={handleModalClose}
+	/>
+{/if}
