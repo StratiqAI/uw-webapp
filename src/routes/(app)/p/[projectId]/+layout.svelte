@@ -13,9 +13,13 @@
 	import ChatDrawer from '$lib/components/layout/ChatDrawer.svelte';
 	import TopBar from '$lib/components/layout/TopBar.svelte';
 	import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
+	import { GraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
+	import { syncWidgetTemplates } from '$lib/services/widgetPromptService';
 	import { createLogger } from '$lib/utils/logger';
 
 	const log = createLogger('projects');
+
+	let widgetTemplatesSynced = false;
 
 	let { children, data }: LayoutProps = $props();
 
@@ -104,6 +108,15 @@
 		return () => {
 			removeSubscription(spec);
 		};
+	});
+
+	$effect(() => {
+		if (!browser || !idToken || widgetTemplatesSynced) return;
+		widgetTemplatesSynced = true;
+		const qc = new GraphQLQueryClient(idToken);
+		syncWidgetTemplates(qc).catch((err) => {
+			log.error('Failed to sync widget prompt templates:', err);
+		});
 	});
 
 	$effect(() => {

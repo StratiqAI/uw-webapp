@@ -71,9 +71,10 @@ export interface BaseWidget extends Position, Size, WidgetConstraints {
 	id: string;
 	type: AnyWidgetType;
 	locked?: boolean;
-	title?: string; // Optional widget title for display
-	description?: string; // Optional widget description
-	topicOverride?: string; // Optional topic override - if set, widget subscribes to this topic instead of default
+	title?: string;
+	description?: string;
+	topicOverride?: string;
+	promptId?: string;
 }
 
 // Widget Action Types

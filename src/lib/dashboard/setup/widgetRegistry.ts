@@ -7,7 +7,7 @@
  * this registry instead of hardcoded lists.
  */
 
-import type { WidgetManifest, StandardWidgetProps } from '@stratiqai/dashboard-widget-sdk';
+import type { WidgetManifest, WidgetPromptConfig, StandardWidgetProps } from '@stratiqai/dashboard-widget-sdk';
 import type { Component } from 'svelte';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -31,4 +31,8 @@ export function getRegisteredManifests(): WidgetManifest[] {
 
 export function isRegisteredWidget(kind: string): boolean {
 	return manifests.has(kind);
+}
+
+export function getWidgetPromptConfig(kind: string): WidgetPromptConfig | undefined {
+	return manifests.get(kind)?.promptConfig;
 }
