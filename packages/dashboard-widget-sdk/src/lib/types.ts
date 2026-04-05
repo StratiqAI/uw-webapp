@@ -24,6 +24,18 @@ export interface StandardWidgetProps<TData = unknown> {
 }
 
 /**
+ * AI prompt configuration declared by a widget package.
+ * Used to create kind-level template Prompt/JsonSchema entities and
+ * seed per-instance prompts.
+ */
+export interface WidgetPromptConfig {
+	defaultPrompt: string;
+	systemInstruction?: string;
+	model?: string;
+	aiOutputSchema: z.ZodSchema;
+}
+
+/**
  * Manifest returned by `defineWidget()`. The host dashboard uses this to
  * register schemas, resolve the component, and seed default data/sizing.
  */
@@ -50,6 +62,8 @@ export interface WidgetManifest<TData = unknown> {
 	capabilities?: string[];
 	/** Palette metadata for the host "Add Widget" UI. */
 	palette?: { icon: string; category?: string };
+	/** AI prompt configuration — if present, the widget supports AI generation. */
+	promptConfig?: WidgetPromptConfig;
 }
 
 /** Provides typed access to host-injected service instances. */

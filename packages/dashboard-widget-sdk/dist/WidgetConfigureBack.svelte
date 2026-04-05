@@ -14,6 +14,8 @@
 		onApply: () => void;
 		onCancel: () => void;
 		userFields?: Snippet;
+		promptChooser?: Snippet;
+		promptEditor?: Snippet;
 	}
 
 	let {
@@ -26,7 +28,9 @@
 		externalData,
 		onApply,
 		onCancel,
-		userFields
+		userFields,
+		promptChooser,
+		promptEditor
 	}: Props = $props();
 
 	const host = getDashboardWidgetHost();
@@ -114,6 +118,18 @@
 			<section class="space-y-3 border-b pb-4 {sectionBorder}">
 				<h4 class={sectionTitle}>Settings</h4>
 				{@render userFields()}
+			</section>
+		{/if}
+
+		{#if promptChooser || promptEditor}
+			<section class="space-y-3 border-b pb-4 {sectionBorder}">
+				<h4 class={sectionTitle}>AI Prompt</h4>
+				{#if promptChooser}
+					{@render promptChooser()}
+				{/if}
+				{#if promptEditor}
+					{@render promptEditor()}
+				{/if}
 			</section>
 		{/if}
 

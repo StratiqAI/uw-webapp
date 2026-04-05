@@ -1,6 +1,7 @@
 export type {
 	StandardWidgetProps,
 	WidgetManifest,
+	WidgetPromptConfig,
 	DashboardWidgetHost,
 	ServiceAccessor,
 	DashboardAppTheme,
@@ -46,3 +47,7 @@ export {
 	flatFieldFromJsonSchemaFragment,
 	parseJsonSchemaToBuilderState
 } from './promptUtils.js';
+
+export { default as SchemaNodesEditor } from './SchemaNodesEditor.svelte';
+export { default as PromptEditor } from './PromptEditor.svelte';
+export { default as PromptChooser } from './PromptChooser.svelte';

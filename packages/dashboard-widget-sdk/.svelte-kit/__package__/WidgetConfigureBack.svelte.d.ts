@@ -15,6 +15,8 @@ interface Props {
     onApply: () => void;
     onCancel: () => void;
     userFields?: Snippet;
+    promptChooser?: Snippet;
+    promptEditor?: Snippet;
 }
 declare const WidgetConfigureBack: import("svelte").Component<Props, {}, "">;
 type WidgetConfigureBack = ReturnType<typeof WidgetConfigureBack>;

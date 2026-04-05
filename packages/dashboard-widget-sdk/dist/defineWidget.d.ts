@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { WidgetManifest, StandardWidgetProps } from './types.js';
+import type { WidgetManifest, WidgetPromptConfig, StandardWidgetProps } from './types.js';
 import type { Component } from 'svelte';
 /**
  * Factory for creating a type-safe widget manifest.
@@ -29,4 +29,6 @@ export declare function defineWidget<TData>(config: {
         icon: string;
         category?: string;
     };
+    /** AI prompt configuration — if present, the widget supports AI generation. */
+    promptConfig?: WidgetPromptConfig;
 }): WidgetManifest<TData>;
