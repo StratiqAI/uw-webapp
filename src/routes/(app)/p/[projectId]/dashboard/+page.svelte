@@ -11,8 +11,6 @@
 	import { onMount, setContext } from 'svelte';
 	import { themeStore } from '$lib/stores/themeStore.svelte';
 	import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
-	import { createSupabaseBrowserClient } from '$lib/services/supabase/browser';
-	import { logSupabaseRpcSmokeTest } from '$lib/services/supabase/supabaseRpcSmokeTest';
 	import { DashboardSyncManager } from '$lib/services/realtime/websocket/sync-managers/DashboardSyncManager';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
@@ -69,15 +67,6 @@
 	onMount(() => {
 		log.debug('Dashboard onMount started');
 		let unsubReset: (() => void) | undefined;
-
-		const supabase = createSupabaseBrowserClient();
-		if (supabase) {
-			void logSupabaseRpcSmokeTest(supabase);
-		} else {
-			log.warn(
-				'[Supabase RPC smoke test] skipped — set PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY'
-			);
-		}
 
 		function updateGridSize() {
 			try {

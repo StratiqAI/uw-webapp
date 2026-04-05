@@ -8,7 +8,11 @@ export const dashboardWidgets: Widget[] = [
 		gridRow: 1,
 		colSpan: 12,
 		rowSpan: 1,
-		data: {} as any // Data is published via ValidatedTopicStore
+		data: {
+			title: 'Market Analysis',
+			subtitle: 'Real-time metrics and analytics',
+			alignment: 'center'
+		}
 	},
 	{
 		id: 'widget-4',

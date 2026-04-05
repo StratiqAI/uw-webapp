@@ -1,6 +1,5 @@
 import type { Component } from 'svelte';
 import { getWidgetComponent } from '$lib/dashboard/setup/widgetRegistry';
-import TitleWidget from '$lib/dashboard/widgets/TitleWidget.svelte';
 import ParagraphWidget from '$lib/dashboard/widgets/ParagraphWidget.svelte';
 import ImageWidget from '$lib/dashboard/widgets/ImageWidget.svelte';
 import LineChartWidget from '$lib/dashboard/widgets/LineChartWidget.svelte';
@@ -16,7 +15,6 @@ import SchemaWidget from '$lib/dashboard/widgets/SchemaWidget.svelte';
 import LocationQuotientWidget from '$lib/dashboard/widgets/LocationQuotientWidget.svelte';
 
 const BUILTIN_WIDGETS: Record<string, Component<any>> = {
-	title: TitleWidget,
 	paragraph: ParagraphWidget,
 	image: ImageWidget,
 	lineChart: LineChartWidget,

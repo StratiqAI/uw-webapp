@@ -15,11 +15,6 @@ import { getWidgetManifest } from '$lib/dashboard/setup/widgetRegistry';
  * in widgetSchemas.ts so they pass ValidatedTopicStore validation.
  */
 export const DEFAULT_WIDGET_DATA: Partial<Record<WidgetType, Record<string, unknown>>> = {
-	title: {
-		title: 'Untitled',
-		subtitle: null,
-		alignment: 'left'
-	},
 	table: {
 		title: null,
 		headers: ['Column 1', 'Column 2'],
@@ -126,7 +121,6 @@ export const DEFAULT_WIDGET_DATA: Partial<Record<WidgetType, Record<string, unkn
  * the topic store or "Add Widget". Kept in sync with DashboardControls.createDefaultWidget.
  */
 export const DEFAULT_WIDGET_SIZES: Partial<Record<WidgetType, { colSpan: number; rowSpan: number }>> = {
-	title: { colSpan: 12, rowSpan: 1 },
 	paragraph: { colSpan: 6, rowSpan: 2 },
 	table: { colSpan: 6, rowSpan: 4 },
 	image: { colSpan: 6, rowSpan: 4 },
@@ -153,7 +147,11 @@ export function getDefaultDataForWidget(widget: Widget): Record<string, unknown>
 		return { ...(manifest.defaultData as Record<string, unknown>) };
 	}
 	const d =
-		DEFAULT_WIDGET_DATA[widget.type as WidgetType] ?? DEFAULT_WIDGET_DATA.title;
+		DEFAULT_WIDGET_DATA[widget.type as WidgetType] ?? {
+			title: 'Untitled',
+			subtitle: null,
+			alignment: 'left'
+		};
 	return { ...d };
 }
 
