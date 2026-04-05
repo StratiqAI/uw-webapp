@@ -200,6 +200,7 @@
 									: 'bg-slate-300'}"
 							role="switch"
 							aria-checked={item.state.inApp}
+							aria-label="Toggle {item.label} in-app notifications"
 						>
 							<span
 								class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform {item
@@ -220,6 +221,7 @@
 									: 'bg-slate-300'}"
 							role="switch"
 							aria-checked={item.state.email}
+							aria-label="Toggle {item.label} email notifications"
 						>
 							<span
 								class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform {item

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import type { CurrentUser } from '$lib/types/auth';
 
 	let { currentUser, darkMode = false } = $props<{
@@ -7,16 +6,16 @@
 		darkMode?: boolean;
 	}>();
 
-	let displayName = $state(currentUser?.name || currentUser?.givenName || '');
+	let displayName = $state('');
 	let email = $derived(currentUser?.email || '');
 	let emailVerified = $derived(currentUser?.emailVerified ?? false);
-	let phone = $state(currentUser?.phoneNumber || '');
+	let phone = $state('');
 	let jobTitle = $state('');
 	let company = $state('');
 	let licenseState = $state('');
 	let licenseNumber = $state('');
 	let bio = $state('');
-	let avatarUrl = $state(currentUser?.pictureUrl || '');
+	let avatarUrl = $state('');
 
 	const JOB_TITLES = [
 		'Broker',
@@ -102,7 +101,7 @@
 		} catch {}
 	}
 
-	function loadSaved() {
+	function initializeProfile() {
 		try {
 			const saved = localStorage.getItem('user-settings-profile');
 			if (saved) {
@@ -118,10 +117,15 @@
 				if (data.primaryMarkets) primaryMarkets = data.primaryMarkets;
 			}
 		} catch {}
+		if (currentUser) {
+			if (!displayName) displayName = currentUser.name || currentUser.givenName || '';
+			if (!phone) phone = currentUser.phoneNumber || '';
+			if (!avatarUrl) avatarUrl = currentUser.pictureUrl || '';
+		}
 	}
 
-	onMount(() => {
-		loadSaved();
+	$effect(() => {
+		if (typeof window !== 'undefined') initializeProfile();
 	});
 </script>
 
@@ -431,6 +435,7 @@
 								<button
 									type="button"
 									onclick={() => removeMarket(market)}
+									aria-label="Remove {market}"
 									class="ml-0.5 rounded-full p-0.5 transition-colors {darkMode
 										? 'hover:bg-primary-800 text-primary-400'
 										: 'hover:bg-primary-200 text-primary-500'}"

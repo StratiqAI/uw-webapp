@@ -25,8 +25,8 @@
 		config
 	}: DocumentUploadProps = $props();
 
-	const acceptedFileTypes = config?.supportedFileTypes ?? SUPPORTED_FILE_TYPES;
-	const maxFileSize = config?.maxFileSize ?? MAX_FILE_SIZE;
+	const acceptedFileTypes = $derived(config?.supportedFileTypes ?? SUPPORTED_FILE_TYPES);
+	const maxFileSize = $derived(config?.maxFileSize ?? MAX_FILE_SIZE);
 
 	// svelte-ignore state_referenced_locally
 	const uploader = createUploader({
