@@ -8,3 +8,6 @@ export type { UseExternalDataOptions, ExternalDataResult } from './useExternalDa
 export { default as FlipCard } from './FlipCard.svelte';
 export { default as WidgetConfigureBack } from './WidgetConfigureBack.svelte';
 export { useWidgetConfigure } from './useWidgetConfigure.svelte.js';
+export type { NestedSchemaNodeType, NestedItemSchema, NestedSchemaPropertyNode } from './promptSchemaTypes.js';
+export type { SchemaBuilderState, RenameResult } from './promptUtils.js';
+export { newNestedId, extractPromptVariables, getOrderedFieldEntries, addSchemaField, removeSchemaField, updateSchemaField, updateSchemaFieldType, toggleSchemaFieldRequired, renameSchemaField, nestedNodeToJsonSchema, nestedItemSchemaToJsonSchema, topLevelFieldToJsonSchema, buildSchemaPreview, jsonSchemaToPropertyNode, jsonSchemaToItemSchema, flatFieldFromJsonSchemaFragment, parseJsonSchemaToBuilderState } from './promptUtils.js';
