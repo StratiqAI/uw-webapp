@@ -31,6 +31,7 @@
 	import MetaTag from './MetaTag.svelte';
 	import TopBar from '$lib/components/layout/TopBar.svelte';
 	import { gql } from '$lib/services/realtime/graphql/requestHandler';
+	import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
 	import { createLogger } from '$lib/utils/logger';
 
 	const log = createLogger('projects');
@@ -49,10 +50,12 @@
 
 	// Local projects list — seeded from the server, kept current by subscriptions
 	let allProjects = $state<Project[]>([]);
+	let hasLoaded = $state(false);
 
 	// Sync from server before DOM paint (initial load + scope change)
 	$effect.pre(() => {
 		allProjects = serverItems;
+		hasLoaded = true;
 	});
 
 	// UI State
@@ -107,11 +110,19 @@
 		}
 	});
 
+	// #region agent log
+	const _dbgPage = (location: string, message: string, data: Record<string, unknown> = {}) =>
+		fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bfa702'},body:JSON.stringify({sessionId:'bfa702',location,message,data,timestamp:Date.now()})}).catch(()=>{});
+	// #endregion
+
 	async function createNewProjectHandler(e: Event) {
 		e.preventDefault();
 		errorMsg = null;
 
 		try {
+			// #region agent log
+			_dbgPage('+page.svelte:createNewProjectHandler','creating project',{hypothesisId:'D'});
+			// #endregion
 			const res = await gql<{ createProject: Project }>(
 				print(M_CREATE_PROJECT),
 				{ input: { name: 'New Project', sharingMode: 'PRIVATE' } },
@@ -123,11 +134,25 @@
 				return;
 			}
 
+			// #region agent log
+			_dbgPage('+page.svelte:createNewProjectHandler','project created, navigating',{hypothesisId:'D',newProjectId:res.createProject.id});
+			// #endregion
 			await goto(`/p/${res.createProject.id}/docs`);
+			// #region agent log
+			_dbgPage('+page.svelte:createNewProjectHandler','navigation complete',{hypothesisId:'D'});
+			// #endregion
 		} catch (err) {
+			// #region agent log
+			_dbgPage('+page.svelte:createNewProjectHandler','ERROR',{hypothesisId:'D',error:String(err)});
+			// #endregion
 			log.error('Error creating new project:', err);
 			errorMsg = 'Error creating new project';
 		}
+	}
+
+	function handleProjectUpdate(projectId: string, updates: Partial<Project>) {
+		allProjects = allProjects.map((p) => (p.id === projectId ? { ...p, ...updates } : p));
+		globalProjectStore.updateProject(projectId, updates);
 	}
 
 	async function handleDeleteConfirm() {
@@ -333,7 +358,15 @@
 		<!-- Projects Grid -->
 		<div class="flex-1 overflow-y-auto {darkMode ? 'bg-slate-900/80' : 'bg-primary-50/40'}">
 			<div class="px-6 py-6">
-				{#if projects.length > 0}
+				{#if !hasLoaded}
+					<div class="flex flex-col items-center justify-center py-24">
+						<svg class="h-10 w-10 animate-spin {darkMode ? 'text-indigo-400' : 'text-indigo-600'}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+						</svg>
+						<p class="mt-4 text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'}">Loading projects…</p>
+					</div>
+				{:else if projects.length > 0}
 					<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
 						{#each projects as project (project.id)}
 							<ProjectCard
@@ -341,6 +374,7 @@
 								{darkMode}
 								{idToken}
 								onDelete={(p) => { current_project = p; openDelete = true; }}
+								onUpdate={handleProjectUpdate}
 							/>
 						{/each}
 					</div>

@@ -4,6 +4,7 @@
 	import { print } from 'graphql';
 	import { goto } from '$app/navigation';
 	import { gql } from '$lib/services/realtime/graphql/requestHandler';
+	import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
 	import { createLogger } from '$lib/utils/logger';
 
 	const log = createLogger('dashboard');
@@ -77,6 +78,7 @@
 				{ id: projectId, input: { name: trimmed } },
 				idToken
 			);
+			globalProjectStore.updateProject(projectId, { name: trimmed });
 		} catch (err) {
 			log.error('Failed to rename project:', err);
 		} finally {

@@ -33,6 +33,7 @@ export interface PDFPage {
 export interface PDFDocument {
 	numPages: number;
 	getPage: (pageNumber: number) => Promise<PDFPage>;
+	destroy?: () => void;
 }
 
 export interface Viewport {

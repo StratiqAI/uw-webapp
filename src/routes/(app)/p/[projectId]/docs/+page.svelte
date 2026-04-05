@@ -334,7 +334,7 @@
 					documents={documents}
 					bind:currentDocHash={selectedDocId}
 					bind:currentPage={currentPage}
-					showButtons={['navigation', 'zoom', 'rotate', 'download']}
+					showButtons={['navigation', 'zoom', 'rotate', 'download', 'refresh']}
 				/>
 			</div>
 

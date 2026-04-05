@@ -16,7 +16,7 @@
 		scale = $bindable(1.0),
 		pageNum = 1,
 		flipTime = 120,
-		showButtons = ['navigation', 'zoom', 'rotate', 'download'],
+		showButtons = ['navigation', 'zoom', 'rotate', 'download', 'refresh'],
 		currentPage = $bindable(1),
 		currentDocHash = $bindable(''),
 		totalPage = 0,
@@ -39,6 +39,10 @@
 	let docs = $derived(documents ?? []);
 	let url = $derived(
 		`https://${PUBLIC_DOCUMENTS_BUCKET}.s3.${PUBLIC_REGION}.amazonaws.com/${currentDocHash}/document.pdf`
+	);
+	let reloadNonce = $state(0);
+	let documentLoadUrl = $derived(
+		url && reloadNonce > 0 ? `${url}${url.includes('?') ? '&' : '?'}r=${reloadNonce}` : url
 	);
 	let currentDocFilename = $derived(docs.find((doc) => doc.id === currentDocHash)?.filename ?? '');
 	let hasDocuments: boolean = $derived((documents?.length ?? 0) > 0);
@@ -68,7 +72,13 @@
 	let password = $state('');
 	let passwordError = $state(false);
 	let passwordMessage = $state('');
+	let loadError = $state('');
+	let retryCount = 0;
+	let retryTimer: ReturnType<typeof setTimeout> | undefined;
 	let isInitialized: boolean = false;
+
+	const MAX_RETRIES = 6;
+	const RETRY_BASE_MS = 1500;
 
 	let isLoading = $state(true);
 	let docSelectorOpen = $state(false);
@@ -228,6 +238,28 @@
 		initialLoad();
 	};
 
+	const refreshPdf = (): void => {
+		if ((!currentDocHash && !data) || isLoading) return;
+		reloadNonce += 1;
+		resetLoadState();
+		initialLoad();
+	};
+
+	const resetLoadState = (): void => {
+		clearTimeout(retryTimer);
+		retryCount = 0;
+		loadError = '';
+		passwordError = false;
+		try {
+			pdfDoc?.destroy?.();
+		} catch {
+			/* ignore */
+		}
+		pdfDoc = null;
+		pages = [];
+		isInitialized = false;
+	};
+
 	const initialLoad = async (): Promise<void> => {
 		if (!currentDocHash && !data) {
 			isLoading = false;
@@ -236,9 +268,11 @@
 		}
 
 		isLoading = true;
+		pdfContent = '';
+		readingTime = 0;
 		try {
 			const loadingTask = pdfjs.getDocument({
-				...(url && { url }),
+				...(documentLoadUrl && { url: documentLoadUrl }),
 				...(data && { data }),
 				...(password && { password })
 			});
@@ -265,10 +299,29 @@
 
 			await tick();
 			fitToWidth();
-		} catch (error) {
-			isLoading = false;
-			passwordError = true;
-			passwordMessage = (error as Error).message;
+		} catch (error: any) {
+			const isPasswordError =
+				error?.name === 'PasswordException' ||
+				error?.code === 1 ||
+				/password/i.test(error?.message ?? '');
+
+			if (isPasswordError) {
+				isLoading = false;
+				passwordError = true;
+				passwordMessage = (error as Error).message;
+				return;
+			}
+
+			if (retryCount < MAX_RETRIES) {
+				const delay = RETRY_BASE_MS * Math.pow(2, retryCount);
+				retryCount += 1;
+				log.warn(`PDF load failed (attempt ${retryCount}/${MAX_RETRIES}), retrying in ${delay}ms…`, error);
+				retryTimer = setTimeout(() => initialLoad(), delay);
+			} else {
+				isLoading = false;
+				loadError = (error as Error).message || 'Failed to load document';
+				log.error('PDF load failed after max retries:', error);
+			}
 		}
 	};
 
@@ -280,9 +333,8 @@
 		const hash = currentDocHash;
 		if (hash && hash !== prevDocHash) {
 			prevDocHash = hash;
-			passwordError = false;
-			isInitialized = false;
-			pdfDoc = null;
+			reloadNonce = 0;
+			resetLoadState();
 			currentPage = 1;
 			initialLoad();
 		}
@@ -305,6 +357,8 @@
 	const onDocumentChange = (documentId: string): void => {
 		currentDocHash = documentId;
 		currentPage = 1;
+		reloadNonce = 0;
+		resetLoadState();
 		docSelectorOpen = false;
 		initialLoad();
 	};
@@ -359,6 +413,7 @@
 	onDestroy(() => {
 		clearInterval(interval);
 		clearInterval(secondInterval);
+		clearTimeout(retryTimer);
 	});
 </script>
 
@@ -582,6 +637,31 @@
 			</button>
 		</div>
 
+		{#if showButtons.includes('refresh')}
+			<!-- Divider -->
+			<div class="h-5 w-px mx-1 {darkMode ? 'bg-slate-600' : 'bg-slate-300'}"></div>
+
+			<button
+				type="button"
+				onclick={refreshPdf}
+				disabled={(!currentDocHash && !data) || isLoading}
+				class="rounded-md p-1.5 transition-colors
+					{(!currentDocHash && !data) || isLoading
+						? (darkMode ? 'text-slate-600 cursor-not-allowed' : 'text-slate-300 cursor-not-allowed')
+						: (darkMode ? 'text-slate-300 hover:bg-slate-700 hover:text-white' : 'text-slate-600 hover:bg-slate-200 hover:text-slate-900')}"
+				title="Reload PDF from server"
+			>
+				<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+					/>
+				</svg>
+			</button>
+		{/if}
+
 		<!-- Spacer -->
 		<div class="flex-1"></div>
 
@@ -620,7 +700,7 @@
 			</div>
 		{/if}
 
-	{#if !hasDocuments && !data && !passwordError}
+	{#if !hasDocuments && !data && !passwordError && !loadError}
 		<div class="flex flex-col items-center justify-center gap-3 py-16 px-8">
 			<svg class="h-12 w-12 {darkMode ? 'text-slate-600' : 'text-slate-300'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -633,6 +713,28 @@
 					Upload a PDF to view it here
 				</p>
 			</div>
+		</div>
+	{:else if loadError}
+		<div class="flex flex-col items-center justify-center gap-4 py-16 px-8">
+			<svg class="h-12 w-12 {darkMode ? 'text-amber-400' : 'text-amber-500'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+			</svg>
+			<div class="text-center">
+				<p class="text-sm font-medium {darkMode ? 'text-white' : 'text-slate-900'}">
+					Unable to Load Document
+				</p>
+				<p class="mt-1 text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'}">
+					The document may still be processing. You can retry now or wait a moment.
+				</p>
+			</div>
+			<button
+				type="button"
+				onclick={() => { retryCount = 0; loadError = ''; initialLoad(); }}
+				class="rounded-lg px-4 py-2 text-sm font-medium transition-colors
+					{darkMode ? 'bg-indigo-600 text-white hover:bg-indigo-500' : 'bg-indigo-600 text-white hover:bg-indigo-700'}"
+			>
+				Retry
+			</button>
 		</div>
 	{:else if passwordError}
 		<div class="flex flex-col items-center justify-center gap-4 py-16 px-8">

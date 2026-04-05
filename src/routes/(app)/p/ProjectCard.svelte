@@ -13,9 +13,10 @@
 		darkMode: boolean;
 		idToken?: string;
 		onDelete: (project: Project) => void;
+		onUpdate?: (projectId: string, updates: Partial<Project>) => void;
 	}
 
-	let { project, darkMode, idToken, onDelete }: Props = $props();
+	let { project, darkMode, idToken, onDelete, onUpdate }: Props = $props();
 
 	const projectBase = $derived(`/p/${project.id}`);
 
@@ -37,17 +38,17 @@
 
 	const statusStyle = $derived(statusColors[project.status] ?? statusColors.ACTIVE);
 
-	// Inline rename state
-	let isEditing = $state(false);
+	// Inline name editing state
+	let isEditingName = $state(false);
 	let editedName = $state('');
-	let isSaving = $state(false);
+	let isSavingName = $state(false);
 
-	function startEditing(e: Event) {
+	function startEditingName(e: Event) {
 		e.preventDefault();
 		e.stopPropagation();
 		if (!idToken) return;
 		editedName = project.name;
-		isEditing = true;
+		isEditingName = true;
 		setTimeout(() => {
 			const input = document.getElementById(`rename-${project.id}`) as HTMLInputElement;
 			input?.focus();
@@ -55,34 +56,76 @@
 		}, 0);
 	}
 
-	async function saveRename() {
+	async function saveName() {
 		const trimmed = editedName.trim();
 		if (!trimmed || trimmed === project.name || !idToken) {
-			isEditing = false;
+			isEditingName = false;
 			return;
 		}
-		isSaving = true;
+		isSavingName = true;
 		try {
 			await gql<{ updateProject: Project }>(
 				print(M_UPDATE_PROJECT),
 				{ id: project.id, input: { name: trimmed } },
 				idToken
 			);
+			onUpdate?.(project.id, { name: trimmed });
 		} catch (err) {
 			log.error('Failed to rename project:', err);
 		} finally {
-			isSaving = false;
-			isEditing = false;
+			isSavingName = false;
+			isEditingName = false;
 		}
 	}
 
-	function cancelRename() {
-		isEditing = false;
+	function handleNameKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter') { e.preventDefault(); saveName(); }
+		else if (e.key === 'Escape') { e.preventDefault(); isEditingName = false; }
 	}
 
-	function handleRenameKeydown(e: KeyboardEvent) {
-		if (e.key === 'Enter') { e.preventDefault(); saveRename(); }
-		else if (e.key === 'Escape') { e.preventDefault(); cancelRename(); }
+	// Inline description editing state
+	let isEditingDesc = $state(false);
+	let editedDesc = $state('');
+	let isSavingDesc = $state(false);
+
+	function startEditingDesc(e: Event) {
+		e.preventDefault();
+		e.stopPropagation();
+		if (!idToken) return;
+		editedDesc = project.description ?? '';
+		isEditingDesc = true;
+		setTimeout(() => {
+			const input = document.getElementById(`desc-${project.id}`) as HTMLInputElement;
+			input?.focus();
+			input?.select();
+		}, 0);
+	}
+
+	async function saveDesc() {
+		const trimmed = editedDesc.trim();
+		if (trimmed === (project.description ?? '') || !idToken) {
+			isEditingDesc = false;
+			return;
+		}
+		isSavingDesc = true;
+		try {
+			await gql<{ updateProject: Project }>(
+				print(M_UPDATE_PROJECT),
+				{ id: project.id, input: { description: trimmed || null } },
+				idToken
+			);
+			onUpdate?.(project.id, { description: trimmed || undefined });
+		} catch (err) {
+			log.error('Failed to update project description:', err);
+		} finally {
+			isSavingDesc = false;
+			isEditingDesc = false;
+		}
+	}
+
+	function handleDescKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter') { e.preventDefault(); saveDesc(); }
+		else if (e.key === 'Escape') { e.preventDefault(); isEditingDesc = false; }
 	}
 </script>
 
@@ -104,15 +147,15 @@
 		</a>
 
 		<div class="min-w-0 flex-1">
-			{#if isEditing}
+			{#if isEditingName}
 				<div class="flex items-center gap-1.5">
 					<input
 						id={`rename-${project.id}`}
 						type="text"
 						bind:value={editedName}
-						onkeydown={handleRenameKeydown}
-						onblur={saveRename}
-						disabled={isSaving}
+						onkeydown={handleNameKeydown}
+						onblur={saveName}
+						disabled={isSavingName}
 						class="w-full px-2 py-0.5 text-sm font-semibold rounded border transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500
 							{darkMode
 							? 'bg-slate-700 border-slate-600 text-white'
@@ -130,7 +173,7 @@
 					</a>
 					{#if idToken}
 						<button
-							onclick={startEditing}
+							onclick={startEditingName}
 							class="p-0.5 rounded opacity-0 group-hover/name:opacity-100 transition-opacity {darkMode ? 'text-slate-400 hover:text-indigo-400' : 'text-slate-400 hover:text-indigo-600'}"
 							title="Rename project"
 							aria-label="Rename project"
@@ -143,10 +186,40 @@
 				</div>
 			{/if}
 
-			{#if project.description}
-				<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} line-clamp-1 mt-0.5">{project.description}</p>
+			{#if isEditingDesc}
+				<div class="flex items-center gap-1.5 mt-0.5">
+					<input
+						id={`desc-${project.id}`}
+						type="text"
+						bind:value={editedDesc}
+						onkeydown={handleDescKeydown}
+						onblur={saveDesc}
+						disabled={isSavingDesc}
+						placeholder="Add a description..."
+						class="w-full px-2 py-0.5 text-xs rounded border transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500
+							{darkMode
+							? 'bg-slate-700 border-slate-600 text-white placeholder-slate-500'
+							: 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'}"
+					/>
+				</div>
 			{:else}
-				<p class="text-xs {darkMode ? 'text-slate-600' : 'text-slate-400'} italic mt-0.5">No description</p>
+				<!-- svelte-ignore a11y_click_events_have_key_events -->
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div
+					class="group/desc flex items-center gap-1 mt-0.5 {idToken ? 'cursor-pointer' : ''}"
+					onclick={idToken ? startEditingDesc : undefined}
+				>
+					{#if project.description}
+						<p class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'} line-clamp-1">{project.description}</p>
+					{:else}
+						<p class="text-xs {darkMode ? 'text-slate-600' : 'text-slate-400'} italic">No description</p>
+					{/if}
+					{#if idToken}
+						<svg class="w-3 h-3 shrink-0 opacity-0 group-hover/desc:opacity-100 transition-opacity {darkMode ? 'text-slate-500' : 'text-slate-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+						</svg>
+					{/if}
+				</div>
 			{/if}
 		</div>
 
