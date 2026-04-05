@@ -10,3 +10,9 @@
 export declare function useReactiveValidatedTopic<T = unknown>(topic: () => string): {
     readonly current: T | undefined;
 };
+/**
+ * Publish validated data to a widget's output topic via the host context.
+ * Returns false if the host does not support output publishing or the
+ * widget kind has no registered output schema.
+ */
+export declare function publishWidgetOutput(kind: string, widgetId: string, data: unknown): boolean;

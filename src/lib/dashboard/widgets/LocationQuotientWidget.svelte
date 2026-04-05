@@ -108,7 +108,7 @@
 		data: LocationQuotientWidgetConfig;
 		widgetId?: string;
 		topicOverride?: string;
-		onConfigureFlipReady?: (toggleFlip: () => void) => void;
+		onConfigureReady?: (toggleFlip: () => void) => void;
 		onUpdateData: (data: LocationQuotientWidgetConfig) => void;
 		/** Bumped from WidgetWrapper for menu actions */
 		lqSignals?: { refresh: number; exportRequest: number };
@@ -118,7 +118,7 @@
 		data,
 		widgetId = DEFAULT_WIDGET_ID,
 		topicOverride: _topicOverride,
-		onConfigureFlipReady,
+		onConfigureReady,
 		onUpdateData,
 		lqSignals = DEFAULT_LQ_SIGNALS
 	}: Props = $props();
@@ -173,7 +173,7 @@
 	}
 
 	$effect(() => {
-		onConfigureFlipReady?.(toggleFlip);
+		onConfigureReady?.(toggleFlip);
 	});
 
 	const sortedSectors = $derived.by(() => {

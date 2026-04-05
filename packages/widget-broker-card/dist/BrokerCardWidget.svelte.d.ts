@@ -1,12 +1,6 @@
 import type { BrokerCardWidgetData } from './schema.js';
-import { type DashboardAppTheme } from '@stratiqai/dashboard-widget-sdk';
-interface Props {
-    data: BrokerCardWidgetData;
-    widgetId?: string;
-    topicOverride?: string;
-    darkMode?: boolean;
-    theme?: DashboardAppTheme;
-}
+import { type StandardWidgetProps } from '@stratiqai/dashboard-widget-sdk';
+type Props = StandardWidgetProps<BrokerCardWidgetData>;
 declare const BrokerCardWidget: import("svelte").Component<Props, {}, "">;
 type BrokerCardWidget = ReturnType<typeof BrokerCardWidget>;
 export default BrokerCardWidget;

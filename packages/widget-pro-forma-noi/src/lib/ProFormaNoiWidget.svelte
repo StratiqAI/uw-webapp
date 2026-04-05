@@ -2,9 +2,12 @@
 	import {
 		useReactiveValidatedTopic,
 		getDashboardWidgetHost,
+		FlipCard,
+		WidgetConfigureBack,
+		useWidgetConfigure,
 		type StandardWidgetProps
 	} from '@stratiqai/dashboard-widget-sdk';
-	import { FlipCard, fmt, pct, proFormaTheme } from '@stratiqai/widget-pro-forma-base';
+	import { fmt, pct, proFormaTheme } from '@stratiqai/widget-pro-forma-base';
 	import type { ProFormaNoiConfig, ProFormaNoiInput } from './schema.js';
 	import { computeNoiProjections, type NoiYearProjection } from './calculations.js';
 
@@ -16,6 +19,7 @@
 		widgetId = 'pro-forma-noi-default',
 		topicOverride,
 		darkMode = true,
+		theme,
 		onUpdateConfig,
 		onConfigureReady
 	}: StandardWidgetProps<ProFormaNoiConfig> = $props();
@@ -45,7 +49,6 @@
 	const projections = $derived<NoiYearProjection[]>(computeNoiProjections(mergedConfig));
 	const t = $derived(proFormaTheme(darkMode));
 
-	/** NOI banner + accents — matches reference (#DCE6F1 / #002060) in light mode. */
 	const noiBanner = $derived(
 		darkMode
 			? 'bg-sky-950/50 text-sky-100 border-b-2 border-sky-700'
@@ -61,53 +64,14 @@
 		return fmt(value);
 	}
 
-	let isFlipped = $state(false);
-	let draftEgiY1 = $state(0);
-	let draftEgiGrowth = $state(0.03);
-	let draftOpexY1 = $state(0);
-	let draftOpexGrowth = $state(0.03);
-	let draftYears = $state(5);
-	let draftPropertyName = $state('');
-	let draftShowBreakdown = $state(false);
-
-	function syncDraft() {
-		draftEgiY1 = widgetData.egiYear1;
-		draftEgiGrowth = widgetData.egiGrowthRate;
-		draftOpexY1 = widgetData.totalOpexYear1;
-		draftOpexGrowth = widgetData.opexGrowthRate;
-		draftYears = widgetData.projectionYears;
-		draftPropertyName = widgetData.propertyName ?? '';
-		draftShowBreakdown = widgetData.showBreakdown;
-	}
-
-	function toggleFlip() {
-		isFlipped = !isFlipped;
-		if (isFlipped) syncDraft();
-	}
-
-	$effect(() => {
-		onConfigureReady?.(toggleFlip);
+	const configure = useWidgetConfigure<ProFormaNoiConfig>({
+		data: () => widgetData,
+		onUpdateConfig: (d) => onUpdateConfig?.(d),
+		onConfigureReady: (fn) => onConfigureReady?.(fn)
 	});
-
-	function applyConfig() {
-		onUpdateConfig?.({
-			egiYear1: draftEgiY1,
-			egiGrowthRate: draftEgiGrowth,
-			totalOpexYear1: draftOpexY1,
-			opexGrowthRate: draftOpexGrowth,
-			projectionYears: draftYears,
-			propertyName: draftPropertyName.trim() || undefined,
-			showBreakdown: draftShowBreakdown
-		});
-		isFlipped = false;
-	}
-
-	function cancelConfig() {
-		isFlipped = false;
-	}
 </script>
 
-<FlipCard {isFlipped} shellClass={t.shell} flipBackClass={t.flipBackBg}>
+<FlipCard isFlipped={configure.isFlipped} shellClass={t.shell} flipBackClass={t.flipBackBg}>
 	{#snippet front()}
 		<table class="w-full border-collapse text-sm">
 			<thead>
@@ -179,81 +143,64 @@
 	{/snippet}
 
 	{#snippet back()}
-		<div class="flex min-h-full flex-col items-center px-4 py-5 sm:px-6">
-			<div class="flex w-full max-w-lg flex-1 flex-col">
-				<header class="mb-4 shrink-0 text-center sm:text-left">
-					<h3 class="text-lg font-bold {t.cfgTitle}">Configure Net Operating Income</h3>
-					<p class="mt-1 text-sm {t.muted}">
-						NOI is calculated as Effective Gross Income minus total operating expenses for each year.
-						Match Year 1 values to your Revenue and OpEx widgets, or publish EGI / OpEx via topics.
-					</p>
-				</header>
+		<WidgetConfigureBack
+			kind="proFormaNoi"
+			{widgetId}
+			{darkMode}
+			theme={theme ?? 'dark'}
+			{topicOverride}
+			onApply={() => configure.applyConfig({
+				...configure.draft,
+				propertyName: configure.draft.propertyName?.trim() || undefined
+			})}
+			onCancel={configure.cancelConfig}
+		>
+			{#snippet userFields()}
+				<label class="block">
+					<span class={t.cfgLabel}>Property Name (optional)</span>
+					<input type="text" bind:value={configure.draft.propertyName} class={t.cfgField} placeholder="e.g. Riverside Apartments" />
+				</label>
 
-				<section class={t.cfgPanel} aria-label="Widget configuration">
-					<form
-						class="flex flex-col gap-3"
-						onsubmit={(e) => {
-							e.preventDefault();
-							applyConfig();
-						}}
-					>
+				<fieldset class="rounded-lg border p-3 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
+					<legend class="px-1 text-xs font-semibold {t.muted}">Effective Gross Income</legend>
+					<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
 						<label class="block">
-							<span class={t.cfgLabel}>Property Name (optional)</span>
-							<input type="text" bind:value={draftPropertyName} class={t.cfgField} placeholder="e.g. Riverside Apartments" />
+							<span class={t.cfgLabel}>Year 1 EGI ($)</span>
+							<input type="number" bind:value={configure.draft.egiYear1} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
 						</label>
-
-						<fieldset class="rounded-lg border p-3 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
-							<legend class="px-1 text-xs font-semibold {t.muted}">Effective Gross Income</legend>
-							<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-								<label class="block">
-									<span class={t.cfgLabel}>Year 1 EGI ($)</span>
-									<input type="number" bind:value={draftEgiY1} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
-								</label>
-								<label class="block">
-									<span class={t.cfgLabel}>Annual EGI Growth</span>
-									<input type="number" bind:value={draftEgiGrowth} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
-									<p class="mt-0.5 text-[11px] {t.muted}">e.g. 0.03 = 3%/yr</p>
-								</label>
-							</div>
-						</fieldset>
-
-						<fieldset class="rounded-lg border p-3 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
-							<legend class="px-1 text-xs font-semibold {t.muted}">Total Operating Expenses</legend>
-							<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-								<label class="block">
-									<span class={t.cfgLabel}>Year 1 Total OpEx ($)</span>
-									<input type="number" bind:value={draftOpexY1} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
-								</label>
-								<label class="block">
-									<span class={t.cfgLabel}>Annual OpEx Growth</span>
-									<input type="number" bind:value={draftOpexGrowth} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
-									<p class="mt-0.5 text-[11px] {t.muted}">e.g. 0.03 = 3%/yr</p>
-								</label>
-							</div>
-						</fieldset>
-
 						<label class="block">
-							<span class={t.cfgLabel}>Projection Years</span>
-							<input type="number" bind:value={draftYears} min="1" max="10" step="1" class={t.cfgField} />
+							<span class={t.cfgLabel}>Annual EGI Growth</span>
+							<input type="number" bind:value={configure.draft.egiGrowthRate} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
+							<p class="mt-0.5 text-[11px] {t.muted}">e.g. 0.03 = 3%/yr</p>
 						</label>
+					</div>
+				</fieldset>
 
-						<label class="flex items-center gap-2">
-							<input type="checkbox" bind:checked={draftShowBreakdown} class="rounded" />
-							<span class="text-sm {t.muted}">Show EGI and OpEx rows on the table</span>
+				<fieldset class="rounded-lg border p-3 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
+					<legend class="px-1 text-xs font-semibold {t.muted}">Total Operating Expenses</legend>
+					<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+						<label class="block">
+							<span class={t.cfgLabel}>Year 1 Total OpEx ($)</span>
+							<input type="number" bind:value={configure.draft.totalOpexYear1} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
 						</label>
+						<label class="block">
+							<span class={t.cfgLabel}>Annual OpEx Growth</span>
+							<input type="number" bind:value={configure.draft.opexGrowthRate} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
+							<p class="mt-0.5 text-[11px] {t.muted}">e.g. 0.03 = 3%/yr</p>
+						</label>
+					</div>
+				</fieldset>
 
-						<div class="flex justify-end gap-2 border-t pt-4 {darkMode ? 'border-slate-600' : 'border-slate-200'}">
-							<button type="button" class={t.cfgBtnSecondary} onclick={cancelConfig}>Cancel</button>
-							<button
-								type="submit"
-								class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
-							>
-								Apply
-							</button>
-						</div>
-					</form>
-				</section>
-			</div>
-		</div>
+				<label class="block">
+					<span class={t.cfgLabel}>Projection Years</span>
+					<input type="number" bind:value={configure.draft.projectionYears} min="1" max="10" step="1" class={t.cfgField} />
+				</label>
+
+				<label class="flex items-center gap-2">
+					<input type="checkbox" bind:checked={configure.draft.showBreakdown} class="rounded" />
+					<span class="text-sm {t.muted}">Show EGI and OpEx rows on the table</span>
+				</label>
+			{/snippet}
+		</WidgetConfigureBack>
 	{/snippet}
 </FlipCard>

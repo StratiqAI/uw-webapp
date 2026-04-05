@@ -8,9 +8,10 @@
 	import { createDropHandlers } from '$lib/dashboard/utils/dragDrop';
 	import { DEFAULT_WIDGET_SIZES, getDefaultDataForWidget } from '$lib/dashboard/setup/defaultDashboardValues';
 	import type { Widget, WidgetType } from '$lib/dashboard/types/widget';
-	import { setDashboardWidgetHost } from '@stratiqai/dashboard-widget-sdk';
+	import { setDashboardWidgetHost, HostServices } from '@stratiqai/dashboard-widget-sdk';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
-	import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { getWidgetTopic, getWidgetTopicsByType } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { streamCatalog } from '$lib/stores/streamCatalog.svelte';
 	import { createSupabaseBrowserClient } from '$lib/services/supabase/browser';
 	import { generateWidgetId } from '$lib/dashboard/utils/idGenerator';
 	import { themeStore } from '$lib/stores/themeStore.svelte';
@@ -39,6 +40,59 @@
 		services: {
 			get: <T>(name: string) => serviceMap.get(name) as T | undefined,
 			has: (name: string) => serviceMap.has(name)
+		},
+
+		getAvailableTopics(kind: string, widgetId: string) {
+			const defaultTopic = getWidgetTopic(kind as any, widgetId);
+			const w = dashboard.widgets.find((w) => w.id === widgetId);
+			const currentTopic = w?.topicOverride ?? defaultTopic;
+			const byType = getWidgetTopicsByType(kind as any);
+			return byType.map((item) => ({
+				topic: `widgets/${kind}/${item.id}`,
+				isCurrent: `widgets/${kind}/${item.id}` === currentTopic
+			}));
+		},
+		setTopicOverride(widgetId: string, topic: string | undefined) {
+			const w = dashboard.widgets.find((w) => w.id === widgetId);
+			const defaultTopic = getWidgetTopic(w?.type as any ?? '', widgetId);
+			dashboard.updateWidget(widgetId, {
+				topicOverride: topic === defaultTopic ? undefined : topic
+			});
+		},
+		getCurrentTopicOverride(widgetId: string) {
+			return dashboard.widgets.find((w) => w.id === widgetId)?.topicOverride;
+		},
+
+		streams: {
+			list() {
+				return streamCatalog.streams.map((s) => ({
+					id: s.id,
+					topic: s.topic,
+					title: s.title,
+					schemaId: s.schemaId,
+					source: s.source
+				}));
+			},
+			getByTopic(topic: string) {
+				const s = streamCatalog.getStreamByTopic(topic);
+				return s ? { id: s.id, title: s.title } : undefined;
+			},
+			filterBySchemaId(schemaId: string) {
+				return streamCatalog.getStreamsBySchemaId(schemaId).map((s) => ({
+					id: s.id,
+					topic: s.topic,
+					title: s.title,
+					schemaId: s.schemaId,
+					source: s.source
+				}));
+			}
+		},
+
+		getServiceStatus() {
+			return Object.values(HostServices).map((name) => ({
+				name,
+				available: serviceMap.has(name)
+			}));
 		}
 	});
 

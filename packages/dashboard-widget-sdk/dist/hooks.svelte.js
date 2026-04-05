@@ -11,16 +11,26 @@ import { getDashboardWidgetHost } from './context.svelte.js';
 export function useReactiveValidatedTopic(topic) {
     const host = getDashboardWidgetHost();
     const store = host.validatedTopicStore;
-    let current = $state(undefined);
-    $effect(() => {
-        // Access store.tree to establish a reactive dependency
+    const current = $derived.by(() => {
         const _ = store.tree;
-        const currentTopic = topic();
-        current = store.at(currentTopic);
+        return store.at(topic());
     });
     return {
         get current() {
             return current;
         }
     };
+}
+/**
+ * Publish validated data to a widget's output topic via the host context.
+ * Returns false if the host does not support output publishing or the
+ * widget kind has no registered output schema.
+ */
+export function publishWidgetOutput(kind, widgetId, data) {
+    const host = getDashboardWidgetHost();
+    if (!host.publishWidgetOutput) {
+        console.warn(`publishWidgetOutput not available on host — ${kind}/${widgetId} publish skipped`);
+        return false;
+    }
+    return host.publishWidgetOutput(kind, widgetId, data);
 }

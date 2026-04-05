@@ -58,6 +58,34 @@ export interface ServiceAccessor {
 	has(name: string): boolean;
 }
 
+/** Lightweight description of an available topic for a widget type. */
+export interface TopicEntry {
+	topic: string;
+	isCurrent: boolean;
+}
+
+/** Lightweight description of a data stream (AI-generated or manual). */
+export interface StreamEntry {
+	id: string;
+	topic: string;
+	title: string;
+	schemaId: string;
+	source: string;
+}
+
+/** Read-only access to the host's stream catalog. */
+export interface HostStreamCatalog {
+	list(): StreamEntry[];
+	getByTopic(topic: string): Pick<StreamEntry, 'id' | 'title'> | undefined;
+	filterBySchemaId(schemaId: string): StreamEntry[];
+}
+
+/** Status of a named host service (Supabase, fetch, MCP, etc.). */
+export interface ServiceStatus {
+	name: string;
+	available: boolean;
+}
+
 /**
  * Contract that the host app must satisfy and inject via `setDashboardWidgetHost()`.
  * Widget packages read this through `getDashboardWidgetHost()` at runtime.
@@ -79,4 +107,17 @@ export interface DashboardWidgetHost {
 	publishWidgetOutput?(kind: string, widgetId: string, data: unknown): boolean;
 	/** Service registry -- host provides named service instances. */
 	services?: ServiceAccessor;
+
+	/** Return the topics available for a given widget kind, marking the current one. */
+	getAvailableTopics?(kind: string, widgetId: string): TopicEntry[];
+	/** Change (or clear) the topic override for a widget. */
+	setTopicOverride?(widgetId: string, topic: string | undefined): void;
+	/** Return the current topic override for a widget (undefined = using default). */
+	getCurrentTopicOverride?(widgetId: string): string | undefined;
+
+	/** Read-only access to the host's AI / manual stream catalog. */
+	streams?: HostStreamCatalog;
+
+	/** Snapshot of which host services are available. */
+	getServiceStatus?(): ServiceStatus[];
 }

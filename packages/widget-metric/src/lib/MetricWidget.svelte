@@ -1,39 +1,131 @@
 <script lang="ts">
 	import type { MetricWidgetData } from './schema.js';
-	import { useReactiveValidatedTopic, getDashboardWidgetHost } from '@stratiqai/dashboard-widget-sdk';
+	import {
+		FlipCard,
+		WidgetConfigureBack,
+		useWidgetConfigure,
+		useReactiveValidatedTopic,
+		getDashboardWidgetHost,
+		type StandardWidgetProps
+	} from '@stratiqai/dashboard-widget-sdk';
 
-	interface Props {
-		data: MetricWidgetData;
-		widgetId?: string;
-		topicOverride?: string;
-		darkMode?: boolean;
-	}
-
-	let { data, widgetId = 'metric-widget-default', topicOverride, darkMode = false }: Props = $props();
+	let {
+		data,
+		widgetId = 'metric-widget-default',
+		topicOverride,
+		darkMode = false,
+		theme,
+		onUpdateConfig,
+		onConfigureReady
+	}: StandardWidgetProps<MetricWidgetData> = $props();
 
 	const host = getDashboardWidgetHost();
 	const topic = $derived(host.getWidgetTopic('metric', widgetId, topicOverride));
 	const dataStream = useReactiveValidatedTopic<MetricWidgetData>(() => topic);
 	let widgetData = $derived<MetricWidgetData>(dataStream.current || data);
+
+	const configure = useWidgetConfigure<MetricWidgetData>({
+		data: () => widgetData,
+		get onUpdateConfig() {
+			return onUpdateConfig;
+		},
+		get onConfigureReady() {
+			return onConfigureReady;
+		}
+	});
+
+	const shellClass = $derived(darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white');
+	const flipBackClass = $derived(darkMode ? 'border-slate-600 bg-slate-900' : 'border-slate-200 bg-slate-50');
+	const inputClass = $derived(
+		darkMode
+			? 'w-full rounded-md border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500'
+			: 'w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500'
+	);
+	const resolvedTheme = $derived(theme ?? (darkMode ? 'dark' : 'light'));
 </script>
 
-<div class="metric-widget h-full flex flex-col justify-center">
-	<p class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'} mb-1">{widgetData.label}</p>
-	<p class="text-3xl font-bold {darkMode ? 'text-slate-100' : 'text-slate-900'}">
-		{widgetData.value}{widgetData.unit ? ` ${widgetData.unit}` : ''}
-	</p>
-	{#if widgetData.change != null}
-		<p class="text-sm mt-2 flex items-center {widgetData.changeType === 'increase' ? (darkMode ? 'text-green-400' : 'text-green-600') : (darkMode ? 'text-red-400' : 'text-red-600')}">
-			{#if widgetData.changeType === 'increase'}
-				<svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-					<path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
-				</svg>
-			{:else}
-				<svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-					<path fill-rule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-				</svg>
+<FlipCard isFlipped={configure.isFlipped} {shellClass} {flipBackClass}>
+	{#snippet front()}
+		<div class="metric-widget flex h-full flex-col justify-center">
+			<p class="mb-1 text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'}">{widgetData.label}</p>
+			<p class="text-3xl font-bold {darkMode ? 'text-slate-100' : 'text-slate-900'}">
+				{widgetData.value}{widgetData.unit ? ` ${widgetData.unit}` : ''}
+			</p>
+			{#if widgetData.change != null}
+				<p
+					class="mt-2 flex items-center text-sm {widgetData.changeType === 'increase'
+						? darkMode
+							? 'text-green-400'
+							: 'text-green-600'
+						: darkMode
+							? 'text-red-400'
+							: 'text-red-600'}"
+				>
+					{#if widgetData.changeType === 'increase'}
+						<svg class="mr-1 h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+							<path
+								fill-rule="evenodd"
+								d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z"
+								clip-rule="evenodd"
+							></path>
+						</svg>
+					{:else}
+						<svg class="mr-1 h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+							<path
+								fill-rule="evenodd"
+								d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z"
+								clip-rule="evenodd"
+							></path>
+						</svg>
+					{/if}
+					{Math.abs(widgetData.change)}%
+				</p>
 			{/if}
-			{Math.abs(widgetData.change)}%
-		</p>
-	{/if}
-</div>
+		</div>
+	{/snippet}
+	{#snippet back()}
+		<WidgetConfigureBack
+			kind="metric"
+			{widgetId}
+			{darkMode}
+			theme={resolvedTheme}
+			{topicOverride}
+			onApply={() => configure.applyConfig()}
+			onCancel={configure.cancelConfig}
+		>
+			{#snippet userFields()}
+				<label class="block">
+					<span class="text-xs font-medium {darkMode ? 'text-slate-400' : 'text-slate-500'}">Label</span>
+					<input class="{inputClass} mt-1 block" type="text" bind:value={configure.draft.label} />
+				</label>
+				<label class="block">
+					<span class="text-xs font-medium {darkMode ? 'text-slate-400' : 'text-slate-500'}">Value</span>
+					<input class="{inputClass} mt-1 block" type="text" bind:value={configure.draft.value} />
+				</label>
+				<label class="block">
+					<span class="text-xs font-medium {darkMode ? 'text-slate-400' : 'text-slate-500'}">Unit</span>
+					<input class="{inputClass} mt-1 block" type="text" bind:value={configure.draft.unit} />
+				</label>
+				<label class="block">
+					<span class="text-xs font-medium {darkMode ? 'text-slate-400' : 'text-slate-500'}">Change (%)</span>
+					<input class="{inputClass} mt-1 block" type="number" bind:value={configure.draft.change} />
+				</label>
+				<label class="block">
+					<span class="text-xs font-medium {darkMode ? 'text-slate-400' : 'text-slate-500'}">Change type</span>
+					<select
+						class="{inputClass} mt-1 block"
+						value={configure.draft.changeType ?? ''}
+						onchange={(e) => {
+							const v = (e.target as HTMLSelectElement).value;
+							configure.draft.changeType = v === '' ? null : (v as 'increase' | 'decrease');
+						}}
+					>
+						<option value="">—</option>
+						<option value="increase">Increase</option>
+						<option value="decrease">Decrease</option>
+					</select>
+				</label>
+			{/snippet}
+		</WidgetConfigureBack>
+	{/snippet}
+</FlipCard>

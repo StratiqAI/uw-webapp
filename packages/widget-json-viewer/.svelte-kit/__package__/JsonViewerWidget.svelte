@@ -1,20 +1,42 @@
 <script lang="ts">
 	import type { JsonViewerWidgetData } from './schema.js';
-	import { useReactiveValidatedTopic, getDashboardWidgetHost } from '@stratiqai/dashboard-widget-sdk';
+	import {
+		FlipCard,
+		WidgetConfigureBack,
+		useWidgetConfigure,
+		useReactiveValidatedTopic,
+		getDashboardWidgetHost,
+		type StandardWidgetProps
+	} from '@stratiqai/dashboard-widget-sdk';
 
-	interface Props {
-		data: JsonViewerWidgetData;
-		widgetId?: string;
-		topicOverride?: string;
-		darkMode?: boolean;
-	}
-
-	let { data, widgetId = 'json-viewer-default', topicOverride, darkMode = false }: Props = $props();
+	let {
+		data,
+		widgetId = 'json-viewer-default',
+		topicOverride,
+		darkMode = false,
+		theme,
+		onUpdateConfig,
+		onConfigureReady
+	}: StandardWidgetProps<JsonViewerWidgetData> = $props();
 
 	const host = getDashboardWidgetHost();
 	const topic = $derived(host.getWidgetTopic('jsonViewer', widgetId, topicOverride));
 	const dataStream = useReactiveValidatedTopic<JsonViewerWidgetData>(() => topic);
 	let widgetData = $derived<JsonViewerWidgetData>(dataStream.current || data);
+
+	const configure = useWidgetConfigure<JsonViewerWidgetData>({
+		data: () => widgetData,
+		get onUpdateConfig() {
+			return onUpdateConfig;
+		},
+		get onConfigureReady() {
+			return onConfigureReady;
+		}
+	});
+
+	const shellClass = $derived(darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white');
+	const flipBackClass = $derived(darkMode ? 'border-slate-600 bg-slate-900' : 'border-slate-200 bg-slate-50');
+	const resolvedTheme = $derived(theme ?? (darkMode ? 'dark' : 'light'));
 
 	let formatted = $derived(formatJson(widgetData.json));
 	let copySuccess = $state(false);
@@ -32,27 +54,47 @@
 			await navigator.clipboard.writeText(formatted);
 			copySuccess = true;
 			setTimeout(() => (copySuccess = false), 1500);
-		} catch { /* noop */ }
+		} catch {
+			/* noop */
+		}
 	}
 </script>
 
-<div class="json-viewer h-full flex flex-col overflow-hidden">
-	<div class="flex items-center justify-between px-3 py-1.5 border-b {darkMode ? 'border-slate-700' : 'border-slate-200'}">
-		<span class="text-xs font-medium uppercase tracking-wider {darkMode ? 'text-slate-400' : 'text-slate-500'}">
-			Raw JSON
-		</span>
-		<button
-			onclick={copyToClipboard}
-			class="text-xs px-2 py-0.5 rounded transition-colors {darkMode
-				? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
-				: 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}"
-		>
-			{copySuccess ? 'Copied!' : 'Copy'}
-		</button>
-	</div>
-	<pre
-		class="flex-1 overflow-auto p-3 text-xs font-mono leading-relaxed whitespace-pre-wrap break-all {darkMode
-			? 'bg-slate-900 text-emerald-400'
-			: 'bg-slate-50 text-slate-800'}"
-	>{formatted}</pre>
-</div>
+<FlipCard isFlipped={configure.isFlipped} {shellClass} {flipBackClass}>
+	{#snippet front()}
+		<div class="json-viewer flex h-full flex-col overflow-hidden">
+			<div
+				class="flex items-center justify-between border-b px-3 py-1.5 {darkMode ? 'border-slate-700' : 'border-slate-200'}"
+			>
+				<span class="text-xs font-medium uppercase tracking-wider {darkMode ? 'text-slate-400' : 'text-slate-500'}">
+					Raw JSON
+				</span>
+				<button
+					type="button"
+					onclick={copyToClipboard}
+					class="rounded px-2 py-0.5 text-xs transition-colors {darkMode
+						? 'text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+						: 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'}"
+				>
+					{copySuccess ? 'Copied!' : 'Copy'}
+				</button>
+			</div>
+			<pre
+				class="flex-1 overflow-auto whitespace-pre-wrap break-all p-3 font-mono text-xs leading-relaxed {darkMode
+					? 'bg-slate-900 text-emerald-400'
+					: 'bg-slate-50 text-slate-800'}"
+			>{formatted}</pre>
+		</div>
+	{/snippet}
+	{#snippet back()}
+		<WidgetConfigureBack
+			kind="jsonViewer"
+			{widgetId}
+			{darkMode}
+			theme={resolvedTheme}
+			{topicOverride}
+			onApply={() => configure.applyConfig()}
+			onCancel={configure.cancelConfig}
+		/>
+	{/snippet}
+</FlipCard>

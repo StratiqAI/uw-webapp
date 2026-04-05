@@ -14,6 +14,8 @@ export declare function defineWidget<TData>(config: {
     zodSchema: z.ZodSchema<TData>;
     /** Narrow schema for topic store validation (defaults to zodSchema). */
     inputSchema?: z.ZodSchema;
+    /** Schema for payloads this widget publishes. Omit for subscribe-only widgets. */
+    outputSchema?: z.ZodSchema;
     component: Component<StandardWidgetProps<TData>>;
     defaultData: TData;
     defaultSize?: {
@@ -22,4 +24,9 @@ export declare function defineWidget<TData>(config: {
     };
     /** Services this widget requires from the host (informational). */
     capabilities?: string[];
+    /** Palette metadata for the host "Add Widget" UI. */
+    palette?: {
+        icon: string;
+        category?: string;
+    };
 }): WidgetManifest<TData>;

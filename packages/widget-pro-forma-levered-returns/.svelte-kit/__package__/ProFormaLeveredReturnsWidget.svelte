@@ -2,10 +2,12 @@
 	import {
 		useReactiveValidatedTopic,
 		getDashboardWidgetHost,
+		FlipCard,
+		WidgetConfigureBack,
+		useWidgetConfigure,
 		type StandardWidgetProps
 	} from '@stratiqai/dashboard-widget-sdk';
 	import {
-		FlipCard,
 		fmt,
 		pct,
 		proFormaTheme,
@@ -28,6 +30,7 @@
 		widgetId = 'pro-forma-levered-returns-default',
 		topicOverride,
 		darkMode = true,
+		theme,
 		onUpdateConfig,
 		onConfigureReady
 	}: StandardWidgetProps<ProFormaLeveredReturnsConfig> = $props();
@@ -84,80 +87,14 @@
 		return y === 0 ? value : '-';
 	}
 
-	let isFlipped = $state(false);
-	let draft = $state({
-		propertyName: '',
-		years: 5,
-		purchase: 0,
-		acqCosts: 0,
-		capEx: 0,
-		egiY1: 0,
-		egiG: 0.03,
-		opexY1: 0,
-		opexG: 0.03,
-		exitCap: 0.055,
-		costSale: 0.03,
-		ltv: 0.65,
-		loanRate: 0.065,
-		amort: 30,
-		io: false,
-		leveredDiscount: 0.12
+	const configure = useWidgetConfigure<ProFormaLeveredReturnsConfig>({
+		data: () => widgetData,
+		onUpdateConfig,
+		onConfigureReady
 	});
-
-	function syncDraft() {
-		draft = {
-			propertyName: widgetData.propertyName ?? '',
-			years: widgetData.projectionYears,
-			purchase: widgetData.purchasePrice,
-			acqCosts: widgetData.acquisitionCosts,
-			capEx: widgetData.initialCapEx,
-			egiY1: widgetData.egiYear1,
-			egiG: widgetData.egiGrowthRate,
-			opexY1: widgetData.totalOpexYear1,
-			opexG: widgetData.opexGrowthRate,
-			exitCap: widgetData.terminalCapRate,
-			costSale: widgetData.costOfSalePercent,
-			ltv: widgetData.loanLtv,
-			loanRate: widgetData.loanInterestRate,
-			amort: widgetData.amortizationYears,
-			io: widgetData.interestOnly,
-			leveredDiscount: widgetData.leveredDiscountRate
-		};
-	}
-
-	function toggleFlip() {
-		isFlipped = !isFlipped;
-		if (isFlipped) syncDraft();
-	}
-
-	$effect(() => {
-		onConfigureReady?.(toggleFlip);
-	});
-
-	function applyConfig() {
-		onUpdateConfig?.({
-			propertyName: draft.propertyName.trim() || undefined,
-			projectionYears: draft.years,
-			purchasePrice: draft.purchase,
-			acquisitionCosts: draft.acqCosts,
-			initialCapEx: draft.capEx,
-			egiYear1: draft.egiY1,
-			egiGrowthRate: draft.egiG,
-			totalOpexYear1: draft.opexY1,
-			opexGrowthRate: draft.opexG,
-			terminalCapRate: draft.exitCap,
-			costOfSalePercent: draft.costSale,
-			loanLtv: draft.ltv,
-			loanInterestRate: draft.loanRate,
-			amortizationYears: draft.amort,
-			interestOnly: draft.io,
-			leveredDiscountRate: draft.leveredDiscount
-		});
-		isFlipped = false;
-	}
 </script>
 
-<FlipCard {isFlipped} shellClass={t.shell} flipBackClass={t.flipBackBg}>
+<FlipCard isFlipped={configure.isFlipped} shellClass={t.shell} flipBackClass={t.flipBackBg}>
 	{#snippet front()}
 		<table class="w-full border-collapse text-sm">
 			<thead>
@@ -227,120 +164,109 @@
 	{/snippet}
 
 	{#snippet back()}
-		<div class="flex min-h-full flex-col items-center px-4 py-5 sm:px-6">
-			<div class="flex w-full max-w-lg flex-1 flex-col">
-				<header class="mb-4">
-					<h3 class="text-lg font-bold {t.cfgTitle}">Configure Levered Returns</h3>
-					<p class="mt-1 text-sm {t.muted}">
-						Uses the same levered cash-flow path as the Levered CF widget. Set the levered hurdle rate for NPV.
-					</p>
-				</header>
-				<section class="{t.cfgPanel} max-h-[calc(100%-72px)] overflow-y-auto">
-					<form
-						class="flex flex-col gap-3"
-						onsubmit={(e) => {
-							e.preventDefault();
-							applyConfig();
-						}}
-					>
-						<label class="block">
-							<span class={t.cfgLabel}>Property name (optional)</span>
-							<input type="text" bind:value={draft.propertyName} class={t.cfgField} />
+		<WidgetConfigureBack
+			kind="proFormaLeveredReturns"
+			{widgetId}
+			{darkMode}
+			theme={theme ?? 'dark'}
+			{topicOverride}
+			onApply={() => configure.applyConfig({
+				...configure.draft,
+				propertyName: configure.draft.propertyName?.trim() || undefined
+			})}
+			onCancel={configure.cancelConfig}
+		>
+			{#snippet userFields()}
+				<label class="block">
+					<span class={t.cfgLabel}>Property name (optional)</span>
+					<input type="text" bind:value={configure.draft.propertyName} class={t.cfgField} />
+				</label>
+				<label class="block">
+					<span class={t.cfgLabel}>Levered discount rate (NPV)</span>
+					<input
+						type="number"
+						bind:value={configure.draft.leveredDiscountRate}
+						min="0"
+						max="1"
+						step={FORM_STEP_RATE}
+						class={t.cfgField}
+					/>
+				</label>
+				<label class="block">
+					<span class={t.cfgLabel}>Holding period (Year N)</span>
+					<input type="number" bind:value={configure.draft.projectionYears} min="1" max="10" class={t.cfgField} />
+				</label>
+				<fieldset class="rounded-lg border p-3 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
+					<legend class="px-1 text-xs font-semibold {t.muted}">Acquisition</legend>
+					<div class="grid grid-cols-3 gap-2">
+						<label class="block"
+							><span class={t.cfgLabel}>Purchase</span>
+							<input type="number" bind:value={configure.draft.purchasePrice} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
 						</label>
-						<label class="block">
-							<span class={t.cfgLabel}>Levered discount rate (NPV)</span>
-							<input
-								type="number"
-								bind:value={draft.leveredDiscount}
-								min="0"
-								max="1"
-								step={FORM_STEP_RATE}
-								class={t.cfgField}
-							/>
+						<label class="block"
+							><span class={t.cfgLabel}>Acq. costs</span>
+							<input type="number" bind:value={configure.draft.acquisitionCosts} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
 						</label>
-						<label class="block">
-							<span class={t.cfgLabel}>Holding period (Year N)</span>
-							<input type="number" bind:value={draft.years} min="1" max="10" class={t.cfgField} />
+						<label class="block"
+							><span class={t.cfgLabel}>CapEx</span>
+							<input type="number" bind:value={configure.draft.initialCapEx} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
 						</label>
-						<fieldset class="rounded-lg border p-3 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
-							<legend class="px-1 text-xs font-semibold {t.muted}">Acquisition</legend>
-							<div class="grid grid-cols-3 gap-2">
-								<label class="block"
-									><span class={t.cfgLabel}>Purchase</span>
-									<input type="number" bind:value={draft.purchase} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
-								</label>
-								<label class="block"
-									><span class={t.cfgLabel}>Acq. costs</span>
-									<input type="number" bind:value={draft.acqCosts} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
-								</label>
-								<label class="block"
-									><span class={t.cfgLabel}>CapEx</span>
-									<input type="number" bind:value={draft.capEx} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
-								</label>
-							</div>
-						</fieldset>
-						<fieldset class="rounded-lg border p-3 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
-							<legend class="px-1 text-xs font-semibold {t.muted}">NOI</legend>
-							<div class="grid grid-cols-2 gap-2">
-								<label class="block"
-									><span class={t.cfgLabel}>Y1 EGI</span>
-									<input type="number" bind:value={draft.egiY1} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
-								</label>
-								<label class="block"
-									><span class={t.cfgLabel}>EGI gr.</span>
-									<input type="number" bind:value={draft.egiG} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
-								</label>
-								<label class="block"
-									><span class={t.cfgLabel}>Y1 OpEx</span>
-									<input type="number" bind:value={draft.opexY1} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
-								</label>
-								<label class="block"
-									><span class={t.cfgLabel}>OpEx gr.</span>
-									<input type="number" bind:value={draft.opexG} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
-								</label>
-							</div>
-						</fieldset>
-						<fieldset class="rounded-lg border p-3 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
-							<legend class="px-1 text-xs font-semibold {t.muted}">Exit</legend>
-							<div class="grid grid-cols-2 gap-2">
-								<label class="block"
-									><span class={t.cfgLabel}>Terminal cap</span>
-									<input type="number" bind:value={draft.exitCap} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
-								</label>
-								<label class="block"
-									><span class={t.cfgLabel}>Cost of sale</span>
-									<input type="number" bind:value={draft.costSale} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
-								</label>
-							</div>
-						</fieldset>
-						<fieldset class="rounded-lg border p-3 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
-							<legend class="px-1 text-xs font-semibold {t.muted}">Debt</legend>
-							<label class="block">
-								<span class={t.cfgLabel}>Loan-to-value</span>
-								<input type="number" bind:value={draft.ltv} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
-							</label>
-							<label class="block">
-								<span class={t.cfgLabel}>Annual interest rate</span>
-								<input type="number" bind:value={draft.loanRate} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
-							</label>
-							<label class="block">
-								<span class={t.cfgLabel}>Amortization (years)</span>
-								<input type="number" bind:value={draft.amort} min="1" max="40" class={t.cfgField} />
-							</label>
-							<label class="flex items-center gap-2">
-								<input type="checkbox" bind:checked={draft.io} class="rounded" />
-								<span class="text-sm {t.muted}">Interest-only</span>
-							</label>
-						</fieldset>
-						<div class="flex justify-end gap-2 border-t pt-4 {darkMode ? 'border-slate-600' : 'border-slate-200'}">
-							<button type="button" class={t.cfgBtnSecondary} onclick={() => (isFlipped = false)}>Cancel</button>
-							<button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500">
-								Apply
-							</button>
-						</div>
-					</form>
-				</section>
-			</div>
-		</div>
+					</div>
+				</fieldset>
+				<fieldset class="rounded-lg border p-3 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
+					<legend class="px-1 text-xs font-semibold {t.muted}">NOI</legend>
+					<div class="grid grid-cols-2 gap-2">
+						<label class="block"
+							><span class={t.cfgLabel}>Y1 EGI</span>
+							<input type="number" bind:value={configure.draft.egiYear1} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
+						</label>
+						<label class="block"
+							><span class={t.cfgLabel}>EGI gr.</span>
+							<input type="number" bind:value={configure.draft.egiGrowthRate} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
+						</label>
+						<label class="block"
+							><span class={t.cfgLabel}>Y1 OpEx</span>
+							<input type="number" bind:value={configure.draft.totalOpexYear1} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
+						</label>
+						<label class="block"
+							><span class={t.cfgLabel}>OpEx gr.</span>
+							<input type="number" bind:value={configure.draft.opexGrowthRate} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
+						</label>
+					</div>
+				</fieldset>
+				<fieldset class="rounded-lg border p-3 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
+					<legend class="px-1 text-xs font-semibold {t.muted}">Exit</legend>
+					<div class="grid grid-cols-2 gap-2">
+						<label class="block"
+							><span class={t.cfgLabel}>Terminal cap</span>
+							<input type="number" bind:value={configure.draft.terminalCapRate} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
+						</label>
+						<label class="block"
+							><span class={t.cfgLabel}>Cost of sale</span>
+							<input type="number" bind:value={configure.draft.costOfSalePercent} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
+						</label>
+					</div>
+				</fieldset>
+				<fieldset class="rounded-lg border p-3 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
+					<legend class="px-1 text-xs font-semibold {t.muted}">Debt</legend>
+					<label class="block">
+						<span class={t.cfgLabel}>Loan-to-value</span>
+						<input type="number" bind:value={configure.draft.loanLtv} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
+					</label>
+					<label class="block">
+						<span class={t.cfgLabel}>Annual interest rate</span>
+						<input type="number" bind:value={configure.draft.loanInterestRate} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
+					</label>
+					<label class="block">
+						<span class={t.cfgLabel}>Amortization (years)</span>
+						<input type="number" bind:value={configure.draft.amortizationYears} min="1" max="40" class={t.cfgField} />
+					</label>
+					<label class="flex items-center gap-2">
+						<input type="checkbox" bind:checked={configure.draft.interestOnly} class="rounded" />
+						<span class="text-sm {t.muted}">Interest-only</span>
+					</label>
+				</fieldset>
+			{/snippet}
+		</WidgetConfigureBack>
 	{/snippet}
 </FlipCard>

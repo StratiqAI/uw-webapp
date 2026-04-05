@@ -2,9 +2,12 @@
 	import {
 		useReactiveValidatedTopic,
 		getDashboardWidgetHost,
+		FlipCard,
+		WidgetConfigureBack,
+		useWidgetConfigure,
 		type StandardWidgetProps
 	} from '@stratiqai/dashboard-widget-sdk';
-	import { FlipCard, fmt, fmtDeduction, pct, proFormaTheme } from '@stratiqai/widget-pro-forma-base';
+	import { fmt, fmtDeduction, pct, proFormaTheme } from '@stratiqai/widget-pro-forma-base';
 	import type { ProFormaRevenueConfig, ProFormaRevenueInput } from './schema.js';
 	import { computeRevenueProjections, type YearProjection } from './calculations.js';
 
@@ -16,6 +19,7 @@
 		widgetId = 'pro-forma-revenue-default',
 		topicOverride,
 		darkMode = true,
+		theme,
 		onUpdateConfig,
 		onConfigureReady
 	}: StandardWidgetProps<ProFormaRevenueConfig> = $props();
@@ -52,61 +56,11 @@
 	const projections = $derived<YearProjection[]>(computeRevenueProjections(mergedConfig));
 	const t = $derived(proFormaTheme(darkMode));
 
-	// --- Flip state & draft config ---
-	let isFlipped = $state(false);
-
-	let draftUnitType = $state<'units' | 'sqft'>('units');
-	let draftTotalUnits = $state(0);
-	let draftTotalSqFt = $state(0);
-	let draftMarketRent = $state(0);
-	let draftRentGrowth = $state(0.03);
-	let draftVacancyRate = $state(0.05);
-	let draftOtherIncome = $state(0);
-	let draftOtherGrowth = $state(0.02);
-	let draftYears = $state(5);
-	let draftPropertyName = $state('');
-
-	function syncDraftFromData() {
-		draftUnitType = widgetData.unitType;
-		draftTotalUnits = widgetData.totalUnits;
-		draftTotalSqFt = widgetData.totalSqFt;
-		draftMarketRent = widgetData.marketRentPerUnit;
-		draftRentGrowth = widgetData.rentGrowthRate;
-		draftVacancyRate = widgetData.vacancyRate;
-		draftOtherIncome = widgetData.otherIncomeAnnual;
-		draftOtherGrowth = widgetData.otherIncomeGrowthRate;
-		draftYears = widgetData.projectionYears;
-		draftPropertyName = widgetData.propertyName ?? '';
-	}
-
-	function toggleFlip() {
-		isFlipped = !isFlipped;
-		if (isFlipped) syncDraftFromData();
-	}
-
-	$effect(() => {
-		onConfigureReady?.(toggleFlip);
+	const configure = useWidgetConfigure<ProFormaRevenueConfig>({
+		data: () => widgetData,
+		onUpdateConfig: (d) => onUpdateConfig?.(d),
+		onConfigureReady: (fn) => onConfigureReady?.(fn)
 	});
-
-	function applyConfig() {
-		onUpdateConfig?.({
-			unitType: draftUnitType,
-			totalUnits: draftTotalUnits,
-			totalSqFt: draftTotalSqFt,
-			marketRentPerUnit: draftMarketRent,
-			rentGrowthRate: draftRentGrowth,
-			vacancyRate: draftVacancyRate,
-			otherIncomeAnnual: draftOtherIncome,
-			otherIncomeGrowthRate: draftOtherGrowth,
-			projectionYears: draftYears,
-			propertyName: draftPropertyName.trim() || undefined
-		});
-		isFlipped = false;
-	}
-
-	function cancelConfig() {
-		isFlipped = false;
-	}
 
 	const quantityLabel = $derived(mergedConfig.unitType === 'sqft' ? 'Sq Ft' : 'Units');
 	const rentLabel = $derived(
@@ -114,7 +68,7 @@
 	);
 </script>
 
-<FlipCard {isFlipped} shellClass={t.shell} flipBackClass={t.flipBackBg}>
+<FlipCard isFlipped={configure.isFlipped} shellClass={t.shell} flipBackClass={t.flipBackBg}>
 	{#snippet front()}
 		<table class="w-full border-collapse text-sm">
 			<thead>
@@ -220,104 +174,83 @@
 	{/snippet}
 
 	{#snippet back()}
-		<div class="flex min-h-full flex-col items-center px-4 py-5 sm:px-6">
-			<div class="flex w-full max-w-lg flex-1 flex-col">
-				<header class="mb-4 shrink-0 text-center sm:text-left">
-					<h3 class="text-lg font-bold {t.cfgTitle}">
-						Configure Revenue Projections
-					</h3>
-					<p class="mt-1 text-sm {t.muted}">
-						Enter property fundamentals to generate a multi-year before-tax cash flow
-						analysis.
-					</p>
-				</header>
+		<WidgetConfigureBack
+			kind="proFormaRevenue"
+			{widgetId}
+			{darkMode}
+			theme={theme ?? 'dark'}
+			{topicOverride}
+			onApply={() => configure.applyConfig({
+				...configure.draft,
+				propertyName: configure.draft.propertyName?.trim() || undefined
+			})}
+			onCancel={configure.cancelConfig}
+		>
+			{#snippet userFields()}
+				<label class="block">
+					<span class={t.cfgLabel}>Property Name (optional)</span>
+					<input type="text" bind:value={configure.draft.propertyName} class={t.cfgField} placeholder="e.g. Riverside Apartments" />
+				</label>
 
-				<section class={t.cfgPanel} aria-label="Widget configuration">
-					<form
-						class="flex flex-col gap-3"
-						onsubmit={(e) => {
-							e.preventDefault();
-							applyConfig();
-						}}
-					>
+				<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+					<label class="block">
+						<span class={t.cfgLabel}>Measurement Type</span>
+						<select bind:value={configure.draft.unitType} class={t.cfgField}>
+							<option value="units">Units</option>
+							<option value="sqft">Square Footage</option>
+						</select>
+					</label>
+					{#if configure.draft.unitType === 'sqft'}
 						<label class="block">
-							<span class={t.cfgLabel}>Property Name (optional)</span>
-							<input type="text" bind:value={draftPropertyName} class={t.cfgField} placeholder="e.g. Riverside Apartments" />
+							<span class={t.cfgLabel}>Total Leasable Sq Ft</span>
+							<input type="number" bind:value={configure.draft.totalSqFt} min="0" step="1" class={t.cfgField} />
 						</label>
-
-						<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-							<label class="block">
-								<span class={t.cfgLabel}>Measurement Type</span>
-								<select bind:value={draftUnitType} class={t.cfgField}>
-									<option value="units">Units</option>
-									<option value="sqft">Square Footage</option>
-								</select>
-							</label>
-							{#if draftUnitType === 'sqft'}
-								<label class="block">
-									<span class={t.cfgLabel}>Total Leasable Sq Ft</span>
-									<input type="number" bind:value={draftTotalSqFt} min="0" step="1" class={t.cfgField} />
-								</label>
-							{:else}
-								<label class="block">
-									<span class={t.cfgLabel}>Total Number of Units</span>
-									<input type="number" bind:value={draftTotalUnits} min="0" step="1" class={t.cfgField} />
-								</label>
-							{/if}
-						</div>
-
-						<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-							<label class="block">
-								<span class={t.cfgLabel}>
-									Market Rent / {draftUnitType === 'sqft' ? 'Sq Ft' : 'Unit'} / Month ($)
-								</span>
-								<input type="number" bind:value={draftMarketRent} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
-							</label>
-							<label class="block">
-								<span class={t.cfgLabel}>Annual Rent Growth Rate</span>
-								<input type="number" bind:value={draftRentGrowth} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
-								<p class="mt-0.5 text-[11px] {t.muted}">e.g. 0.03 = 3% per year</p>
-							</label>
-						</div>
-
+					{:else}
 						<label class="block">
-							<span class={t.cfgLabel}>Vacancy Rate</span>
-							<input type="number" bind:value={draftVacancyRate} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
-							<p class="mt-0.5 text-[11px] {t.muted}">e.g. 0.05 = 5% vacancy</p>
+							<span class={t.cfgLabel}>Total Number of Units</span>
+							<input type="number" bind:value={configure.draft.totalUnits} min="0" step="1" class={t.cfgField} />
 						</label>
+					{/if}
+				</div>
 
-						<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-							<label class="block">
-								<span class={t.cfgLabel}>Other Income (Annual $)</span>
-								<input type="number" bind:value={draftOtherIncome} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
-								<p class="mt-0.5 text-[11px] {t.muted}">Parking, laundry, storage, etc.</p>
-							</label>
-							<label class="block">
-								<span class={t.cfgLabel}>Other Income Growth Rate</span>
-								<input type="number" bind:value={draftOtherGrowth} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
-								<p class="mt-0.5 text-[11px] {t.muted}">e.g. 0.02 = 2% per year</p>
-							</label>
-						</div>
+				<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+					<label class="block">
+						<span class={t.cfgLabel}>
+							Market Rent / {configure.draft.unitType === 'sqft' ? 'Sq Ft' : 'Unit'} / Month ($)
+						</span>
+						<input type="number" bind:value={configure.draft.marketRentPerUnit} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
+					</label>
+					<label class="block">
+						<span class={t.cfgLabel}>Annual Rent Growth Rate</span>
+						<input type="number" bind:value={configure.draft.rentGrowthRate} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
+						<p class="mt-0.5 text-[11px] {t.muted}">e.g. 0.03 = 3% per year</p>
+					</label>
+				</div>
 
-						<label class="block">
-							<span class={t.cfgLabel}>Projection Years</span>
-							<input type="number" bind:value={draftYears} min="1" max="10" step="1" class={t.cfgField} />
-						</label>
+				<label class="block">
+					<span class={t.cfgLabel}>Vacancy Rate</span>
+					<input type="number" bind:value={configure.draft.vacancyRate} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
+					<p class="mt-0.5 text-[11px] {t.muted}">e.g. 0.05 = 5% vacancy</p>
+				</label>
 
-						<div class="flex justify-end gap-2 border-t pt-4 {darkMode ? 'border-slate-600' : 'border-slate-200'}">
-							<button type="button" class={t.cfgBtnSecondary} onclick={cancelConfig}>
-								Cancel
-							</button>
-							<button
-								type="submit"
-								class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
-							>
-								Apply
-							</button>
-						</div>
-					</form>
-				</section>
-			</div>
-		</div>
+				<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+					<label class="block">
+						<span class={t.cfgLabel}>Other Income (Annual $)</span>
+						<input type="number" bind:value={configure.draft.otherIncomeAnnual} min="0" step={FORM_STEP_CURRENCY} class={t.cfgField} />
+						<p class="mt-0.5 text-[11px] {t.muted}">Parking, laundry, storage, etc.</p>
+					</label>
+					<label class="block">
+						<span class={t.cfgLabel}>Other Income Growth Rate</span>
+						<input type="number" bind:value={configure.draft.otherIncomeGrowthRate} min="0" max="1" step={FORM_STEP_RATE} class={t.cfgField} />
+						<p class="mt-0.5 text-[11px] {t.muted}">e.g. 0.02 = 2% per year</p>
+					</label>
+				</div>
+
+				<label class="block">
+					<span class={t.cfgLabel}>Projection Years</span>
+					<input type="number" bind:value={configure.draft.projectionYears} min="1" max="10" step="1" class={t.cfgField} />
+				</label>
+			{/snippet}
+		</WidgetConfigureBack>
 	{/snippet}
 </FlipCard>

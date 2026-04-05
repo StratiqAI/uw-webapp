@@ -43,7 +43,6 @@
 	let showEditDialog = $state(false);
 	let widgetAIGenerateFn: ((prompt: string) => Promise<void>) | null = null;
 	let widgetFlipFn: (() => void) | null = null;
-	let widgetConfigureFlipFn: (() => void) | null = null;
 	let lqMenuSignals = $state<Record<string, { refresh: number; exportRequest: number }>>({});
 	let removeConfirmOpen = $state(false);
 	let lastRefreshedAt = $state<Date | null>(null);
@@ -81,10 +80,6 @@
 		widgetFlipFn = flipFn;
 	}
 
-	function handleConfigureFlipReady(flipFn: () => void) {
-		widgetConfigureFlipFn = flipFn;
-	}
-
 	function bumpLqRefresh(id: string) {
 		const cur = lqMenuSignals[id] ?? { refresh: 0, exportRequest: 0 };
 		lqMenuSignals = { ...lqMenuSignals, [id]: { ...cur, refresh: cur.refresh + 1 } };
@@ -97,19 +92,15 @@
 
 	function handleWidgetAction(action: WidgetAction) {
 		switch (action) {
-			case 'configure':
-			case 'edit':
-			case 'settings':
-				if (ResolvedComp && registeredConfigureFn) {
-					registeredConfigureFn();
-					break;
-				}
-				if (widget.type === 'locationQuotient') {
-					widgetConfigureFlipFn?.();
-					break;
-				}
-				showEditDialog = true;
+		case 'configure':
+		case 'edit':
+		case 'settings':
+			if (ResolvedComp && registeredConfigureFn) {
+				registeredConfigureFn();
 				break;
+			}
+			showEditDialog = true;
+			break;
 
 			case 'duplicate':
 				dashboard.duplicateWidget(widget.id);
@@ -293,10 +284,9 @@
 					showTitleInChrome={!!displayTitle}
 					onUpdateConfig={(d: any) => dashboard.updateWidget(widget.id, { data: d })}
 					onConfigureReady={(fn: () => void) => { registeredConfigureFn = fn; }}
-					onAIGenerationReady={handleAIGenerationReady}
-					onFlipControlReady={handleFlipControlReady}
-					onConfigureFlipReady={handleConfigureFlipReady}
-					onUpdateData={(d: any) => dashboard.updateWidget(widget.id, { data: d })}
+				onAIGenerationReady={handleAIGenerationReady}
+				onFlipControlReady={handleFlipControlReady}
+				onUpdateData={(d: any) => dashboard.updateWidget(widget.id, { data: d })}
 					lqSignals={lqMenuSignals[widget.id] ?? DEFAULT_LQ_MENU_SIGNALS}
 				/>
 			{/if}
