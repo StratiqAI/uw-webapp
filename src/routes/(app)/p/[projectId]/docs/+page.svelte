@@ -20,6 +20,9 @@
 	import { gql } from '$lib/services/realtime/graphql/requestHandler';
 	import { Q_GET_PROJECT } from '$lib/services/realtime/graphql/queries/Project';
 	import type { SubscriptionSpec } from '$lib/services/realtime/websocket/types';
+	import { createLogger } from '$lib/utils/logger';
+
+	const log = createLogger('documents');
 
 	interface ProjectDocument {
 		id: string;
@@ -220,7 +223,7 @@
 				documentIds
 			});
 		} catch (err) {
-			console.error('Failed to fetch document entities:', err);
+			log.error('Failed to fetch document entities:', err);
 			entitiesError = err instanceof Error ? err.message : 'Failed to load document entities';
 		} finally {
 			isLoadingEntities = false;
@@ -295,7 +298,7 @@
 						project = res.getProject;
 					}
 				})
-				.catch((err) => console.error('Failed to fetch project doclinks:', err));
+				.catch((err) => log.error('Failed to fetch project doclinks:', err));
 		}
 
 		return () => { cancelled = true; };
@@ -313,10 +316,10 @@
 			variables: { parentId: pid },
 			path: 'onCreateDoclink',
 			next: (doclink: Doclink) => mergeDoclink(pid, doclink),
-			error: (err: any) => console.error('Doclink subscription error:', err)
+			error: (err: any) => log.error('Doclink subscription error:', err)
 		};
 
-		addSubscription(token, spec).catch(err => console.error('Failed to add doclink subscription:', err));
+		addSubscription(token, spec).catch(err => log.error('Failed to add doclink subscription:', err));
 
 		return () => { removeSubscription(spec); };
 	});

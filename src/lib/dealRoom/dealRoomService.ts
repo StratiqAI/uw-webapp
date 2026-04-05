@@ -14,6 +14,9 @@ import type {
   DocumentSearchResult,
   DealProject
 } from './types';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('dealRoom');
 
 const DEAL_FIELDS = `
   id name description status
@@ -37,7 +40,7 @@ async function withFallback<T>(
     return { data, fromFallback: false };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.warn('[DealRoom] Backend call failed, using fallback:', message);
+    log.warn('Backend call failed, using fallback:', message);
     return { data: fallback, fromFallback: true, error: message };
   }
 }

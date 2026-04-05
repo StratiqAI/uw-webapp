@@ -50,7 +50,9 @@
 
 // Import the public environment variables
 import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from '$env/static/public';
-import { logger } from '$lib/utils/debug';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('realtime');
 import { print, type DocumentNode } from 'graphql';
 
 // Websocket resources
@@ -203,7 +205,7 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 
 		// Log the message
 		if (msg.type != 'ka') {
-			logger(`msg ${msg.type}`, msg);
+			log.debug(`msg ${msg.type}`, msg);
 		}
 
 		// Call the onEvent callback
@@ -287,7 +289,7 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 		// per-subscription error (has id) or connection-level error (no id)
 		const sub = msg.id ? this.subs.get(msg.id) : undefined;
 		if (sub?.error) sub.error(msg.payload ?? msg);
-		else console.error('AppSync WS error', msg.payload ?? msg);
+		else log.error('AppSync WS error', msg.payload ?? msg);
 	}
 
 	private handleComplete(msg: any): void {
@@ -329,7 +331,7 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 	}
 
 	private setupSubscription<T>(spec: SubscriptionSpec<T>): void {
-		logger('Setting up subscription ---------------------->: ', spec);
+		log.debug('Setting up subscription:', spec);
 		const selector =
 			spec.select ?? (spec.path ? (payload: any) => pluck(payload, spec.path) : (payload: any) => payload);
 
@@ -341,10 +343,10 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 					const picked = selector(payload);
 					if (picked !== undefined) spec.next(picked);
 				} catch (e) {
-					(spec.error ?? console.error)('selector error', e);
+					(spec.error ?? log.error.bind(log))('selector error', e);
 				}
 			},
-			error: spec.error ?? ((e: unknown) => console.error('subscription error', e))
+			error: spec.error ?? ((e: unknown) => log.error('subscription error', e))
 		});
 
 		this.subscriptionHandles.push(h);

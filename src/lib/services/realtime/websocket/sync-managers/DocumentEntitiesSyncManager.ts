@@ -20,6 +20,9 @@ import {
 } from '$lib/stores/projectEntitiesStore';
 import { addSubscription, removeSubscription, ensureConnection } from '$lib/stores/appSyncClientStore';
 import type { SubscriptionSpec } from '$lib/services/realtime/websocket/types';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('documents');
 
 /**
  * GraphQL query to fetch a document with its texts, tables, and images
@@ -164,7 +167,7 @@ export class DocumentEntitiesSyncManager {
 
 			const document = result.getDocument;
 			if (!document) {
-				console.warn(`Document ${documentId} not found`);
+				log.warn(`Document ${documentId} not found`);
 				return { texts: [], tables: [], images: [] };
 			}
 
@@ -174,7 +177,7 @@ export class DocumentEntitiesSyncManager {
 				images: document.images?.items ?? []
 			};
 		} catch (err) {
-			console.warn(`Failed to fetch document ${documentId} with entities:`, err);
+			log.warn(`Failed to fetch document ${documentId} with entities:`, err);
 			return { texts: [], tables: [], images: [] };
 		}
 	}
@@ -197,7 +200,7 @@ export class DocumentEntitiesSyncManager {
 					if (projectId) addProjectText(projectId, text);
 				},
 				error: (err: any) => {
-					console.error(`[DocumentEntitiesSyncManager] Text subscription error for ${documentId}:`, err);
+					log.error(`[DocumentEntitiesSyncManager] Text subscription error for ${documentId}:`, err);
 				}
 			},
 			{
@@ -208,7 +211,7 @@ export class DocumentEntitiesSyncManager {
 					if (projectId) addProjectTable(projectId, table);
 				},
 				error: (err: any) => {
-					console.error(`[DocumentEntitiesSyncManager] Table subscription error for ${documentId}:`, err);
+					log.error(`[DocumentEntitiesSyncManager] Table subscription error for ${documentId}:`, err);
 				}
 			},
 			{
@@ -219,7 +222,7 @@ export class DocumentEntitiesSyncManager {
 					if (projectId) addProjectImage(projectId, image);
 				},
 				error: (err: any) => {
-					console.error(`[DocumentEntitiesSyncManager] Image subscription error for ${documentId}:`, err);
+					log.error(`[DocumentEntitiesSyncManager] Image subscription error for ${documentId}:`, err);
 				}
 			}
 		];
@@ -231,7 +234,7 @@ export class DocumentEntitiesSyncManager {
 			}
 			this.subscriptionSpecs.push(...specs);
 		} catch (err) {
-			console.error(`[DocumentEntitiesSyncManager] Failed to set up subscriptions for ${documentId}:`, err);
+			log.error(`[DocumentEntitiesSyncManager] Failed to set up subscriptions for ${documentId}:`, err);
 		}
 	}
 
@@ -301,7 +304,7 @@ export class DocumentEntitiesSyncManager {
 
 			this._status = 'ready';
 		} catch (err) {
-			console.error('Failed to fetch document entities:', err);
+			log.error('Failed to fetch document entities:', err);
 			this._error = err instanceof Error ? err.message : 'Failed to load document entities';
 			this._status = 'error';
 			throw err;
@@ -352,7 +355,7 @@ export class DocumentEntitiesSyncManager {
 
 			await this.setupSubscriptionsForDocument(documentId);
 		} catch (err) {
-			console.error(`Failed to fetch entities for document ${documentId}:`, err);
+			log.error(`Failed to fetch entities for document ${documentId}:`, err);
 			throw err;
 		}
 	}

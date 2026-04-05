@@ -1,4 +1,7 @@
 import { json } from '@sveltejs/kit';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('mcp');
 import type { RequestHandler } from './$types';
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -30,7 +33,7 @@ function loadMCPConfig(): MCPServerConfig[] {
 		}));
 	} catch (error) {
 		// Fallback to default configuration if file doesn't exist
-		console.warn('Could not load mcp.json, using default configuration:', error);
+		log.warn('Could not load mcp.json, using default configuration:', error);
 		return [
 			{
 				name: 'us-census',

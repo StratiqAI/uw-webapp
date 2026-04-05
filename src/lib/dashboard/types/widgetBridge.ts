@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 import { jobUpdateStore, type JobUpdate } from '$lib/stores/jobUpdateStore.svelte';
 import { DashboardStorage } from '$lib/dashboard/utils/storage';
+import { createLogger } from '$lib/utils/logger';
 import type {
 	WidgetChannelConfig,
 	WidgetDataTypeMap,
@@ -13,6 +14,8 @@ import type {
 	WidgetDataBridgeConfig
 } from './widgetSchemas';
 import type { WidgetType } from './widget';
+
+const log = createLogger('widgets');
 
 // ===== Topic Path Utilities =====
 
@@ -35,47 +38,41 @@ class ValidatedPublisherImpl<T> implements ValidatedPublisher<T> {
 		private widgetType: string
 	) {
 		this.topic = getWidgetTopicPath(widgetType, channelId);
-		console.log(`[ValidatedPublisher] Constructor called for topic: ${this.topic}`);
+		log.debug(`Publisher created for topic: ${this.topic}`);
 	}
 
 	publish(data: T): void {
-		console.log(`[ValidatedPublisher:${this.topic}] publish() called with data:`, data);
+		log.debug(`publish() on ${this.topic}`, data);
 		const result = this.schema.safeParse(data);
 		if (!result.success) {
-			console.error(`[ValidatedPublisher:${this.topic}] Validation failed:`, result.error);
+			log.error(`Validation failed on ${this.topic}:`, result.error);
 			throw result.error;
 		}
-		console.log(`[ValidatedPublisher:${this.topic}] ✅ Validation passed, publishing to ValidatedTopicStore`);
+		log.debug(`Validation passed on ${this.topic}, publishing to store`);
 		
-		// Publish to ValidatedTopicStore (which also validates against registered schemas)
 		const published = validatedTopicStore.publish(this.topic, result.data);
 		if (!published) {
-			console.error(`[ValidatedPublisher:${this.topic}] ❌ ValidatedTopicStore rejected the data`);
+			log.error(`ValidatedTopicStore rejected data on ${this.topic}`);
 			return;
 		}
 		
-		// Trigger auto-save of widget data to localStorage
-		console.log(`[ValidatedPublisher:${this.topic}] 💾 Triggering auto-save to localStorage...`);
+		log.debug(`Auto-saving widget data for ${this.topic}`);
 		DashboardStorage.autoSaveWidgetData();
 	}
 
 	safeParse(data: unknown): { success: true; data: T } | { success: false; error: z.ZodError } {
-		console.log(`[ValidatedPublisher:${this.topic}] safeParse() called`);
 		const result = this.schema.safeParse(data);
 		if (result.success) {
-			console.log(`[ValidatedPublisher:${this.topic}] ✅ safeParse validation passed`);
+			log.debug(`safeParse passed on ${this.topic}`);
 			return { success: true, data: result.data };
 		}
-		console.log(`[ValidatedPublisher:${this.topic}] ❌ safeParse validation failed`);
+		log.debug(`safeParse failed on ${this.topic}`);
 		return { success: false, error: result.error };
 	}
 
 	clear(): void {
-		console.log(`[ValidatedPublisher:${this.topic}] clear() called`);
+		log.debug(`Clearing ${this.topic}`);
 		validatedTopicStore.delete(this.topic);
-		
-		// Trigger auto-save after clearing
-		console.log(`[ValidatedPublisher:${this.topic}] 💾 Triggering auto-save after clear...`);
 		DashboardStorage.autoSaveWidgetData();
 	}
 }
@@ -92,30 +89,25 @@ class ValidatedConsumerImpl<T> implements ValidatedConsumer<T> {
 		private widgetType: string
 	) {
 		this.topic = getWidgetTopicPath(widgetType, channelId);
-		console.log(`[ValidatedConsumer] Constructor called for topic: ${this.topic}`);
+		log.debug(`Consumer created for topic: ${this.topic}`);
 	}
 
 	subscribe(callback: (data: T | undefined) => void): () => void {
-		console.log(`[ValidatedConsumer:${this.topic}] subscribe() called, setting up subscription`);
+		log.debug(`subscribe() on ${this.topic}`);
 		
-		// Use ValidatedTopicStore's subscribe method for programmatic subscriptions
 		const unsubscribe = validatedTopicStore.subscribe(this.topic, (value: unknown) => {
-			console.log(`[ValidatedConsumer:${this.topic}] 📥 Data received from ValidatedTopicStore:`, value);
-			
 			if (value === undefined) {
-				console.log(`[ValidatedConsumer:${this.topic}] Data is undefined, passing through`);
 				callback(undefined);
 				return;
 			}
 
 			const result = this.schema.safeParse(value);
 			if (!result.success) {
-				console.error(`[ValidatedConsumer:${this.topic}] ❌ Invalid data received:`, result.error);
+				log.error(`Invalid data received on ${this.topic}:`, result.error);
 				callback(undefined);
 				return;
 			}
 
-			console.log(`[ValidatedConsumer:${this.topic}] ✅ Validation passed, calling callback with validated data`);
 			callback(result.data);
 		});
 		
@@ -134,21 +126,16 @@ class ValidatedConsumerImpl<T> implements ValidatedConsumer<T> {
 	}
 
 	get(): T | undefined {
-		console.log(`[ValidatedConsumer:${this.topic}] get() called`);
 		const data = validatedTopicStore.at<T>(this.topic);
 		
-		if (data === undefined) {
-			console.log(`[ValidatedConsumer:${this.topic}] No data in store`);
-			return undefined;
-		}
+		if (data === undefined) return undefined;
 
 		const result = this.schema.safeParse(data);
 		if (!result.success) {
-			console.error(`[ValidatedConsumer:${this.topic}] Invalid data in store:`, result.error);
+			log.error(`Invalid data in store for ${this.topic}:`, result.error);
 			return undefined;
 		}
 
-		console.log(`[ValidatedConsumer:${this.topic}] ✅ Returning validated data from store`);
 		return result.data;
 	}
 }
@@ -163,8 +150,7 @@ export function createWidgetPublisher<T extends WidgetType>(
 	config: WidgetChannelConfig<T>,
 	publisherId: string
 ): ValidatedPublisher<WidgetDataTypeMap[T]> {
-	console.log(`\n🔧 [createWidgetPublisher] Called for channel: ${config.channelId}, publisher: ${publisherId}`);
-	console.log(`   ↳ Using ValidatedTopicStore at topic: widgets/${config.widgetType}/${config.channelId}`);
+	log.debug(`createWidgetPublisher: channel=${config.channelId}, publisher=${publisherId}`);
 
 	return new ValidatedPublisherImpl(
 		config.schema,
@@ -181,8 +167,7 @@ export function createWidgetConsumer<T extends WidgetType>(
 	config: WidgetChannelConfig<T>,
 	consumerId: string
 ): ValidatedConsumer<WidgetDataTypeMap[T]> {
-	console.log(`\n🔧 [createWidgetConsumer] Called for channel: ${config.channelId}, consumer: ${consumerId}`);
-	console.log(`   ↳ Using ValidatedTopicStore at topic: widgets/${config.widgetType}/${config.channelId}`);
+	log.debug(`createWidgetConsumer: channel=${config.channelId}, consumer=${consumerId}`);
 
 	return new ValidatedConsumerImpl(
 		config.schema,
@@ -218,9 +203,7 @@ export function createJobWidgetBridge<T extends WidgetType>(
 	config: WidgetDataBridgeConfig<T>
 ): JobWidgetBridge {
 	const bridgeId = `job-${config.jobId}-to-${config.channel.channelId}`;
-	console.log(`\n🌉 [createJobWidgetBridge] Creating bridge: ${bridgeId}`);
-	console.log(`   Job ID: ${config.jobId}`);
-	console.log(`   Target Channel: ${config.channel.channelId}`);
+	log.debug(`Creating bridge: ${bridgeId}`);
 	
 	const publisher = createWidgetPublisher(config.channel, bridgeId);
 
@@ -228,15 +211,10 @@ export function createJobWidgetBridge<T extends WidgetType>(
 	let lastError: z.ZodError | undefined;
 	let isConnected = true;
 
-	// Default transformer: parse JSON from job result
 	const transform =
 		config.transformer ||
-		((result: string): WidgetDataTypeMap[T] => {
-			console.log(`[JobWidgetBridge:${bridgeId}] Using default transformer (JSON.parse)`);
-			return JSON.parse(result);
-		});
+		((result: string): WidgetDataTypeMap[T] => JSON.parse(result));
 
-	// Default filter: only process COMPLETED status with non-null result
 	const filter =
 		config.filter ||
 		((update: { status: string; result: string | null }) => {
@@ -246,64 +224,41 @@ export function createJobWidgetBridge<T extends WidgetType>(
 			);
 		});
 
-	console.log(`[JobWidgetBridge:${bridgeId}] Subscribing to job updates...`);
-	
-	// Subscribe to job updates
 	const jobUpdatesStore = jobUpdateStore.subscribeToJobUpdates(config.jobId);
 	const unsubscribe = jobUpdatesStore.subscribe((updates: JobUpdate[]) => {
-		console.log(`\n📨 [JobWidgetBridge:${bridgeId}] Job update received, ${updates.length} updates in store`);
-		
-		if (!isConnected || updates.length === 0) {
-			console.log(`   ↳ Skipping: ${!isConnected ? 'disconnected' : 'no updates'}`);
-			return;
-		}
+		if (!isConnected || updates.length === 0) return;
 
 		const latestUpdate = updates[0];
-		console.log(`   Latest update status: ${latestUpdate.status}`);
-		console.log(`   Has result: ${latestUpdate.result !== null}`);
+		log.debug(`Bridge ${bridgeId}: status=${latestUpdate.status}, hasResult=${latestUpdate.result !== null}`);
 		
-		if (!filter({ status: latestUpdate.status, result: latestUpdate.result })) {
-			console.log(`   ↳ Update filtered out by filter function`);
-			return;
-		}
-
-		console.log(`   ✅ Update passed filter, processing...`);
+		if (!filter({ status: latestUpdate.status, result: latestUpdate.result })) return;
 
 		try {
-			// Transform job result to widget data
-			console.log(`   🔄 Transforming job result to widget data...`);
 			const widgetData = transform(latestUpdate.result!);
-			console.log(`   ✅ Transform successful:`, widgetData);
-
-			// Publish to widget channel via ValidatedTopicStore (with validation)
-			console.log(`   📤 Publishing to ValidatedTopicStore...`);
 			publisher.publish(widgetData);
 			lastUpdate = new Date();
 			lastError = undefined;
-
-			console.log(`✅ [JobWidgetBridge:${bridgeId}] Successfully published data to ValidatedTopicStore`);
+			log.debug(`Bridge ${bridgeId}: published successfully`);
 		} catch (error) {
 			if (error instanceof z.ZodError) {
 				lastError = error;
-				console.error(`❌ [JobWidgetBridge:${bridgeId}] Validation error:`, error);
+				log.error(`Bridge ${bridgeId}: validation error`, error);
 			} else {
-				console.error(`❌ [JobWidgetBridge:${bridgeId}] Transform error:`, error);
+				log.error(`Bridge ${bridgeId}: transform error`, error);
 			}
 		}
 	});
 
-	console.log(`✅ [JobWidgetBridge:${bridgeId}] Bridge created and listening`);
+	log.debug(`Bridge ${bridgeId} created and listening`);
 
 	return {
 		disconnect: () => {
-			console.log(`\n🔌 [JobWidgetBridge:${bridgeId}] disconnect() called`);
+			log.debug(`Disconnecting bridge ${bridgeId}`);
 			isConnected = false;
 			unsubscribe();
 			publisher.clear();
-			console.log(`   ✅ Disconnected`);
 		},
 		getStatus: () => {
-			console.log(`[JobWidgetBridge:${bridgeId}] getStatus() called`);
 			return {
 				connected: isConnected,
 				lastUpdate,
@@ -327,11 +282,9 @@ export function createJobMultiWidgetBridge(
 		filter?: (update: { status: string; result: string | null }) => boolean;
 	}>
 ): JobWidgetBridge {
-	console.log(`\n🌉🌉 [createJobMultiWidgetBridge] Creating multi-bridge for job: ${jobId}`);
-	console.log(`   Number of channels: ${channels.length}`);
+	log.debug(`Creating multi-bridge for job: ${jobId}, channels: ${channels.length}`);
 	
-	const bridges = channels.map((channel, index) => {
-		console.log(`   Creating bridge ${index + 1}/${channels.length} for channel: ${channel.config.channelId}`);
+	const bridges = channels.map((channel) => {
 		return createJobWidgetBridge({
 			jobId,
 			channel: channel.config as any,
@@ -340,18 +293,12 @@ export function createJobMultiWidgetBridge(
 		});
 	});
 
-	console.log(`✅ [createJobMultiWidgetBridge] All bridges created`);
-
 	return {
 		disconnect: () => {
-			console.log(`\n🔌 [createJobMultiWidgetBridge] Disconnecting all bridges for job: ${jobId}`);
-			bridges.forEach((bridge, index) => {
-				console.log(`   Disconnecting bridge ${index + 1}/${bridges.length}`);
-				bridge.disconnect();
-			});
+			log.debug(`Disconnecting all bridges for job: ${jobId}`);
+			bridges.forEach((bridge) => bridge.disconnect());
 		},
 		getStatus: () => {
-			console.log(`[createJobMultiWidgetBridge] getStatus() called for job: ${jobId}`);
 			const statuses = bridges.map((bridge) => bridge.getStatus());
 			return {
 				connected: statuses.some((s) => s.connected),
@@ -381,8 +328,7 @@ export function bridgeJobToMultipleWidgets(
 		filter?: (update: JobUpdate) => boolean;
 	}>
 ): JobWidgetBridge {
-	console.log(`\n🌉🌉 [bridgeJobToMultipleWidgets] Creating multi-bridge for job: ${jobId}`);
-	console.log(`   Number of channels: ${channels.length}`);
+	log.debug(`Creating multi-bridge for job: ${jobId}, channels: ${channels.length}`);
 	
 	const bridges = channels.map((config) =>
 		createJobWidgetBridge({
@@ -393,15 +339,12 @@ export function bridgeJobToMultipleWidgets(
 		})
 	);
 
-	console.log(`✅ [bridgeJobToMultipleWidgets] All bridges created`);
-
 	return {
 		disconnect(): void {
-			console.log(`\n🔌 [bridgeJobToMultipleWidgets] Disconnecting all bridges for job: ${jobId}`);
+			log.debug(`Disconnecting all bridges for job: ${jobId}`);
 			bridges.forEach((bridge) => bridge.disconnect());
 		},
 		getStatus() {
-			console.log(`[bridgeJobToMultipleWidgets] getStatus() called for job: ${jobId}`);
 			const statuses = bridges.map((b) => b.getStatus());
 			return {
 				connected: statuses.some((s) => s.connected),
@@ -424,7 +367,6 @@ export function createParagraphPublisher(
 	channelId: string,
 	publisherId: string
 ): ValidatedPublisher<WidgetDataTypeMap['paragraph']> {
-	console.log(`\n🔧 [createParagraphPublisher] Called for channel: ${channelId}, publisher: ${publisherId}`);
 	return createWidgetPublisher(
 		{
 			channelId,
@@ -446,7 +388,6 @@ export function createParagraphConsumer(
 	channelId: string,
 	consumerId: string
 ): ValidatedConsumer<WidgetDataTypeMap['paragraph']> {
-	console.log(`\n🔧 [createParagraphConsumer] Called for channel: ${channelId}, consumer: ${consumerId}`);
 	return createWidgetConsumer(
 		{
 			channelId,
@@ -474,7 +415,6 @@ export function createReactiveWidgetConsumer<T extends WidgetType>(
 	subscribe: (callback: (data: WidgetDataTypeMap[T] | undefined) => void) => () => void;
 	get: () => WidgetDataTypeMap[T] | undefined;
 } {
-	console.log(`\n🔧 [createReactiveWidgetConsumer] Called for channel: ${config.channelId}, consumer: ${consumerId}`);
 	return createWidgetConsumer(config, consumerId);
 }
 

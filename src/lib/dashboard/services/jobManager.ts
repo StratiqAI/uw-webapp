@@ -4,6 +4,9 @@
  */
 
 import type { Readable } from 'svelte/store';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('jobs');
 
 // ===== Type Definitions =====
 
@@ -151,7 +154,7 @@ export function parseResult(resultStr: string | null): ParsedResult | null {
     }
     return parsed;
   } catch (error) {
-    console.error('Failed to parse result:', error);
+    log.error('Failed to parse result:', error);
     return {
       error: `Failed to parse result: ${error instanceof Error ? error.message : 'Unknown error'}`
     };
@@ -270,7 +273,7 @@ export class JobSubmissionClient {
 
     try {
       const result = await this.submitJobWithRetry(input, idToken);
-      console.log('Job submitted successfully:', result);
+      log.debug('Job submitted successfully:', result);
 
       // Update with actual job ID
       this.currentJobId = result.id;
@@ -368,7 +371,7 @@ export class JobSubmissionClient {
       return response.submitJob;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error(`Job submission attempt ${attempt} failed:`, errorMessage);
+      log.error(`Job submission attempt ${attempt} failed:`, errorMessage);
 
       const isRetryable = !(
         error instanceof JobSubmissionError && error.code === 'INVALID_RESPONSE'
@@ -376,7 +379,7 @@ export class JobSubmissionClient {
 
       if (attempt < this.config.maxRetries && isRetryable) {
         const delay = calculateBackoffDelay(attempt, this.config);
-        console.log(
+        log.debug(
           `Retrying in ${delay}ms (attempt ${attempt + 1}/${this.config.maxRetries})...`
         );
 
@@ -391,7 +394,7 @@ export class JobSubmissionClient {
   }
 
   private async setupSubscription(jobId: string, token: string): Promise<void> {
-    console.log('Setting up subscription for job:', jobId);
+    log.debug('Setting up subscription for job:', jobId);
     this.updateJobState(jobId, { connectionState: CONNECTION_STATES.CONNECTING });
     this.callbacks.onConnectionStateChange?.(CONNECTION_STATES.CONNECTING);
 
@@ -410,7 +413,7 @@ export class JobSubmissionClient {
             return update as JobUpdate;
           }
 
-          console.warn('Invalid update structure:', payload);
+          log.warn('Invalid update structure:', payload);
           return undefined;
         },
         next: (update: JobUpdate) => {
@@ -419,7 +422,7 @@ export class JobSubmissionClient {
             this.addJobUpdate(jobId, update);
 
             if (isTerminalStatus(update.status as JobStatus)) {
-              console.log('Job complete, scheduling subscription cleanup');
+              log.debug('Job complete, scheduling subscription cleanup');
               setTimeout(() => this.cleanupWebSocket(jobId), 1000);
             } else {
               this.startSubscriptionTimeout(jobId);
@@ -432,7 +435,7 @@ export class JobSubmissionClient {
               ? new WebSocketError(error.message, 'SUBSCRIPTION_ERROR')
               : new WebSocketError('Unknown subscription error', 'UNKNOWN_ERROR');
 
-          console.error('Subscription error:', wsError);
+          log.error('Subscription error:', wsError);
           this.handleSubscriptionError(wsError, jobId, token);
         }
       };
@@ -447,14 +450,14 @@ export class JobSubmissionClient {
         reconnectAttempts: 0
       });
       this.callbacks.onConnectionStateChange?.(CONNECTION_STATES.CONNECTED);
-      console.log('✓ Subscription established for job:', jobId);
+      log.debug('✓ Subscription established for job:', jobId);
     } catch (error) {
       const wsError =
         error instanceof Error
           ? new WebSocketError(error.message, 'CONNECTION_ERROR')
           : new WebSocketError('Failed to establish connection', 'UNKNOWN_ERROR');
 
-      console.error('Failed to establish subscription:', wsError);
+      log.error('Failed to establish subscription:', wsError);
       this.handleSubscriptionError(wsError, jobId, token);
     }
   }
@@ -480,7 +483,7 @@ export class JobSubmissionClient {
       this.updateJobState(jobId, { reconnectAttempts: newAttempts });
       const delay = calculateBackoffDelay(newAttempts, this.config);
 
-      console.log(
+      log.debug(
         `Scheduling reconnection attempt ${newAttempts}/${this.config.maxRetries} in ${delay}ms`
       );
 
@@ -488,13 +491,13 @@ export class JobSubmissionClient {
         this.setupSubscription(jobId, token);
       }, delay);
     } else {
-      console.error('Max reconnection attempts reached or job complete, stopping reconnection');
+      log.error('Max reconnection attempts reached or job complete, stopping reconnection');
       this.callbacks.onJobError?.(error);
     }
   }
 
   private addJobUpdate(jobId: string, update: JobUpdate): void {
-    console.log('Adding job update:', {
+    log.debug('Adding job update:', {
       id: update.id,
       status: update.status,
       timestamp: update.updatedAt
@@ -517,7 +520,7 @@ export class JobSubmissionClient {
     this.clearSubscriptionTimeout();
 
     this.networkState.subscriptionTimeout = setTimeout(() => {
-      console.warn(`Subscription timeout for job ${jobId}`);
+      log.warn(`Subscription timeout for job ${jobId}`);
       const idToken = ''; // This would need to be stored or passed
       this.handleSubscriptionError(
         new WebSocketError('Subscription timeout', 'TIMEOUT', false),
@@ -546,7 +549,7 @@ export class JobSubmissionClient {
       try {
         this.removeSubscription(this.networkState.currentSubscription);
       } catch (error) {
-        console.error('Error removing subscription:', error);
+        log.error('Error removing subscription:', error);
       } finally {
         this.networkState.currentSubscription = null;
       }
@@ -616,8 +619,8 @@ export function createJobSubmissionClient(
  *     retryDelay: 1000
  *   },
  *   callbacks: {
- *     onJobComplete: (update) => console.log('Job completed:', update),
- *     onJobError: (error) => console.error('Job error:', error)
+ *     onJobComplete: (update) => { void update; },
+ *     onJobError: (error) => { void error; }
  *   }
  * });
  * 

@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { listNDAAgreements, updateNDAAgreement } from '$lib/deal-room/dealRoomService';
-	import { dealRoomSampleStore } from '$lib/deal-room/stores/dealRoomSampleStore.svelte';
-	import type { NDAAgreement } from '$lib/deal-room/types';
+	import { listNDAAgreements, updateNDAAgreement } from '$lib/dealRoom/dealRoomService';
+	import { dealRoomSampleStore } from '$lib/dealRoom/stores/dealRoomSampleStore.svelte';
+	import type { NDAAgreement } from '$lib/dealRoom/types';
 	import { authStore } from '$lib/stores/auth.svelte';
 
 	interface Props {

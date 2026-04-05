@@ -5,6 +5,9 @@
 	import { S_JOB_UPDATE } from '$lib/services/realtime/graphql/subscriptions/Job';
 	import { jobUpdateStore, type JobUpdate } from '$lib/stores/jobUpdateStore.svelte';
 	import type { SubscriptionSpec } from '$lib/services/realtime/websocket/types';
+	import { createLogger } from '$lib/utils/logger';
+
+	const log = createLogger('ai');
 
 	// ===== Type and Variables Related to Job Status =====
 
@@ -258,7 +261,7 @@
 			}
 			return parsed;
 		} catch (error) {
-			console.error('Failed to parse result:', error);
+			log.error('Failed to parse result:', error);
 			return {
 				error: `Failed to parse result: ${error instanceof Error ? error.message : 'Unknown error'}`
 			};
@@ -277,7 +280,7 @@
 				timeStyle: 'medium'
 			}).format(date);
 		} catch (error) {
-			console.error('Date formatting error:', error);
+			log.error('Date formatting error:', error);
 			return dateStr; // Return original string if formatting fails
 		}
 	}
@@ -308,7 +311,7 @@
 			return response.submitJob;
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-			console.error(`Job submission attempt ${attempt} failed:`, errorMessage);
+			log.error(`Job submission attempt ${attempt} failed:`, errorMessage);
 
 			// Check if error is retryable
 			const isRetryable = !(
@@ -317,7 +320,7 @@
 
 			if (attempt < config.options.maxRetries && isRetryable) {
 				const delay = calculateBackoffDelay(attempt);
-				console.log(
+				log.debug(
 					`Retrying in ${delay}ms (attempt ${attempt + 1}/${config.options.maxRetries})...`
 				);
 
@@ -333,13 +336,13 @@
 
 	// ===== WebSocket Management with Enhanced Error Handling =====
 	function addJobUpdate(jobId: string, update: JobUpdate): void {
-		console.log('Adding job update:', {
+		log.debug('Adding job update:', {
 			id: update.id,
 			status: update.status,
 			timestamp: update.updatedAt
 		});
 
-		console.log('Adding job update to store:', update);
+		log.debug('Adding job update to store:', update);
 		// Write to store (store handles duplicate prevention)
 		jobUpdateStore.addJobUpdate(jobId, update);
 
@@ -358,7 +361,7 @@
 		clearSubscriptionTimeout();
 
 		networkState.subscriptionTimeout = setTimeout(() => {
-			console.warn(`Subscription timeout for job ${jobId}`);
+			log.warn(`Subscription timeout for job ${jobId}`);
 			handleSubscriptionError(
 				new WebSocketError('Subscription timeout', 'TIMEOUT', false),
 				jobId,
@@ -375,7 +378,7 @@
 	}
 
 	async function setupSubscription(jobId: string, token: string): Promise<void> {
-		console.log('Setting up subscription for job:', jobId);
+		log.debug('Setting up subscription for job:', jobId);
 		jobUpdateStore.updateJobState(jobId, { connectionState: CONNECTION_STATES.CONNECTING });
 
 		try {
@@ -399,7 +402,7 @@
 						return update as JobUpdate;
 					}
 
-					console.warn('Invalid update structure:', payload);
+					log.warn('Invalid update structure:', payload);
 					return undefined;
 				},
 				next: (update: JobUpdate) => {
@@ -409,7 +412,7 @@
 
 						// Auto-disconnect if job is complete
 						if (isTerminalStatus(update.status as JobStatus)) {
-							console.log('Job complete, scheduling subscription cleanup');
+							log.debug('Job complete, scheduling subscription cleanup');
 							setTimeout(() => cleanupWebSocket(jobId), 1000);
 						} else {
 							startSubscriptionTimeout(jobId); // Restart timeout for next update
@@ -422,7 +425,7 @@
 							? new WebSocketError(error.message, 'SUBSCRIPTION_ERROR')
 							: new WebSocketError('Unknown subscription error', 'UNKNOWN_ERROR');
 
-					console.error('Subscription error:', wsError);
+					log.error('Subscription error:', wsError);
 					handleSubscriptionError(wsError, jobId, token);
 				}
 			};
@@ -438,14 +441,14 @@
 				connectionState: CONNECTION_STATES.CONNECTED,
 				reconnectAttempts: 0
 			});
-			console.log('✓ Subscription established for job:', jobId);
+			log.debug('✓ Subscription established for job:', jobId);
 		} catch (error) {
 			const wsError =
 				error instanceof Error
 					? new WebSocketError(error.message, 'CONNECTION_ERROR')
 					: new WebSocketError('Failed to establish connection', 'UNKNOWN_ERROR');
 
-			console.error('Failed to establish subscription:', wsError);
+			log.error('Failed to establish subscription:', wsError);
 			handleSubscriptionError(wsError, jobId, token);
 		}
 	}
@@ -470,7 +473,7 @@
 			jobUpdateStore.updateJobState(jobId, { reconnectAttempts: newAttempts });
 			const delay = calculateBackoffDelay(newAttempts);
 
-			console.log(
+			log.debug(
 				`Scheduling reconnection attempt ${newAttempts}/${config.options.maxRetries} in ${delay}ms`
 			);
 
@@ -478,7 +481,7 @@
 				setupSubscription(jobId, token);
 			}, delay);
 		} else {
-			console.error('Max reconnection attempts reached or job complete, stopping reconnection');
+			log.error('Max reconnection attempts reached or job complete, stopping reconnection');
 			onJobError?.(error);
 		}
 	}
@@ -496,7 +499,7 @@
 			try {
 				removeSubscription(networkState.currentSubscription);
 			} catch (error) {
-				console.error('Error removing subscription:', error);
+				log.error('Error removing subscription:', error);
 			} finally {
 				networkState.currentSubscription = null;
 			}
@@ -560,7 +563,7 @@
 
 		try {
 			const result = await submitJobWithRetry(config.job.input, config.auth.idToken);
-			console.log('Job submitted successfully:', result);
+			log.debug('Job submitted successfully:', result);
 
 			// Update with actual job ID
 			currentJobId = result.id;
@@ -591,7 +594,7 @@
 				error: jobError,
 				loading: false
 			});
-			console.error('Job submission failed:', jobError);
+			log.error('Job submission failed:', jobError);
 			onJobError?.(jobError);
 		}
 	}
@@ -600,7 +603,7 @@
 	onMount(() => {
 		// Set up performance monitoring in dev
 		if (import.meta.env.DEV) {
-			console.log('Job Submission Component mounted', {
+			log.debug('Job Submission Component mounted', {
 				config: {
 					maxRetries: config.options.maxRetries,
 					retryDelay: config.options.retryDelay,
@@ -618,7 +621,7 @@
 		clearSubscriptionTimeout();
 
 		if (import.meta.env.DEV) {
-			console.log('Job Submission Component destroyed');
+			log.debug('Job Submission Component destroyed');
 		}
 	});
 

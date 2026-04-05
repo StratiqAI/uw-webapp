@@ -4,6 +4,9 @@
 	import { print } from 'graphql';
 	import { goto } from '$app/navigation';
 	import { gql } from '$lib/services/realtime/graphql/requestHandler';
+	import { createLogger } from '$lib/utils/logger';
+
+	const log = createLogger('dashboard');
 
 	interface Props {
 		projects: Project[];
@@ -75,7 +78,7 @@
 				idToken
 			);
 		} catch (err) {
-			console.error('Failed to rename project:', err);
+			log.error('Failed to rename project:', err);
 		} finally {
 			isSaving = false;
 			renamingId = null;

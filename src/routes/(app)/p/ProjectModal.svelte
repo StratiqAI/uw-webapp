@@ -5,6 +5,9 @@
 	import { M_CREATE_PROJECT, M_UPDATE_PROJECT } from '@stratiqai/types-simple';
 	import { print } from 'graphql';
 	import { goto } from '$app/navigation';
+	import { createLogger } from '$lib/utils/logger';
+
+	const log = createLogger('projects');
 
 	// Using imported mutations from Project.ts
 	let { open = $bindable(true), data, idToken }: UserModalProps = $props();
@@ -55,7 +58,7 @@
 				);
 				
 				if (!projectRes.updateProject) {
-					console.error('Project update returned null project');
+					log.error('Project update returned null project');
 					alert('Error updating project: No project returned');
 					return;
 				}
@@ -73,7 +76,7 @@
 				);
 				
 				if (!projectRes.createProject) {
-					console.error('Project creation returned null project');
+					log.error('Project creation returned null project');
 					alert('Error creating project: No project returned');
 					return;
 				}
@@ -105,7 +108,7 @@
 			open = false;
 			await goto(`/p/${projectId}/docs`);
 		} catch (err) {
-			console.error('Error saving project:', err);
+			log.error('Error saving project:', err);
 			alert('Error saving project');
 		}
 	}

@@ -16,6 +16,9 @@ import { print } from 'graphql';
 
 // Types
 import type { Project } from '@stratiqai/types-simple';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('app');
 
 // Server-side load
 export const load: PageServerLoad = async ({ cookies, url }) => {
@@ -51,7 +54,7 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
 			scope
 		};
 	} catch (err: any) {
-		console.error('Error loading data:', err);
+		log.error('Error loading data:', err);
 		if (err?.status) {
 			throw err;
 		}

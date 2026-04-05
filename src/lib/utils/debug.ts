@@ -1,11 +1,13 @@
-/**
- * Debug logging function that only logs if PUBLIC_LOG_LEVEL is set to 'DEBUG'.
- * @param args - The arguments to log.
- */
-import { PUBLIC_LOG_LEVEL } from '$env/static/public';
+import { createLogger } from './logger';
 
+const legacyLogger = createLogger('legacy');
+
+/**
+ * @deprecated Use `createLogger(namespace)` from `$lib/utils/logger` instead.
+ *
+ * Legacy debug logging function preserved for backward compatibility.
+ * Delegates to `createLogger('legacy').debug(...)`.
+ */
 export function logger(...args: any[]) {
-	if (PUBLIC_LOG_LEVEL === 'DEBUG') {
-		console.log(...args);
-	}
+	legacyLogger.debug(...args);
 }

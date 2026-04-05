@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
-	import { dealRoomSampleStore } from '$lib/deal-room/stores/dealRoomSampleStore.svelte';
+	import { dealRoomSampleStore } from '$lib/dealRoom/stores/dealRoomSampleStore.svelte';
 	import {
 		DealDashboard,
 		NdaGate,
@@ -9,7 +9,7 @@
 		QAndATab,
 		AnnouncementsTab,
 		AnalyticsTab
-	} from '$lib/deal-room/components';
+	} from '$lib/dealRoom/components';
 
 	let { data } = $props();
 

@@ -14,6 +14,9 @@ import { createWidgetPublisher, getWidgetData } from '$lib/dashboard/utils/widge
 import { getDefaultDataForWidget } from '$lib/dashboard/setup/defaultDashboardValues';
 import type { Widget, WidgetType } from '$lib/dashboard/types/widget';
 import { PUBLIC_GEOAPIFY_API_KEY } from '$env/static/public';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('widgets');
 
 export interface PublishWidgetDataOptions {
 	/** When true, skip widgets that already have data in the store (e.g. after restore from localStorage) */
@@ -235,7 +238,7 @@ const widgetInitialData: Record<string, unknown> = {
  */
 export function publishWidgetData(widgets: Widget[], options?: PublishWidgetDataOptions): void {
 	const onlyIfMissing = options?.onlyIfMissing ?? false;
-	console.log('📡 [Widget Data Publishers] Publishing to ValidatedTopicStore...', onlyIfMissing ? '(only if missing)' : '');
+	log.debug('Publishing to ValidatedTopicStore', onlyIfMissing ? '(only if missing)' : '');
 
 	let published = 0;
 	for (const widget of widgets) {
@@ -252,15 +255,15 @@ export function publishWidgetData(widgets: Widget[], options?: PublishWidgetData
 			const ok = publisher.publish(data);
 			if (ok) {
 				published++;
-				console.log(`   ✅ ${widget.id} (${widget.type})`);
+				log.debug(`${widget.id} (${widget.type})`);
 			} else {
-				console.warn(`   ⚠️  Validation failed for ${widget.id} (${widget.type})`);
+				log.warn(`Validation failed for ${widget.id} (${widget.type})`);
 			}
 		} catch (error) {
-			console.error(`   ❌ Failed to publish for ${widget.id}:`, error);
+			log.error(`Failed to publish for ${widget.id}:`, error);
 		}
 	}
 
-	console.log(`✅ [Widget Data Publishers] Published ${published}/${widgets.length} widgets`);
+	log.info(`Published ${published}/${widgets.length} widgets`);
 }
 

@@ -28,6 +28,10 @@
 -->
 
 <script lang="ts">
+	import { createLogger } from '$lib/utils/logger';
+
+	const log = createLogger('workflows');
+
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import { generateId } from '../utils/idGenerator';
 	import WorkflowSidebar from '../components/layout/WorkflowSidebar.svelte';
@@ -183,7 +187,7 @@
 					setupSubscriptions: true
 				});
 			} catch (error) {
-				console.error('Failed to initialize WorkflowSyncManager:', error);
+				log.error('Failed to initialize WorkflowSyncManager:', error);
 			}
 		}
 	});
@@ -220,7 +224,7 @@
 		const wfId = selectedWorkflowId;
 		const projectId = selectedProjectId;
 		const token = data.idToken;
-		console.log('[loadWorkflowExecutions] Loading executions:', { wfId, projectId, token });
+		log.debug('[loadWorkflowExecutions] Loading executions:', { wfId, projectId, token });
 		if (!wfId || !projectId || !token) {
 			executions = [];
 			return;
@@ -228,12 +232,12 @@
 
 		executionsLoading = true;
 		try {
-			console.log('[loadWorkflowExecutions] Loading executions:', { wfId, projectId });
+			log.debug('[loadWorkflowExecutions] Loading executions:', { wfId, projectId });
 			const { items } = await fetchWorkflowExecutions(wfId, projectId, token);
-			console.log('[loadWorkflowExecutions] Loaded executions:', { count: items.length, items });
+			log.debug('[loadWorkflowExecutions] Loaded executions:', { count: items.length, items });
 			executions = items;
 		} catch (e) {
-			console.error('Failed to load workflow executions:', e);
+			log.error('Failed to load workflow executions:', e);
 			executions = [];
 		} finally {
 			executionsLoading = false;
@@ -266,8 +270,8 @@
 			const workflowItems = project?.workflows?.items || [];
 			const executionItems = project?.workflowexecutions?.items || [];
 			
-			console.log('Loaded workflows for project:', projectId, workflowItems);
-			console.log('Loaded workflow executions for project:', projectId, executionItems.length, executionItems);
+			log.debug('Loaded workflows for project:', projectId, workflowItems);
+			log.debug('Loaded workflow executions for project:', projectId, executionItems.length, executionItems);
 			
 			workflows = workflowItems;
 
@@ -276,16 +280,16 @@
 				for (const execution of executionItems) {
 					const topic = toTopicPath('workflowExecutions', execution.id);
 					const published = validatedTopicStore.publish(topic, execution);
-					console.log(`[loadWorkflowsForProject] Published execution ${execution.id} to ${topic}:`, published, execution);
+					log.debug(`[loadWorkflowsForProject] Published execution ${execution.id} to ${topic}:`, published, execution);
 				}
-				console.log(`[loadWorkflowsForProject] Published ${executionItems.length} workflow executions to store`);
+				log.debug(`[loadWorkflowsForProject] Published ${executionItems.length} workflow executions to store`);
 				
 				// Verify they're in the store
 				const stored = validatedTopicStore.getAllAtArray<WorkflowExecution>('workflowExecutions');
-				console.log(`[loadWorkflowsForProject] Verified: ${stored.length} executions now in store:`, stored.map(e => ({ id: e.id, parentId: e.parentId })));
+				log.debug(`[loadWorkflowsForProject] Verified: ${stored.length} executions now in store:`, stored.map(e => ({ id: e.id, parentId: e.parentId })));
 			}
 		} catch (error) {
-			console.error('Failed to load workflows:', error);
+			log.error('Failed to load workflows:', error);
 			workflows = [];
 		} finally {
 			loadingWorkflows = false;
@@ -509,7 +513,7 @@
 					workflowJsonSchemaId = (workflow as any).jsonSchemaId;
 				}
 			} else {
-				console.error('Workflow has no ui or definition (expected definition.nodes and definition.edges)');
+				log.error('Workflow has no ui or definition (expected definition.nodes and definition.edges)');
 				return;
 			}
 
@@ -531,7 +535,7 @@
 				}
 
 				if (!elementType) {
-					console.warn(`Could not find element type for: ${elData.type} (category: ${elData.category})`);
+					log.warn(`Could not find element type for: ${elData.type} (category: ${elData.category})`);
 					continue;
 				}
 
@@ -591,7 +595,7 @@
 										gridElement.aiQueryData.responseFormat = { type: 'json_schema' as const, schema: schemaObj };
 									}
 								} catch (e) {
-									console.warn('Failed to fetch node JsonSchema:', config.jsonSchemaId, e);
+									log.warn('Failed to fetch node JsonSchema:', config.jsonSchemaId, e);
 								}
 							}
 							}
@@ -628,11 +632,11 @@
 						outputSchema = typeof raw === 'string' ? JSON.parse(raw) : raw;
 					}
 				} catch (e) {
-					console.warn('Failed to fetch workflow JsonSchema:', workflowJsonSchemaId, e);
+					log.warn('Failed to fetch workflow JsonSchema:', workflowJsonSchemaId, e);
 				}
 			}
 		} catch (error) {
-			console.error('Failed to load workflow into canvas:', error);
+			log.error('Failed to load workflow into canvas:', error);
 			toastStore.error(`Error loading workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
 		}
 	}
@@ -666,20 +670,20 @@
 	// ------------------------------------------------------------------------------------------------
 	async function handleDeleteWorkflow(workflowId: string) {
 		if (!data.idToken) {
-			console.error('No authentication token available');
+			log.error('No authentication token available');
 			toastStore.error('Not authenticated. Please refresh the page.');
 			return;
 		}
 
 		if (!selectedProjectId) {
-			console.error('No project selected');
+			log.error('No project selected');
 			toastStore.error('Please select a project before deleting the workflow.');
 			return;
 		}
 
 		const workflow = workflows.find((w) => w.id === workflowId);
 		if (!workflow) {
-			console.error('Workflow not found:', workflowId);
+			log.error('Workflow not found:', workflowId);
 			return;
 		}
 
@@ -697,7 +701,7 @@
 			);
 
 			if (!response.deleteWorkflow) {
-				console.error('Workflow deletion returned null');
+				log.error('Workflow deletion returned null');
 				toastStore.error('Error deleting workflow: No workflow returned');
 				return;
 			}
@@ -712,9 +716,9 @@
 				connections = [];
 			}
 
-			console.log('Workflow deleted successfully:', response.deleteWorkflow);
+			log.debug('Workflow deleted successfully:', response.deleteWorkflow);
 		} catch (error) {
-			console.error('Failed to delete workflow:', error);
+			log.error('Failed to delete workflow:', error);
 			toastStore.error(`Error deleting workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
 			throw error;
 		}
@@ -725,20 +729,20 @@
 	// ------------------------------------------------------------------------------------------------
 	async function handleRenameWorkflow(workflowId: string, newName: string) {
 		if (!data.idToken) {
-			console.error('No authentication token available');
+			log.error('No authentication token available');
 			toastStore.error('Not authenticated. Please refresh the page.');
 			return;
 		}
 
 		if (!selectedProjectId) {
-			console.error('No project selected');
+			log.error('No project selected');
 			toastStore.error('Please select a project before renaming the workflow.');
 			return;
 		}
 
 		const workflow = workflows.find((w) => w.id === workflowId);
 		if (!workflow) {
-			console.error('Workflow not found:', workflowId);
+			log.error('Workflow not found:', workflowId);
 			return;
 		}
 
@@ -773,7 +777,7 @@
 			);
 
 			if (!response.updateWorkflow) {
-				console.error('Workflow update returned null');
+				log.error('Workflow update returned null');
 				toastStore.error('Error renaming workflow: No workflow returned');
 				return;
 			}
@@ -789,9 +793,9 @@
 				workflows = [...workflows];
 			}
 
-			console.log('Workflow renamed successfully:', response.updateWorkflow);
+			log.debug('Workflow renamed successfully:', response.updateWorkflow);
 		} catch (error) {
-			console.error('Failed to rename workflow:', error);
+			log.error('Failed to rename workflow:', error);
 			toastStore.error(`Error renaming workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
 			throw error; // Re-throw so the component can handle it
 		}
@@ -802,7 +806,7 @@
 	// ------------------------------------------------------------------------------------------------
 	async function saveWorkflow() {
 		if (!data.idToken) {
-			console.error('No authentication token available');
+			log.error('No authentication token available');
 			toastStore.error('Not authenticated. Please refresh the page.');
 			return;
 		}
@@ -879,7 +883,7 @@
 				);
 
 				if (!response.updateWorkflow) {
-					console.error('Workflow update returned null');
+					log.error('Workflow update returned null');
 					toastStore.error('Error updating workflow: No workflow returned');
 					return;
 				}
@@ -894,7 +898,7 @@
 					workflows = [...workflows]; // Trigger reactivity
 				}
 
-				console.log('Workflow updated successfully:', response.updateWorkflow);
+				log.debug('Workflow updated successfully:', response.updateWorkflow);
 				toastStore.success('Workflow updated successfully!');
 			} else {
 				// Create new workflow
@@ -908,7 +912,7 @@
 					input.jsonSchemaId = resolvedSchemaId;
 				}
 
-				console.log('[saveWorkflow] Creating new workflow:', { input });
+				log.debug('[saveWorkflow] Creating new workflow:', { input });
 
 				const response = await gql<CreateWorkflowMutation>(
 					M_CREATE_WORKFLOW,
@@ -917,7 +921,7 @@
 				);
 
 				if (!response.createWorkflow) {
-					console.error('Workflow creation returned null');
+					log.error('Workflow creation returned null');
 					toastStore.error('Error saving workflow: No workflow returned');
 					return;
 				}
@@ -931,11 +935,11 @@
 					await goto(`/p/${selectedProjectId}/workflows/${response.createWorkflow.id}`, { replaceState: true });
 				}
 
-				console.log('Workflow created successfully:', response.createWorkflow);
+				log.debug('Workflow created successfully:', response.createWorkflow);
 				toastStore.success('Workflow created successfully!');
 			}
 		} catch (error) {
-			console.error('Failed to save workflow:', error);
+			log.error('Failed to save workflow:', error);
 			toastStore.error(`Error saving workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
 		}
 	}
@@ -1047,7 +1051,7 @@
 					workflowExecutionOutput = null;
 				}
 			} catch (err) {
-				console.error('[Workflow] Failed to load selected execution node statuses:', err);
+				log.error('[Workflow] Failed to load selected execution node statuses:', err);
 			}
 		})();
 		return () => {
@@ -1074,7 +1078,7 @@
 		const execUnsub = validatedTopicStore.subscribe('workflowExecutions/+', (value: unknown, topic?: string) => {
 			const exec = (value as any)?.data || (value as any);
 			const updateType = exec?.status ? `STATUS_${exec.status}` : 'UPDATE';
-			console.log('[Workflow Execution Subscription] Store Update Received - WORKFLOW_EXECUTION:', {
+			log.debug('[Workflow Execution Subscription] Store Update Received - WORKFLOW_EXECUTION:', {
 				entityType: 'WORKFLOW_EXECUTION',
 				subscriptionType: 'validatedTopicStore.subscribe',
 				subscriptionOperation: updateType,
@@ -1093,12 +1097,12 @@
 							? JSON.parse(exec.outputData) 
 							: exec.outputData;
 						workflowExecutionOutput = parsed;
-						console.log('[Workflow Execution Subscription] Stored workflow output:', {
+						log.debug('[Workflow Execution Subscription] Stored workflow output:', {
 							executionId: exec.id,
 							outputData: workflowExecutionOutput
 						});
 					} catch (err) {
-						console.error('[Workflow Execution Subscription] Failed to parse outputData:', err);
+						log.error('[Workflow Execution Subscription] Failed to parse outputData:', err);
 						workflowExecutionOutput = exec.outputData;
 					}
 				} else if (exec.status === 'FAILED' || exec.status === 'CANCELLED') {
@@ -1134,7 +1138,7 @@
 			const parentId = raw?.parentId ?? (value as any)?.parentId;
 
 			const updateType = status ? `STATUS_${status}` : 'UNKNOWN';
-			console.log('[Node Execution Subscription] Store Update Received - WORKFLOW_NODE_EXECUTION:', {
+			log.debug('[Node Execution Subscription] Store Update Received - WORKFLOW_NODE_EXECUTION:', {
 				entityType: 'WORKFLOW_NODE_EXECUTION',
 				subscriptionType: 'validatedTopicStore.subscribe',
 				subscriptionOperation: updateType,
@@ -1149,7 +1153,7 @@
 
 			// Only apply when we have the fields needed to update the canvas
 			if (!nodeId || !status) {
-				console.warn('[Node Execution Subscription] Missing nodeId or status:', { nodeId, status, value: raw });
+				log.warn('[Node Execution Subscription] Missing nodeId or status:', { nodeId, status, value: raw });
 				return;
 			}
 			// If parentId is present, must match current execution; if absent (e.g. enriched payload), apply for current execution
@@ -1158,7 +1162,7 @@
 			}
 
 			const matchingElement = gridElements.find((el) => el.id === nodeId);
-			console.log('[Node Execution Subscription] Applying node execution status:', {
+			log.debug('[Node Execution Subscription] Applying node execution status:', {
 				nodeId,
 				status,
 				executionId: currentExecutionId,
@@ -1227,19 +1231,19 @@
 				workflowExecutionOutput = null;
 			}
 		} catch (err) {
-			console.error('[Workflow] Failed to show labels:', err);
+			log.error('[Workflow] Failed to show labels:', err);
 		}
 	}
 
 	async function executeWorkflow() {
 		if (!selectedWorkflowId || !selectedProjectId || !data.idToken) {
-			console.error('Cannot execute workflow: missing workflowId, projectId, or idToken');
+			log.error('Cannot execute workflow: missing workflowId, projectId, or idToken');
 			toastStore.error('Cannot execute workflow: ensure a workflow is selected and you are authenticated.');
 			return;
 		}
 
 		if (isExecutingWorkflow) {
-			console.log('Workflow execution already in progress');
+			log.debug('Workflow execution already in progress');
 			return;
 		}
 
@@ -1248,7 +1252,7 @@
 			// Clear previous execution state
 			clearExecutionState();
 			
-			console.log('Starting workflow execution', {
+			log.debug('Starting workflow execution', {
 				workflowId: selectedWorkflowId,
 				projectId: selectedProjectId,
 			});
@@ -1269,7 +1273,7 @@
 				throw new Error('No execution returned from mutation');
 			}
 
-			console.log('Workflow execution started successfully', {
+			log.debug('Workflow execution started successfully', {
 				executionId: execution.id,
 				status: execution.status,
 			});
@@ -1285,9 +1289,9 @@
 					await workflowSyncManager.syncWorkflowNodeExecutionList(execution.id, {
 						setupSubscriptions: true
 					});
-					console.log('Node execution subscriptions set up for execution:', execution.id);
+					log.debug('Node execution subscriptions set up for execution:', execution.id);
 				} catch (err) {
-					console.error('Failed to set up node execution subscriptions:', err);
+					log.error('Failed to set up node execution subscriptions:', err);
 				}
 			}
 
@@ -1295,9 +1299,9 @@
 			await loadWorkflowExecutions();
 
 			toastStore.success('Workflow execution started.');
-			console.log('✅ Workflow execution started:', execution.id);
+			log.debug('✅ Workflow execution started:', execution.id);
 		} catch (error) {
-			console.error('Failed to start workflow execution:', error);
+			log.error('Failed to start workflow execution:', error);
 			toastStore.error(
 				`Failed to start workflow execution: ${error instanceof Error ? error.message : String(error)}`
 			);

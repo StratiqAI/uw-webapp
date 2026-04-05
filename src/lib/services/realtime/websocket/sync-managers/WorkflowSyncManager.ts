@@ -30,6 +30,9 @@ import { EntitySyncManager } from '$lib/services/realtime/store/EntitySyncManage
 import type { EntitySyncOptions, EntitySyncResult } from '$lib/services/realtime/store/EntitySyncConfig';
 import { createWorkflowSyncConfig, createEntitySyncConfig } from '$lib/services/realtime/store/EntitySyncHelpers';
 import { toTopicPath } from '$lib/services/realtime/store/TopicMapper';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('sync');
 
 // Re-export the specific store used by this manager
 export const store = validatedTopicStore;
@@ -37,7 +40,7 @@ export const store = validatedTopicStore;
 // Expose dumpStore function to browser console for debugging
 if (browser && typeof window !== 'undefined') {
 	(window as any).dumpWorkflowStore = () => {
-		console.log('ValidatedTopicStore workflow contents:', store.toJSON());
+		log.debug('ValidatedTopicStore workflow contents:', store.toJSON());
 		return store.toJSON();
 	};
 }
@@ -434,11 +437,11 @@ export class WorkflowSyncManager {
 		this.#ensureReady();
 
 		if (this.nodeExecutionSubscriptions.has(workflowExecutionId)) {
-			console.log('[WorkflowSyncManager] Node execution subscription already exists for:', workflowExecutionId);
+			log.debug('Node execution subscription already exists for:', workflowExecutionId);
 			return;
 		}
 
-		console.log('[WorkflowSyncManager] Setting up node execution subscription for:', workflowExecutionId);
+		log.debug('Setting up node execution subscription for:', workflowExecutionId);
 
 		const spec: SubscriptionSpec<any> = {
 			query: S_ON_WORKFLOW_NODE_EXECUTION_STATUS_CHANGE,
@@ -446,7 +449,7 @@ export class WorkflowSyncManager {
 			next: (payload: any) => {
 				const subscriptionType = 'onWorkflowNodeExecutionStatusChange';
 				const nodeExec = payload?.onWorkflowNodeExecutionStatusChange;
-				console.log('[WorkflowSyncManager] GraphQL Subscription Update Received - WORKFLOW_NODE_EXECUTION:', {
+				log.debug('GraphQL Subscription Update Received - WORKFLOW_NODE_EXECUTION:', {
 					entityType: 'WORKFLOW_NODE_EXECUTION',
 					subscriptionType,
 					subscriptionOperation: 'STATUS_CHANGE',
@@ -457,7 +460,7 @@ export class WorkflowSyncManager {
 				});
 				if (nodeExec && nodeExec.parentId === workflowExecutionId) {
 					const topicPath = toTopicPath('workflowNodeExecutions', nodeExec.id);
-					console.log('[WorkflowSyncManager] Publishing WORKFLOW_NODE_EXECUTION to store:', {
+					log.debug('Publishing WORKFLOW_NODE_EXECUTION to store:', {
 						entityType: 'WORKFLOW_NODE_EXECUTION',
 						subscriptionType,
 						subscriptionOperation: 'STATUS_CHANGE',
@@ -470,7 +473,7 @@ export class WorkflowSyncManager {
 					store.publish(topicPath, nodeExec);
 					this.#recordEvent('workflowNodeExecution', 'statusChange', nodeExec.id, nodeExec);
 				} else {
-					console.warn('[WorkflowSyncManager] Node execution parentId mismatch or missing:', {
+					log.warn('Node execution parentId mismatch or missing:', {
 						subscriptionType,
 						subscriptionOperation: 'STATUS_CHANGE',
 						expected: workflowExecutionId,
@@ -480,7 +483,7 @@ export class WorkflowSyncManager {
 				}
 			},
 			error: (e: any) => {
-				console.error('[WorkflowSyncManager] Node execution subscription error:', e);
+				log.error('Node execution subscription error:', e);
 				this.#recordEvent(
 					'workflowNodeExecution',
 					'statusChange',
@@ -493,7 +496,7 @@ export class WorkflowSyncManager {
 
 		this.subscriptionClient!.addSubscription(spec);
 		this.nodeExecutionSubscriptions.set(workflowExecutionId, spec);
-		console.log('[WorkflowSyncManager] Node execution subscription added successfully for:', workflowExecutionId);
+		log.debug('Node execution subscription added successfully for:', workflowExecutionId);
 	}
 
 	/**
@@ -563,7 +566,7 @@ export class WorkflowSyncManager {
 			try {
 				listener(event);
 			} catch (err) {
-				console.error('Error in subscription event listener:', err);
+				log.error('Error in subscription event listener:', err);
 			}
 		});
 	}

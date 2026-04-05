@@ -8,6 +8,9 @@
 	} from '@stratiqai/types-simple';
 	import { fetchWorkflowExecutionDetail } from '../../services/backend/workflowExecutionService';
 	import type { WorkflowExecution, WorkflowNodeExecution } from '@stratiqai/types-simple';
+	import { createLogger } from '$lib/utils/logger';
+
+	const log = createLogger('workflows');
 
 	const { executionId, workflowId, idToken, projectId, darkMode = false, onClose }: {
 		executionId: string;
@@ -57,27 +60,27 @@
 
 	onMount(async () => {
 		if (!executionId || !workflowId || !idToken) {
-			console.error('[WorkflowExecutionDetailModal] Missing executionId, workflowId, or idToken', { executionId, workflowId, hasToken: !!idToken });
+			log.error('[WorkflowExecutionDetailModal] Missing executionId, workflowId, or idToken', { executionId, workflowId, hasToken: !!idToken });
 			return;
 		}
 
 		loading = true;
 		error = null;
-		console.log('[WorkflowExecutionDetailModal] Fetching execution:', { executionId, workflowId, projectId });
+		log.debug('[WorkflowExecutionDetailModal] Fetching execution:', { executionId, workflowId, projectId });
 		try {
 			const result = await fetchWorkflowExecutionDetail(executionId, workflowId, idToken);
-			console.log('[WorkflowExecutionDetailModal] Fetched execution:', result);
+			log.debug('[WorkflowExecutionDetailModal] Fetched execution:', result);
 			if (result) {
-				console.log('[WorkflowExecutionDetailModal] Node executions count:', result.nodeExecutions?.items?.length ?? 0);
-				console.log('[WorkflowExecutionDetailModal] Node executions:', result.nodeExecutions?.items);
+				log.debug('[WorkflowExecutionDetailModal] Node executions count:', result.nodeExecutions?.items?.length ?? 0);
+				log.debug('[WorkflowExecutionDetailModal] Node executions:', result.nodeExecutions?.items);
 			}
 			execution = result;
 			if (!result) {
 				error = 'Execution not found';
-				console.warn('[WorkflowExecutionDetailModal] Execution returned null');
+				log.warn('[WorkflowExecutionDetailModal] Execution returned null');
 			}
 		} catch (e) {
-			console.error('[WorkflowExecutionDetailModal] Error fetching execution:', e);
+			log.error('[WorkflowExecutionDetailModal] Error fetching execution:', e);
 			error = e instanceof Error ? e.message : 'Failed to load execution';
 		} finally {
 			loading = false;
@@ -97,7 +100,7 @@
 					execution = { ...execution, ...data };
 				}
 			},
-			error: (e) => console.error('onUpdateWorkflowExecution sub', e)
+			error: (e) => log.error('onUpdateWorkflowExecution sub', e)
 		});
 		unsubscribes.push(() => h1.unsubscribe());
 
@@ -114,7 +117,7 @@
 					};
 				}
 			},
-			error: (e) => console.error('onWorkflowNodeExecutionStatusChange sub', e)
+			error: (e) => log.error('onWorkflowNodeExecutionStatusChange sub', e)
 		});
 		unsubscribes.push(() => h2.unsubscribe());
 	});
@@ -137,7 +140,7 @@
 				try {
 					parsedOutputData = JSON.parse(node.outputData);
 				} catch (e) {
-					console.warn('[WorkflowExecutionDetailModal] Failed to parse node outputData:', e);
+					log.warn('[WorkflowExecutionDetailModal] Failed to parse node outputData:', e);
 				}
 			}
 			

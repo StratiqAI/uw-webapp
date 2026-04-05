@@ -44,6 +44,9 @@ import type { IGraphQLQueryClient } from './GraphQLQueryClient';
 import type { AppSyncWsClient } from '../websocket/wsClient';
 import type { EntitySyncConfig, EntitySyncOptions, EntitySyncResult } from './EntitySyncConfig';
 import { toTopicPath } from './TopicMapper';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('sync');
 
 /**
  * ValidatedTopicStore interface (to avoid circular dependency)
@@ -220,7 +223,7 @@ export class EntitySyncManager<T extends { id: string } = any> {
 						: this.config.entityType === 'workflowExecutions'
 						? 'WORKFLOW_EXECUTION'
 						: this.config.entityType.toUpperCase();
-					console.log(`[EntitySyncManager] GraphQL Subscription Update Received - ${entityTypeLabel}:`, {
+					log.debug(`[EntitySyncManager] GraphQL Subscription Update Received - ${entityTypeLabel}:`, {
 						entityType: entityTypeLabel,
 						subscriptionType,
 						subscriptionOperation: 'UPDATE',
@@ -231,7 +234,7 @@ export class EntitySyncManager<T extends { id: string } = any> {
 					});
 					const topic = toTopicPath(this.config.entityType, entityId);
 					this.store.publish(topic, updatedEntity);
-					console.log(`[EntitySyncManager] Published ${entityTypeLabel} to store:`, {
+					log.debug(`[EntitySyncManager] Published ${entityTypeLabel} to store:`, {
 						entityType: entityTypeLabel,
 						subscriptionType,
 						subscriptionOperation: 'UPDATE',
@@ -270,7 +273,7 @@ export class EntitySyncManager<T extends { id: string } = any> {
 						: this.config.entityType === 'workflowExecutions'
 						? 'WORKFLOW_EXECUTION'
 						: this.config.entityType.toUpperCase();
-					console.log(`[EntitySyncManager] GraphQL Subscription Update Received - ${entityTypeLabel}:`, {
+					log.debug(`[EntitySyncManager] GraphQL Subscription Update Received - ${entityTypeLabel}:`, {
 						entityType: entityTypeLabel,
 						subscriptionType,
 						subscriptionOperation: 'DELETE',
@@ -281,7 +284,7 @@ export class EntitySyncManager<T extends { id: string } = any> {
 					});
 					const topic = toTopicPath(this.config.entityType, entityId);
 					this.store.delete(topic);
-					console.log(`[EntitySyncManager] Deleted ${entityTypeLabel} from store:`, {
+					log.debug(`[EntitySyncManager] Deleted ${entityTypeLabel} from store:`, {
 						entityType: entityTypeLabel,
 						subscriptionType,
 						subscriptionOperation: 'DELETE',
@@ -341,7 +344,7 @@ export class EntitySyncManager<T extends { id: string } = any> {
 					: this.config.entityType === 'workflowExecutions'
 					? 'WORKFLOW_EXECUTION'
 					: this.config.entityType.toUpperCase();
-				console.log(`[EntitySyncManager] GraphQL Subscription Update Received - ${entityTypeLabel}:`, {
+				log.debug(`[EntitySyncManager] GraphQL Subscription Update Received - ${entityTypeLabel}:`, {
 					entityType: entityTypeLabel,
 					subscriptionType,
 					subscriptionOperation: 'CREATE',
@@ -358,7 +361,7 @@ export class EntitySyncManager<T extends { id: string } = any> {
 						: this.config.entityType === 'workflowExecutions'
 						? 'WORKFLOW_EXECUTION'
 						: this.config.entityType.toUpperCase();
-					console.log(`[EntitySyncManager] Published ${entityTypeLabel} to store:`, {
+					log.debug(`[EntitySyncManager] Published ${entityTypeLabel} to store:`, {
 						entityType: entityTypeLabel,
 						subscriptionType,
 						subscriptionOperation: 'CREATE',

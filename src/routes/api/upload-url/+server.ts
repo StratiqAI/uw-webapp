@@ -23,6 +23,9 @@ import { z } from 'zod';
 
 // Load environment variables (must be defined)
 import { REGION, USER_FILE_STAGING_BUCKET } from '$env/static/private';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('api');
 if (!USER_FILE_STAGING_BUCKET) {
   throw new Error('Missing USER_FILE_STAGING_BUCKET env var');
 }
@@ -42,10 +45,10 @@ const payloadSchema = z.object({
  * POST handler: Validates input, generates a presigned S3 upload URL, and returns it.
  */
 export const POST: RequestHandler = async ({ request }) => {
-  console.log("Entering Server side POST function: /api/upload-url");
+  log.debug('POST /api/upload-url');
   let { filename, contentType, checksumSHA256 } = await request.json();
 
-  console.log("Request body:", filename, contentType);
+  log.debug('Request body:', filename, contentType);
   
   // Parse and validate the JSON body against our schema
   // try {
@@ -86,7 +89,7 @@ export const POST: RequestHandler = async ({ request }) => {
   } catch (err) {
     // Log the error for debugging purposes
     
-    console.error('Presign error:', err);
+    log.error('Presign error:', err);
     // Return HTTP 500 on failure to generate URL
     
     throw error(500, 'Could not generate upload URL');

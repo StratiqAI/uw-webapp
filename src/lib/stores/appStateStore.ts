@@ -1,4 +1,7 @@
 import { writable, get, type Writable } from 'svelte/store';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('store');
 import type { Project, Document, Doclink } from '@stratiqai/types-simple';
 import type { ProjectDocumentLinkConnection, ProjectDocumentLink } from '$lib/types/cloud/app';
 
@@ -167,13 +170,13 @@ export function dumpStore<TEntity, TCollection>(
 	const loading = get(store.loading);
 	const error = get(store.error);
 
-	console.group(`📦 ${label} Dump`);
-	console.log('Entity:', entity);
-	console.log('Collection:', collection);
-	console.log('Collection Length:', Array.isArray(collection) ? collection.length : 'N/A');
-	console.log('Loading:', loading);
-	console.log('Error:', error);
-	console.groupEnd();
+	log.debug(`${label} dump`, {
+		entity,
+		collection,
+		collectionLength: Array.isArray(collection) ? collection.length : 'N/A',
+		loading,
+		error
+	});
 }
 
 // Create project-specific store instance (maintains backward compatibility)

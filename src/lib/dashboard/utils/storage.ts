@@ -12,6 +12,9 @@ import {
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 import type { DashboardLayout } from '@stratiqai/types-simple';
 import type { DashboardSyncManager } from '$lib/services/realtime/websocket/sync-managers/DashboardSyncManager';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('dashboard');
 
 const STORAGE_KEYS = {
 	WIDGETS: 'dashboard_widgets',
@@ -138,7 +141,7 @@ function tryParseLegacyV3(projectId: string | null): MultiTabDashboardState | nu
 	const widgetDataJson = localStorage.getItem(widgetDataKey);
 	const widgetData = widgetDataJson ? (JSON.parse(widgetDataJson) as WidgetDataSnapshot) : {};
 
-	console.info('   📦 Migrating v3 → v5 (layout → Market tab)');
+	log.info('   📦 Migrating v3 → v5 (layout → Market tab)');
 	const migrated = migrateLegacyV3ToMulti({ widgets: widgets as Widget[], config, widgetData });
 	DashboardStorage.saveMultiTabState(migrated, projectId);
 	DashboardStorage.removeLegacyV3Keys(projectId);
@@ -231,7 +234,7 @@ export class DashboardStorage {
 					const parsed = JSON.parse(json) as Record<string, unknown>;
 					const migrated = migrateV4ToV5(parsed);
 					if (migrated) {
-						console.info('   📦 Migrated v4 → v5');
+						log.info('   📦 Migrated v4 → v5');
 						this.saveMultiTabState(migrated, projectId);
 						return migrated;
 					}
@@ -360,18 +363,18 @@ export class DashboardStorage {
 			try {
 				cloudState = typeof raw === 'string' ? JSON.parse(raw) : raw;
 			} catch {
-				console.warn('[DashboardStorage] Cloud layout state is not valid JSON');
+				log.warn('[DashboardStorage] Cloud layout state is not valid JSON');
 				return { layoutId: cloudLayout.id, state: null };
 			}
 
 			if (!isValidMultiTabState(cloudState)) {
-				console.warn('[DashboardStorage] Cloud state failed validation');
+				log.warn('[DashboardStorage] Cloud state failed validation');
 				return { layoutId: cloudLayout.id, state: null };
 			}
 
 			return { layoutId: cloudLayout.id, state: cloudState };
 		} catch (err) {
-			console.error('[DashboardStorage] Failed to load from cloud:', err);
+			log.error('[DashboardStorage] Failed to load from cloud:', err);
 			return null;
 		}
 	}
@@ -390,7 +393,7 @@ export class DashboardStorage {
 			const result = await syncManager.updateLayout(stateJson, DASHBOARD_STORAGE_VERSION);
 			return result;
 		} catch (err) {
-			console.error('[DashboardStorage] Failed to save to cloud:', err);
+			log.error('[DashboardStorage] Failed to save to cloud:', err);
 			return null;
 		}
 	}
@@ -408,16 +411,16 @@ export class DashboardStorage {
 			const stateJson = JSON.stringify(state);
 
 			if (existing) {
-				console.info('[DashboardStorage] Cloud layout already exists — updating instead of creating');
+				log.info('[DashboardStorage] Cloud layout already exists — updating instead of creating');
 				const updated = await syncManager.updateLayout(stateJson, DASHBOARD_STORAGE_VERSION);
 				return updated ?? existing;
 			}
 
 			const layout = await syncManager.createLayout(stateJson, DASHBOARD_STORAGE_VERSION);
-			console.info('[DashboardStorage] Created cloud layout for project');
+			log.info('[DashboardStorage] Created cloud layout for project');
 			return layout;
 		} catch (err) {
-			console.error('[DashboardStorage] Failed to migrate to cloud:', err);
+			log.error('[DashboardStorage] Failed to migrate to cloud:', err);
 			return null;
 		}
 	}

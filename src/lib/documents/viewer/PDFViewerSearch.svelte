@@ -8,8 +8,12 @@
     // Works with SvelteKit (Vite) without extra config.
     // @ts-ignore - virtual query param
     import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+    import { createLogger } from '$lib/utils/logger';
   
     pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
+
+    const log = createLogger('documents');
+
     interface Props {
       src: string;
       scale?: number;
@@ -129,12 +133,12 @@
       clearHighlights();
       if (!q) return;
       const needle = q.toLowerCase();
-      console.log('Searching for:', needle);
+      log.debug('Searching for:', needle);
 
       for (const p of pages) {
         // Find matching items
         const matches = p.textItems.filter((t) => t.str.toLowerCase().includes(needle));
-        console.log('Found matches:', matches.length, 'on page', p.page.pageNumber);
+        log.debug('Found matches:', matches.length, 'on page', p.page.pageNumber);
 
         // For each match, we'll draw one or more highlight boxes.
         // To keep it simple, we highlight the entire text item that contains the match.

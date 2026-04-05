@@ -2,6 +2,9 @@
 	import type { GridElement, AIQueryData } from '../../types';
 	import { isAINode } from '../../types/node';
 	import WorkflowModal from './WorkflowModal.svelte';
+	import { createLogger } from '$lib/utils/logger';
+
+	const log = createLogger('workflows');
 
 	let {
 		darkMode = false,
@@ -210,7 +213,7 @@
 						const schema = JSON.parse(jsonSchemaText);
 						aiQueryData.responseFormat = { type: 'json_schema', schema };
 					} catch (e) {
-						console.error('Invalid JSON schema:', e);
+						log.error('Invalid JSON schema:', e);
 					}
 				}
 			}
@@ -224,14 +227,14 @@
 			try {
 				aiQueryData.logitBias = JSON.parse(logitBiasText);
 			} catch (e) {
-				console.error('Invalid logit bias:', e);
+				log.error('Invalid logit bias:', e);
 			}
 		}
 		if (metadataText.trim()) {
 			try {
 				aiQueryData.metadata = JSON.parse(metadataText);
 			} catch (e) {
-				console.error('Invalid metadata:', e);
+				log.error('Invalid metadata:', e);
 			}
 		}
 

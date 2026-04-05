@@ -3,6 +3,9 @@
 	import { isProcessNode, isInputNode } from '../../types/node';
 	import type { ProcessNodeRequiredInput } from '../../types/node';
 	import WorkflowModal from './WorkflowModal.svelte';
+	import { createLogger } from '$lib/utils/logger';
+
+	const log = createLogger('workflows');
 
 	/** Gold default for Input node trigger (e.g. doclink created). */
 	const DEFAULT_TRIGGER_SOURCE = 'com.stratiqai.doclink';
@@ -64,7 +67,7 @@
 			}
 			return options;
 		} catch (error) {
-			console.warn('Failed to resolve default node options', error);
+			log.warn('Failed to resolve default node options', error);
 			return triggerDefaults;
 		}
 	}

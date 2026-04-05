@@ -6,6 +6,10 @@
  *  - The `data-theme` attribute on <html> (drives explicit warm-theme CSS overrides)
  */
 
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('app');
+
 export type AppTheme = 'light' | 'dark' | 'warm';
 
 const STORAGE_KEY = 'app-theme';
@@ -39,7 +43,7 @@ function initialize() {
 			state.theme = prefersDark ? 'dark' : 'light';
 		}
 	} catch (e) {
-		console.warn('Failed to load theme preference:', e);
+		log.warn('Failed to load theme preference:', e);
 	}
 
 	applyToDocument();
@@ -59,7 +63,7 @@ function save() {
 	try {
 		localStorage.setItem(STORAGE_KEY, state.theme);
 	} catch (e) {
-		console.warn('Failed to save theme preference:', e);
+		log.warn('Failed to save theme preference:', e);
 	}
 }
 

@@ -4,6 +4,9 @@
 	import { print } from 'graphql';
 	import { gql } from '$lib/services/realtime/graphql/requestHandler';
 	import { timeAgo } from '$lib/utils/dateFormat';
+	import { createLogger } from '$lib/utils/logger';
+
+	const log = createLogger('projects');
 
 	interface Props {
 		project: Project;
@@ -66,7 +69,7 @@
 				idToken
 			);
 		} catch (err) {
-			console.error('Failed to rename project:', err);
+			log.error('Failed to rename project:', err);
 		} finally {
 			isSaving = false;
 			isEditing = false;

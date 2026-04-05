@@ -31,6 +31,9 @@
 	import { calcRT, getPageText, onPrint, savePDF } from './utils/Helper.svelte';
 
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
+	import { createLogger } from '$lib/utils/logger';
+
+	const log = createLogger('documents');
 	const darkMode = $derived(darkModeStore.darkMode);
 
 	let docs = $derived(documents ?? []);
@@ -123,7 +126,7 @@
 			}
 			if (showButtons.length) pageNum = num;
 		} catch (error) {
-			console.error('Error rendering page:', error);
+			log.error('Error rendering page:', error);
 			pageRendering = false;
 		}
 	};
@@ -140,7 +143,7 @@
 				}
 			});
 		} catch (error) {
-			console.warn('Could not process page annotations:', error);
+			log.warn('Could not process page annotations:', error);
 		}
 	};
 

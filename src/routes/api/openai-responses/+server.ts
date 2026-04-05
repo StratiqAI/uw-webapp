@@ -1,6 +1,9 @@
 import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
 import { OPENAI_API_KEY } from '$env/static/private';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('api');
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
@@ -56,7 +59,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			data: data
 		});
 	} catch (error) {
-		console.error('Error calling OpenAI Responses API:', error);
+		log.error('Error calling OpenAI Responses API:', error);
 		
 		// Handle OpenAI API errors
 		if (error instanceof OpenAI.APIError) {

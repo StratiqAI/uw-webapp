@@ -31,6 +31,9 @@
 	import { themeStore } from '$lib/stores/themeStore.svelte';
 	import StreamPicker from '$lib/components/streams/StreamPicker.svelte';
 	import { streamCatalog, type DataStream } from '$lib/stores/streamCatalog.svelte';
+	import { createLogger } from '$lib/utils/logger';
+
+	const log = createLogger('dashboard');
 
 	const DEFAULT_LQ_MENU_SIGNALS = { refresh: 0, exportRequest: 0 };
 
@@ -233,14 +236,14 @@
 	}
 
 	function refreshWidgetData() {
-		console.log('Refreshing widget data:', widget.id);
+		log.debug('Refreshing widget data:', widget.id);
 	}
 
 	function applyTopicChange() {
 		const defaultTopic = getWidgetTopic(widget.type, widget.id);
 		const newTopicOverride = selectedTopic === defaultTopic ? undefined : selectedTopic;
 		dashboard.updateWidget(widget.id, { topicOverride: newTopicOverride });
-		console.log(`✅ Changed topic for ${widget.id}: ${currentTopic} → ${selectedTopic}`);
+		log.debug(`✅ Changed topic for ${widget.id}: ${currentTopic} → ${selectedTopic}`);
 		showEditDialog = false;
 	}
 

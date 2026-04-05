@@ -7,8 +7,11 @@ import { searchForWorkspaceRoot } from 'vite';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export default defineConfig(() => ({
+export default defineConfig(({ mode }) => ({
 	plugins: [tailwindcss(), sveltekit()],
+	define: {
+		__LOG_ENABLED__: JSON.stringify(mode !== 'production')
+	},
 	build: {
 		chunkSizeWarningLimit: 2500
 	},

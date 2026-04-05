@@ -1,6 +1,9 @@
 import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
 import { OPENAI_API_KEY, OPENAI_BASE_URL } from '$env/static/private';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('api');
 import OpenAI from 'openai';
 import type { DemographicsResult, JobsAndCommutingResult, EconomyResult } from './types';
 // const DEFAULT_MODEL = 'gpt-4o-nano'; // change as you like
@@ -324,14 +327,14 @@ export const POST: RequestHandler = async ({ request }) => {
 			{ role: 'system', content: SYSTEM_PROMPT },
 			...messages.filter((msg: any) => {
 				if (!VALID_ROLES.includes(msg.role)) {
-					console.warn(`Filtering out message with invalid role: ${msg.role}`, msg);
+					log.warn(`Filtering out message with invalid role: ${msg.role}`, msg);
 					return false;
 				}
 				return true;
 			})
 		];
 
-		// console.log('validMessages: ', validMessages);
+		// log.debug('validMessages: ', validMessages);
 
 		// OpenAI Chat Completions (simple non-streaming for reliability)
 		const respTools = await fetch(`${OPENAI_BASE_URL}/v1/responses`, {
@@ -348,7 +351,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			})
 		});
 
-		// console.log('respTools: ', respTools);
+		// log.debug('respTools: ', respTools);
 
 		if (!respTools.ok) {
 			const errText = await respTools.text().catch(() => '');
@@ -357,8 +360,8 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		const data = await respTools.json();
 
-		console.log('data.output: ', JSON.stringify(data.output, null, 2));
-		console.log('==============================================')
+		log.debug('data.output: ', JSON.stringify(data.output, null, 2));
+		log.debug('==============================================')
 		const toolCalls = data.output;
 
 		if (toolCalls.length) {
@@ -367,19 +370,19 @@ export const POST: RequestHandler = async ({ request }) => {
 				if (call.type !== 'function_call') continue;
 				const args = call.arguments ? JSON.parse(call.arguments) : {};
 				const result = await handleToolCall(call.name, args);
-				console.log('result: ', JSON.stringify(result, null, 2));
-				console.log('==============================================')
+				log.debug('result: ', JSON.stringify(result, null, 2));
+				log.debug('==============================================')
 				toolMessages.push({
 					role: 'assistant',
 					content: JSON.stringify(result)
 				});
 			}
 
-			console.log('toolMessages: ', JSON.stringify(toolMessages, null, 2));
-			console.log('==============================================')
+			log.debug('toolMessages: ', JSON.stringify(toolMessages, null, 2));
+			log.debug('==============================================')
 			validMessages.push(...toolMessages);
-			console.log('validMessages: ', JSON.stringify(validMessages, null, 2));
-			console.log('==============================================')
+			log.debug('validMessages: ', JSON.stringify(validMessages, null, 2));
+			log.debug('==============================================')
 
 			const resp = await fetch(`${OPENAI_BASE_URL}/v1/responses`, {
 				method: 'POST',
@@ -405,11 +408,11 @@ export const POST: RequestHandler = async ({ request }) => {
 			const reply = responseData.output
 				.map((o: any) => o.content?.map((c: any) => c.text).join(' ') ?? '')
 				.join(' ');
-			console.log('reply: ', reply);
+			log.debug('reply: ', reply);
 			return json({ reply });
 		}
 
-		// console.log('reply: ', JSON.stringify(reply, null, 2));
+		// log.debug('reply: ', JSON.stringify(reply, null, 2));
 
 		// // OpenAI Chat Completions (simple non-streaming for reliability)
 		// const resp = await fetch(`${OPENAI_BASE_URL}/v1/responses`, {
@@ -424,7 +427,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		// 	})
 		// });
 
-		// console.log('resp: ', resp);
+		// log.debug('resp: ', resp);
 
 		// if (!resp.ok) {
 		// 	const errText = await resp.text().catch(() => '');

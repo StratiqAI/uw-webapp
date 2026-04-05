@@ -5,7 +5,6 @@
 	import { gql } from '$lib/services/realtime/graphql/requestHandler';
 	import type { Project } from '$lib/types/cloud/app';
 	import { M_DELETE_PROJECT } from '$lib/services/realtime/graphql/mutations/Project';
-	import { logger } from '$lib/utils/debug';
 	let {
 		open = $bindable(true),	
 		title = 'Are you sure you want to delete this?',

@@ -3,6 +3,9 @@
 	import type { WorkflowSyncManager } from '$lib/services/realtime/websocket/sync-managers/WorkflowSyncManager';
 	import type { WorkflowExecution, WorkflowNodeExecution } from '@stratiqai/types-simple';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
+	import { createLogger } from '$lib/utils/logger';
+
+	const log = createLogger('workflows');
 
 	const {
 		executions = [],
@@ -48,7 +51,7 @@
 			// Backend now filters by workflowId and provides chronological sorting
 			// Use projectId as parentId when workflowId is not available
 			if (syncManager?.isReady) {
-				console.log('[WorkflowExecutionsPanel] Syncing executions for workflow:', selectedWorkflowId, 'or project:', selectedProjectId);
+				log.debug('[WorkflowExecutionsPanel] Syncing executions for workflow:', selectedWorkflowId, 'or project:', selectedProjectId);
 				await syncManager.syncWorkflowExecutionList(selectedWorkflowId ?? undefined, selectedProjectId ?? undefined, {
 					setupSubscriptions: true
 				});
@@ -56,12 +59,12 @@
 
 			// Read from store (backend already filtered by workflowId and sorted chronologically)
 			let allExecutions = validatedTopicStore.getAllAtArray<WorkflowExecution>('workflowExecutions');
-			console.log('[WorkflowExecutionsPanel] All executions in store:', allExecutions.length);
+			log.debug('[WorkflowExecutionsPanel] All executions in store:', allExecutions.length);
 			
 			// Filter by parentId (defensive - in case store has executions from other workflows)
 			// Backend should already filter, but this ensures correctness
 			let filtered = allExecutions.filter((exec) => exec?.parentId === selectedWorkflowId);
-			console.log('[WorkflowExecutionsPanel] Filtered executions for workflow', selectedWorkflowId, ':', filtered.length);
+			log.debug('[WorkflowExecutionsPanel] Filtered executions for workflow', selectedWorkflowId, ':', filtered.length);
 
 			// Backend provides chronological sorting (newest first), so no client-side sorting needed
 			storeExecutions = filtered;
@@ -85,14 +88,14 @@
 							.getAllAtArray<WorkflowNodeExecution>('workflowNodeExecutions')
 							.filter((ne) => ne?.parentId === exec.id);
 					} catch (err) {
-						console.error(`Failed to load node executions for ${exec.id}:`, err);
+						log.error(`Failed to load node executions for ${exec.id}:`, err);
 					}
 				}
 				nodeExecMap.set(exec.id, nodeExecs);
 			}
 			storeNodeExecutions = nodeExecMap;
 		} catch (err) {
-			console.error('Failed to load executions from store:', err);
+			log.error('Failed to load executions from store:', err);
 		} finally {
 			isLoadingFromStore = false;
 		}
@@ -224,7 +227,7 @@
 				return parsed;
 			}
 		} catch (err) {
-			console.error('Failed to parse outputData:', err);
+			log.error('Failed to parse outputData:', err);
 		}
 		
 		return null;

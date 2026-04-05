@@ -3,7 +3,7 @@
  * When enabled, deal room components use this data instead of calling the API.
  */
 
-import { getSampleData, type SampleData } from '$lib/deal-room/sampleData';
+import { getSampleData, type SampleData } from '$lib/dealRoom/sampleData';
 
 const state = $state<{
 	enabled: boolean;

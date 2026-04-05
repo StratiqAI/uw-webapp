@@ -31,6 +31,9 @@
 	import MetaTag from './MetaTag.svelte';
 	import TopBar from '$lib/components/layout/TopBar.svelte';
 	import { gql } from '$lib/services/realtime/graphql/requestHandler';
+	import { createLogger } from '$lib/utils/logger';
+
+	const log = createLogger('projects');
 
 	// ----------------------------------------------------------------------------
 	// Props + Core Reactive State
@@ -122,7 +125,7 @@
 
 			await goto(`/p/${res.createProject.id}/docs`);
 		} catch (err) {
-			console.error('Error creating new project:', err);
+			log.error('Error creating new project:', err);
 			errorMsg = 'Error creating new project';
 		}
 	}
@@ -151,11 +154,11 @@
 					allProjects = [...allProjects, created];
 				}
 			},
-			error: (err: unknown) => console.error('Project create subscription error:', err)
+			error: (err: unknown) => log.error('Project create subscription error:', err)
 		};
 
 		addSubscription(token, spec).catch((err) =>
-			console.error('Failed to add project create subscription:', err)
+			log.error('Failed to add project create subscription:', err)
 		);
 		return () => removeSubscription(spec);
 	});
@@ -173,12 +176,12 @@
 				allProjects = allProjects.filter((p) => p.id !== deleted.id);
 			},
 			error: (err: unknown) =>
-				console.error('Project delete subscription error:', project.id, err)
+				log.error('Project delete subscription error:', project.id, err)
 		}));
 
 		specs.forEach((s) =>
 			addSubscription(token, s).catch((err) =>
-				console.error('Failed to add project delete subscription:', err)
+				log.error('Failed to add project delete subscription:', err)
 			)
 		);
 		return () => specs.forEach((s) => removeSubscription(s));
@@ -197,12 +200,12 @@
 				notificationStore.addNotification(notification);
 			},
 			error: (err: unknown) =>
-				console.error('Notification subscription error for project', project.id, err)
+				log.error('Notification subscription error for project', project.id, err)
 		}));
 
 		specs.forEach((s) =>
 			addSubscription(token, s).catch((err) =>
-				console.error('Failed to add notification subscription:', err)
+				log.error('Failed to add notification subscription:', err)
 			)
 		);
 		return () => specs.forEach((s) => removeSubscription(s));

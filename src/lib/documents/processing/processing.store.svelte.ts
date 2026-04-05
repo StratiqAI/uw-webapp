@@ -13,6 +13,9 @@ import type {
 	FeedEntry,
 	ProcessingStatistics
 } from './types';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('documents');
 
 /**
  * Creates a reactive store for managing document processing state.
@@ -85,7 +88,7 @@ export function createProcessingStore(
 						: notification.properties;
 			}
 		} catch (e) {
-			console.error('Failed to parse Notification.properties:', e);
+			log.error('Failed to parse Notification.properties:', e);
 		}
 
 		const eventType = properties.eventType || notification.message;

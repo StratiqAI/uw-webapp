@@ -28,6 +28,9 @@
 	import { streamCatalog } from '$lib/stores/streamCatalog.svelte';
 	import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
 	import ToastContainer from '$lib/components/ui/ToastContainer.svelte';
+	import { createLogger } from '$lib/utils/logger';
+
+	const log = createLogger('app');
 
 	registerWidget(metricWidget);
 	registerWidget(jsonViewerWidget);
@@ -56,7 +59,7 @@
 		try {
 			initializeWidgetSchemas();
 		} catch (error) {
-			console.error('Failed to initialize widget schemas:', error);
+			log.error('Failed to initialize widget schemas:', error);
 		}
 
 		destroySync = initTopicStoreSync(validatedTopicStore);

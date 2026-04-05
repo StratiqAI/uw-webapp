@@ -26,6 +26,9 @@
 		parseTemplateToAIQueryData,
 		type AIQueryData
 	} from './PromptService';
+	import { createLogger } from '$lib/utils/logger';
+
+	const log = createLogger('prompts');
 
 	let { data } = $props<{ data: { idToken: string; projects: Project[] } }>();
 
@@ -112,7 +115,7 @@
 				await loadTemplatesForProject(selectedProjectId);
 			}
 		} catch (err) {
-			console.error('Failed to initialize:', err);
+			log.error('Failed to initialize:', err);
 			error = err instanceof Error ? err.message : 'Failed to initialize';
 		} finally {
 			isLoading = false;
@@ -139,7 +142,7 @@
 				validatedTopicStore.publish(toTopicPath('prompts', template.id), template);
 			}
 		} catch (err) {
-			console.error('Failed to load templates:', err);
+			log.error('Failed to load templates:', err);
 			error = err instanceof Error ? err.message : 'Failed to load templates';
 		} finally {
 			isLoading = false;
@@ -223,7 +226,7 @@
 			editingTemplate = null;
 			isCreating = false;
 		} catch (err) {
-			console.error('Failed to save template:', err);
+			log.error('Failed to save template:', err);
 			// Rethrow so the modal can show the error and reset saving state
 			throw err;
 		} finally {
@@ -253,7 +256,7 @@
 
 			validatedTopicStore.delete(toTopicPath('prompts', template.id));
 		} catch (err) {
-			console.error('Failed to delete template:', err);
+			log.error('Failed to delete template:', err);
 			toastStore.error(err instanceof Error ? err.message : 'Failed to delete template');
 		} finally {
 			isLoading = false;

@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { listInvitations, createInvitation } from '$lib/deal-room/dealRoomService';
-	import { dealRoomSampleStore } from '$lib/deal-room/stores/dealRoomSampleStore.svelte';
-	import type { Invitation } from '$lib/deal-room/types';
+	import { listInvitations, createInvitation } from '$lib/dealRoom/dealRoomService';
+	import { dealRoomSampleStore } from '$lib/dealRoom/stores/dealRoomSampleStore.svelte';
+	import type { Invitation } from '$lib/dealRoom/types';
 
 	interface Props {
 		projectId: string;

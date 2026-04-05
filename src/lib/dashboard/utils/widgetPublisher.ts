@@ -8,6 +8,9 @@
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
 import type { WidgetType } from '$lib/dashboard/types/widget';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('widgets');
 
 /**
  * Create a publisher for a widget topic
@@ -32,21 +35,21 @@ export function createWidgetPublisher<T = unknown>(
 ) {
 	const topic = getWidgetTopic(widgetType, widgetId);
 
-	console.log(`📡 [createWidgetPublisher] Creating publisher for topic: ${topic} (producer: ${producerId})`);
+	log.debug(`Creating publisher for topic: ${topic} (producer: ${producerId})`);
 
 	return {
 		publish: (data: T) => {
 			const success = validatedTopicStore.publish(topic, data);
 			if (success) {
-				console.log(`   ✅ Published to ${topic}`);
+				log.debug(`Published to ${topic}`);
 			} else {
-				console.error(`   ❌ Failed to publish to ${topic} - validation failed`);
+				log.error(`Failed to publish to ${topic} - validation failed`);
 			}
 			return success;
 		},
 		dispose: () => {
 			// ValidatedTopicStore doesn't require explicit disposal
-			console.log(`   🗑️ Disposed publisher for ${topic}`);
+			log.debug(`Disposed publisher for ${topic}`);
 		}
 	};
 }
@@ -61,7 +64,7 @@ export function createWidgetPublisher<T = unknown>(
  * @example
  * ```typescript
  * const data = getWidgetData('title', 'widget-123');
- * console.log('Widget data:', data);
+ * void data;
  * ```
  */
 export function getWidgetData<T = unknown>(widgetType: WidgetType, widgetId: string): T | undefined {
@@ -80,7 +83,7 @@ export function getWidgetData<T = unknown>(widgetType: WidgetType, widgetId: str
  * @example
  * ```typescript
  * const unsubscribe = subscribeToWidget('title', 'widget-123', (data) => {
- *   console.log('Widget data updated:', data);
+ *   void data;
  * });
  * // ... later
  * unsubscribe();

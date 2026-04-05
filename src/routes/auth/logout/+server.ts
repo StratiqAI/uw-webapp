@@ -25,10 +25,13 @@ import {
 	COGNITO_LOGOUT_URI,
 	COGNITO_DOMAIN
 } from '$env/static/private';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('auth');
 
 // Handle GET requests to the /logout endpoint
 export const GET: RequestHandler = async ({ cookies }) => {
-	console.log("Entering Server side GET function: /auth/logout");
+	log.debug('GET /auth/logout');
 	// Delete authentication-related cookies from the client
 	cookies.delete('access_token', { path: '/' });
 	cookies.delete('id_token', { path: '/' });

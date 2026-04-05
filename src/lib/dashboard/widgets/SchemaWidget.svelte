@@ -2,7 +2,7 @@
 	import type { SchemaWidget } from '$lib/dashboard/types/widget';
 	import { useReactiveValidatedTopic } from '$lib/hooks/validatedTopicStoreRunes.svelte';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
-	import AutoDataView from '$lib/components/data-display/AutoDataView.svelte';
+	import AutoDataView from './AutoDataView.svelte';
 
 	interface Props {
 		data: SchemaWidget['data'];

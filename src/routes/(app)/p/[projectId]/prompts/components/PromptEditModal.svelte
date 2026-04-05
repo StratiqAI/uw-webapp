@@ -12,6 +12,9 @@
 	import { M_GENERATE_PROMPT_DRAFT } from '$lib/services/graphql/promptOperations';
 	import type { IGraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
 	import { getTemplateStrForEditor, parseTemplateToAIQueryData, type AIQueryData } from '../PromptService';
+	import { createLogger } from '$lib/utils/logger';
+
+	const log = createLogger('prompts');
 
 	/** All valid AIModel enum values (schema) — used so 3.1 and all models pass VALID_AI_MODELS.has() */
 	const AIMODEL_VALUES: readonly string[] = [
@@ -595,7 +598,7 @@
 				applySchemaDefinitionToForm(result.getJsonSchema.schemaDefinition);
 			}
 		} catch (e) {
-			console.error('Failed to load JsonSchema:', e);
+			log.error('Failed to load JsonSchema:', e);
 		}
 	}
 
@@ -636,7 +639,7 @@
 
 			aiGenerateDescription = '';
 		} catch (e) {
-			console.error('AI generate failed:', e);
+			log.error('AI generate failed:', e);
 			aiGenerateError = e instanceof Error ? e.message : 'Generation failed';
 		} finally {
 			aiGenerating = false;
@@ -713,7 +716,7 @@
 						const schema = JSON.parse(jsonSchemaText);
 						aiQueryData.responseFormat = { type: 'json_schema', schema };
 					} catch (e) {
-						console.error('Invalid JSON schema:', e);
+						log.error('Invalid JSON schema:', e);
 					}
 				}
 			}
@@ -726,14 +729,14 @@
 			try {
 				aiQueryData.logitBias = JSON.parse(logitBiasText);
 			} catch (e) {
-				console.error('Invalid logit bias:', e);
+				log.error('Invalid logit bias:', e);
 			}
 		}
 		if (metadataText.trim()) {
 			try {
 				aiQueryData.metadata = JSON.parse(metadataText);
 			} catch (e) {
-				console.error('Invalid metadata:', e);
+				log.error('Invalid metadata:', e);
 			}
 		}
 
@@ -769,7 +772,7 @@
 				...(schemaData && { schemaData })
 			});
 		} catch (err) {
-			console.error('Save failed:', err);
+			log.error('Save failed:', err);
 			const message = err instanceof Error ? err.message : 'Failed to save';
 			const hint = message.includes('enum') || message.includes('AIModel')
 				? ' The selected AI model may not be in the deployed API schema yet—try redeploying or pick another model.'

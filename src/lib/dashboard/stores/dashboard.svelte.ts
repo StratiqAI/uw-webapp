@@ -26,6 +26,9 @@ import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
 import type { DashboardSyncManager } from '$lib/services/realtime/websocket/sync-managers/DashboardSyncManager';
 import type { DashboardLayout } from '@stratiqai/types-simple';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('dashboard');
 
 const DEFAULT_CONFIG: DashboardConfig = structuredClone(DEFAULT_DASHBOARD_CONFIG);
 
@@ -226,7 +229,7 @@ class DashboardStore {
 			if (this.#devMode) {
 				this.#applyTabSlice(fresh.tabs[DEFAULT_ACTIVE_TAB]);
 				this.#initialized = true;
-				console.info('📦 Dashboard initialized in dev mode (localStorage disabled)');
+				log.info('Dashboard initialized in dev mode (localStorage disabled)');
 				return false;
 			}
 			
@@ -247,13 +250,13 @@ class DashboardStore {
 						'Cloud reconciliation'
 					);
 				} catch (err) {
-					console.error('[Dashboard] Cloud reconciliation failed:', err);
+					log.error('Cloud reconciliation failed:', err);
 				}
 			}
 			
 			return !!savedState;
 		} catch (error) {
-			console.error('Failed to initialize dashboard:', error);
+			log.error('Failed to initialize dashboard:', error);
 			this.#initialized = true;
 			return false;
 		}
@@ -282,7 +285,7 @@ class DashboardStore {
 	// Save operations
 	save(): boolean {
 		if (this.#devMode) {
-			console.info('📦 Dashboard save skipped (dev mode)');
+			log.info('Dashboard save skipped (dev mode)');
 			return false;
 		}
 		
@@ -304,7 +307,7 @@ class DashboardStore {
 
 			return success;
 		} catch (error) {
-			console.error('Failed to save dashboard:', error);
+			log.error('Failed to save dashboard:', error);
 			return false;
 		}
 	}
@@ -346,7 +349,7 @@ class DashboardStore {
 			this.#cloudSyncStatus = 'error';
 			return false;
 		} catch (err) {
-			console.error('[Dashboard] Manual cloud sync failed:', err);
+			log.error('Manual cloud sync failed:', err);
 			this.#cloudSyncStatus = 'error';
 			return false;
 		}
@@ -424,7 +427,7 @@ class DashboardStore {
 			this.#cloudSyncStatus = 'synced';
 			return true;
 		} catch (err) {
-			console.error('[Dashboard] reloadFromCloud failed:', err);
+			log.error('reloadFromCloud failed:', err);
 			this.#cloudSyncStatus = 'error';
 			return false;
 		} finally {
@@ -544,7 +547,7 @@ class DashboardStore {
 			
 			return true;
 		} catch (error) {
-			console.error('Failed to add widget:', error);
+			log.error('Failed to add widget:', error);
 			return false;
 		}
 	}
@@ -603,7 +606,7 @@ class DashboardStore {
 		);
 		
 		if (!position) {
-			console.warn('No available space for duplicate widget');
+			log.warn('No available space for duplicate widget');
 			return null;
 		}
 		
@@ -626,7 +629,7 @@ class DashboardStore {
 			try {
 				validatedTopicStore.publish(destTopic, structuredClone(sourceData));
 			} catch (e) {
-				console.warn(`[duplicateWidget] Failed to copy topic data to ${destTopic}:`, e);
+				log.warn(`Failed to copy topic data to ${destTopic}:`, e);
 			}
 		}
 
@@ -885,17 +888,17 @@ class DashboardStore {
 	setAutoSaveWidgetData(enabled: boolean): void {
 		this.#autoSaveWidgetData = enabled;
 		DashboardStorage.setAutoSaveWidgetData(enabled);
-		console.log(`🔧 Widget data auto-save: ${enabled ? 'enabled' : 'disabled'}`);
+		log.info(`Widget data auto-save: ${enabled ? 'enabled' : 'disabled'}`);
 	}
 	
 	setDevMode(enabled: boolean): void {
 		this.#devMode = enabled;
-		console.info(`📦 Dev mode ${enabled ? 'enabled' : 'disabled'}`);
+		log.info(`Dev mode ${enabled ? 'enabled' : 'disabled'}`);
 	}
 	
 	// Data management
 	resetToDefault(defaultWidgets?: Widget[]): void {
-		console.log('🔄 Resetting active tab to default layout...');
+		log.info('Resetting active tab to default layout...');
 
 		this.#suspendAutoSave = true;
 		try {
@@ -926,14 +929,14 @@ class DashboardStore {
 		}
 
 		if (defaultWidgets && defaultWidgets.length > 0) {
-			console.log(`✅ Reset complete: loaded default layout (${defaultWidgets.length} widgets) on ${this.#activeTabId}`);
+			log.info(`Reset complete: loaded default layout (${defaultWidgets.length} widgets) on ${this.#activeTabId}`);
 		} else {
-			console.log('✅ Reset complete (no default widgets)');
+			log.info('Reset complete (no default widgets)');
 		}
 	}
 	
 	clearSavedDashboard(): boolean {
-		console.log('🧹 Clearing saved dashboard...');
+		log.info('Clearing saved dashboard...');
 		const success = DashboardStorage.clearDashboard(this.#projectId);
 		
 		if (success) {
@@ -953,7 +956,7 @@ class DashboardStore {
 				clearTimeout(this.#cloudSaveTimeout);
 				this.#cloudSaveTimeout = null;
 			}
-			console.log('✅ Dashboard cleared');
+			log.info('Dashboard cleared');
 		}
 		
 		return success;
@@ -963,7 +966,7 @@ class DashboardStore {
 		try {
 			return DashboardStorage.exportDashboard(this.#projectId);
 		} catch (error) {
-			console.error('Failed to export dashboard:', error);
+			log.error('Failed to export dashboard:', error);
 			return null;
 		}
 	}
@@ -979,7 +982,7 @@ class DashboardStore {
 			this.#loadFromSavedState(savedState);
 			return true;
 		} catch (error) {
-			console.error('Failed to import dashboard:', error);
+			log.error('Failed to import dashboard:', error);
 			return false;
 		}
 	}
@@ -1088,7 +1091,7 @@ class DashboardStore {
 		this.#config = plain.config;
 
 		if (repairOverlaps(this.#widgets)) {
-			console.log('🔧 Repaired overlapping widget positions');
+			log.info('Repaired overlapping widget positions');
 		}
 
 		this.#widgetZIndexMap.clear();
@@ -1159,7 +1162,7 @@ class DashboardStore {
 		}
 		
 		if (expanded) {
-			console.log(`📏 Grid expanded: ${oldColumns}x${oldRows} → ${this.#config.gridColumns}x${this.#config.gridRows}`);
+			log.debug(`Grid expanded: ${oldColumns}x${oldRows} -> ${this.#config.gridColumns}x${this.#config.gridRows}`);
 			this.#scheduleAutoSave();
 			this.#emit('grid:expanded', { 
 				rows: this.#config.gridRows, 
@@ -1180,7 +1183,7 @@ class DashboardStore {
 		const minRequiredRows = maxRowUsed + GRID_BUFFER_ROWS;
 		
 		if (minRequiredRows > this.#config.gridRows) {
-			console.log(`📏 Ensuring capacity: ${this.#config.gridRows} → ${minRequiredRows} rows`);
+			log.debug(`Ensuring capacity: ${this.#config.gridRows} -> ${minRequiredRows} rows`);
 			this.#config = { ...this.#config, gridRows: minRequiredRows };
 			this.#scheduleAutoSave();
 		}
@@ -1329,7 +1332,7 @@ class DashboardStore {
 					if (reconciled && reconciled !== localState) {
 						this.#loadFromSavedState(reconciled);
 						this.#emit('dashboard:loaded', undefined);
-						console.info('[Dashboard] Loaded newer state from cloud');
+						log.info('Loaded newer state from cloud');
 					}
 				} else {
 					// Cloud entity exists but state is empty or unusable — keep in-memory dashboard, persist layout id.
@@ -1398,9 +1401,9 @@ class DashboardStore {
 			this.#isReconciling = true;
 			this.#loadFromSavedState(persisted);
 			this.#emit('dashboard:loaded', undefined);
-			console.info('[Dashboard] Applied remote update via AppSync subscription');
+			log.info('Applied remote update via AppSync subscription');
 		} catch (err) {
-			console.error('[Dashboard] Failed to apply remote update:', err);
+			log.error('Failed to apply remote update:', err);
 		} finally {
 			this.#isReconciling = false;
 		}

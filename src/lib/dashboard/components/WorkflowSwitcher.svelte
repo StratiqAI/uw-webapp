@@ -1,6 +1,9 @@
 <script lang="ts">
 	import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
 	import { toastStore } from '$lib/stores/toastStore.svelte';
+	import { createLogger } from '$lib/utils/logger';
+
+	const log = createLogger('dashboard');
 
 	// Workflow type - defined locally since it may not be exported from types-simple
 	type Workflow = {
@@ -72,7 +75,7 @@
 				await onRename(workflowId, trimmedName);
 				cancelEdit();
 			} catch (error) {
-				console.error('Failed to rename workflow:', error);
+				log.error('Failed to rename workflow:', error);
 				// Keep editing state on error so user can retry
 			}
 		} else {
@@ -102,7 +105,7 @@
 		try {
 			await onDelete(workflow.id);
 		} catch (error) {
-			console.error('Failed to delete workflow:', error);
+			log.error('Failed to delete workflow:', error);
 			toastStore.error(
 				`Error deleting workflow: ${error instanceof Error ? error.message : 'Unknown error'}`
 			);

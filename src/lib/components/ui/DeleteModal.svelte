@@ -13,6 +13,10 @@
 	import { ExclamationCircleOutline } from 'flowbite-svelte-icons';
 	import { gql } from '$lib/services/realtime/graphql/requestHandler';
 	import type { Project } from '@stratiqai/types-simple';
+	import { createLogger } from '$lib/utils/logger';
+
+	const log = createLogger('projects');
+
 	let {
 		open = $bindable(true),
 		title = 'Are you sure you want to delete this?',
@@ -35,13 +39,13 @@
 			
 			// Check if project was deleted (new format returns entity directly)
 			if (!res.deleteProject) {
-				console.error('Project deletion returned null project');
+				log.error('Project deletion returned null project');
 				throw new Error('Error deleting project: No project returned');
 			}
 			
 			return res.deleteProject;
 		} catch (e) {
-			console.error('Error deleting project:', e);
+			log.error('Error deleting project:', e);
 			throw e;
 		}
 	}
@@ -126,7 +130,7 @@
 						}
 						open = false;
 					} catch (error) {
-						console.error('Failed to delete project:', error);
+						log.error('Failed to delete project:', error);
 						alert('Failed to delete project. Please try again.');
 					}
 				}}

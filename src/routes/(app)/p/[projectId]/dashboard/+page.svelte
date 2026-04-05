@@ -16,6 +16,9 @@
 	import { DashboardSyncManager } from '$lib/services/realtime/websocket/sync-managers/DashboardSyncManager';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import { createLogger } from '$lib/utils/logger';
+
+	const log = createLogger('dashboard');
 
 	const SYNC_INIT_TIMEOUT_MS = 8_000;
 
@@ -64,14 +67,14 @@
 	}
 
 	onMount(() => {
-		console.log('🚀 Dashboard onMount started');
+		log.debug('Dashboard onMount started');
 		let unsubReset: (() => void) | undefined;
 
 		const supabase = createSupabaseBrowserClient();
 		if (supabase) {
 			void logSupabaseRpcSmokeTest(supabase);
 		} else {
-			console.warn(
+			log.warn(
 				'[Supabase RPC smoke test] skipped — set PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY'
 			);
 		}
@@ -94,7 +97,7 @@
 				const requiredRows = Math.max(minRows, dashboard.config.gridRows);
 				dashboard.updateGridConfig({ gridColumns, gridRows: requiredRows });
 			} catch (error) {
-				console.error('Error updating grid size:', error);
+				log.error('Error updating grid size:', error);
 			}
 		}
 
@@ -114,7 +117,7 @@
 					);
 					dashboard.setSyncManager(syncManager);
 				} catch (e) {
-					console.warn('Cloud sync unavailable for dashboard:', e);
+					log.warn('Cloud sync unavailable for dashboard:', e);
 					dashboard.setSyncManager(null);
 				}
 			}
@@ -122,17 +125,17 @@
 			const hasLoadedDashboard = await dashboard.initialize(projectId);
 
 				if (!hasLoadedDashboard) {
-					console.info('No saved dashboard found, loading defaults');
+					log.info('No saved dashboard found, loading defaults');
 					try {
 						publishWidgetData(dashboardWidgets);
 					} catch (error) {
-						console.error('Error publishing widget data:', error);
+						log.error('Error publishing widget data:', error);
 					}
 					dashboardWidgets.forEach((widget) => {
 						try {
 							dashboard.addWidget(widget);
 						} catch (error) {
-							console.error(`Failed to add widget ${widget.id}:`, error);
+							log.error(`Failed to add widget ${widget.id}:`, error);
 						}
 					});
 				} else {
@@ -140,15 +143,15 @@
 					try {
 						publishWidgetData(dashboard.widgets, { onlyIfMissing: true });
 					} catch (error) {
-						console.error('Error publishing widget data:', error);
+						log.error('Error publishing widget data:', error);
 					}
 				}
 
 				dashboard.ensureGridCapacity();
 				updateGridSize();
-				console.log('✅ Dashboard initialization complete');
+				log.debug('Dashboard initialization complete');
 			} catch (error) {
-				console.error('Error initializing dashboard:', error);
+				log.error('Error initializing dashboard:', error);
 			} finally {
 				isLoading = false;
 			}
@@ -162,7 +165,7 @@
 			try {
 				publishWidgetData(dashboard.widgets);
 			} catch (e) {
-				console.error('Error publishing widget data after reset:', e);
+				log.error('Error publishing widget data after reset:', e);
 			}
 		});
 
@@ -172,7 +175,7 @@
 					dashboard.save();
 				}
 			} catch (error) {
-				console.error('Error saving dashboard on beforeunload:', error);
+				log.error('Error saving dashboard on beforeunload:', error);
 			}
 		});
 
@@ -184,7 +187,7 @@
 					dashboard.save();
 				}
 			} catch (error) {
-				console.error('Error saving dashboard on cleanup:', error);
+				log.error('Error saving dashboard on cleanup:', error);
 			}
 		};
 	});

@@ -14,6 +14,9 @@
 import { AppSyncWsClient } from '$lib/services/realtime/websocket/AppSyncWsClient';
 import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from '$env/static/public';
 import type { SubscriptionSpec } from '$lib/services/realtime/websocket/types';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('realtime');
 
 interface ClientState {
 	client: AppSyncWsClient | null;
@@ -59,7 +62,7 @@ export async function ensureConnection(idToken: string): Promise<AppSyncWsClient
 
 	// If token has changed, disconnect old client
 	if (state.client && state.currentToken !== idToken) {
-		console.log('Token changed, disconnecting old AppSync client');
+		log.info('Token changed, disconnecting old AppSync client');
 		state.client.disconnect();
 		state.client = null;
 		state.currentToken = null;
@@ -71,7 +74,7 @@ export async function ensureConnection(idToken: string): Promise<AppSyncWsClient
 
 	state.connectionPromise = (async () => {
 		try {
-			console.log('Creating shared AppSync WebSocket client');
+			log.info('Creating shared AppSync WebSocket client');
 			const client = new AppSyncWsClient({
 				graphqlHttpUrl: PUBLIC_GRAPHQL_HTTP_ENDPOINT,
 				auth: { mode: 'cognito', idToken },
@@ -80,9 +83,9 @@ export async function ensureConnection(idToken: string): Promise<AppSyncWsClient
 
 			await client.ready();
 			state.client = client;
-			console.log('✓ Shared AppSync client connected');
+			log.info('Shared AppSync client connected');
 		} catch (error) {
-			console.error('Failed to connect AppSync client:', error);
+			log.error('Failed to connect AppSync client:', error);
 			state.client = null;
 			state.currentToken = null;
 			throw error;
@@ -129,7 +132,7 @@ export function removeSubscription<T>(spec: SubscriptionSpec<T>): void {
  */
 export function disconnectClient(): void {
 	if (state.client) {
-		console.log('Disconnecting shared AppSync client');
+		log.info('Disconnecting shared AppSync client');
 		state.client.disconnect();
 		state.client = null;
 		state.currentToken = null;

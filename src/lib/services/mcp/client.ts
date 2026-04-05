@@ -5,6 +5,9 @@
 
 import { spawn } from 'child_process';
 import type { Readable, Writable } from 'stream';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('mcp');
 
 export interface MCPServerConfig {
 	name: string;
@@ -68,7 +71,7 @@ export class MCPClient {
 							const response: JSONRPCResponse = JSON.parse(line);
 							this.handleResponse(response);
 						} catch (error) {
-							console.error('Failed to parse MCP response:', error);
+							log.error('Failed to parse MCP response:', error);
 						}
 					}
 				}
@@ -76,12 +79,12 @@ export class MCPClient {
 
 			// Handle stderr
 			this.process.stderr?.on('data', (chunk: Buffer) => {
-				console.error('MCP server stderr:', chunk.toString());
+				log.error('MCP server stderr:', chunk.toString());
 			});
 
 			// Handle process exit
 			this.process.on('exit', (code) => {
-				console.log(`MCP server exited with code ${code}`);
+				log.info(`MCP server exited with code ${code}`);
 				this.process = null;
 			});
 

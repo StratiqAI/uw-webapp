@@ -1,5 +1,8 @@
 import type { GridElement, WorkflowJSON } from '../../types/workflow';
 import type { Connection } from '../../types/connection';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('workflows');
 
 /** GraphQL WorkflowNodeKind - aligned with schema enum */
 type WorkflowNodeKind = 'INPUT' | 'PROCESS' | 'OUTPUT' | 'AI' | 'TOOLS' | 'COMMENT';
@@ -231,7 +234,7 @@ export async function copyWorkflowJSONToClipboard(workflowJSON: string): Promise
 		await navigator.clipboard.writeText(workflowJSON);
 		return true;
 	} catch (err) {
-		console.error('Failed to copy:', err);
+		log.error('Failed to copy:', err);
 		return false;
 	}
 }

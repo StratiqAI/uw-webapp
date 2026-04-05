@@ -52,6 +52,9 @@ import {
 	buildSchemaPattern,
 	buildNestedSchemaPattern
 } from './TopicMapper';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('graphql');
 
 /**
  * ValidatedTopicStore interface (to avoid circular dependency)
@@ -267,7 +270,7 @@ export class GraphQLStorePublisher {
 				}
 			},
 			error: config.onError || ((error: any) => {
-				console.error(`Subscription error for ${config.entityType}:`, error);
+				log.error(`Subscription error for ${config.entityType}:`, error);
 			})
 		};
 	}
@@ -277,7 +280,7 @@ export class GraphQLStorePublisher {
 	 */
 	private handleSubscriptionData(data: any, config: SubscriptionConfig, projectTopic: string): void {
 		if (!data || !data.id) {
-			console.warn('Subscription data missing id:', data);
+			log.warn('Subscription data missing id:', data);
 			return;
 		}
 

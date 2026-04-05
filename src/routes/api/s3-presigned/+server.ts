@@ -4,6 +4,9 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { REGION, USER_FILE_STAGING_BUCKET, COGNITO_IDENTITY_POOL_ID, COGNITO_USER_POOL_ID } from '$env/static/private';
 import { fromCognitoIdentityPool } from '@aws-sdk/credential-provider-cognito-identity';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('api');
 
 export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   const { filename, contentType, projectId, fileHash, metadata } = await request.json();
@@ -63,12 +66,10 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   
     const url = await getSignedUrl(s3, cmd, { expiresIn: 900 }); // 15 min
   
-    console.log('Generated presigned URL:', url);
-    console.log('Key:', key);
-    console.log("++++++++++++++++++++++++++++++++")
+    log.debug('Generated presigned URL', { url, key });
     return json({ url, key });
   } catch (err) {
-    console.error('Error generating presigned URL:', err);
+    log.error('Error generating presigned URL:', err);
     throw svelteError(500, 'Could not generate upload URL');
   }
 };

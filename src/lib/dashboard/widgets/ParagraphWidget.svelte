@@ -29,6 +29,9 @@
 	import { submitAIJob, type JobSubmissionCallbacks } from './utils/aiJobSubmission';
 	import { paragraphTitleQuery } from '$lib/dashboard/types/openAiQueryDefs';
 	import { project as projectStore } from '$lib/stores/appStateStore';
+	import { createLogger } from '$lib/utils/logger';
+
+	const log = createLogger('widgets');
 
 	// Inferred Types
 	type ParagraphWidgetData = z.infer<typeof ParagraphWidgetDataSchema>;
@@ -144,7 +147,7 @@
 		try {
 			return ParagraphWidgetDataSchema.parse(data);
 		} catch (err) {
-			console.error('Invalid widget data:', err);
+			log.error('Invalid widget data:', err);
 			return {
 				title: 'Error',
 				content: 'Failed to load widget content',
@@ -179,34 +182,34 @@
 					markdown: (parsedOutput.markdown ?? false) as boolean | null
 				};
 
-				console.log(`✅ AI content generated: "${newData.title || 'Untitled'}"`);
+				log.debug(`✅ AI content generated: "${newData.title || 'Untitled'}"`);
 				
 				// Publish to ValidatedTopicStore using the current topic
 				const currentTopic = getWidgetTopic('paragraph', widgetId, topicOverride);
 				const published = validatedTopicStore.publish(currentTopic, newData);
 				if (!published) {
-					console.error('❌ Failed to publish to ValidatedTopicStore');
+					log.error('❌ Failed to publish to ValidatedTopicStore');
 					error = 'Failed to save generated content';
 				}
 			} catch (err) {
-				console.error('Failed to process AI response:', err);
+				log.error('Failed to process AI response:', err);
 				error = 'Failed to process AI response';
 				isLoading = false;
 			}
 		},
 
 		onJobError: (err: Error) => {
-			console.error('❌ Job failed:', err);
+			log.error('❌ Job failed:', err);
 			error = err.message || 'AI generation failed';
 			isLoading = false;
 		},
 
 		onStatusUpdate: (update: JobUpdate) => {
-			console.log('📊 Job status:', update.status);
+			log.debug('📊 Job status:', update.status);
 		},
 
 		onConnectionStateChange: (state: string) => {
-			console.log('🔌 Connection state:', state);
+			log.debug('🔌 Connection state:', state);
 			const stateMap: Record<string, typeof connectionState> = {
 				connected: 'Researching',
 				connecting: 'Ready',
@@ -228,8 +231,8 @@
 			error = null;
 			isLoading = true;
 
-			console.log('projectStore:', $projectStore);
-			console.log('projectStore.vectorStoreId:', $projectStore?.vectorStoreId);
+			log.debug('projectStore:', $projectStore);
+			log.debug('projectStore.vectorStoreId:', $projectStore?.vectorStoreId);
 			const vectorStoreId = $projectStore?.vectorStoreId || 'vs_68da2c6862088191a5b51b8b4566b300';
 
 			await submitAIJob(
@@ -238,7 +241,7 @@
 				jobCallbacks
 			);
 		} catch (err) {
-			console.error('Failed to submit AI job:', err);
+			log.error('Failed to submit AI job:', err);
 			error = 'Failed to submit AI request';
 			isLoading = false;
 		}

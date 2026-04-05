@@ -1,6 +1,9 @@
 <script lang="ts">
 	import type { Connection, GridElement } from '../../types';
 	import WorkflowModal from './WorkflowModal.svelte';
+	import { createLogger } from '$lib/utils/logger';
+
+	const log = createLogger('workflows');
 
 	let {
 		darkMode = false,
@@ -64,7 +67,7 @@
 				copiedToClipboard = false;
 			}, 2000);
 		} catch (err) {
-			console.error('Failed to copy:', err);
+			log.error('Failed to copy:', err);
 		}
 	}
 

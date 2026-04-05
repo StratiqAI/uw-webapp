@@ -19,7 +19,9 @@
 
 // Import only necessary utilities.
 // Assuming logger handles environment-specific logging levels (e.g., no debug logs in prod).
-import { logger } from '$lib/utils/debug';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('realtime');
 import { print } from 'graphql';
 
 // Websocket resources
@@ -237,7 +239,7 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 		try {
 			queryString = typeof params.query === 'string' ? params.query : print(params.query);
 		} catch (e) {
-			console.error('Failed to print GraphQL query AST', e);
+			log.error('Failed to print GraphQL query AST', e);
 			params.error?.(new Error('Invalid GraphQL Query'));
 			return { id, unsubscribe: () => {} };
 		}
@@ -317,7 +319,7 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 		}
 
 		if (code !== WS_CLOSE_NORMAL) {
-			logger(`AppSync WS closed unexpectedly. Code: ${code}`, reason);
+			log.debug(`AppSync WS closed unexpectedly. Code: ${code}`, reason);
 		}
 
 		this.cleanupConnection();
@@ -355,13 +357,13 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 		const msg = safeJsonParse<AppSyncMessage>(String(evt.data));
 
 		if (!msg || !msg.type) {
-			logger('Received invalid or non-JSON message from AppSync protocol');
+			log.debug('Received invalid or non-JSON message from AppSync protocol');
 			return;
 		}
 
 		// Log non-keep-alive messages for debugging (assuming logger handles redaction in prod)
 		if (msg.type !== MSG_TYPE.KA) {
-			logger(`[${msg.type}]`, msg);
+			log.debug(`[${msg.type}]`, msg);
 		}
 
 		this.onEvent?.(msg);
@@ -405,7 +407,7 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 			this.kaTimer = window.setInterval(() => {
 				const timeSinceLastKa = Date.now() - this.lastKa;
 				if (timeSinceLastKa > this.connectionTimeoutMs) {
-					console.error('AppSync Keep-Alive timeout exceeded. Closing connection.');
+					log.error('AppSync Keep-Alive timeout exceeded. Closing connection.');
 					// 4008 = Policy Violation (server didn't respect KA policy)
 					this.websocket.close(WS_CLOSE_POLICY_VIOLATION, 'KA Timeout');
 				}
@@ -425,7 +427,7 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 	private handleDataMessage(msg: AppSyncMessage): void {
 		// DoS PREVENTION: Bounded queue.
 		if (this.queue.length >= MAX_QUEUE_SIZE) {
-			console.warn('AppSync client message queue full. Dropping incoming data message to prevent memory exhaustion.');
+			log.warn('AppSync client message queue full. Dropping incoming data message to prevent memory exhaustion.');
 			// Optional: Could choose to disconnect here if flooding is severe.
 			return;
 		}
@@ -443,7 +445,7 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 		} else {
 			// Global connection error. Log it.
 			// Note: AppSync often sends connection errors just before closing the socket.
-			console.error('AppSync Protocol Error:', msg.payload ?? msg);
+			log.error('AppSync Protocol Error:', msg.payload ?? msg);
 		}
 	}
 
@@ -471,7 +473,7 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 					}
 				}
 			} catch (e) {
-				console.error('Error processing subscription data queue', e);
+				log.error('Error processing subscription data queue', e);
 			} finally {
 				// Always reset queue state even if processing failed
 				this.queue = [];
@@ -493,14 +495,13 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 				this.websocket.send(JSON.stringify(obj));
 				return true;
 			} catch (e) {
-				// Catch rare network stack errors during send even if readyState was OPEN
-				console.error('Failed to send WebSocket message via network transport', e);
+				log.error('Failed to send WebSocket message via network transport', e);
 				// Force close if network transport is broken
 				this.websocket.close(WS_CLOSE_POLICY_VIOLATION, 'Transport Error');
 				return false;
 			}
 		} else {
-			logger('Cannot send message, websocket is not OPEN.', obj.type, `ReadyState: ${this.websocket.readyState}`);
+			log.debug('Cannot send message, websocket is not OPEN.', obj.type, `ReadyState: ${this.websocket.readyState}`);
 			return false;
 		}
 	}
@@ -535,7 +536,7 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 	 * Converts a declarative SubscriptionSpec into an active subscription.
 	 */
 	private setupManagedSubscription<T>(spec: SubscriptionSpec<T>): void {
-		logger('Setting up managed subscription:', spec);
+		log.debug('Setting up managed subscription:', spec);
 
 		// Determine the data selector function
 		let selector = (payload: any) => payload;
@@ -555,11 +556,11 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 					// Only fire next if data was actually selected (avoids undefined updates)
 					if (picked !== undefined) spec.next(picked);
 				} catch (e) {
-					const errorHandler = spec.error ?? console.error;
+					const errorHandler = spec.error ?? log.error.bind(log);
 					errorHandler('Subscription selector error', e);
 				}
 			},
-			error: spec.error ?? ((e) => console.error('Managed subscription error', e))
+			error: spec.error ?? ((e: unknown) => log.error('Managed subscription error', e))
 		});
 
 		this.specToHandleMap.set(spec, handle);

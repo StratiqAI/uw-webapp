@@ -1,4 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('supabase');
 
 /** Must match `CREATE FUNCTION public.smoke_test_ping` in Supabase. */
 export const SMOKE_TEST_RPC = 'smoke_test_ping';
@@ -32,8 +35,8 @@ export async function runSupabaseRpcSmokeTest(
 export async function logSupabaseRpcSmokeTest(supabase: SupabaseClient): Promise<void> {
 	const result = await runSupabaseRpcSmokeTest(supabase);
 	if (result.success) {
-		console.info('[Supabase RPC smoke test]', `OK (${result.rows.length} rows)`, result.rows);
+		log.info('RPC smoke test OK', `(${result.rows.length} rows)`, result.rows);
 	} else {
-		console.error('[Supabase RPC smoke test]', 'FAILED', result.error);
+		log.error('RPC smoke test FAILED', result.error);
 	}
 }

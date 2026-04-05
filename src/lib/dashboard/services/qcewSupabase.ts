@@ -9,6 +9,9 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('dashboard');
 
 /** Must match `CREATE FUNCTION public.lq_location_quotient_sectors`. */
 export const LQ_RPC_SECTORS = 'lq_location_quotient_sectors';
@@ -103,15 +106,15 @@ export async function loadLocationQuotientData(
 //     "p_agglvl_code": "44",
 //     "p_size_code": "0"
 // }
-	console.log('[loadLocationQuotientData] rpcSectorsArgs', rpcSectorsArgs);
-	console.log('[loadLocationQuotientData] rpcTotalArgs', rpcTotalArgs);
+	log.debug('[loadLocationQuotientData] rpcSectorsArgs', rpcSectorsArgs);
+	log.debug('[loadLocationQuotientData] rpcTotalArgs', rpcTotalArgs);
 	const [sectorsRes, totalRes] = await Promise.all([
 		supabase.rpc(LQ_RPC_SECTORS, rpcSectorsArgs),
 		supabase.rpc(LQ_RPC_TOTAL_AVG_MONTHLY_EMP, rpcTotalArgs)
 	]);
 
-	console.log('[loadLocationQuotientData] sectorsRes', sectorsRes);
-	console.log('[loadLocationQuotientData] totalRes', totalRes);
+	log.debug('[loadLocationQuotientData] sectorsRes', sectorsRes);
+	log.debug('[loadLocationQuotientData] totalRes', totalRes);
 
 	if (sectorsRes.error) {
 		throw new Error(`QCEW sectors RPC failed: ${sectorsRes.error.message}`);
@@ -121,8 +124,8 @@ export async function loadLocationQuotientData(
 	}
 
 	const raw = sectorsRes.data;
-	console.log('[loadLocationQuotientData] raw', raw);
-	console.log('[loadLocationQuotientData] raw', raw);
+	log.debug('[loadLocationQuotientData] raw', raw);
+	log.debug('[loadLocationQuotientData] raw', raw);
 	const rows = Array.isArray(raw)
 		? (raw as Record<string, unknown>[]).map(mapRpcSectorRow)
 		: [];

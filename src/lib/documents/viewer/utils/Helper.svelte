@@ -1,4 +1,8 @@
 <script context="module">
+  import { createLogger } from '$lib/utils/logger';
+
+  const log = createLogger('documents');
+
   /**
    * Print entire pdf pages
    * @param {String} url pdf url
@@ -78,10 +82,10 @@
     }
     let blobs = await fetch(fileUrl).then(r => r.blob())
     if (!blobs || !(blobs instanceof Blob)) {
-      console.log('Invalid blob object passed to URL.createObjectURL()')
+      log.warn('Invalid blob object passed to URL.createObjectURL()')
     }
     if (typeof URL.createObjectURL === 'undefined') {
-      console.log('Your browser does not support URL.createObjectURL()')
+      log.warn('Your browser does not support URL.createObjectURL()')
     }
 
     const url = URL.createObjectURL(blobs)

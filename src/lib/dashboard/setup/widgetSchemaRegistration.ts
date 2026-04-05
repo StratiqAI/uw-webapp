@@ -15,6 +15,9 @@ import { WidgetDataSchemas } from '$lib/dashboard/types/widgetSchemas';
 import type { WidgetType } from '$lib/dashboard/types/widget';
 import type { JsonSchemaDefinition } from '$lib/types/models';
 import { getRegisteredManifests, getWidgetManifest } from '$lib/dashboard/setup/widgetRegistry';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('widgets');
 
 const WIDGET_NAMES: Record<WidgetType, string> = {
 	paragraph: 'Paragraph Widget',
@@ -107,7 +110,7 @@ export function initializeWidgetSchemas(): void {
 				jsonSchema: zodToCleanJsonSchema(zodSchema, `${widgetType}WidgetData`)
 			});
 		} catch (error) {
-			console.error(`Failed to register ${schemaId}:`, error);
+			log.error(`Failed to register ${schemaId}:`, error);
 			throw error;
 		}
 	}
@@ -127,7 +130,7 @@ export function initializeWidgetSchemas(): void {
 				jsonSchema: zodToCleanJsonSchema(topicZod, `${manifest.kind}WidgetData`)
 			});
 		} catch (error) {
-			console.error(`Failed to register package widget ${schemaId}:`, error);
+			log.error(`Failed to register package widget ${schemaId}:`, error);
 		}
 
 		if (manifest.outputSchema) {
@@ -143,7 +146,7 @@ export function initializeWidgetSchemas(): void {
 					jsonSchema: zodToCleanJsonSchema(manifest.outputSchema, `${manifest.kind}WidgetOutput`)
 				});
 			} catch (error) {
-				console.error(`Failed to register output schema ${outputSchemaId}:`, error);
+				log.error(`Failed to register output schema ${outputSchemaId}:`, error);
 			}
 		}
 	}

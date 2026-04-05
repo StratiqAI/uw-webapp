@@ -13,6 +13,9 @@
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
 	import { createSupabaseBrowserClient } from '$lib/services/supabase/browser';
+	import { createLogger } from '$lib/utils/logger';
+
+	const log = createLogger('dashboard');
 
 	const serviceMap = new Map<string, unknown>();
 	const sbClient = createSupabaseBrowserClient();
@@ -141,7 +144,7 @@
 					} as Widget;
 					dashboard.addWidget(widget);
 				} catch (err) {
-					console.error('Topic drop failed:', err);
+					log.error('Topic drop failed:', err);
 				}
 				topicDropGhost = null;
 				topicDragStore.set(null);

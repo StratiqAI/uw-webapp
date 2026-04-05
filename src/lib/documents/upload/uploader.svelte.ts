@@ -13,6 +13,9 @@ import {
 	DEFAULT_PRESIGNED_URL_ENDPOINT
 } from './constants';
 import type { UploadFile, PresignedUrlResponse, FileMetadata, LoggerFn } from './types';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('documents');
 
 export interface UploaderOptions {
 	idToken?: string | null;
@@ -88,7 +91,7 @@ export function createUploader(options: UploaderOptions = {}) {
 			});
 
 			if (!metadataAtRequestTime) {
-				console.warn(
+				log.warn(
 					`${LOG_PREFIX} [UPLOAD_WAIT] Metadata not immediately available, waiting up to 2 seconds...`,
 					{ fileName: upload.file.name }
 				);
@@ -122,7 +125,7 @@ export function createUploader(options: UploaderOptions = {}) {
 
 			if (!metadataAtRequestTime) {
 				const errorMsg = `Metadata is required for upload but was not available after waiting. Token: ${token ? 'present' : 'null'}, Project: ${project ? 'present' : 'null'}. Please ensure the project is fully loaded before uploading.`;
-				console.error(`${LOG_PREFIX} [UPLOAD_ERROR] ${errorMsg}`, {
+				log.error(`${LOG_PREFIX} [UPLOAD_ERROR] ${errorMsg}`, {
 					fileName: upload.file.name,
 					stackTrace: new Error().stack
 				});
@@ -212,7 +215,7 @@ export function createUploader(options: UploaderOptions = {}) {
 		},
 		add(filesToAdd: File[]) {
 			if (!fileMetadata) {
-				console.warn(
+				log.warn(
 					`${LOG_PREFIX} Files added but metadata is not available yet. Upload will wait for metadata or fail if it doesn't become available.`,
 					{ hasToken: !!token, hasProject: !!project, hasMetadata: !!fileMetadata }
 				);
@@ -293,7 +296,7 @@ async function getPresignedUrl(
 
 	if (!projectId) {
 		const errorMsg = 'Project ID is required for upload';
-		console.error(`${LOG_PREFIX} ${errorMsg}. ProjectId: ${projectId}`);
+		log.error(`${LOG_PREFIX} ${errorMsg}. ProjectId: ${projectId}`);
 		throw new Error(errorMsg);
 	}
 
@@ -317,7 +320,7 @@ async function getPresignedUrl(
 	if (!response.ok) {
 		const errorText = await response.text();
 		const errorMsg = `Could not get upload URL (${response.status}): ${errorText}`;
-		console.error(`${LOG_PREFIX} ${errorMsg}`, {
+		log.error(`${LOG_PREFIX} ${errorMsg}`, {
 			status: response.status,
 			statusText: response.statusText,
 			errorText,
@@ -359,7 +362,7 @@ function uploadToS3(
 				resolve();
 			} else {
 				const errorMsg = `Upload failed with status ${xhr.status}${xhr.responseText ? `: ${xhr.responseText}` : ''}`;
-				console.error(`${LOG_PREFIX} ${errorMsg}`, {
+				log.error(`${LOG_PREFIX} ${errorMsg}`, {
 					status: xhr.status,
 					statusText: xhr.statusText,
 					responseText: xhr.responseText,

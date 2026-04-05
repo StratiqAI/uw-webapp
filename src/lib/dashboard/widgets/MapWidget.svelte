@@ -9,6 +9,9 @@
 	import type { MapWidget } from '$lib/dashboard/types/widget';
 	import { useReactiveValidatedTopic } from '$lib/hooks/validatedTopicStoreRunes.svelte';
 	import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { createLogger } from '$lib/utils/logger';
+
+	const log = createLogger('widgets');
 
 	interface Props {
 		data: MapWidget['data'];
@@ -27,9 +30,9 @@
 	let widgetData = $derived<MapWidget['data']>(dataStream.current || data);
 
 	$effect(() => {
-		console.log(`🗺️ MapWidget:${widgetId} - Initialized with ValidatedTopicStore`);
-		console.log(`   Topic: ${topic}`);
-		console.log(`   Initial data:`, data);
+		log.debug(`MapWidget:${widgetId} - Initialized with ValidatedTopicStore`);
+		log.debug(`   Topic: ${topic}`);
+		log.debug(`   Initial data:`, data);
 	});
 
 	const apiKey = PUBLIC_GEOAPIFY_API_KEY;
@@ -44,13 +47,13 @@
 			const range = 300;
 			const isolineUrl = `https://api.geoapify.com/v1/isoline?lat=${centerLat}&lon=${centerLon}&type=time&mode=drive&range=${range}&apiKey=${apiKey}`;
 			
-			console.log('Fetching isoline data from:', isolineUrl);
+			log.debug('Fetching isoline data from:', isolineUrl);
 			
 			const response = await fetch(isolineUrl);
 			const data = await response.json();
 			
 			if (response.ok && data.features && data.features.length > 0) {
-				console.log('Isoline data received:', data);
+				log.debug('Isoline data received:', data);
 				
 				// Add the isoline to the map using Leaflet's GeoJSON layer
 				L.geoJSON(data, {
@@ -65,12 +68,12 @@
 					}
 				}).addTo(map);
 				
-				console.log('✅ Isoline added to map successfully');
+				log.debug('Isoline added to map successfully');
 			} else {
-				console.error('Failed to fetch isoline data:', data);
+				log.error('Failed to fetch isoline data:', data);
 			}
 		} catch (error) {
-			console.error('Error fetching isoline:', error);
+			log.error('Error fetching isoline:', error);
 		}
 	}
 
@@ -89,9 +92,7 @@
 		const currentLon = widgetData.lon;
 		const currentZoom = widgetData.zoom;
 
-		console.log('===============');
-		console.log(currentLat, currentLon, currentZoom);
-		console.log('===============');
+		log.debug('map view', { currentLat, currentLon, currentZoom });
 		// 1. Initialize the Leaflet map, binding it to our <div>
 		const map = L.map(mapContainer).setView([currentLat, currentLon], currentZoom);
 

@@ -13,6 +13,9 @@
 	import ChatDrawer from '$lib/components/layout/ChatDrawer.svelte';
 	import TopBar from '$lib/components/layout/TopBar.svelte';
 	import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
+	import { createLogger } from '$lib/utils/logger';
+
+	const log = createLogger('projects');
 
 	let { children, data }: LayoutProps = $props();
 
@@ -66,7 +69,7 @@
 				}
 			} catch (err) {
 				if (aborted) return;
-				console.error('Error initializing project sync:', err);
+				log.error('Error initializing project sync:', err);
 			}
 		}
 
@@ -86,16 +89,16 @@
 			variables: { parentId: projectId },
 			path: 'onCreateNotification',
 			next: (notification: Notification) => {
-				console.log('Notification received for project:', projectId, notification);
+				log.debug('Notification received for project:', projectId, notification);
 				notificationStore.addNotification(notification);
 			},
 			error: (err: unknown) => {
-				console.error('Notification subscription error for project', projectId, err);
+				log.error('Notification subscription error for project', projectId, err);
 			}
 		};
 
 		addSubscription(idToken, spec).catch((err) => {
-			console.error('Failed to add notification subscription for project', projectId, err);
+			log.error('Failed to add notification subscription for project', projectId, err);
 		});
 
 		return () => {

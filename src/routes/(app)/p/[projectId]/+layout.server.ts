@@ -3,6 +3,9 @@ import type { LayoutServerLoad } from './$types';
 import type { Project } from '@stratiqai/types-simple';
 import { gql } from '$lib/services/realtime/graphql/requestHandler';
 import { Q_GET_PROJECT } from '$lib/services/realtime/graphql/queries/Project';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('app');
 
 type GraphQLProjectResponse = {
 	getProject: Project | null;
@@ -52,7 +55,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, url, parent }) =
 		if (err && typeof err === 'object' && 'status' in err && (err as any).status === 302) {
 			throw err;
 		}
-		console.error('Failed to load project data:', err);
+		log.error('Failed to load project data:', err);
 		throw redirect(302, '/p?reason=project-error');
 	}
 };

@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { getDealProject } from '$lib/deal-room/dealRoomService';
-	import { dealRoomSampleStore } from '$lib/deal-room/stores/dealRoomSampleStore.svelte';
-	import type { DealProject } from '$lib/deal-room/types';
+	import { getDealProject } from '$lib/dealRoom/dealRoomService';
+	import { dealRoomSampleStore } from '$lib/dealRoom/stores/dealRoomSampleStore.svelte';
+	import type { DealProject } from '$lib/dealRoom/types';
 
 	interface Props {
 		projectId: string;

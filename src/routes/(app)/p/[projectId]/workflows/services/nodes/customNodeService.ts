@@ -1,5 +1,7 @@
 import type { ElementType, AIQueryData, AIMessage } from '../../types/node';
+import { createLogger } from '$lib/utils/logger';
 
+const log = createLogger('workflows');
 const STORAGE_KEY = 'workflow-custom-ai-nodes';
 
 /**
@@ -84,7 +86,7 @@ export function loadCustomAINodes(): ElementType[] {
 			}));
 		}
 	} catch (e) {
-		console.error('Failed to load custom AI nodes:', e);
+		log.error('Failed to load custom AI nodes:', e);
 	}
 	return [];
 }
@@ -106,7 +108,7 @@ export function saveCustomAINodes(customNodes: ElementType[]): void {
 		});
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(serializable));
 	} catch (e) {
-		console.error('Failed to save custom AI nodes:', e);
+		log.error('Failed to save custom AI nodes:', e);
 	}
 }
 
@@ -164,7 +166,7 @@ function createAIExecuteFunction(defaultAIQueryData?: AIQueryData): (input: any,
 			}
 			return 'No response';
 		} catch (error) {
-			console.error('AI Query error:', error);
+			log.error('AI Query error:', error);
 			return `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
 		}
 	};

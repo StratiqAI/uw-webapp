@@ -23,6 +23,9 @@ import type { LfprDashboardConfig } from '@stratiqai/widget-lfpr-dashboard';
 import { lfprDashboardConfigSchema as LfprDashboardConfigSchema } from '@stratiqai/widget-lfpr-dashboard';
 import type { Mapbox3dConfig } from '@stratiqai/widget-mapbox-3d';
 import { mapbox3dConfigSchema as Mapbox3dConfigSchema } from '@stratiqai/widget-mapbox-3d';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('widgets');
 
 export type { MetricWidgetData, JsonViewerWidgetData, BrokerCardWidgetData };
 
@@ -337,9 +340,9 @@ export function zodSchemaToOpenAI<T extends z.ZodSchema>(
 	schema: T,
 	description?: string
 ): OpenAIStructuredOutputConfig {
-	console.log(`\n🔧 [zodSchemaToOpenAI] Converting Zod schema to OpenAI format`);
-	console.log(`   Name: ${name}`);
-	console.log(`   Description: ${description || '(none)'}`);
+	log.debug(`\n🔧 [zodSchemaToOpenAI] Converting Zod schema to OpenAI format`);
+	log.debug(`   Name: ${name}`);
+	log.debug(`   Description: ${description || '(none)'}`);
 	
 	// Convert Zod schema to JSON Schema
 	const jsonSchema = zodToJsonSchema(schema, {
@@ -350,7 +353,7 @@ export function zodSchemaToOpenAI<T extends z.ZodSchema>(
 	// Extract the schema object (remove $schema property if present)
 	const { $schema, ...schemaObject } = jsonSchema as any;
 
-	console.log(`   ✅ Conversion complete`);
+	log.debug(`   ✅ Conversion complete`);
 
 	return {
 		type: 'json_schema',
@@ -387,13 +390,13 @@ export function getWidgetTextFormat<T extends WidgetType>(
 	widgetType: T,
 	name?: string
 ): OpenAITextFormatConfig {
-	console.log(`\n🔧 [getWidgetTextFormat] Getting OpenAI text format for widget type: ${widgetType}`);
+	log.debug(`\n🔧 [getWidgetTextFormat] Getting OpenAI text format for widget type: ${widgetType}`);
 	const schema = WidgetDataSchemas[widgetType];
 	const configName = name || `${widgetType}WidgetData`;
 	
-	console.log(`   Using zodTextFormat with name: ${configName}`);
+	log.debug(`   Using zodTextFormat with name: ${configName}`);
 	const textFormat = zodTextFormat(schema, configName);
-	console.log(`   ✅ Text format generated`);
+	log.debug(`   ✅ Text format generated`);
 	
 	return textFormat as OpenAITextFormatConfig;
 }
@@ -457,10 +460,10 @@ export function validateWidgetData<T extends WidgetType>(
 	widgetType: T,
 	data: unknown
 ): { success: true; data: WidgetDataTypeMap[T] } | { success: false; error: z.ZodError } {
-	console.log(`\n🔧 [validateWidgetData] Validating data for widget type: ${widgetType}`);
+	log.debug(`\n🔧 [validateWidgetData] Validating data for widget type: ${widgetType}`);
 	const schema = WidgetDataSchemas[widgetType];
 	const result = schema.safeParse(data) as any;
-	console.log(`   Result: ${result.success ? '✅ Valid' : '❌ Invalid'}`);
+	log.debug(`   Result: ${result.success ? '✅ Valid' : '❌ Invalid'}`);
 	return result;
 }
 
@@ -471,16 +474,16 @@ export function parseWidgetData<T extends WidgetType>(
 	widgetType: T,
 	data: unknown
 ): WidgetDataTypeMap[T] {
-	console.log(`\n🔧 [parseWidgetData] Parsing data for widget type: ${widgetType}`);
+	log.debug(`\n🔧 [parseWidgetData] Parsing data for widget type: ${widgetType}`);
 	const schema = WidgetDataSchemas[widgetType];
 	// Type assertion needed due to TypeScript's limitations with indexed schema types
 	// Runtime validation by Zod ensures type safety
 	try {
 		const result = schema.parse(data) as any;
-		console.log(`   ✅ Parse successful`);
+		log.debug(`   ✅ Parse successful`);
 		return result;
 	} catch (error) {
-		console.error(`   ❌ Parse failed:`, error);
+		log.error(`   ❌ Parse failed:`, error);
 		throw error;
 	}
 }

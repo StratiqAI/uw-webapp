@@ -1,5 +1,8 @@
 import type { AIQueryData, AIMessage } from '../../types/node';
 import { WorkflowNode } from '../WorkflowNode';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('workflows');
 
 type AIWorkflowNodeConfig = {
 	id: string;
@@ -160,7 +163,7 @@ export function createAIWorkflowNode(config: AIWorkflowNodeConfig): WorkflowNode
 				}
 				return 'No response';
 			} catch (error) {
-				console.error('AI Query error:', error);
+				log.error('AI Query error:', error);
 				return `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
 			}
 		}

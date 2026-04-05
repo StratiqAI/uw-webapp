@@ -14,6 +14,9 @@ import {
 	type AppSyncWsClient
 } from '../wsClient';
 import { GraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('sync');
 
 export type DashboardSyncManagerOptions = {
 	idToken: string;
@@ -119,7 +122,7 @@ export class DashboardSyncManager {
 
 		const existing = await this.loadLayout();
 		if (existing) {
-			console.info('[DashboardSyncManager] Layout already exists for project — updating instead of creating.');
+			log.info('Layout already exists for project — updating instead of creating.');
 			this.layoutId = existing.id;
 			const updated = await this.queryClient!.query<{
 				updateDashboardLayout: DashboardLayout;
@@ -148,7 +151,7 @@ export class DashboardSyncManager {
 			if (existing) {
 				this.layoutId = existing.id;
 			} else {
-				console.info('[DashboardSyncManager] No layout exists — creating one.');
+				log.info('No layout exists — creating one.');
 				return this.createLayout(state, version);
 			}
 		}
@@ -183,7 +186,7 @@ export class DashboardSyncManager {
 				}
 			},
 			error: (err) => {
-				console.error('[DashboardSyncManager] Update subscription error:', err);
+				log.error('Update subscription error:', err);
 			}
 		});
 	}
@@ -207,7 +210,7 @@ export class DashboardSyncManager {
 				}
 			},
 			error: (err) => {
-				console.error('[DashboardSyncManager] Create subscription error:', err);
+				log.error('Create subscription error:', err);
 			}
 		});
 	}

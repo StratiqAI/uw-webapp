@@ -2,7 +2,9 @@
 // ListOperations.ts
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-import { logger } from "$lib/utils/debug";
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('realtime');
 
 // Generic helpers to manage a list of T by a computed key.
 // Works great with Svelte 5 $state deep reactivity (mutations are tracked).
@@ -19,11 +21,9 @@ export function createListOps<T>(opts: { keyFor: KeyFn<T>; normalize?: Normalize
 
 	function upsertMutable(items: T[], it: T): void {
 		it = norm(it);
-		logger('it', it);
+		log.debug('upsertMutable item:', it);
 		const k = opts.keyFor(it);
-		logger('k', k);
 		const i = items.findIndex((x) => opts.keyFor(x) === k);
-		logger('i', i);
 		if (i >= 0) items[i] = it;
 		else items.unshift(it);
 	}

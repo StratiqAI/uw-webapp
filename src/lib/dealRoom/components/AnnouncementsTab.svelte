@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { listAnnouncements, createAnnouncement } from '$lib/deal-room/dealRoomService';
-	import { dealRoomSampleStore } from '$lib/deal-room/stores/dealRoomSampleStore.svelte';
-	import type { Announcement } from '$lib/deal-room/types';
+	import { listAnnouncements, createAnnouncement } from '$lib/dealRoom/dealRoomService';
+	import { dealRoomSampleStore } from '$lib/dealRoom/stores/dealRoomSampleStore.svelte';
+	import type { Announcement } from '$lib/dealRoom/types';
 
 	interface Props {
 		projectId: string;

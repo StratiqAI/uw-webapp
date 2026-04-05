@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { listBuyerEngagements, listMatchScores } from '$lib/deal-room/dealRoomService';
-	import { dealRoomSampleStore } from '$lib/deal-room/stores/dealRoomSampleStore.svelte';
-	import type { BuyerEngagement, MatchScore } from '$lib/deal-room/types';
+	import { listBuyerEngagements, listMatchScores } from '$lib/dealRoom/dealRoomService';
+	import { dealRoomSampleStore } from '$lib/dealRoom/stores/dealRoomSampleStore.svelte';
+	import type { BuyerEngagement, MatchScore } from '$lib/dealRoom/types';
 
 	interface Props {
 		projectId: string;

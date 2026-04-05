@@ -15,6 +15,9 @@ import { EntitySyncManager } from '$lib/services/realtime/store/EntitySyncManage
 import type { EntitySyncOptions, EntitySyncResult } from '$lib/services/realtime/store/EntitySyncConfig';
 import { createProjectSyncConfig } from '$lib/services/realtime/store/EntitySyncHelpers';
 import { toTopicPath } from '$lib/services/realtime/store/TopicMapper';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('sync');
 
 // Re-export the specific store used by this manager
 export const store = validatedTopicStore;
@@ -22,7 +25,7 @@ export const store = validatedTopicStore;
 // Expose dumpStore function to browser console for debugging
 if (browser && typeof window !== 'undefined') {
 	(window as any).dumpStore = () => {
-		console.log('ValidatedTopicStore contents:', store.toJSON());
+		log.debug('ValidatedTopicStore contents:', store.toJSON());
 		return store.toJSON();
 	};
 }

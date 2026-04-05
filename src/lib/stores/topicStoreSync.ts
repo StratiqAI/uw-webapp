@@ -12,6 +12,9 @@
  */
 
 import type { ValidatedTopicStore, SchemaRegistration, StoreChangeEvent } from './validatedTopicStore';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('store');
 
 // ── localStorage keys ───────────────────────────────────────────────
 const DATA_KEY = 'vts:data';
@@ -142,7 +145,7 @@ export function initTopicStoreSync(store: ValidatedTopicStore): () => void {
 					topicSnapshot.set(msg.topic, msg.value);
 					const ok = store.publish(msg.topic, msg.value);
 					if (!ok) {
-						console.warn(`[TopicStoreSync] Remote publish rejected by validation: ${msg.topic}`);
+						log.warn(`[TopicStoreSync] Remote publish rejected by validation: ${msg.topic}`);
 					}
 					break;
 				}
@@ -225,7 +228,7 @@ function restoreSchemas(store: ValidatedTopicStore): void {
 		}
 	}
 	if (count > 0) {
-		console.log(`[TopicStoreSync] Restored ${count} UI schema(s) from localStorage`);
+		log.info(`[TopicStoreSync] Restored ${count} UI schema(s) from localStorage`);
 	}
 }
 
@@ -243,14 +246,14 @@ function restoreTopics(store: ValidatedTopicStore, snapshot: Map<string, unknown
 				count++;
 			} else {
 				rejected++;
-				console.warn(`[TopicStoreSync] Restore rejected by validation: ${topic}`);
+				log.warn(`[TopicStoreSync] Restore rejected by validation: ${topic}`);
 			}
 		} catch {
 			rejected++;
 		}
 	}
 	if (count > 0 || rejected > 0) {
-		console.log(`[TopicStoreSync] Restored ${count} topic(s) from localStorage` +
+		log.info(`[TopicStoreSync] Restored ${count} topic(s) from localStorage` +
 			(rejected > 0 ? ` (${rejected} rejected)` : ''));
 	}
 }

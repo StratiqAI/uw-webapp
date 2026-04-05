@@ -1,6 +1,8 @@
 import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from "$env/static/public";
-import { logger } from "$lib/utils/debug";
 import { print, type DocumentNode } from "graphql";
+import { createLogger } from "$lib/utils/logger";
+
+const log = createLogger("graphql");
 
 /**
  * Executes a GraphQL query or mutation against the AppSync HTTP endpoint.
@@ -35,9 +37,9 @@ export async function gql<T>(
 	});
 	
 	if (!res.ok) {
-		console.error('GraphQL HTTP error:', res.status, res.statusText);
+		log.error('GraphQL HTTP error:', res.status, res.statusText);
 		const text = await res.text();
-		console.error('Response body:', text);
+		log.error('Response body:', text);
 		throw new Error(`HTTP ${res.status}: ${res.statusText}`);
 	}
 	
@@ -45,7 +47,7 @@ export async function gql<T>(
 	// console.log('GraphQL Response:', JSON.stringify(body, null, 2));
 	
 	if (body.errors?.length) {
-		console.error('GraphQL errors:', body.errors);
+		log.error('GraphQL errors:', body.errors);
 		throw new Error(body.errors.map((e: any) => e.message).join('; '));
 	}
 	return body.data as T;

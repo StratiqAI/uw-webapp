@@ -1,5 +1,8 @@
 import { createWidgetConsumer } from '$lib/dashboard/types/widgetBridge';
 import type { WidgetChannelConfig } from '$lib/dashboard/types/widgetSchemas';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('widgets');
 
 /**
  * Sets up a consumer for a widget with automatic subscription
@@ -14,25 +17,20 @@ export function setupConsumer<TData>(
 	widgetId: string,
 	onDataReceived: (data: TData | undefined) => void
 ) {
-	console.log(`\n📝 [ParagraphWidget] Initializing widget`);
-	console.log(`   Widget ID: ${widgetId}`);
-	console.log(`   Channel ID: ${channel.channelId}`);
+	log.debug('Initializing widget consumer', { widgetId, channelId: channel.channelId });
 
-	// Create a validated consumer using the type-safe bridge system
 	const consumer = createWidgetConsumer(channel, widgetId);
 
-	console.log(`📝 [ParagraphWidget:${widgetId}] Consumer created, setting up subscription...`);
+	log.debug(`Consumer created, subscribing: ${widgetId}`);
 
 	// Subscribe to validated content updates
 	// The consumer automatically validates data against the Zod schema
 	const unsubscribe = consumer.subscribe((validatedData) => {
-		console.log(`\n📝 [ParagraphWidget:${widgetId}] 📥 Subscription callback triggered`);
 		if (validatedData) {
-			console.log(`   ✅ Received validated data:`, validatedData);
+			log.debug(`Subscription data for ${widgetId}`, validatedData);
 			onDataReceived(validatedData as TData);
-			console.log(`   ✅ Widget state updated`);
 		} else {
-			console.log(`   ⚠️ Received undefined or invalid data`);
+			log.debug(`No data for ${widgetId}`);
 			onDataReceived(undefined);
 		}
 	});

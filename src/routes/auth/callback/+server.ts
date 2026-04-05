@@ -1,6 +1,9 @@
 // src/routes/auth/callback/+server.ts
 import { COGNITO_CLIENT_ID, COGNITO_DOMAIN } from '$env/static/private';
 import { error, redirect, type RequestHandler } from '@sveltejs/kit';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('auth');
 
 export const GET: RequestHandler = async (params) => {
 	const { cookies, url } = params;
@@ -40,7 +43,7 @@ export const GET: RequestHandler = async (params) => {
 	// Handle unsuccessful token exchange
 	if (!response.ok) {
 		const errorText = await response.text();
-		console.error('Token exchange failed:', {
+		log.error('Token exchange failed:', {
 			status: response.status,
 			statusText: response.statusText,
 			error: errorText

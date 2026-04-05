@@ -27,6 +27,9 @@ import {
   type SubmitJobInput,
   type JobState
 } from './jobManager';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('widgets');
 
 // ============================================================================
 // Types
@@ -207,7 +210,7 @@ export function validateAndNormalize<T extends WidgetType>(
     return result.data;
   }
   
-  console.error('Validation failed:', result.error);
+  log.error('Validation failed:', result.error);
   
   // Return safe defaults based on widget type
   const defaults: { [K in WidgetType]: WidgetDataTypeMap[K] } = {
@@ -315,9 +318,9 @@ export function createWidgetAIService<T extends WidgetType>(
                   const validated = validateAndNormalize(config.type, widgetData);
                   publisher.publish(validated);
                   
-                  console.log(`✅ ${config.type} content generated successfully`);
+                  log.debug(`✅ ${config.type} content generated successfully`);
                 } catch (err) {
-                  console.error('Failed to process AI response:', err);
+                  log.error('Failed to process AI response:', err);
                   state.update(s => ({ 
                     ...s, 
                     error: 'Failed to process AI response' 
@@ -326,7 +329,7 @@ export function createWidgetAIService<T extends WidgetType>(
               },
               
               onError: (err) => {
-                console.error('❌ Generation failed:', err);
+                log.error('❌ Generation failed:', err);
                 state.update(s => ({ 
                   ...s, 
                   error: err.message || 'Generation failed' 
@@ -372,7 +375,7 @@ export function createWidgetAIService<T extends WidgetType>(
         await jobManager.submitJob(jobInput, token);
         
       } catch (err) {
-        console.error('Failed to submit job:', err);
+        log.error('Failed to submit job:', err);
         state.update(s => ({ 
           ...s, 
           error: 'Failed to submit request',

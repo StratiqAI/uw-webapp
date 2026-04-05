@@ -4,6 +4,9 @@
 
 import type { Workflow, CreateWorkflowInput, UpdateWorkflowInput } from '$lib/types/cloud/Workflow';
 import { gql } from '$lib/services/realtime/graphql/requestHandler';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('graphql');
 
 export const M_CREATE_WORKFLOW = `
   mutation createWorkflow($input: CreateWorkflowInput!) {
@@ -99,7 +102,7 @@ export async function createWorkflow(
 		const res = await gql<{ createWorkflow: Workflow }>(M_CREATE_WORKFLOW, { input }, idToken);
 		return res.createWorkflow;
 	} catch (e) {
-		console.error('Error creating workflow:', e);
+		log.error('Error creating workflow:', e);
 		throw e;
 	}
 }
@@ -115,7 +118,7 @@ export async function updateWorkflow(
 		const res = await gql<{ updateWorkflow: Workflow }>(M_UPDATE_WORKFLOW, { input }, idToken);
 		return res.updateWorkflow;
 	} catch (e) {
-		console.error('Error updating workflow:', e);
+		log.error('Error updating workflow:', e);
 		throw e;
 	}
 }
@@ -128,7 +131,7 @@ export async function deleteWorkflow(id: string, idToken: string): Promise<Workf
 		const res = await gql<{ deleteWorkflow: Workflow }>(M_DELETE_WORKFLOW, { id }, idToken);
 		return res.deleteWorkflow;
 	} catch (e) {
-		console.error('Error deleting workflow:', e);
+		log.error('Error deleting workflow:', e);
 		throw e;
 	}
 }

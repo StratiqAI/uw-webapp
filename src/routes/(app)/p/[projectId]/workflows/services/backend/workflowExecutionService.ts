@@ -1,6 +1,9 @@
 import { gql } from '$lib/services/realtime/graphql/requestHandler';
 import { Q_GET_WORKFLOW_EXECUTION, Q_LIST_WORKFLOW_EXECUTIONS } from '@stratiqai/types-simple';
 import type { WorkflowExecution } from '@stratiqai/types-simple';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('workflows');
 
 export type WorkflowExecutionListItem = Pick<
 	WorkflowExecution,
@@ -32,7 +35,7 @@ export async function fetchWorkflowExecutions(
 ): Promise<{ items: WorkflowExecutionListItem[]; nextToken?: string | null }> {
 	const limit = options?.limit ?? 50;
 
-	console.log('[fetchWorkflowExecutions] Fetching executions for workflow:', {
+	log.debug('[fetchWorkflowExecutions] Fetching executions for workflow:', {
 		workflowId,
 		limit,
 		status: options?.status,
@@ -58,7 +61,7 @@ export async function fetchWorkflowExecutions(
 	const executions = response?.listWorkflowExecutions?.items ?? [];
 	const nextToken = response?.listWorkflowExecutions?.nextToken ?? null;
 
-	console.log('[fetchWorkflowExecutions] Results:', {
+	log.debug('[fetchWorkflowExecutions] Results:', {
 		workflowId,
 		count: executions.length,
 		executionIds: executions.map((e) => e.id),
@@ -83,7 +86,7 @@ export async function fetchWorkflowExecutionDetail(
 	workflowId: string, // parentId - the Workflow ID (execution's parent)
 	idToken: string
 ): Promise<WorkflowExecution | null> {
-	console.log('[fetchWorkflowExecutionDetail] Fetching execution:', { id, workflowId });
+	log.debug('[fetchWorkflowExecutionDetail] Fetching execution:', { id, workflowId });
 	
 	// getWorkflowExecution requires composite key: { id, parentId }
 	// parentId is the Workflow ID (WorkflowExecution is a child of Workflow)
@@ -93,16 +96,16 @@ export async function fetchWorkflowExecutionDetail(
 			{ key: { id, parentId: workflowId } },
 			idToken
 		);
-		console.log('[fetchWorkflowExecutionDetail] Query response:', response);
+		log.debug('[fetchWorkflowExecutionDetail] Query response:', response);
 		const result = response?.getWorkflowExecution ?? null;
 		if (!result) {
-			console.warn('[fetchWorkflowExecutionDetail] Execution not found for id:', id);
+			log.warn('[fetchWorkflowExecutionDetail] Execution not found for id:', id);
 		} else {
-			console.log('[fetchWorkflowExecutionDetail] Found execution:', result.id);
+			log.debug('[fetchWorkflowExecutionDetail] Found execution:', result.id);
 		}
 		return result;
 	} catch (error) {
-		console.error('[fetchWorkflowExecutionDetail] GraphQL error:', error);
+		log.error('[fetchWorkflowExecutionDetail] GraphQL error:', error);
 		throw error;
 	}
 }

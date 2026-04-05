@@ -1,5 +1,8 @@
 // src/hooks.server.ts
 import '$lib/server/retainSubscriptionDocumentsForSsr';
+import { createLogger } from '$lib/utils/logger';
+
+const log = createLogger('auth');
 import { type CurrentUser } from '$lib/types/auth';
 import { createSupabaseServerClient } from '$lib/services/supabase/server';
 import type { Handle } from '@sveltejs/kit';
@@ -130,7 +133,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		event.cookies.delete('id_token', { path: '/' });
 		event.cookies.delete('access_token', { path: '/' });
 		event.cookies.delete('refresh_token', { path: '/' });
-		console.error('Error verifying token:', error);
+		log.error('Error verifying token:', error);
 		event.locals.currentUser = { 
 			isAuthenticated: false,
 			sub: '',
