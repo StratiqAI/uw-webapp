@@ -53,7 +53,6 @@ const WIDGET_NAMES: Record<WidgetType, string> = {
 };
 
 export const WIDGET_TYPES: WidgetType[] = [
-	'paragraph',
 	'table',
 	'image',
 	'lineChart',
