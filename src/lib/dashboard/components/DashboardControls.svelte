@@ -1,28 +1,29 @@
 <script lang="ts">
 	import { tick, untrack } from 'svelte';
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
-	import type { Widget, WidgetType } from '../types/widget';
+	import type { Widget } from '../types/widget';
 	import { findAvailablePosition } from '../utils/grid';
-	import { PUBLIC_GEOAPIFY_API_KEY, PUBLIC_MAPBOX_ACCESS_TOKEN } from '$env/static/public';
+	import { getRegisteredManifests } from '$lib/dashboard/setup/widgetRegistry';
+	import { getDefaultDataForWidget, getDefaultSizeForWidget } from '$lib/dashboard/setup/defaultDashboardValues';
+	import { generateWidgetId } from '$lib/dashboard/utils/idGenerator';
 	import type { DashboardTabId } from '$lib/dashboard/types/dashboardTabs';
-	import type { AppTheme } from '$lib/stores/themeStore.svelte';
+	import { themeStore, type AppTheme } from '$lib/stores/themeStore.svelte';
 	import TopBar from '$lib/components/layout/TopBar.svelte';
 	import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
 	import { toastStore } from '$lib/stores/toastStore.svelte';
 
 	interface Props {
-		darkMode?: boolean;
-		currentTheme?: AppTheme;
 		defaultWidgets?: Widget[];
 		onProjectChange?: (projectId: string | null) => void;
 	}
 
 	let {
-		darkMode = false,
-		currentTheme = 'dark',
 		defaultWidgets,
 		onProjectChange
 	}: Props = $props();
+
+	const darkMode = $derived(themeStore.darkMode);
+	const currentTheme = $derived(themeStore.theme);
 
 	let showExportDialog = $state(false);
 	let showImportDialog = $state(false);
@@ -296,52 +297,15 @@
 	}
 
 	// ── Widget creation ────────────────────────────────────────────
-	function generateWidgetId(): string {
-		return `widget-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-	}
-
-	function createDefaultWidget(type: WidgetType): Widget | null {
+	function createDefaultWidget(type: string): Widget | null {
 		const widgetId = generateWidgetId();
 		const config = dashboard.config;
-
-		const defaultSizes: Record<WidgetType, { colSpan: number; rowSpan: number }> = {
-			title: { colSpan: 12, rowSpan: 1 },
-			metric: { colSpan: 2, rowSpan: 1 },
-			paragraph: { colSpan: 6, rowSpan: 2 },
-			table: { colSpan: 6, rowSpan: 3 },
-			image: { colSpan: 6, rowSpan: 4 },
-			map: { colSpan: 8, rowSpan: 4 },
-			lineChart: { colSpan: 6, rowSpan: 3 },
-			barChart: { colSpan: 6, rowSpan: 3 },
-			donutChart: { colSpan: 4, rowSpan: 3 },
-			areaChart: { colSpan: 6, rowSpan: 3 },
-			gauge: { colSpan: 3, rowSpan: 2 },
-			sparkline: { colSpan: 4, rowSpan: 1 },
-			heatmap: { colSpan: 6, rowSpan: 4 },
-			divergingBarChart: { colSpan: 6, rowSpan: 3 },
-			schema: { colSpan: 6, rowSpan: 3 },
-			locationQuotient: { colSpan: 12, rowSpan: 4 },
-			jsonViewer: { colSpan: 6, rowSpan: 3 },
-			brokerCard: { colSpan: 3, rowSpan: 2 },
-			lqAnalysis: { colSpan: 12, rowSpan: 4 },
-			proFormaRevenue: { colSpan: 12, rowSpan: 3 },
-			proFormaOpEx: { colSpan: 12, rowSpan: 3 },
-			proFormaNoi: { colSpan: 12, rowSpan: 2 },
-			proFormaUnleveredCf: { colSpan: 12, rowSpan: 3 },
-			proFormaLeveredCf: { colSpan: 12, rowSpan: 3 },
-			proFormaUnleveredReturns: { colSpan: 12, rowSpan: 2 },
-			proFormaLeveredReturns: { colSpan: 12, rowSpan: 2 },
-			econBaseMultiplier: { colSpan: 8, rowSpan: 4 },
-			industryTrendScorecard: { colSpan: 12, rowSpan: 6 },
-			lfprDashboard: { colSpan: 12, rowSpan: 5 },
-			mapbox3d: { colSpan: 8, rowSpan: 5 }
-		};
-
-		const { colSpan, rowSpan } = defaultSizes[type];
+		const size = getDefaultSizeForWidget(type);
+		const data = getDefaultDataForWidget({ type, id: widgetId } as Widget);
 
 		const position = findAvailablePosition(
-			colSpan,
-			rowSpan,
+			size.colSpan,
+			size.rowSpan,
 			config.gridColumns,
 			config.gridRows,
 			dashboard.widgets
@@ -354,320 +318,20 @@
 			return null;
 		}
 
-		const baseWidget = {
+		return {
 			id: widgetId,
+			type,
 			gridColumn: position.gridColumn,
 			gridRow: position.gridRow,
-			colSpan,
-			rowSpan,
+			colSpan: size.colSpan,
+			rowSpan: size.rowSpan,
 			minWidth: 1,
-			minHeight: 1
-		};
-
-		switch (type) {
-			case 'title':
-				return { ...baseWidget, type: 'title', data: { title: 'New Title', subtitle: 'Subtitle text', alignment: 'center' } } as Widget;
-			case 'metric':
-				return { ...baseWidget, type: 'metric', data: { label: 'METRIC', value: '0' } } as Widget;
-			case 'paragraph':
-				return { ...baseWidget, type: 'paragraph', data: { title: 'New Paragraph', content: 'Enter your content here...', markdown: false } } as Widget;
-			case 'table':
-				return { ...baseWidget, type: 'table', data: { rows: [], sortable: true, paginated: true, pageSize: 10, searchable: true } } as Widget;
-			case 'image':
-				return { ...baseWidget, type: 'image', data: { title: 'New Image', src: 'https://via.placeholder.com/800x600', alt: 'Placeholder image', objectFit: 'cover' } } as Widget;
-			case 'map':
-				return { ...baseWidget, type: 'map', data: { title: 'New Map', lat: 29.416775, lon: -98.406103, zoom: 15, mapType: 'leaflet', apiKey: PUBLIC_GEOAPIFY_API_KEY } } as Widget;
-			case 'lineChart':
-				return { ...baseWidget, type: 'lineChart', data: { labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'], datasets: [{ label: 'Dataset 1', data: [10, 20, 15, 25, 30], color: '#3b82f6' }], options: { responsive: true, maintainAspectRatio: false } } } as Widget;
-			case 'barChart':
-				return { ...baseWidget, type: 'barChart', data: { labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'], datasets: [{ label: 'Dataset 1', data: [10, 20, 15, 25, 30], backgroundColor: '#3b82f6' }], orientation: 'vertical' } } as Widget;
-			case 'donutChart':
-				return { ...baseWidget, type: 'donutChart', data: { labels: ['A', 'B', 'C', 'D'], values: [28, 22, 35, 15], colors: ['#6366f1', '#8b5cf6', '#a855f7', '#c084fc'], centerLabel: 'Total' } } as Widget;
-			case 'areaChart':
-				return { ...baseWidget, type: 'areaChart', data: { labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], datasets: [{ label: 'Series 1', data: [20, 35, 45, 40, 55, 60], color: '#06b6d4' }, { label: 'Series 2', data: [10, 25, 30, 35, 40, 50], color: '#8b5cf6' }] } } as Widget;
-			case 'gauge':
-				return { ...baseWidget, type: 'gauge', data: { value: 65, min: 0, max: 100, label: 'Score', unit: '%', color: '#22c55e' } } as Widget;
-			case 'sparkline':
-				return { ...baseWidget, type: 'sparkline', data: { values: [12, 19, 15, 25, 22, 30, 28, 35], label: 'Trend', color: '#3b82f6' } } as Widget;
-			case 'heatmap':
-				return { ...baseWidget, type: 'heatmap', data: { rows: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], cols: ['AM', 'PM'], values: [[4, 6], [3, 5], [5, 7], [2, 4], [6, 8]] } } as Widget;
-			case 'divergingBarChart':
-				return { ...baseWidget, type: 'divergingBarChart', data: { labels: ['Strongly disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly agree'], values: [-24, -18, 12, 32, 42], positiveColor: '#3b82f6', negativeColor: '#ef4444' } } as Widget;
-			case 'schema':
-				return { ...baseWidget, type: 'schema', data: { schemaId: 'example-schema', data: {} } } as Widget;
-			case 'locationQuotient':
-				return { ...baseWidget, type: 'locationQuotient', data: { areaFips: 'C3890', year: 2025, regionLabel: 'Portland-Vancouver-Hillsboro, OR-WA', sortOrder: 'lq_desc', exportBaseThreshold: 1.08, localBandLow: 0.92, localBandHigh: 1.08 } } as Widget;
-			case 'jsonViewer':
-				return { ...baseWidget, type: 'jsonViewer', data: { title: null, description: null, json: {} } } as Widget;
-			case 'brokerCard':
-				return {
-					...baseWidget,
-					type: 'brokerCard',
-					data: {
-						title: null,
-						description: null,
-						fullName: 'Pete Beihea',
-						company: 'Newmark',
-						phone: '310-407-3830',
-						email: 'pete.beihea@nmrk.com',
-						initials: 'PB',
-						avatarUrl: null
-					}
-				} as Widget;
-			case 'lqAnalysis':
-				return {
-					...baseWidget,
-					type: 'lqAnalysis',
-					data: {
-						city: 'Portland',
-						state: 'OR',
-						year: 2025,
-						regionLabel: 'Portland-Vancouver-Hillsboro, OR-WA',
-						sortOrder: 'lq_desc',
-						exportBaseThreshold: 1.08,
-						localBandLow: 0.92,
-						localBandHigh: 1.08
-					}
-				} as Widget;
-			case 'proFormaRevenue':
-				return {
-					...baseWidget,
-					type: 'proFormaRevenue',
-					data: {
-						unitType: 'units',
-						totalUnits: 100,
-						totalSqFt: 0,
-						marketRentPerUnit: 1500,
-						rentGrowthRate: 0.03,
-						vacancyRate: 0.05,
-						otherIncomeAnnual: 24000,
-						otherIncomeGrowthRate: 0.02,
-						projectionYears: 5,
-						propertyName: ''
-					}
-				} as Widget;
-			case 'proFormaOpEx':
-				return {
-					...baseWidget,
-					type: 'proFormaOpEx',
-					data: {
-						unitType: 'units',
-						totalUnits: 100,
-						totalSqFt: 0,
-						egiYear1: 1734000,
-						egiGrowthRate: 0.03,
-						baseOperatingExpenses: 480000,
-						expenseGrowthRate: 0.03,
-						managementFeeRate: 0.04,
-						reservePerUnit: 250,
-						applyGrowthToReserves: false,
-						customExpenses: [],
-						projectionYears: 5,
-						propertyName: ''
-					}
-				} as Widget;
-			case 'proFormaNoi':
-				return {
-					...baseWidget,
-					type: 'proFormaNoi',
-					data: {
-						egiYear1: 1734000,
-						egiGrowthRate: 0.03,
-						totalOpexYear1: 920000,
-						opexGrowthRate: 0.03,
-						projectionYears: 5,
-						propertyName: '',
-						showBreakdown: false
-					}
-				} as Widget;
-			case 'proFormaUnleveredCf':
-				return {
-					...baseWidget,
-					type: 'proFormaUnleveredCf',
-					data: {
-						projectionYears: 5,
-						purchasePrice: 12_000_000,
-						acquisitionCosts: 180_000,
-						initialCapEx: 0,
-						egiYear1: 1_734_000,
-						egiGrowthRate: 0.03,
-						totalOpexYear1: 920_000,
-						opexGrowthRate: 0.03,
-						terminalCapRate: 0.055,
-						costOfSalePercent: 0.03,
-						propertyName: ''
-					}
-				} as Widget;
-			case 'proFormaLeveredCf':
-				return {
-					...baseWidget,
-					type: 'proFormaLeveredCf',
-					data: {
-						projectionYears: 5,
-						purchasePrice: 12_000_000,
-						acquisitionCosts: 180_000,
-						initialCapEx: 0,
-						egiYear1: 1_734_000,
-						egiGrowthRate: 0.03,
-						totalOpexYear1: 920_000,
-						opexGrowthRate: 0.03,
-						terminalCapRate: 0.055,
-						costOfSalePercent: 0.03,
-						propertyName: '',
-						loanLtv: 0.65,
-						loanInterestRate: 0.065,
-						amortizationYears: 30,
-						interestOnly: false
-					}
-				} as Widget;
-			case 'proFormaUnleveredReturns':
-				return {
-					...baseWidget,
-					type: 'proFormaUnleveredReturns',
-					data: {
-						projectionYears: 5,
-						purchasePrice: 12_000_000,
-						acquisitionCosts: 180_000,
-						initialCapEx: 0,
-						egiYear1: 1_734_000,
-						egiGrowthRate: 0.03,
-						totalOpexYear1: 920_000,
-						opexGrowthRate: 0.03,
-						terminalCapRate: 0.055,
-						costOfSalePercent: 0.03,
-						propertyName: '',
-						unleveredDiscountRate: 0.1
-					}
-				} as Widget;
-			case 'proFormaLeveredReturns':
-				return {
-					...baseWidget,
-					type: 'proFormaLeveredReturns',
-					data: {
-						projectionYears: 5,
-						purchasePrice: 12_000_000,
-						acquisitionCosts: 180_000,
-						initialCapEx: 0,
-						egiYear1: 1_734_000,
-						egiGrowthRate: 0.03,
-						totalOpexYear1: 920_000,
-						opexGrowthRate: 0.03,
-						terminalCapRate: 0.055,
-						costOfSalePercent: 0.03,
-						propertyName: '',
-						loanLtv: 0.65,
-						loanInterestRate: 0.065,
-						amortizationYears: 30,
-						interestOnly: false,
-						leveredDiscountRate: 0.12
-					}
-				} as Widget;
-			case 'econBaseMultiplier':
-				return {
-					...baseWidget,
-					type: 'econBaseMultiplier',
-					data: {
-						regionLabel: 'Sample Region',
-						industries: [
-							{ name: 'Finance & Insurance', naicsCode: '52', localEmp: 14200, nationalEmp: 6800000 },
-							{ name: 'Professional Services', naicsCode: '54', localEmp: 22100, nationalEmp: 9200000 },
-							{ name: 'Health Care', naicsCode: '62', localEmp: 31400, nationalEmp: 16800000 },
-							{ name: 'Retail Trade', naicsCode: '44-45', localEmp: 18700, nationalEmp: 15400000 },
-							{ name: 'Accommodation & Food', naicsCode: '72', localEmp: 21500, nationalEmp: 13200000 },
-							{ name: 'Construction', naicsCode: '23', localEmp: 9800, nationalEmp: 7400000 },
-							{ name: 'Manufacturing', naicsCode: '31-33', localEmp: 7200, nationalEmp: 12700000 },
-							{ name: 'Information', naicsCode: '51', localEmp: 4100, nationalEmp: 3100000 }
-						]
-					}
-				} as Widget;
-			case 'industryTrendScorecard':
-				return {
-					...baseWidget,
-					type: 'industryTrendScorecard',
-					data: {
-						quarters: ['Q1 2024', 'Q2 2024', 'Q3 2024'],
-						industries: [
-							{ name: 'Professional Services', naicsCode: '54', color: '#22d3ee', lqTrend: 'rising', data: [{ empYoy: 3.8, lqValue: 1.52, wageYoy: 3.5, estabYoy: 2.8 }, { empYoy: 4.1, lqValue: 1.55, wageYoy: 3.7, estabYoy: 3.0 }, { empYoy: 4.4, lqValue: 1.58, wageYoy: 3.9, estabYoy: 3.1 }] },
-							{ name: 'Finance & Insurance', naicsCode: '52', color: '#3b82f6', lqTrend: 'rising', data: [{ empYoy: 2.2, lqValue: 1.30, wageYoy: 4.8, estabYoy: 1.5 }, { empYoy: 2.8, lqValue: 1.33, wageYoy: 5.0, estabYoy: 1.6 }, { empYoy: 3.2, lqValue: 1.37, wageYoy: 5.2, estabYoy: 1.8 }] },
-							{ name: 'Construction', naicsCode: '23', color: '#ef4444', lqTrend: 'stable', data: [{ empYoy: 4.0, lqValue: 1.22, wageYoy: 5.0, estabYoy: 2.2 }, { empYoy: 3.8, lqValue: 1.23, wageYoy: 5.2, estabYoy: 2.4 }, { empYoy: 3.5, lqValue: 1.25, wageYoy: 5.4, estabYoy: 2.6 }] },
-							{ name: 'Health Care', naicsCode: '62', color: '#a855f7', lqTrend: 'stable', data: [{ empYoy: 2.0, lqValue: 1.18, wageYoy: 5.7, estabYoy: 0.9 }, { empYoy: 2.3, lqValue: 1.20, wageYoy: 5.9, estabYoy: 1.0 }, { empYoy: 2.5, lqValue: 1.23, wageYoy: 6.1, estabYoy: 1.1 }] },
-							{ name: 'Information', naicsCode: '51', color: '#10b981', lqTrend: 'stable', data: [{ empYoy: 1.2, lqValue: 0.95, wageYoy: 7.5, estabYoy: 0.0 }, { empYoy: 1.3, lqValue: 0.93, wageYoy: 7.8, estabYoy: 0.1 }, { empYoy: 1.4, lqValue: 0.87, wageYoy: 8.1, estabYoy: 0.2 }] },
-							{ name: 'Accommodation & Food', naicsCode: '72', color: '#eab308', lqTrend: 'stable', data: [{ empYoy: 1.5, lqValue: 1.05, wageYoy: 3.5, estabYoy: -0.5 }, { empYoy: 1.0, lqValue: 1.06, wageYoy: 3.7, estabYoy: -0.7 }, { empYoy: 0.6, lqValue: 1.07, wageYoy: 3.9, estabYoy: -0.9 }] },
-							{ name: 'Manufacturing', naicsCode: '31-33', color: '#1d4ed8', lqTrend: 'stable', data: [{ empYoy: -1.0, lqValue: 0.40, wageYoy: 1.0, estabYoy: -0.8 }, { empYoy: -1.3, lqValue: 0.38, wageYoy: 1.2, estabYoy: -1.0 }, { empYoy: -1.6, lqValue: 0.37, wageYoy: 1.4, estabYoy: -1.2 }] },
-							{ name: 'Retail Trade', naicsCode: '44-45', color: '#f97316', lqTrend: 'stable', data: [{ empYoy: -0.8, lqValue: 0.82, wageYoy: 1.4, estabYoy: -1.7 }, { empYoy: -1.1, lqValue: 0.81, wageYoy: 1.6, estabYoy: -1.9 }, { empYoy: -1.4, lqValue: 0.80, wageYoy: 1.8, estabYoy: -2.1 }] }
-						],
-						weights: { emp: 35, lq: 30, wage: 20, estab: 15 }
-					}
-				} as Widget;
-			case 'lfprDashboard':
-				return {
-					...baseWidget,
-					type: 'lfprDashboard',
-					data: {
-						title: 'Labor Force Participation Rate (LFPR)',
-						adultPopulation: 268.1,
-						adultPopYoy: 0.6,
-						laborForce: 168.1,
-						laborForceYoy: 0.5,
-						lfpr: 62.7,
-						lfprDirection: 'down',
-						trendData: [
-							{ year: '2020', rate: 60.2 },
-							{ year: '2021', rate: 61.7 },
-							{ year: '2022', rate: 62.4 },
-							{ year: '2023', rate: 63.1 },
-							{ year: '2024', rate: 62.7 }
-						],
-						growthDrivers: [
-							{ label: 'Prime-Age Workers (25-54)', impact: 'high', description: 'Participating at 84.1%, the strongest driver of labor force growth' },
-							{ label: 'Immigration', impact: 'moderate', description: 'New entrants consistently joining the workforce' }
-						],
-						dragDrivers: [
-							{ label: 'Retirements (Aging Population)', impact: 'high', description: 'Baby Boomer generation leaving the workforce at accelerating rates' },
-							{ label: 'Long-Term Sickness / Disability', impact: 'moderate', description: 'Structural barrier keeping a consistent segment out of the workforce' }
-						]
-					}
-				} as Widget;
-			case 'mapbox3d':
-				return {
-					...baseWidget,
-					type: 'mapbox3d',
-					data: {
-						accessToken: PUBLIC_MAPBOX_ACCESS_TOKEN ?? '',
-						center: [-0.126326, 51.533582],
-						zoom: 15.27,
-						pitch: 42,
-						bearing: -50,
-						minZoom: 15,
-						maxZoom: 16,
-						style: 'mapbox://styles/mapbox/standard',
-						lightPreset: 'dusk',
-						clipPolygon: [
-							[
-								[-0.12573, 51.53222],
-								[-0.12458, 51.53219],
-								[-0.12358, 51.53492],
-								[-0.12701, 51.53391],
-								[-0.12573, 51.53222]
-							]
-						],
-						model: {
-							uri: 'https://docs.mapbox.com/mapbox-gl-js/assets/tower.glb',
-							coordinates: [-0.12501974, 51.5332374],
-							rotation: [0.0, 0.0, 35.0],
-							scale: [0.8, 0.8, 1.2],
-							opacity: 1,
-							emissiveStrength: 0.8,
-							castShadows: true
-						}
-					}
-				} as Widget;
-			default:
-				return null;
-		}
+			minHeight: 1,
+			data
+		} as Widget;
 	}
 
-	function handleAddWidget(type: WidgetType) {
+	function handleAddWidget(type: string) {
 		const widget = createDefaultWidget(type);
 		if (widget) {
 			const success = dashboard.addWidget(widget);
@@ -679,38 +343,41 @@
 		}
 	}
 
-	const widgetTypes: Array<{ type: WidgetType; label: string; icon: string }> = [
-		{ type: 'title', label: 'Title', icon: '📝' },
-		{ type: 'metric', label: 'Metric', icon: '📊' },
-		{ type: 'paragraph', label: 'Paragraph', icon: '📄' },
-		{ type: 'table', label: 'Table', icon: '📋' },
-		{ type: 'image', label: 'Image', icon: '🖼' },
-		{ type: 'map', label: 'Map', icon: '🗺' },
-		{ type: 'lineChart', label: 'Line Chart', icon: '📈' },
-		{ type: 'barChart', label: 'Bar Chart', icon: '📊' },
-		{ type: 'donutChart', label: 'Donut Chart', icon: '🍩' },
-		{ type: 'areaChart', label: 'Area Chart', icon: '📉' },
-		{ type: 'gauge', label: 'Gauge', icon: '⏱' },
-		{ type: 'sparkline', label: 'Sparkline', icon: '〰' },
-		{ type: 'heatmap', label: 'Heatmap', icon: '🔥' },
-		{ type: 'divergingBarChart', label: 'Diverging Bar', icon: '↔' },
-		{ type: 'schema', label: 'Schema Widget', icon: '📋' },
-		{ type: 'locationQuotient', label: 'Location Quotient', icon: '📍' },
-		{ type: 'jsonViewer', label: 'JSON Viewer', icon: '{ }' },
-		{ type: 'brokerCard', label: 'Broker Card', icon: '👤' },
-		{ type: 'lqAnalysis', label: 'LQ Analysis', icon: '📍' },
-		{ type: 'proFormaRevenue', label: 'Pro Forma Revenue', icon: '💰' },
-		{ type: 'proFormaOpEx', label: 'Pro Forma OpEx', icon: '📋' },
-		{ type: 'proFormaNoi', label: 'Pro Forma NOI', icon: '📐' },
-		{ type: 'proFormaUnleveredCf', label: 'Pro Forma Unlevered CF', icon: '💵' },
-		{ type: 'proFormaLeveredCf', label: 'Pro Forma Levered CF', icon: '🏦' },
-		{ type: 'proFormaUnleveredReturns', label: 'Pro Forma Unlevered Returns', icon: '📈' },
-		{ type: 'proFormaLeveredReturns', label: 'Pro Forma Levered Returns', icon: '📊' },
-		{ type: 'econBaseMultiplier', label: 'Econ Base Multiplier', icon: '📊' },
-		{ type: 'industryTrendScorecard', label: 'Industry Trend Scorecard', icon: '📈' },
-		{ type: 'lfprDashboard', label: 'LFPR Dashboard', icon: '👥' },
-		{ type: 'mapbox3d', label: 'Mapbox 3D Model', icon: '🗺' }
-	];
+	const widgetTypes = $derived.by(() => {
+		const builtIn: Array<{ type: string; label: string; icon: string; category: string }> = [
+			{ type: 'title', label: 'Title', icon: '📝', category: 'content' },
+			{ type: 'paragraph', label: 'Paragraph', icon: '📄', category: 'content' },
+			{ type: 'image', label: 'Image', icon: '🖼', category: 'content' },
+			{ type: 'table', label: 'Table', icon: '📋', category: 'content' },
+			{ type: 'map', label: 'Map', icon: '🗺', category: 'content' },
+			{ type: 'lineChart', label: 'Line Chart', icon: '📈', category: 'charts' },
+			{ type: 'barChart', label: 'Bar Chart', icon: '📊', category: 'charts' },
+			{ type: 'donutChart', label: 'Donut Chart', icon: '🍩', category: 'charts' },
+			{ type: 'areaChart', label: 'Area Chart', icon: '📉', category: 'charts' },
+			{ type: 'gauge', label: 'Gauge', icon: '⏱', category: 'charts' },
+			{ type: 'sparkline', label: 'Sparkline', icon: '〰', category: 'charts' },
+			{ type: 'heatmap', label: 'Heatmap', icon: '🔥', category: 'charts' },
+			{ type: 'divergingBarChart', label: 'Diverging Bar', icon: '↔', category: 'charts' },
+			{ type: 'schema', label: 'Schema Widget', icon: '📋', category: 'data' },
+			{ type: 'locationQuotient', label: 'Location Quotient', icon: '📍', category: 'data' },
+		];
+
+		const builtInTypes = new Set(builtIn.map(b => b.type));
+
+		const fromRegistry = getRegisteredManifests()
+			.filter(m => !builtInTypes.has(m.kind))
+			.map(m => {
+				const pal = (m as unknown as { palette?: { icon?: string; category?: string } }).palette;
+				return {
+					type: m.kind,
+					label: m.displayName,
+					icon: pal?.icon ?? '🧩',
+					category: pal?.category ?? 'packages'
+				};
+			});
+
+		return [...builtIn, ...fromRegistry];
+	});
 </script>
 
 <TopBar

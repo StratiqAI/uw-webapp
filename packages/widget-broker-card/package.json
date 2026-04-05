@@ -1,6 +1,11 @@
 {
 	"name": "@stratiqai/widget-broker-card",
 	"version": "0.1.0",
+	"stratiqai": {
+		"widget": true,
+		"manifest": "./src/lib/index.ts",
+		"manifestExport": "brokerCardWidget"
+	},
 	"type": "module",
 	"svelte": "./dist/index.js",
 	"types": "./dist/index.d.ts",

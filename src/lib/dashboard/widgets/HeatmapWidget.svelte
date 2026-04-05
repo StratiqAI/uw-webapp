@@ -2,16 +2,18 @@
 	import type { HeatmapWidget } from '$lib/dashboard/types/widget';
 	import { useReactiveValidatedTopic } from '$lib/hooks/validatedTopicStoreRunes.svelte';
 	import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { themeStore } from '$lib/stores/themeStore.svelte';
 	import * as d3 from 'd3';
 
 	interface Props {
 		data: HeatmapWidget['data'];
 		widgetId?: string;
 		topicOverride?: string;
-		darkMode?: boolean;
 	}
 
-	let { data, widgetId = 'heatmap-widget-default', topicOverride, darkMode = false }: Props = $props();
+	let { data, widgetId = 'heatmap-widget-default', topicOverride }: Props = $props();
+
+	const darkMode = $derived(themeStore.darkMode);
 
 	const topic = $derived(getWidgetTopic('heatmap', widgetId, topicOverride));
 	const dataStream = useReactiveValidatedTopic<HeatmapWidget['data']>(() => topic);

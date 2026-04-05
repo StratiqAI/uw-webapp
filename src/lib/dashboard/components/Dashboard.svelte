@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
 	import { topicDragStore, TOPIC_DROP_MIME } from '$lib/dashboard/stores/topicDragStore.svelte';
 	import GridContainer from '$lib/dashboard/components/GridContainer.svelte';
@@ -13,6 +12,8 @@
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
 	import { createSupabaseBrowserClient } from '$lib/services/supabase/browser';
+	import { generateWidgetId } from '$lib/dashboard/utils/idGenerator';
+	import { themeStore } from '$lib/stores/themeStore.svelte';
 	import { createLogger } from '$lib/utils/logger';
 
 	const log = createLogger('dashboard');
@@ -41,13 +42,10 @@
 		}
 	});
 
-	interface Props {
-		darkMode?: boolean;
-	}
-
-	let { darkMode = false }: Props = $props();
+	const darkMode = $derived(themeStore.darkMode);
 
 	let containerEl = $state<HTMLElement>();
+	let dropZoneEl = $state<HTMLElement>();
 	let topicDropGhost = $state<{ position: { gridColumn: number; gridRow: number }; widgetType: WidgetType; topic: string } | null>(null);
 	let ghostValid = $state(true);
 	let lastDragCell: { col: number; row: number } | null = null;
@@ -62,7 +60,8 @@
 			dashboard.config.gridColumns,
 			dashboard.config.gridRows,
 			dashboard.config.gap,
-			dashboard.config.minCellHeight
+			dashboard.config.minCellHeight,
+			0
 		);
 	}
 
@@ -142,8 +141,8 @@
 						topicDragStore.set(null);
 						return;
 					}
-					const size = DEFAULT_WIDGET_SIZES[widgetType] ?? { colSpan: 4, rowSpan: 2 };
-					const newId = `widget-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+				const size = DEFAULT_WIDGET_SIZES[widgetType] ?? { colSpan: 4, rowSpan: 2 };
+				const newId = generateWidgetId();
 					const data = getDefaultDataForWidget({ type: widgetType, id: newId } as Widget);
 					const widget: Widget = {
 						id: newId,
@@ -181,9 +180,9 @@
 
 		onDragLeave: (e: DragEvent) => {
 			if (
-				containerEl &&
+				dropZoneEl &&
 				e.relatedTarget instanceof Node &&
-				containerEl.contains(e.relatedTarget)
+				dropZoneEl.contains(e.relatedTarget)
 			) {
 				return;
 			}
@@ -230,12 +229,13 @@
 		}
 	}
 
-	onMount(() => window.addEventListener('keydown', handleKeyboard));
-	onDestroy(() => window.removeEventListener('keydown', handleKeyboard));
 </script>
+
+<svelte:window onkeydown={handleKeyboard} />
 
 <GridContainer
 	bind:containerEl
+	bind:dropZoneEl
 	columns={dashboard.config.gridColumns}
 	rows={dashboard.config.gridRows}
 	gap={dashboard.config.gap}
@@ -244,7 +244,7 @@
 >
 	{#key dashboard.activeTabId}
 		{#each dashboard.widgets as widget (widget.id)}
-			<WidgetWrapper {widget} {darkMode} onDragStart={handleWidgetDragStart} onDragEnd={handleWidgetDragEnd} />
+			<WidgetWrapper {widget} onDragStart={handleWidgetDragStart} onDragEnd={handleWidgetDragEnd} />
 		{/each}
 	{/key}
 

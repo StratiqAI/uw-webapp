@@ -545,7 +545,7 @@ export class WorkflowSyncManager {
 		error?: string
 	): void {
 		const event: SubscriptionEvent = {
-			id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+			id: `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
 			timestamp: new Date(),
 			entityType,
 			operation,

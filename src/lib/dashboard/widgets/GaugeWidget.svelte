@@ -2,16 +2,18 @@
 	import type { GaugeWidget } from '$lib/dashboard/types/widget';
 	import { useReactiveValidatedTopic } from '$lib/hooks/validatedTopicStoreRunes.svelte';
 	import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { themeStore } from '$lib/stores/themeStore.svelte';
 	import * as d3 from 'd3';
 
 	interface Props {
 		data: GaugeWidget['data'];
 		widgetId?: string;
 		topicOverride?: string;
-		darkMode?: boolean;
 	}
 
-	let { data, widgetId = 'gauge-widget-default', topicOverride, darkMode = false }: Props = $props();
+	let { data, widgetId = 'gauge-widget-default', topicOverride }: Props = $props();
+
+	const darkMode = $derived(themeStore.darkMode);
 
 	const topic = $derived(getWidgetTopic('gauge', widgetId, topicOverride));
 	const dataStream = useReactiveValidatedTopic<GaugeWidget['data']>(() => topic);

@@ -13,10 +13,10 @@
 		type QcewSectorAggregate
 	} from '$lib/dashboard/services/qcewSupabase';
 	import { SupabaseWidgetBase } from './SupabaseWidgetBase.svelte';
+	import { themeStore } from '$lib/stores/themeStore.svelte';
 
 	// --- defaults & constants (widget config, UI, QCEW copy) ---
 	const DEFAULT_WIDGET_ID = 'lq-widget-default';
-	const DEFAULT_DARK_MODE = true;
 	const DEFAULT_LQ_SIGNALS = { refresh: 0, exportRequest: 0 };
 	/** Same default as `DEFAULT_LOCAL_BAND_HIGH` so base-industry stats match chart “Export base” coloring. */
 	const DEFAULT_EXPORT_BASE_THRESHOLD = 1.08;
@@ -108,7 +108,6 @@
 		data: LocationQuotientWidgetConfig;
 		widgetId?: string;
 		topicOverride?: string;
-		darkMode?: boolean;
 		onConfigureFlipReady?: (toggleFlip: () => void) => void;
 		onUpdateData: (data: LocationQuotientWidgetConfig) => void;
 		/** Bumped from WidgetWrapper for menu actions */
@@ -119,11 +118,12 @@
 		data,
 		widgetId = DEFAULT_WIDGET_ID,
 		topicOverride: _topicOverride,
-		darkMode = DEFAULT_DARK_MODE,
 		onConfigureFlipReady,
 		onUpdateData,
 		lqSignals = DEFAULT_LQ_SIGNALS
 	}: Props = $props();
+
+	const darkMode = $derived(themeStore.darkMode);
 
 	function toRpcQueryInput(config: LocationQuotientWidgetConfig): LocationQuotientRpcInput {
 		return { areaFips: config.areaFips, year: config.year };

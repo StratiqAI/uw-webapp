@@ -3,15 +3,16 @@
 	import { useReactiveValidatedTopic } from '$lib/hooks/validatedTopicStoreRunes.svelte';
 	import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
 	import { Chart } from '@flowbite-svelte-plugins/chart';
+	import { themeStore } from '$lib/stores/themeStore.svelte';
 
 	interface Props {
 		data: LineChartWidget['data'];
 		widgetId?: string;
 		topicOverride?: string;
-		darkMode?: boolean;
 	}
 
-	let { data, widgetId = 'linechart-widget-default', topicOverride, darkMode = false }: Props = $props();
+	let { data, widgetId = 'linechart-widget-default', topicOverride }: Props = $props();
+	const darkMode = $derived(themeStore.darkMode);
 
 	// Use topic override if provided, otherwise use default topic naming convention
 	const topic = $derived(getWidgetTopic('lineChart', widgetId, topicOverride));

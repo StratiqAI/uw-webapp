@@ -2,16 +2,18 @@
 	import type { SparklineWidget } from '$lib/dashboard/types/widget';
 	import { useReactiveValidatedTopic } from '$lib/hooks/validatedTopicStoreRunes.svelte';
 	import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { themeStore } from '$lib/stores/themeStore.svelte';
 	import * as d3 from 'd3';
 
 	interface Props {
 		data: SparklineWidget['data'];
 		widgetId?: string;
 		topicOverride?: string;
-		darkMode?: boolean;
 	}
 
-	let { data, widgetId = 'sparkline-widget-default', topicOverride, darkMode = false }: Props = $props();
+	let { data, widgetId = 'sparkline-widget-default', topicOverride }: Props = $props();
+
+	const darkMode = $derived(themeStore.darkMode);
 
 	const topic = $derived(getWidgetTopic('sparkline', widgetId, topicOverride));
 	const dataStream = useReactiveValidatedTopic<SparklineWidget['data']>(() => topic);

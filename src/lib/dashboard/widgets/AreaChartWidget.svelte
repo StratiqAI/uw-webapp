@@ -3,15 +3,16 @@
 	import { useReactiveValidatedTopic } from '$lib/hooks/validatedTopicStoreRunes.svelte';
 	import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
 	import * as d3 from 'd3';
+	import { themeStore } from '$lib/stores/themeStore.svelte';
 
 	interface Props {
 		data: AreaChartWidget['data'];
 		widgetId?: string;
 		topicOverride?: string;
-		darkMode?: boolean;
 	}
 
-	let { data, widgetId = 'area-widget-default', topicOverride, darkMode = false }: Props = $props();
+	let { data, widgetId = 'area-widget-default', topicOverride }: Props = $props();
+	const darkMode = $derived(themeStore.darkMode);
 
 	const topic = $derived(getWidgetTopic('areaChart', widgetId, topicOverride));
 	const dataStream = useReactiveValidatedTopic<AreaChartWidget['data']>(() => topic);

@@ -2,16 +2,18 @@
 	import type { SchemaWidget } from '$lib/dashboard/types/widget';
 	import { useReactiveValidatedTopic } from '$lib/hooks/validatedTopicStoreRunes.svelte';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
+	import { themeStore } from '$lib/stores/themeStore.svelte';
 	import AutoDataView from './AutoDataView.svelte';
 
 	interface Props {
 		data: SchemaWidget['data'];
 		widgetId?: string;
 		topicOverride?: string;
-		darkMode?: boolean;
 	}
 
-	let { data, widgetId = 'schema-widget-default', topicOverride, darkMode = false }: Props = $props();
+	let { data, widgetId = 'schema-widget-default', topicOverride }: Props = $props();
+
+	const darkMode = $derived(themeStore.darkMode);
 
 	// Get schema ID from widget data
 	const schemaId = $derived(data.schemaId);
@@ -55,7 +57,7 @@
 
 		<!-- Auto-rendered data view -->
 		<div class="flex-1 overflow-auto">
-			<AutoDataView data={widgetData} {schemaId} {darkMode} />
+			<AutoDataView data={widgetData} {schemaId} />
 		</div>
 	{/if}
 </div>

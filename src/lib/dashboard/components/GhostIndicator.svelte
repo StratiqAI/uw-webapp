@@ -26,7 +26,7 @@
 	});
 </script>
 
-{#each cells as cell (cell.col + '-' + cell.row)}
+{#each cells as cell (`${cell.col}:${cell.row}`)}
 	<div
 		class="ghost-cell pointer-events-none rounded-lg"
 		class:ghost-cell--valid={valid}

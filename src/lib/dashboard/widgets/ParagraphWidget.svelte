@@ -30,6 +30,7 @@
 	import { paragraphTitleQuery } from '$lib/dashboard/types/openAiQueryDefs';
 	import { project as projectStore } from '$lib/stores/appStateStore';
 	import { createLogger } from '$lib/utils/logger';
+	import { themeStore } from '$lib/stores/themeStore.svelte';
 
 	const log = createLogger('widgets');
 
@@ -46,7 +47,6 @@
 
 	interface Props {
 		data: ParagraphWidget['data'];
-		darkMode?: boolean;
 		/** Optional custom widget ID for consumer registration */
 		widgetId?: string;
 		/** Optional topic override */
@@ -67,7 +67,6 @@
 
 	const {
 		data,
-		darkMode = false,
 		widgetId = 'paragraph-widget-default',
 		topicOverride,
 		defaultPrompt = 'Write a paragraph about the economy around the property',
@@ -77,6 +76,8 @@
 		onFlipControlReady,
 		showTitleInChrome = false
 	}: Props = $props();
+
+	const darkMode = $derived(themeStore.darkMode);
 
 	const titleBarCtx = getContext<WidgetTitleBarContext | undefined>(WIDGET_TITLE_BAR_CONTEXT);
 

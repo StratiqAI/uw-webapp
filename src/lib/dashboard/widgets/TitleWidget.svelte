@@ -2,15 +2,17 @@
 	import type { TitleWidget } from '$lib/dashboard/types/widget';
 	import { useReactiveValidatedTopic } from '$lib/hooks/validatedTopicStoreRunes.svelte';
 	import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { themeStore } from '$lib/stores/themeStore.svelte';
 
 	interface Props {
 		data: TitleWidget['data'];
 		widgetId?: string;
 		topicOverride?: string;
-		darkMode?: boolean;
 	}
 
-	let { data, widgetId = 'title-widget-default', topicOverride, darkMode = false }: Props = $props();
+	let { data, widgetId = 'title-widget-default', topicOverride }: Props = $props();
+	const darkMode = $derived(themeStore.darkMode);
+
 	
 	// Use topic override if provided, otherwise use default topic naming convention
 	const topic = $derived(getWidgetTopic('title', widgetId, topicOverride));

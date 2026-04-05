@@ -47,6 +47,9 @@ export type WidgetType =
 	| 'lfprDashboard'
 	| 'mapbox3d';
 
+/** Accepts any registered WidgetType plus unknown strings from package widgets. */
+export type AnyWidgetType = WidgetType | (string & {});
+
 export interface Position {
 	gridColumn: number;
 	gridRow: number;
@@ -66,7 +69,7 @@ export interface WidgetConstraints {
 
 export interface BaseWidget extends Position, Size, WidgetConstraints {
 	id: string;
-	type: WidgetType;
+	type: AnyWidgetType;
 	locked?: boolean;
 	title?: string; // Optional widget title for display
 	description?: string; // Optional widget description
@@ -353,6 +356,11 @@ export interface Mapbox3dWidgetDef extends BaseWidget {
 	data: Mapbox3dConfig;
 }
 
+export interface GenericWidget extends BaseWidget {
+	type: string;
+	data: Record<string, unknown>;
+}
+
 export type Widget =
 	| TableWidget
 	| TitleWidget
@@ -383,7 +391,8 @@ export type Widget =
 	| EconBaseMultiplierWidgetDef
 	| IndustryTrendScorecardWidgetDef
 	| LfprDashboardWidgetDef
-	| Mapbox3dWidgetDef;
+	| Mapbox3dWidgetDef
+	| GenericWidget;
 
 export interface DashboardConfig {
 	gridColumns: number;

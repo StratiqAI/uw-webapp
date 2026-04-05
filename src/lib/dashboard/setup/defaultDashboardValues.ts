@@ -6,24 +6,15 @@
  * something valid.
  */
 
-import type { Widget, WidgetType } from '$lib/dashboard/types/widget';
+import type { AnyWidgetType, Widget, WidgetType } from '$lib/dashboard/types/widget';
 import { PUBLIC_GEOAPIFY_API_KEY } from '$env/static/public';
 import { getWidgetManifest } from '$lib/dashboard/setup/widgetRegistry';
-import { metricWidget } from '@stratiqai/widget-metric';
-import { jsonViewerWidget } from '@stratiqai/widget-json-viewer';
-import { brokerCardWidget } from '@stratiqai/widget-broker-card';
-import { lqAnalysisWidget } from '@stratiqai/widget-lq-analysis';
-import { econBaseMultiplierWidget } from '@stratiqai/widget-econ-base-multiplier';
-import { industryTrendScorecardWidget } from '@stratiqai/widget-industry-trend-scorecard';
-import { lfprDashboardWidget } from '@stratiqai/widget-lfpr-dashboard';
-import { mapbox3dWidget } from '@stratiqai/widget-mapbox-3d';
-import { PUBLIC_MAPBOX_ACCESS_TOKEN } from '$env/static/public';
 
 /**
  * Default data for each widget type. Values conform to the Zod schemas
  * in widgetSchemas.ts so they pass ValidatedTopicStore validation.
  */
-export const DEFAULT_WIDGET_DATA: Record<WidgetType, Record<string, unknown>> = {
+export const DEFAULT_WIDGET_DATA: Partial<Record<WidgetType, Record<string, unknown>>> = {
 	title: {
 		title: 'Untitled',
 		subtitle: null,
@@ -104,9 +95,6 @@ export const DEFAULT_WIDGET_DATA: Record<WidgetType, Record<string, unknown>> = 
 		positiveColor: '#3b82f6',
 		negativeColor: '#ef4444'
 	},
-	metric: { ...(metricWidget.defaultData as Record<string, unknown>) },
-	jsonViewer: { ...(jsonViewerWidget.defaultData as Record<string, unknown>) },
-	brokerCard: { ...(brokerCardWidget.defaultData as Record<string, unknown>) },
 	map: {
 		title: null,
 		description: null,
@@ -131,22 +119,14 @@ export const DEFAULT_WIDGET_DATA: Record<WidgetType, Record<string, unknown>> = 
 		localBandLow: 0.92,
 		localBandHigh: 1.08
 	},
-	lqAnalysis: { ...(lqAnalysisWidget.defaultData as Record<string, unknown>) },
-	econBaseMultiplier: { ...(econBaseMultiplierWidget.defaultData as Record<string, unknown>) },
-	industryTrendScorecard: { ...(industryTrendScorecardWidget.defaultData as Record<string, unknown>) },
-	lfprDashboard: { ...(lfprDashboardWidget.defaultData as Record<string, unknown>) },
-	mapbox3d: { ...(mapbox3dWidget.defaultData as Record<string, unknown>), accessToken: typeof PUBLIC_MAPBOX_ACCESS_TOKEN === 'string' ? PUBLIC_MAPBOX_ACCESS_TOKEN : '' }
 };
 
 /**
  * Default grid size (colSpan, rowSpan) for each widget type when creating from
  * the topic store or "Add Widget". Kept in sync with DashboardControls.createDefaultWidget.
  */
-export const DEFAULT_WIDGET_SIZES: Record<WidgetType, { colSpan: number; rowSpan: number }> = {
+export const DEFAULT_WIDGET_SIZES: Partial<Record<WidgetType, { colSpan: number; rowSpan: number }>> = {
 	title: { colSpan: 12, rowSpan: 1 },
-	metric: { ...metricWidget.defaultSize },
-	jsonViewer: { ...jsonViewerWidget.defaultSize },
-	brokerCard: { ...brokerCardWidget.defaultSize },
 	paragraph: { colSpan: 6, rowSpan: 2 },
 	table: { colSpan: 6, rowSpan: 4 },
 	image: { colSpan: 6, rowSpan: 4 },
@@ -160,12 +140,7 @@ export const DEFAULT_WIDGET_SIZES: Record<WidgetType, { colSpan: number; rowSpan
 	heatmap: { colSpan: 6, rowSpan: 4 },
 	divergingBarChart: { colSpan: 6, rowSpan: 3 },
 	schema: { colSpan: 6, rowSpan: 3 },
-	locationQuotient: { colSpan: 12, rowSpan: 4 },
-	lqAnalysis: { ...lqAnalysisWidget.defaultSize },
-	econBaseMultiplier: { ...econBaseMultiplierWidget.defaultSize },
-	industryTrendScorecard: { ...industryTrendScorecardWidget.defaultSize },
-	lfprDashboard: { ...lfprDashboardWidget.defaultSize },
-	mapbox3d: { ...mapbox3dWidget.defaultSize }
+	locationQuotient: { colSpan: 12, rowSpan: 4 }
 };
 
 /**
@@ -177,7 +152,8 @@ export function getDefaultDataForWidget(widget: Widget): Record<string, unknown>
 	if (manifest) {
 		return { ...(manifest.defaultData as Record<string, unknown>) };
 	}
-	const d = DEFAULT_WIDGET_DATA[widget.type] ?? DEFAULT_WIDGET_DATA.title;
+	const d =
+		DEFAULT_WIDGET_DATA[widget.type as WidgetType] ?? DEFAULT_WIDGET_DATA.title;
 	return { ...d };
 }
 
@@ -185,7 +161,7 @@ export function getDefaultDataForWidget(widget: Widget): Record<string, unknown>
  * Returns default size for a widget type. Checks the widget package
  * registry first, then falls back to the hardcoded map.
  */
-export function getDefaultSizeForWidget(widgetType: WidgetType | string): { colSpan: number; rowSpan: number } {
+export function getDefaultSizeForWidget(widgetType: AnyWidgetType): { colSpan: number; rowSpan: number } {
 	const manifest = getWidgetManifest(widgetType);
 	if (manifest) {
 		return { ...manifest.defaultSize };

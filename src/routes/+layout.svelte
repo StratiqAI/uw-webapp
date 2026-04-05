@@ -4,23 +4,8 @@
 	import { themeStore, darkModeStore } from '$lib/stores/themeStore.svelte';
 	import { setContext, onMount, onDestroy, untrack } from 'svelte';
 	import { initializeWidgetSchemas } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { widgets } from 'virtual:stratiqai-widgets';
 	import { registerWidget } from '$lib/dashboard/setup/widgetRegistry';
-	import { metricWidget } from '@stratiqai/widget-metric';
-	import { jsonViewerWidget } from '@stratiqai/widget-json-viewer';
-	import { brokerCardWidget } from '@stratiqai/widget-broker-card';
-	import { lqAnalysisWidget } from '@stratiqai/widget-lq-analysis';
-	import { proFormaRevenueWidget } from '@stratiqai/widget-pro-forma-revenue';
-	import { proFormaOpExWidget } from '@stratiqai/widget-pro-forma-opex';
-	import { proFormaNoiWidget } from '@stratiqai/widget-pro-forma-noi';
-	import { proFormaUnleveredCfWidget } from '@stratiqai/widget-pro-forma-unlevered-cf';
-	import { proFormaLeveredCfWidget } from '@stratiqai/widget-pro-forma-levered-cf';
-	import { proFormaUnleveredReturnsWidget } from '@stratiqai/widget-pro-forma-unlevered-returns';
-	import { proFormaLeveredReturnsWidget } from '@stratiqai/widget-pro-forma-levered-returns';
-	import { tableWidget } from '@stratiqai/widget-table';
-	import { econBaseMultiplierWidget } from '@stratiqai/widget-econ-base-multiplier';
-	import { industryTrendScorecardWidget } from '@stratiqai/widget-industry-trend-scorecard';
-	import { lfprDashboardWidget } from '@stratiqai/widget-lfpr-dashboard';
-	import { mapbox3dWidget } from '@stratiqai/widget-mapbox-3d';
 	import { browser } from '$app/environment';
 	import { initTopicStoreSync } from '$lib/stores/topicStoreSync';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
@@ -32,22 +17,9 @@
 
 	const log = createLogger('app');
 
-	registerWidget(metricWidget);
-	registerWidget(jsonViewerWidget);
-	registerWidget(brokerCardWidget);
-	registerWidget(lqAnalysisWidget);
-	registerWidget(proFormaRevenueWidget);
-	registerWidget(proFormaOpExWidget);
-	registerWidget(proFormaNoiWidget);
-	registerWidget(proFormaUnleveredCfWidget);
-	registerWidget(proFormaLeveredCfWidget);
-	registerWidget(proFormaUnleveredReturnsWidget);
-	registerWidget(proFormaLeveredReturnsWidget);
-	registerWidget(tableWidget);
-	registerWidget(econBaseMultiplierWidget);
-	registerWidget(industryTrendScorecardWidget);
-	registerWidget(lfprDashboardWidget);
-	registerWidget(mapbox3dWidget);
+	for (const manifest of widgets) {
+		registerWidget(manifest);
+	}
 
 	let { children, data } = $props<{ children: any; data: LayoutData }>();
 

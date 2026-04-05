@@ -7,7 +7,7 @@
 
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
-import type { WidgetType } from '$lib/dashboard/types/widget';
+import type { AnyWidgetType } from '$lib/dashboard/types/widget';
 import { createLogger } from '$lib/utils/logger';
 
 const log = createLogger('widgets');
@@ -29,7 +29,7 @@ const log = createLogger('widgets');
  * ```
  */
 export function createWidgetPublisher<T = unknown>(
-	widgetType: WidgetType,
+	widgetType: AnyWidgetType,
 	widgetId: string,
 	producerId: string
 ) {
@@ -67,7 +67,7 @@ export function createWidgetPublisher<T = unknown>(
  * void data;
  * ```
  */
-export function getWidgetData<T = unknown>(widgetType: WidgetType, widgetId: string): T | undefined {
+export function getWidgetData<T = unknown>(widgetType: AnyWidgetType, widgetId: string): T | undefined {
 	const topic = getWidgetTopic(widgetType, widgetId);
 	return validatedTopicStore.at<T>(topic);
 }
@@ -90,7 +90,7 @@ export function getWidgetData<T = unknown>(widgetType: WidgetType, widgetId: str
  * ```
  */
 export function subscribeToWidget<T = unknown>(
-	widgetType: WidgetType,
+	widgetType: AnyWidgetType,
 	widgetId: string,
 	callback: (data: T | undefined) => void
 ): () => void {

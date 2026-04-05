@@ -3,12 +3,9 @@
 	import { getWidgetTopicsByType, WIDGET_TYPES } from '$lib/dashboard/setup/widgetSchemaRegistration';
 	import { topicDragStore, TOPIC_DROP_MIME } from '$lib/dashboard/stores/topicDragStore.svelte';
 	import type { WidgetType } from '$lib/dashboard/types/widget';
+	import { themeStore } from '$lib/stores/themeStore.svelte';
 
-	interface Props {
-		darkMode?: boolean;
-	}
-
-	let { darkMode = false }: Props = $props();
+	const darkMode = $derived(themeStore.darkMode);
 
 	let isOpen = $state(false);
 

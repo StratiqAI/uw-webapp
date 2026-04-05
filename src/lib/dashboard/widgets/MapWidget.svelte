@@ -9,6 +9,7 @@
 	import type { MapWidget } from '$lib/dashboard/types/widget';
 	import { useReactiveValidatedTopic } from '$lib/hooks/validatedTopicStoreRunes.svelte';
 	import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { themeStore } from '$lib/stores/themeStore.svelte';
 	import { createLogger } from '$lib/utils/logger';
 
 	const log = createLogger('widgets');
@@ -17,11 +18,12 @@
 		data: MapWidget['data'];
 		widgetId?: string;
 		topicOverride?: string;
-		darkMode?: boolean;
 	}
 
-	let { data, widgetId = 'map-widget-default', topicOverride, darkMode = false }: Props = $props();
-	
+	let { data, widgetId = 'map-widget-default', topicOverride }: Props = $props();
+
+	const darkMode = $derived(themeStore.darkMode);
+
 	// Use topic override if provided, otherwise use default topic naming convention
 	const topic = $derived(getWidgetTopic('map', widgetId, topicOverride));
 	

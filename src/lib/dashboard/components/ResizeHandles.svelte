@@ -1,6 +1,13 @@
 <script lang="ts">
+	import { getContext } from 'svelte';
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
 	import { themeStore } from '$lib/stores/themeStore.svelte';
+	import {
+		GRID_CONTAINER_CONTEXT_KEY,
+		type DashboardGridContainerContext
+	} from '$lib/dashboard/context/dashboardGridContext';
+
+	const gridCtx = getContext<DashboardGridContainerContext | undefined>(GRID_CONTAINER_CONTEXT_KEY);
 
 	interface Props {
 		widgetId: string;
@@ -54,7 +61,7 @@
 			const deltaX = e.clientX - startX;
 			const deltaY = e.clientY - startY;
 
-			const container = document.querySelector('.dashboard-grid');
+			const container = gridCtx?.el;
 			if (!container) return;
 
 			const rect = container.getBoundingClientRect();

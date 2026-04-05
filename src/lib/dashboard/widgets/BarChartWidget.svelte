@@ -3,15 +3,16 @@
 	import { useReactiveValidatedTopic } from '$lib/hooks/validatedTopicStoreRunes.svelte';
 	import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
 	import { Chart } from '@flowbite-svelte-plugins/chart';
+	import { themeStore } from '$lib/stores/themeStore.svelte';
 
 	interface Props {
 		data: BarChartWidget['data'];
 		widgetId?: string;
 		topicOverride?: string;
-		darkMode?: boolean;
 	}
 
-	let { data, widgetId = 'barchart-widget-default', topicOverride, darkMode = false }: Props = $props();
+	let { data, widgetId = 'barchart-widget-default', topicOverride }: Props = $props();
+	const darkMode = $derived(themeStore.darkMode);
 
 	// Use topic override if provided, otherwise use default topic naming convention
 	const topic = $derived(getWidgetTopic('barChart', widgetId, topicOverride));

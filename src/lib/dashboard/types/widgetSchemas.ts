@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { zodTextFormat } from 'openai/helpers/zod';
 import type { WidgetType } from './widget';
+import { getWidgetManifest } from '$lib/dashboard/setup/widgetRegistry';
 import type { MetricWidgetData } from '@stratiqai/widget-metric';
 import { metricWidgetDataSchema as MetricWidgetDataSchema } from '@stratiqai/widget-metric';
 import type { JsonViewerWidgetData } from '@stratiqai/widget-json-viewer';
@@ -189,6 +190,18 @@ export const WidgetDataSchemas = {
 	lfprDashboard: LfprDashboardConfigSchema,
 	mapbox3d: Mapbox3dConfigSchema
 } as const;
+
+/**
+ * Extensible schema lookup: checks the hardcoded registry first, then falls
+ * back to the dynamic widget manifest registry for package-based widgets.
+ */
+export function getWidgetSchema(widgetType: string): z.ZodSchema | undefined {
+	if (widgetType in WidgetDataSchemas) {
+		return WidgetDataSchemas[widgetType as keyof typeof WidgetDataSchemas];
+	}
+	const manifest = getWidgetManifest(widgetType);
+	return manifest?.zodSchema ?? manifest?.inputSchema;
+}
 
 // ===== Inferred Types from Schemas =====
 

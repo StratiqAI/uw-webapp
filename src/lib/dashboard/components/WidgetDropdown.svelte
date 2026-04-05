@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { onMount, onDestroy, tick } from 'svelte';
 	import type { Widget, WidgetAction } from '$lib/dashboard/types/widget';
+	import { themeStore } from '$lib/stores/themeStore.svelte';
 
 	interface MenuRow {
 		action: WidgetAction;
@@ -12,67 +12,44 @@
 
 	interface Props {
 		widget: Widget;
-		darkMode?: boolean;
 		isFullscreen?: boolean;
 		lastRefreshedAt?: Date | null;
 		onAction: (action: WidgetAction) => void;
-		/** When true, trigger is inline in the title row (upper-right cluster) instead of floating over the body. */
 		inTitleBar?: boolean;
 	}
 
 	let {
 		widget,
-		darkMode = false,
 		isFullscreen = false,
 		lastRefreshedAt = null,
 		onAction,
 		inTitleBar = false
 	}: Props = $props();
 
+	const darkMode = $derived(themeStore.darkMode);
+
 	let isOpen = $state(false);
 	let dropdownEl = $state<HTMLElement>();
 	let buttonEl = $state<HTMLElement>();
-	let portalTarget: HTMLElement;
 	let buttonRect = $state<DOMRect | null>(null);
 
 	const PORTAL_Z = 100070;
 
-	onMount(() => {
-		let portal = document.getElementById('dropdown-portal');
-		if (!portal) {
-			portal = document.createElement('div');
-			portal.id = 'dropdown-portal';
-			portal.style.position = 'fixed';
-			portal.style.top = '0';
-			portal.style.left = '0';
-			portal.style.width = '0';
-			portal.style.height = '0';
-			document.body.appendChild(portal);
-		}
-		portal.style.zIndex = String(PORTAL_Z);
-		portalTarget = portal;
-
-		document.addEventListener('click', handleClickOutside);
-		document.addEventListener('keydown', handleKeydown);
-		window.addEventListener('scroll', updateButtonPosition, true);
-		window.addEventListener('resize', updateButtonPosition);
-	});
-
-	onDestroy(() => {
-		document.removeEventListener('click', handleClickOutside);
-		document.removeEventListener('keydown', handleKeydown);
-		window.removeEventListener('scroll', updateButtonPosition, true);
-		window.removeEventListener('resize', updateButtonPosition);
-
-		if (portalTarget && dropdownEl && portalTarget.contains(dropdownEl)) {
-			portalTarget.removeChild(dropdownEl);
-		}
-	});
+	function portal(node: HTMLElement) {
+		document.body.appendChild(node);
+		return {
+			destroy() {
+				if (node.parentNode === document.body) {
+					document.body.removeChild(node);
+				}
+			}
+		};
+	}
 
 	$effect(() => {
-		if (isOpen && buttonEl) {
-			updateButtonPosition();
-		}
+		if (!isOpen) return;
+		window.addEventListener('scroll', updateButtonPosition, true);
+		return () => window.removeEventListener('scroll', updateButtonPosition, true);
 	});
 
 	function updateButtonPosition() {
@@ -83,6 +60,7 @@
 
 	function handleClickOutside(event: MouseEvent) {
 		if (
+			isOpen &&
 			dropdownEl &&
 			buttonEl &&
 			!dropdownEl.contains(event.target as Node) &&
@@ -93,37 +71,23 @@
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
-		if (event.key === 'Escape') {
+		if (isOpen && event.key === 'Escape') {
 			isOpen = false;
 		}
 	}
 
-	async function toggleDropdown(event: MouseEvent) {
+	function toggleDropdown(event: MouseEvent) {
 		event.stopPropagation();
-		isOpen = !isOpen;
-
-		if (isOpen) {
-			await tick();
-			updateButtonPosition();
-
-			if (portalTarget && dropdownEl) {
-				portalTarget.appendChild(dropdownEl);
-			}
-		} else {
-			if (portalTarget && dropdownEl && portalTarget.contains(dropdownEl)) {
-				portalTarget.removeChild(dropdownEl);
-			}
+		if (!isOpen && buttonEl) {
+			buttonRect = buttonEl.getBoundingClientRect();
 		}
+		isOpen = !isOpen;
 	}
 
 	function handleAction(action: WidgetAction, event: MouseEvent) {
 		event.stopPropagation();
 		onAction(action);
 		isOpen = false;
-
-		if (portalTarget && dropdownEl && portalTarget.contains(dropdownEl)) {
-			portalTarget.removeChild(dropdownEl);
-		}
 	}
 
 	function formatRefreshSubtext(at: Date | null): string {
@@ -234,21 +198,20 @@
 
 	let dropdownStyle = $derived(
 		buttonRect
-			? `
-      position: fixed;
-      top: ${buttonRect.top + buttonRect.height + 8}px;
-      left: ${Math.min(buttonRect.right - 256, window.innerWidth - 268)}px;
-      z-index: ${PORTAL_Z};
-    `
+			? `position:fixed;top:${buttonRect.top + buttonRect.height + 8}px;left:${Math.min(buttonRect.right - 256, window.innerWidth - 268)}px;z-index:${PORTAL_Z};`
 			: ''
 	);
 </script>
 
-<div class="widget-dropdown z-[9999] {inTitleBar ? 'relative shrink-0' : 'relative'}">
+<svelte:window onkeydown={handleKeydown} onresize={updateButtonPosition} />
+<svelte:document onclick={handleClickOutside} />
+
+<div class="widget-dropdown {inTitleBar ? 'relative shrink-0' : 'pointer-events-none relative z-20'}">
 	<button
 		bind:this={buttonEl}
 		onclick={toggleDropdown}
-		class="dropdown-trigger z-[9999] flex items-center justify-center rounded-lg border transition-opacity {darkMode
+		ondragstart={(e) => { e.preventDefault(); e.stopPropagation(); }}
+		class="dropdown-trigger pointer-events-auto flex items-center justify-center rounded-lg border transition-opacity {darkMode
 			? 'border-slate-600/80 bg-slate-800/90 text-slate-300 hover:bg-slate-700 hover:text-white'
 			: 'border-slate-200 bg-white/95 text-slate-600 hover:bg-slate-50 hover:text-slate-900'} opacity-0 shadow-sm group-hover:opacity-100 {inTitleBar
 			? 'relative h-8 w-8'
@@ -263,71 +226,72 @@
 			<circle cx="18" cy="12" r="1.75" />
 		</svg>
 	</button>
-
-	{#if isOpen && buttonRect}
-		<div
-			bind:this={dropdownEl}
-			class="dropdown-menu animate-in w-64 rounded-xl border py-2 shadow-2xl {darkMode
-				? 'border-slate-700/80 bg-[#2d2d30]'
-				: 'border-slate-200 bg-white'}"
-			style={dropdownStyle}
-		>
-			{#each menuItems as item}
-				{#if 'divider' in item && item.divider}
-					<div
-						class="mx-2 my-2 border-t {darkMode ? 'border-slate-600/60' : 'border-slate-200'}"
-					></div>
-				{:else if 'action' in item}
-					<button
-						type="button"
-						onclick={(e) => handleAction(item.action, e)}
-						class="menu-item mx-1 flex w-[calc(100%-0.5rem)] items-start gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors {darkMode
-							? item.danger
-								? 'text-red-400 hover:bg-red-950/40 hover:text-red-300'
-								: 'text-slate-100 hover:bg-slate-600/50'
-							: item.danger
-								? 'text-red-600 hover:bg-red-50'
-								: 'text-slate-800 hover:bg-slate-100'}"
-					>
-						<svg
-							class="menu-icon mt-0.5 h-[18px] w-[18px] flex-shrink-0 {darkMode
-								? 'text-slate-400'
-								: 'text-slate-500'}"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d={item.icon}
-							></path>
-						</svg>
-						<span class="min-w-0 flex-1">
-							<span class="block font-medium leading-tight">{item.label}</span>
-							{#if item.subtext}
-								<span
-									class="mt-1 block text-xs font-normal leading-snug {darkMode
-										? 'text-slate-400'
-										: 'text-slate-500'}"
-								>
-									{item.subtext}
-								</span>
-							{/if}
-						</span>
-					</button>
-				{/if}
-			{/each}
-		</div>
-	{/if}
 </div>
+
+{#if isOpen && buttonRect}
+	<div
+		use:portal
+		bind:this={dropdownEl}
+		class="dropdown-menu animate-in w-64 rounded-xl border py-2 shadow-2xl {darkMode
+			? 'border-slate-700/80 bg-[#2d2d30]'
+			: 'border-slate-200 bg-white'}"
+		style={dropdownStyle}
+	>
+		{#each menuItems as item, i (('action' in item) ? item.action : `divider-${i}`)}
+			{#if 'divider' in item && item.divider}
+				<div
+					class="mx-2 my-2 border-t {darkMode ? 'border-slate-600/60' : 'border-slate-200'}"
+				></div>
+			{:else if 'action' in item}
+				<button
+					type="button"
+					onclick={(e) => handleAction(item.action, e)}
+					class="menu-item mx-1 flex w-[calc(100%-0.5rem)] items-start gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors {darkMode
+						? item.danger
+							? 'text-red-400 hover:bg-red-950/40 hover:text-red-300'
+							: 'text-slate-100 hover:bg-slate-600/50'
+						: item.danger
+							? 'text-red-600 hover:bg-red-50'
+							: 'text-slate-800 hover:bg-slate-100'}"
+				>
+					<svg
+						class="menu-icon mt-0.5 h-[18px] w-[18px] flex-shrink-0 {darkMode
+							? 'text-slate-400'
+							: 'text-slate-500'}"
+						fill="none"
+						stroke="currentColor"
+						viewBox="0 0 24 24"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d={item.icon}
+						></path>
+					</svg>
+					<span class="min-w-0 flex-1">
+						<span class="block font-medium leading-tight">{item.label}</span>
+						{#if item.subtext}
+							<span
+								class="mt-1 block text-xs font-normal leading-snug {darkMode
+									? 'text-slate-400'
+									: 'text-slate-500'}"
+							>
+								{item.subtext}
+							</span>
+						{/if}
+					</span>
+				</button>
+			{/if}
+		{/each}
+	</div>
+{/if}
 
 <style>
 	@keyframes slideDown {
 		from {
 			opacity: 0;
-			transform: translateY(-8px);
+			transform: translateY(-4px);
 		}
 		to {
 			opacity: 1;
@@ -336,7 +300,7 @@
 	}
 
 	.animate-in {
-		animation: slideDown 0.2s ease-out;
+		animation: slideDown 0.1s ease-out;
 	}
 
 	.dropdown-trigger:focus-visible {

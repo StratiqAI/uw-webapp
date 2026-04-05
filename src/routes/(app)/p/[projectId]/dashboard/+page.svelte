@@ -208,8 +208,6 @@
 	<!-- Main Content Area -->
 	<div class="flex-1 flex flex-col overflow-hidden {darkMode ? 'bg-slate-900/80' : 'bg-primary-50/40'}">
 		<DashboardControls
-			{darkMode}
-			{currentTheme}
 			defaultWidgets={dashboardWidgets}
 			onProjectChange={handleProjectChange}
 		/>
@@ -257,11 +255,11 @@
 					</div>
 				{:else}
 					<div class="min-h-[800px]">
-						<Dashboard {darkMode} />
+						<Dashboard />
 					</div>
 				{/if}
 			</div>
 		</div>
 	</div>
-	<ValidatedTopicStoreSidebar {darkMode} />
+	<ValidatedTopicStoreSidebar />
 </div>

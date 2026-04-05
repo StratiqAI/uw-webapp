@@ -166,6 +166,12 @@ export function getWidgetSchemaId(widgetType: WidgetType | string): string {
 	return `widget:${widgetType}-v1`;
 }
 
+export function getWidgetDisplayName(widgetType: string): string {
+	const manifest = getWidgetManifest(widgetType);
+	if (manifest) return manifest.displayName;
+	return WIDGET_NAMES[widgetType as WidgetType] ?? widgetType;
+}
+
 /**
  * Returns the output schema id for a widget type, or null if the widget
  * does not publish (subscribe-only / no outputSchema on the manifest).

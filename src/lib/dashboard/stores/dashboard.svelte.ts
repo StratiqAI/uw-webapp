@@ -22,6 +22,7 @@ import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
 import { isValidPosition, findAvailablePosition, resolveCollisions, repairOverlaps } from '$lib/dashboard/utils/grid';
 import type { WidgetRect } from '$lib/dashboard/utils/grid';
 import { DashboardStorage } from '$lib/dashboard/utils/storage';
+import { generateWidgetId } from '$lib/dashboard/utils/idGenerator';
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
 import type { DashboardSyncManager } from '$lib/services/realtime/websocket/sync-managers/DashboardSyncManager';
@@ -103,13 +104,13 @@ interface DashboardEvents {
 
 class DashboardStore {
 	// State using Svelte 5 runes
-	#widgets = $state<Widget[]>([]);
+	#widgets = $state.raw<Widget[]>([]);
 	#widgetZIndexMap = $state<Map<string, number>>(new Map());
-	#config = $state<DashboardConfig>(structuredClone(DEFAULT_CONFIG));
+	#config = $state.raw<DashboardConfig>(structuredClone(DEFAULT_CONFIG));
 	#dragState = $state<DragState>(structuredClone(DEFAULT_DRAG_STATE));
 	#resizeState = $state<ResizeState>(structuredClone(DEFAULT_RESIZE_STATE));
 	#fullscreenWidgetId = $state<string | null>(null);
-	#displacementPreview = $state<Record<string, Position>>({});
+	#displacementPreview = $state.raw<Record<string, Position>>({});
 	
 	// Settings
 	#autoSaveEnabled = $state(true);
@@ -118,8 +119,8 @@ class DashboardStore {
 	#hasUnsavedChanges = $state(false);
 	#projectId = $state<string | null>(null);
 	#activeTabId = $state<DashboardTabId>(DEFAULT_ACTIVE_TAB);
-	#tabOrder = $state<TabInfo[]>(structuredClone(DEFAULT_TABS) as TabInfo[]);
-	#tabSlices = $state<Record<DashboardTabId, TabDashboardSlice>>(cloneEmptyMultiTab().tabs);
+	#tabOrder = $state.raw<TabInfo[]>(structuredClone(DEFAULT_TABS) as TabInfo[]);
+	#tabSlices = $state.raw<Record<DashboardTabId, TabDashboardSlice>>(cloneEmptyMultiTab().tabs);
 	
 	// Private state
 	#initialized = false;
@@ -164,8 +165,6 @@ class DashboardStore {
 	get canRedo(): boolean { return this.#redoStack.length > 0; }
 	
 	// Derived state with memoization
-	gridCells = $derived.by(() => this.#computeGridCells());
-	
 	activeWidget = $derived.by(() => {
 		const id = this.#dragState.activeWidgetId || this.#resizeState.activeWidgetId;
 		return id ? this.#widgets.find((w) => w.id === id) : null;
@@ -1190,28 +1189,6 @@ class DashboardStore {
 		}
 	}
 	
-	#computeGridCells(): boolean[][] {
-		const cells: boolean[][] = Array.from(
-			{ length: this.#config.gridRows },
-			() => new Array(this.#config.gridColumns).fill(false)
-		);
-		
-		for (const widget of this.#widgets) {
-			for (let r = 0; r < widget.rowSpan; r++) {
-				for (let c = 0; c < widget.colSpan; c++) {
-					const row = widget.gridRow - 1 + r;
-					const col = widget.gridColumn - 1 + c;
-					
-					if (row < this.#config.gridRows && col < this.#config.gridColumns) {
-						cells[row][col] = true;
-					}
-				}
-			}
-		}
-		
-		return cells;
-	}
-	
 	#computeOccupiedCells(): Set<string> {
 		const occupied = new Set<string>();
 		
@@ -1243,7 +1220,7 @@ class DashboardStore {
 	}
 	
 	#generateWidgetId(): string {
-		return `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+		return generateWidgetId();
 	}
 	
 	#clamp(value: number, min: number, max: number): number {
