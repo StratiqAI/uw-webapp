@@ -48,7 +48,7 @@
 	interface Props {
 		widget: Widget;
 		darkMode?: boolean;
-		onDragStart: (widget: Widget) => void;
+		onDragStart: (widget: Widget, grabPoint: { clientX: number; clientY: number }) => void;
 		onDragEnd: () => void;
 	}
 
@@ -255,6 +255,8 @@
 	/** Active stream (if current topic is an AI stream topic) */
 	const activeStream = $derived(streamCatalog.getStreamByTopic(currentTopic));
 
+	let lastMousedownTarget: EventTarget | null = null;
+
 	const zIndex = $derived(dashboard.getWidgetZIndex(widget.id));
 	const isBeingDragged = $derived(
 		dashboard.dragState.isDragging && dashboard.dragState.activeWidgetId === widget.id
@@ -328,11 +330,19 @@
     z-index: ${isBeingDragged ? 0 : zIndex};
   `}
 	draggable={!widget.locked && !isWidgetFullscreen}
+	onmousedown={(e) => { lastMousedownTarget = e.target; }}
 	ondragstart={(e) => {
 		if (widget.locked || isWidgetFullscreen) {
 			e.preventDefault();
 			return;
 		}
+		// if (lastMousedownTarget instanceof HTMLElement) {
+		// 	const body = (e.currentTarget as HTMLElement).querySelector('.widget-body');
+		// 	if (body?.contains(lastMousedownTarget)) {
+		// 		e.preventDefault();
+		// 		return;
+		// 	}
+		// }
 		dragHandlers.handleDragStart(e);
 	}}
 	ondragend={dragHandlers.handleDragEnd}
@@ -759,6 +769,7 @@
 	.widget-wrapper {
 		cursor: move;
 		position: relative;
+		outline: none;
 	}
 
 	.widget-wrapper[draggable='false'] {

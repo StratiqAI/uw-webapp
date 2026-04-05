@@ -404,6 +404,8 @@ export interface DragState {
 	isDragging: boolean;
 	activeWidgetId: string | null;
 	ghostPosition: Position | null;
+	/** Grid-cell offset from the grab point to the widget's top-left cell */
+	dragCellOffset: { col: number; row: number } | null;
 }
 
 export interface ResizeState {

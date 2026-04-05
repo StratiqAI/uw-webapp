@@ -334,15 +334,15 @@
 						<Spinner size="8" color="gray" />
 					</div>
 				{:else}
-					{#key widgetData.content}
-						<div class="custom-prose max-w-none">
-							{#if widgetData.markdown}
-								<TypeWriter text={widgetData.content} speed={2} {darkMode} />
-							{:else}
-								<TypeWriter text={widgetData.content} speed={2} {darkMode} />
-							{/if}
-						</div>
-					{/key}
+				{#key widgetData.content}
+					<div class="custom-prose max-w-none text-[0.9375rem]">
+						{#if widgetData.markdown}
+							<TypeWriter text={widgetData.content} speed={2} {darkMode} />
+						{:else}
+							<TypeWriter text={widgetData.content} speed={2} {darkMode} />
+						{/if}
+					</div>
+				{/key}
 				{/if}
 
 				<!-- Update Timestamp -->
@@ -496,7 +496,8 @@
 
 	/* Custom prose styles */
 	.custom-prose {
-		line-height: 1.75;
+		line-height: 1.8;
+		letter-spacing: 0.01em;
 	}
 
 

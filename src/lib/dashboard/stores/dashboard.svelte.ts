@@ -46,7 +46,8 @@ function clearWidgetTopicsForLayout(widgets: Widget[]): void {
 const DEFAULT_DRAG_STATE: DragState = {
 	isDragging: false,
 	activeWidgetId: null,
-	ghostPosition: null
+	ghostPosition: null,
+	dragCellOffset: null
 } as const;
 
 const DEFAULT_RESIZE_STATE: ResizeState = {

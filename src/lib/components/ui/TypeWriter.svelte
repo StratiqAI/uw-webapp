@@ -164,7 +164,7 @@
 {#if skipOnClick}
   <button
     type="button"
-    class="ai-writer {darkMode ? 'text-slate-200' : 'text-slate-700'}"
+    class="ai-writer {darkMode ? 'text-slate-100' : 'text-slate-700'}"
     aria-live="polite"
     onclick={handleClick}
     onkeydown={handleKeydown}
@@ -177,7 +177,7 @@
   </button>
 {:else}
   <span
-    class="ai-writer {darkMode ? 'text-slate-200' : 'text-slate-700'}"
+    class="ai-writer {darkMode ? 'text-slate-100' : 'text-slate-700'}"
     aria-live="polite"
     role="status"
   >
@@ -191,7 +191,7 @@
 <style>
   .ai-writer {
     white-space: pre-wrap;
-    font-variant-ligatures: none; /* avoids weird caret jumps with ligatures */
+    font-variant-ligatures: none;
     cursor: text;
     background: none;
     border: none;
@@ -199,7 +199,6 @@
     margin: 0;
     text-align: inherit;
     font: inherit;
-    color: inherit;
   }
   
   button.ai-writer {

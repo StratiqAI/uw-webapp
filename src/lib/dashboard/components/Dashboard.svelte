@@ -52,18 +52,33 @@
 	let ghostValid = $state(true);
 	let lastDragCell: { col: number; row: number } | null = null;
 
-	function getPositionFromEvent(e: DragEvent): { gridColumn: number; gridRow: number } | null {
+	function getCellAtPoint(clientX: number, clientY: number): { gridColumn: number; gridRow: number } | null {
 		if (!containerEl) return null;
 		const rect = containerEl.getBoundingClientRect();
 		return getGridPositionFromCoordinates(
-			e.clientX,
-			e.clientY,
+			clientX,
+			clientY,
 			rect,
 			dashboard.config.gridColumns,
 			dashboard.config.gridRows,
 			dashboard.config.gap,
 			dashboard.config.minCellHeight
 		);
+	}
+
+	function getPositionFromEvent(e: DragEvent): { gridColumn: number; gridRow: number } | null {
+		return getCellAtPoint(e.clientX, e.clientY);
+	}
+
+	function getOffsetPositionFromEvent(e: DragEvent): { gridColumn: number; gridRow: number } | null {
+		const mouseCell = getPositionFromEvent(e);
+		if (!mouseCell) return null;
+		const cellOffset = dashboard.dragState.dragCellOffset;
+		if (!cellOffset) return mouseCell;
+		return {
+			gridColumn: Math.max(1, mouseCell.gridColumn - cellOffset.col),
+			gridRow: Math.max(1, mouseCell.gridRow - cellOffset.row)
+		};
 	}
 
 	const dropHandlers = createDropHandlers({
@@ -89,7 +104,7 @@
 			topicDropGhost = null;
 			if (!dashboard.dragState.isDragging) return;
 
-			const position = getPositionFromEvent(e);
+			const position = getOffsetPositionFromEvent(e);
 			if (!position) return;
 
 			if (
@@ -181,11 +196,16 @@
 		}
 	});
 
-	function handleWidgetDragStart(widget: Widget) {
+	function handleWidgetDragStart(widget: Widget, grabPoint: { clientX: number; clientY: number }) {
 		dashboard.pushUndoSnapshot();
+		const grabCell = getCellAtPoint(grabPoint.clientX, grabPoint.clientY);
+		const dragCellOffset = grabCell
+			? { col: grabCell.gridColumn - widget.gridColumn, row: grabCell.gridRow - widget.gridRow }
+			: { col: 0, row: 0 };
 		dashboard.setDragState({
 			isDragging: true,
-			activeWidgetId: widget.id
+			activeWidgetId: widget.id,
+			dragCellOffset
 		});
 	}
 
