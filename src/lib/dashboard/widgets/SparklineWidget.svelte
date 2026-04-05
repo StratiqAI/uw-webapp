@@ -86,7 +86,7 @@
 </script>
 
 <div
-	class="sparkline-widget h-full min-h-[48px] flex flex-col {darkMode ? 'bg-slate-800/80' : 'bg-white/80'} rounded-xl p-2 shadow-inner border {darkMode ? 'border-slate-700' : 'border-slate-200'}"
+	class="sparkline-widget h-full min-h-[48px] flex flex-col {darkMode ? 'bg-slate-800/80' : 'bg-white/80'} rounded-xl p-2 shadow-inner"
 >
 	{#if widgetData?.values?.length >= 2}
 		<div class="flex-1 min-h-0 w-full">

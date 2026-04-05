@@ -113,7 +113,7 @@
 </script>
 
 <div
-	class="area-chart-widget h-full min-h-[200px] flex flex-col {darkMode ? 'bg-slate-800/80' : 'bg-white/80'} rounded-xl p-3 shadow-inner border {darkMode ? 'border-slate-700' : 'border-slate-200'}"
+	class="area-chart-widget h-full min-h-[200px] flex flex-col {darkMode ? 'bg-slate-800/80' : 'bg-white/80'} rounded-xl p-3 shadow-inner"
 >
 	{#if widgetData?.labels?.length && widgetData?.datasets?.length}
 		<div class="flex-1 min-h-0 w-full">

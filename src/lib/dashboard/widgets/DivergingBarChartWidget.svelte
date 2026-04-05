@@ -162,7 +162,7 @@
 </script>
 
 <div
-	class="diverging-bar-widget h-full min-h-[200px] flex flex-col {darkMode ? 'bg-slate-800/80' : 'bg-white/80'} rounded-xl p-3 shadow-inner border {darkMode ? 'border-slate-700' : 'border-slate-200'}"
+	class="diverging-bar-widget h-full min-h-[200px] flex flex-col {darkMode ? 'bg-slate-800/80' : 'bg-white/80'} rounded-xl p-3 shadow-inner"
 >
 	{#if hasData}
 		<div class="flex-1 min-h-0 w-full flex items-center justify-center">

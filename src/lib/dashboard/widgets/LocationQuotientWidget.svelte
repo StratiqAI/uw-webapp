@@ -381,7 +381,7 @@
 	<div class="flip-card h-full min-h-[320px]">
 		<!-- FRONT -->
 		<div
-			class="flip-card-front absolute h-full w-full overflow-auto rounded-lg border {shell} shadow-sm flex flex-col"
+			class="flip-card-front absolute h-full w-full overflow-auto rounded-lg {shell} shadow-sm flex flex-col"
 		>
 			<div class="flex flex-shrink-0 flex-col gap-3 border-b px-4 py-3 {darkMode ? 'border-slate-700' : 'border-slate-200'} sm:flex-row sm:items-start sm:justify-between">
 				<div>
@@ -529,9 +529,9 @@
 
 		<!-- BACK (configure): header + single centered configuration panel -->
 		<div
-			class="flip-card-back absolute h-full w-full overflow-auto rounded-lg border {darkMode
-				? 'border-slate-600 bg-slate-900'
-				: 'border-slate-200 bg-slate-50'} shadow-sm"
+			class="flip-card-back absolute h-full w-full overflow-auto rounded-lg {darkMode
+				? 'bg-slate-900'
+				: 'bg-slate-50'} shadow-sm"
 		>
 			<div class="flex min-h-full flex-col items-center px-4 py-5 sm:px-6">
 				<div class="flex w-full max-w-lg flex-1 flex-col">

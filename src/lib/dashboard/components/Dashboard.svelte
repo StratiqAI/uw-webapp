@@ -49,7 +49,10 @@
 			const byType = getWidgetTopicsByType(kind as any);
 			return byType.map((item) => ({
 				topic: `widgets/${kind}/${item.id}`,
-				isCurrent: `widgets/${kind}/${item.id}` === currentTopic
+				isCurrent: `widgets/${kind}/${item.id}` === currentTopic,
+				data: (item.data && typeof item.data === 'object' && !Array.isArray(item.data))
+					? item.data as Record<string, unknown>
+					: undefined
 			}));
 		},
 		setTopicOverride(widgetId: string, topic: string | undefined) {
@@ -86,6 +89,10 @@
 					source: s.source
 				}));
 			}
+		},
+
+		setWidgetFullscreen(widgetId: string, fullscreen: boolean) {
+			dashboard.setFullscreenWidget(fullscreen ? widgetId : null);
 		},
 
 		getServiceStatus() {

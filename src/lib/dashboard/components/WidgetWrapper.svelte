@@ -41,8 +41,6 @@
 	const darkMode = $derived(themeStore.darkMode);
 
 	let showEditDialog = $state(false);
-	let widgetAIGenerateFn: ((prompt: string) => Promise<void>) | null = null;
-	let widgetFlipFn: (() => void) | null = null;
 	let lqMenuSignals = $state<Record<string, { refresh: number; exportRequest: number }>>({});
 	let removeConfirmOpen = $state(false);
 	let lastRefreshedAt = $state<Date | null>(null);
@@ -72,14 +70,6 @@
 		})
 	);
 	
-	function handleAIGenerationReady(generateFn: (prompt: string) => Promise<void>) {
-		widgetAIGenerateFn = generateFn;
-	}
-	
-	function handleFlipControlReady(flipFn: () => void) {
-		widgetFlipFn = flipFn;
-	}
-
 	function bumpLqRefresh(id: string) {
 		const cur = lqMenuSignals[id] ?? { refresh: 0, exportRequest: 0 };
 		lqMenuSignals = { ...lqMenuSignals, [id]: { ...cur, refresh: cur.refresh + 1 } };
@@ -97,6 +87,9 @@
 		case 'settings':
 			if (ResolvedComp && registeredConfigureFn) {
 				registeredConfigureFn();
+				if (!isWidgetFullscreen) {
+					dashboard.setFullscreenWidget(widget.id);
+				}
 				break;
 			}
 			showEditDialog = true;
@@ -249,15 +242,15 @@
 	ondragend={dragHandlers.handleDragEnd}
 >
 	<div
-		class="widget-content h-full overflow-hidden rounded-2xl border
+		class="widget-content h-full overflow-hidden rounded-2xl
 		{widget.type === 'brokerCard' ? 'flex min-h-0 flex-col' : ''}
 		{darkMode
-			? 'border-slate-700/35 bg-linear-to-b from-slate-800/96 to-slate-900/94 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.35)]'
-			: 'border-slate-200/60 bg-white shadow-[0_4px_24px_-8px_rgba(15,23,42,0.08)]'}
+			? 'bg-linear-to-b from-slate-800/96 to-slate-900/94 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.35)]'
+			: 'bg-white shadow-[0_4px_24px_-8px_rgba(15,23,42,0.08)]'}
 		transition-all duration-200
 		{darkMode
-			? 'hover:border-slate-600/45 hover:shadow-[0_16px_48px_-12px_rgba(0,0,0,0.42)] hover:-translate-y-px'
-			: 'hover:border-slate-300/70 hover:shadow-[0_8px_28px_-8px_rgba(15,23,42,0.12)] hover:-translate-y-px'}"
+			? 'hover:shadow-[0_16px_48px_-12px_rgba(0,0,0,0.42)] hover:-translate-y-px'
+			: 'hover:shadow-[0_8px_28px_-8px_rgba(15,23,42,0.12)] hover:-translate-y-px'}"
 	>
 		<WidgetChrome
 			{widget}
@@ -284,8 +277,6 @@
 					showTitleInChrome={!!displayTitle}
 					onUpdateConfig={(d: any) => dashboard.updateWidget(widget.id, { data: d })}
 					onConfigureReady={(fn: () => void) => { registeredConfigureFn = fn; }}
-				onAIGenerationReady={handleAIGenerationReady}
-				onFlipControlReady={handleFlipControlReady}
 				onUpdateData={(d: any) => dashboard.updateWidget(widget.id, { data: d })}
 					lqSignals={lqMenuSignals[widget.id] ?? DEFAULT_LQ_MENU_SIGNALS}
 				/>

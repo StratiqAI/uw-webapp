@@ -110,7 +110,7 @@
 </script>
 
 <div
-	class="heatmap-widget h-full min-h-[180px] flex flex-col {darkMode ? 'bg-slate-800/80' : 'bg-white/80'} rounded-xl p-3 shadow-inner border {darkMode ? 'border-slate-700' : 'border-slate-200'}"
+	class="heatmap-widget h-full min-h-[180px] flex flex-col {darkMode ? 'bg-slate-800/80' : 'bg-white/80'} rounded-xl p-3 shadow-inner"
 >
 	{#if widgetData?.rows?.length && widgetData?.cols?.length && widgetData?.values?.length}
 		<div class="flex-1 min-h-0 w-full">

@@ -15,6 +15,6 @@
 			Raw Data
 		{/if}
 	</div>
-	<pre class="text-xs font-mono bg-slate-100 dark:bg-slate-800 p-3 rounded border border-slate-200 dark:border-slate-700 overflow-auto whitespace-pre-wrap break-words">{JSON.stringify(data, null, 2)}</pre>
+	<pre class="text-xs font-mono bg-slate-100 dark:bg-slate-800 p-3 rounded overflow-auto whitespace-pre-wrap break-words">{JSON.stringify(data, null, 2)}</pre>
 </div>
 

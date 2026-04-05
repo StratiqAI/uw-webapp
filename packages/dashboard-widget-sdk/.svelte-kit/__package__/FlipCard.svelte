@@ -15,12 +15,12 @@
 <div class="flip-container h-full min-h-0" class:flipped={isFlipped}>
 	<div class="flip-card h-full min-h-0">
 		<div
-			class="flip-card-front absolute h-full min-h-0 w-full overflow-auto rounded-lg border {shellClass} shadow-sm flex flex-col"
+			class="flip-card-front absolute h-full min-h-0 w-full overflow-auto rounded-lg {shellClass} shadow-sm flex flex-col"
 		>
 			{@render front()}
 		</div>
 		<div
-			class="flip-card-back absolute h-full min-h-0 w-full overflow-auto rounded-lg border {flipBackClass} shadow-sm"
+			class="flip-card-back absolute h-full min-h-0 w-full overflow-auto rounded-lg {flipBackClass} shadow-sm"
 		>
 			{@render back()}
 		</div>

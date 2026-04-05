@@ -76,6 +76,8 @@ export interface ServiceAccessor {
 export interface TopicEntry {
 	topic: string;
 	isCurrent: boolean;
+	/** Snapshot of the data currently stored at this topic (for preview). */
+	data?: Record<string, unknown>;
 }
 
 /** Lightweight description of a data stream (AI-generated or manual). */
@@ -131,6 +133,9 @@ export interface DashboardWidgetHost {
 
 	/** Read-only access to the host's AI / manual stream catalog. */
 	streams?: HostStreamCatalog;
+
+	/** Enter or exit fullscreen for a widget. */
+	setWidgetFullscreen?(widgetId: string, fullscreen: boolean): void;
 
 	/** Snapshot of which host services are available. */
 	getServiceStatus?(): ServiceStatus[];

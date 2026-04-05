@@ -34,8 +34,8 @@
 		}
 	});
 
-	const shellClass = $derived(darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white');
-	const flipBackClass = $derived(darkMode ? 'border-slate-600 bg-slate-900' : 'border-slate-200 bg-slate-50');
+	const shellClass = $derived(darkMode ? 'bg-slate-800' : 'bg-white');
+	const flipBackClass = $derived(darkMode ? 'bg-slate-900' : 'bg-slate-50');
 	const inputClass = $derived(
 		darkMode
 			? 'w-full rounded-md border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500'
