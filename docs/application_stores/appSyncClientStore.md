@@ -2,6 +2,8 @@
 
 This document describes how `appSyncClientStore` is currently used throughout the application. The store provides a singleton AppSync WebSocket client instance that is shared across all components, ensuring efficient resource usage and centralized connection management.
 
+**Related:** For how subscription payloads should flow into **ValidatedTopicStore** (including ontology / `onInstanceUpdated` planning), see [ValidatedTopicStore — section 13](../validated-topic-store.md#13-appsync-realtime-and-ontology-integration-planning).
+
 ## Architecture Overview
 
 The `appSyncClientStore` provides:
@@ -12,6 +14,10 @@ The `appSyncClientStore` provides:
 - **Resource Efficiency** - Prevents multiple WebSocket connections from being created
 
 The store wraps the `AppSyncWsClient` class and provides a simplified API for managing subscriptions across the application.
+
+### Other WebSocket client in this repo
+
+Some sync managers (**Workflow**, **Dashboard**, **Document entities**) use a parallel implementation in [`src/lib/services/realtime/websocket/wsClient.ts`](../../src/lib/services/realtime/websocket/wsClient.ts) (`getAppSyncWsClient`, `initAppSyncWsClient`, `AppSyncWsClient` export). It is the same AppSync realtime protocol but a different singleton lifecycle than `appSyncClientStore`. New features should avoid opening **two** connections to the same endpoint in one session; align with one pattern or refactor shared ownership later.
 
 ## Current Usage Patterns
 
@@ -344,6 +350,22 @@ const subscription = {
 - **Shared Subscriptions**: Multiple components can share the same connection
 - **Automatic Cleanup**: Subscriptions are removed when components unmount, preventing memory leaks
 - **Token Reuse**: If the same token is used, the existing connection is reused
+
+## Ontology Graph subscriptions (planning)
+
+The platform exposes `onInstanceUpdated(projectId: ID!, id: ID!): EntityInstance` with `@aws_subscribe(mutations: ["saveEntityInstance"])`. AppSync delivers events only when the **mutation result** matches the subscriber’s variables on the filter fields (notably **`projectId`** and **`id`** on the payload).
+
+**Typical wiring:**
+
+1. Define the subscription in `@stratiqai/types-simple` and `print()` the document.
+2. `await ensureConnection(idToken)` then `await addSubscription(idToken, { query, variables: { projectId, id }, path: 'onInstanceUpdated', next, error })`.
+3. In `next`, map the `EntityInstance` into a topic and call `validatedTopicStore.publish(...)` if you want dashboard/knowledge UI to stay in sync (see [ValidatedTopicStore §13](../validated-topic-store.md#13-appsync-realtime-and-ontology-integration-planning)).
+
+**`SubscriptionSpec` reminders** ([`types.ts`](../../src/lib/services/realtime/websocket/types.ts)):
+
+- `path` selects the field name on the GraphQL payload (e.g. `onInstanceUpdated`).
+- Use `select` if you need a custom transform before `next`.
+- Always remove the subscription on unmount (`removeSubscription` with the **same spec object reference** you passed to `addSubscription`).
 
 ## Future Enhancements
 

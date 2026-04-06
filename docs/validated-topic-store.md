@@ -18,6 +18,7 @@ An in-memory, hierarchical state container with MQTT-style topic addressing and 
 10. [Architecture](#10-architecture)
 11. [File Index](#11-file-index)
 12. [Glossary](#12-glossary)
+13. [AppSync realtime and ontology integration (planning)](#13-appsync-realtime-and-ontology-integration-planning)
 
 ---
 
@@ -660,6 +661,10 @@ Several modules (GraphQL sync managers, entity publishers) define local `IValida
 | Package widget SDK hooks | `packages/dashboard-widget-sdk/src/lib/hooks.svelte.ts` |
 | Type definitions | `src/lib/types/models.ts` (`JsonSchemaDefinition`) |
 | Debug sidebar | `src/lib/dashboard/components/ValidatedTopicStoreSidebar.svelte` |
+| AppSync shared WS store (doc) | `docs/application_stores/appSyncClientStore.md` |
+| AppSync WS client (store path) | `src/lib/services/realtime/websocket/AppSyncWsClient.ts` |
+| AppSync WS client (sync managers) | `src/lib/services/realtime/websocket/wsClient.ts` |
+| Subscription spec types | `src/lib/services/realtime/websocket/types.ts` |
 
 ---
 
@@ -678,3 +683,91 @@ Several modules (GraphQL sync managers, entity publishers) define local `IValida
 | **StoreChangeEvent** | Union type emitted on every store mutation (`publish`, `delete`, `clear`, `register-schema`) |
 | **vts:data** | `localStorage` key storing the flat topic → value snapshot |
 | **vts:schemas** | `localStorage` key storing UI-created schema registrations |
+
+---
+
+## 13. AppSync realtime and ontology integration (planning)
+
+This section ties **ValidatedTopicStore** to the **AppSync WebSocket** stack so you can plan wiring the ontology API (`onInstanceUpdated`, `saveEntityInstance`, etc.) into the same reactive model used for workflows and dashboards.
+
+### 13.1 How realtime fits today
+
+**ValidatedTopicStore** is not a WebSocket client. It is the **in-memory, validated sink** that UI and sync code write to with `publish()`. Realtime arrives through a separate layer:
+
+1. A GraphQL **subscription** runs over an AppSync WebSocket connection.
+2. The subscription’s `next` handler receives payloads (e.g. an `EntityInstance`).
+3. The handler **maps** that payload to a topic path and calls `validatedTopicStore.publish(topic, value)`.
+4. If a JSON Schema is registered for a matching topic pattern, **AJV** validates before the value is stored; otherwise the value is accepted as-is.
+5. **`onChange`** fires (`StoreChangeEvent`), which drives **TopicStoreSync** (cross-tab + `localStorage`) and any other listeners (e.g. dashboard autosave for `widgets/` topics in [`+layout.svelte`](../src/routes/+layout.svelte)).
+
+```mermaid
+flowchart LR
+  subgraph appsync [AppSync]
+    Sub[GraphQL subscription]
+  end
+  subgraph browser [Browser]
+    WS[WebSocket client]
+    Next[next handler]
+    VTS[ValidatedTopicStore]
+    Sync[TopicStoreSync]
+  end
+  Sub --> WS
+  WS --> Next
+  Next -->|publish topic value| VTS
+  VTS -->|onChange events| Sync
+```
+
+**Prior art:** [`WorkflowSyncManager`](../src/lib/services/realtime/websocket/sync-managers/WorkflowSyncManager.ts) combines `GraphQLQueryClient` (HTTP), `AppSyncWsClient` from [`wsClient.ts`](../src/lib/services/realtime/websocket/wsClient.ts), and [`EntitySyncManager`](../src/lib/services/realtime/store/EntitySyncManager.ts) to list/get entities and mirror mutations into `validatedTopicStore` via configured topic paths (`toTopicPath`, entity type keys). Use the same idea for ontology instances, or a thinner helper that only subscribes and publishes.
+
+### 13.2 Two WebSocket entry points in this repo
+
+Both speak the AppSync realtime protocol, but **different modules** import different classes:
+
+| Entry | Module | Typical consumers |
+|-------|--------|-------------------|
+| **Shared store API** | [`appSyncClientStore`](../src/lib/stores/appSyncClientStore.ts) → `AppSyncWsClient` from [`AppSyncWsClient.ts`](../src/lib/services/realtime/websocket/AppSyncWsClient.ts) | Pages and stores that call `ensureConnection` / `addSubscription` / `removeSubscription` |
+| **Direct client** | [`wsClient.ts`](../src/lib/services/realtime/websocket/wsClient.ts) (`getAppSyncWsClient`, `initAppSyncWsClient`) | [`WorkflowSyncManager`](../src/lib/services/realtime/websocket/sync-managers/WorkflowSyncManager.ts), [`DashboardSyncManager`](../src/lib/services/realtime/websocket/sync-managers/DashboardSyncManager.ts), [`DocumentEntitiesSyncManager`](../src/lib/services/realtime/websocket/sync-managers/DocumentEntitiesSyncManager.ts) |
+
+For **new ontology UI**, prefer **one** connection strategy per session: either extend the pattern used by your feature (store vs sync manager) or consolidate later. Avoid opening duplicate WebSockets for the same user and endpoint.
+
+> **Doc note:** Detailed API for the shared store is in [AppSync Client Store](./application_stores/appSyncClientStore.md). Subscription payload shape is defined by [`SubscriptionSpec`](../src/lib/services/realtime/websocket/types.ts) (`query`, `variables`, `path` or `select`, `next`, `error`).
+
+### 13.3 Ontology subscription: `onInstanceUpdated`
+
+Backend contract (AppSync):
+
+- Subscription: `onInstanceUpdated(projectId: ID!, id: ID!)` filtered on the **mutation result** for `saveEntityInstance`.
+- The mutation resolver must return **`projectId` and `id`** (GraphQL-facing IDs, not raw `PROJ#` / `INST#` prefixes) so clients subscribing with the same variables receive events.
+
+Client checklist:
+
+1. Add the subscription document to **`@stratiqai/types-simple`** (project convention), run types/codegen as usual.
+2. Subscribe with `variables: { projectId, id }` matching the instance you care about (or use multiple specs / a small manager if you need many instances).
+3. In `next`, normalize the `EntityInstance` if needed, choose a **topic** (see below), then `validatedTopicStore.publish(topic, payload)`.
+
+### 13.4 Topic and schema conventions for ontology
+
+Pick a stable namespace so ontology data does not collide with existing trees (`widgets/`, `workflowExecutions/`, etc.):
+
+- **Per-instance topic (explicit):**  
+  `ontology/projects/{projectId}/instances/{instanceId}`  
+  Value: full or partial `EntityInstance` (or a UI-specific projection).
+- **Pattern for schemas:**  
+  e.g. `ontology/projects/+/instances/+` so one JSON Schema applies to all instances under a project, or finer patterns if you need per-definition shapes.
+
+Register schemas with `registerSchema({ id, name, topicPattern, jsonSchema, ... })` **before** relying on validation; mirror the structure you put in `publish()`.
+
+If validation fails, `publish()` returns **`false`** and errors appear in `validatedTopicStore.errors` — shape subscription payloads to match the registered schema or skip validation for that topic (no matching pattern).
+
+### 13.5 Queries and mutations vs the store
+
+Realtime updates only reflect **future** `saveEntityInstance` calls. Plan also:
+
+- **Initial load:** `listEntityDefinitions` / `getEntityInstance` (HTTP via your existing GraphQL client, e.g. [`GraphQLQueryClient`](../src/lib/services/realtime/store/GraphQLQueryClient.ts)) to seed `validatedTopicStore` or a dedicated Svelte store.
+- **Writes:** mutation from the UI, then either rely on the subscription to update the store or apply an optimistic `publish()` and reconcile on error.
+
+### 13.6 Related documentation
+
+- [AppSync Client Store](./application_stores/appSyncClientStore.md) — singleton connection and `SubscriptionSpec` usage.
+- Platform ontology architecture: stratiqai-platform `environments/docs-src/internal/architecture/ontology-graph.md` (DynamoDB + resolvers).
+- Types package: `stratiqai-types-simple` ontology GraphQL files and schema fingerprinting docs under `docs/ontology/`.

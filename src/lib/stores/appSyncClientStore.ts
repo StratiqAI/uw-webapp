@@ -8,7 +8,8 @@
  * - Automatically handling connection lifecycle and reconnection
  * 
  * For comprehensive usage documentation, see:
- * @see {@link ../../docs/application_stores/appSyncClientStore.md}
+ * @see {@link ../../../docs/application_stores/appSyncClientStore.md}
+ * @see {@link ../../../docs/validated-topic-store.md#13-appsync-realtime-and-ontology-integration-planning} — wiring subscriptions into ValidatedTopicStore (ontology planning)
  */
 
 import { AppSyncWsClient } from '$lib/services/realtime/websocket/AppSyncWsClient';
