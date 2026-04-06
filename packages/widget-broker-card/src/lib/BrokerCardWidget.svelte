@@ -2,8 +2,10 @@
 	import type { BrokerCardWidgetData } from './schema.js';
 	import {
 		useReactiveValidatedTopic,
+		useAiGenerationStatus,
 		getDashboardWidgetHost,
 		FlipCard,
+		AiStatusOverlay,
 		WidgetConfigureBack,
 		useWidgetConfigure,
 		type StandardWidgetProps,
@@ -25,6 +27,7 @@
 	const host = getDashboardWidgetHost();
 	const topic = $derived(host.getWidgetTopic('brokerCard', widgetId, topicOverride));
 	const dataStream = useReactiveValidatedTopic<BrokerCardWidgetData>(() => topic);
+	const aiStatus = useAiGenerationStatus(() => topic);
 	let widgetData = $derived<BrokerCardWidgetData>(dataStream.current || data);
 
 	const configure = useWidgetConfigure<BrokerCardWidgetData>({
@@ -114,6 +117,11 @@
 >
 	{#snippet front()}
 		<div class="broker-card-widget flex h-full min-h-0 flex-col">
+			{#if aiStatus.generating || aiStatus.error}
+				<div class="px-4 py-4">
+					<AiStatusOverlay generating={aiStatus.generating} error={aiStatus.error} {darkMode} />
+				</div>
+			{:else}
 			<div class="flex min-h-0 flex-1 flex-col overflow-hidden {innerShellClass}">
 				<div class="flex min-h-0 flex-1 flex-col">
 					<div class="flex items-start gap-3 px-4 pb-3 pt-4">
@@ -190,6 +198,7 @@
 					</div>
 				</div>
 			</div>
+			{/if}
 		</div>
 	{/snippet}
 	{#snippet back()}
@@ -199,6 +208,7 @@
 			darkMode={darkMode}
 			theme={theme}
 			topicOverride={topicOverride}
+			showAITab={true}
 			onApply={() => configure.applyConfig()}
 			onCancel={() => configure.cancelConfig()}
 		>

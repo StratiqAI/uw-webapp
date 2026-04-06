@@ -1,5 +1,5 @@
 import { defineWidget } from '@stratiqai/dashboard-widget-sdk';
-import { areaChartWidgetDataSchema } from './schema.js';
+import { areaChartWidgetDataSchema, areaChartAiOutputSchema } from './schema.js';
 import AreaChartWidget from './AreaChartWidget.svelte';
 
 export const areaChartWidget = defineWidget({
@@ -15,9 +15,20 @@ export const areaChartWidget = defineWidget({
 		]
 	},
 	defaultSize: { colSpan: 6, rowSpan: 3 },
-	palette: { icon: '📉', category: 'charts' }
+	palette: { icon: '📉', category: 'charts' },
+	promptConfig: {
+		defaultPrompt: 'Generate a stacked area chart showing cumulative trends',
+		systemInstruction:
+			'You are a data visualization assistant. Return structured area chart data with labels and stacked datasets.',
+		model: 'GEMINI_2_5_FLASH',
+		aiOutputSchema: areaChartAiOutputSchema,
+		mapAiOutput: (out) => ({
+			labels: out.labels,
+			datasets: out.datasets
+		})
+	}
 });
 
-export { areaChartWidgetDataSchema } from './schema.js';
-export type { AreaChartWidgetData } from './schema.js';
+export { areaChartWidgetDataSchema, areaChartAiOutputSchema } from './schema.js';
+export type { AreaChartWidgetData, AreaChartAiOutput } from './schema.js';
 export { default as AreaChartWidget } from './AreaChartWidget.svelte';

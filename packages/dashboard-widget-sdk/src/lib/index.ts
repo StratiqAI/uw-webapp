@@ -13,12 +13,14 @@ export type {
 } from './types.js';
 export { defineWidget } from './defineWidget.js';
 export { setDashboardWidgetHost, getDashboardWidgetHost } from './context.svelte.js';
-export { useReactiveValidatedTopic, publishWidgetOutput } from './hooks.svelte.js';
+export { useReactiveValidatedTopic, publishWidgetOutput, useAiGenerationStatus, getAiStatusTopic } from './hooks.svelte.js';
+export type { AiGenerationStatus } from './hooks.svelte.js';
 export { HostServices } from './services.js';
 export type { HostConfig } from './services.js';
 export { useHostService, useExternalData } from './useExternalData.svelte.js';
 export type { UseExternalDataOptions, ExternalDataResult } from './useExternalData.svelte.js';
 export { default as FlipCard } from './FlipCard.svelte';
+export { default as AiStatusOverlay } from './AiStatusOverlay.svelte';
 export { default as WidgetConfigureBack } from './WidgetConfigureBack.svelte';
 export { useWidgetConfigure } from './useWidgetConfigure.svelte.js';
 

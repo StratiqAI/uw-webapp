@@ -34,3 +34,19 @@ export function publishWidgetOutput(kind, widgetId, data) {
     }
     return host.publishWidgetOutput(kind, widgetId, data);
 }
+const AI_STATUS_SUFFIX = '/__ai_status';
+export function getAiStatusTopic(widgetTopic) {
+    return widgetTopic + AI_STATUS_SUFFIX;
+}
+export function useAiGenerationStatus(topic) {
+    const host = getDashboardWidgetHost();
+    const store = host.validatedTopicStore;
+    const status = $derived.by(() => {
+        const _ = store.tree;
+        return store.at(getAiStatusTopic(topic()));
+    });
+    return {
+        get generating() { return status?.generating ?? false; },
+        get error() { return status?.error; }
+    };
+}

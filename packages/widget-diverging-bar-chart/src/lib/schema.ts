@@ -8,3 +8,10 @@ export const divergingBarChartWidgetDataSchema = z.object({
 });
 
 export type DivergingBarChartWidgetData = z.infer<typeof divergingBarChartWidgetDataSchema>;
+
+export const divergingBarChartAiOutputSchema = z.object({
+	labels: z.array(z.string()).describe('Category labels for each bar'),
+	values: z.array(z.number()).describe('Positive and negative numeric values for each label')
+});
+
+export type DivergingBarChartAiOutput = z.infer<typeof divergingBarChartAiOutputSchema>;

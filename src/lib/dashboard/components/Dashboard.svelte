@@ -8,7 +8,7 @@
 	import { createDropHandlers } from '$lib/dashboard/utils/dragDrop';
 	import { getDefaultDataForWidget, getDefaultSizeForWidget } from '$lib/dashboard/setup/defaultDashboardValues';
 	import type { Widget, WidgetType } from '$lib/dashboard/types/widget';
-	import { setDashboardWidgetHost, HostServices, parseJsonSchemaToBuilderState, buildSchemaPreview } from '@stratiqai/dashboard-widget-sdk';
+	import { setDashboardWidgetHost, HostServices, parseJsonSchemaToBuilderState, buildSchemaPreview, getAiStatusTopic } from '@stratiqai/dashboard-widget-sdk';
 	import type { WidgetPromptEditData } from '@stratiqai/dashboard-widget-sdk';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import { getWidgetTopic, getWidgetTopicsByType } from '$lib/dashboard/setup/widgetSchemaRegistration';
@@ -25,30 +25,57 @@
 		getWidgetInstancePromptForEditing,
 		updateWidgetInstancePrompt
 	} from '$lib/services/widgetPromptService';
-	import {
-		createJobSubmissionClientWithAppSync,
-		PRIORITY_LEVELS,
-		type JobSubmissionClient
-	} from '$lib/dashboard/services/jobManager';
+	import { aiService } from '$lib/services/ai';
 	import { PUBLIC_GEOAPIFY_API_KEY } from '$env/static/public';
 	import { createLogger } from '$lib/utils/logger';
+	import { gql } from '$lib/services/realtime/graphql/requestHandler';
+	import { Q_LIST_DOCLINKS } from '@stratiqai/types-simple';
+	import type { Project, Doclink } from '$lib/types/cloud/app';
 
 	const log = createLogger('dashboard');
+
+	function extractDocumentIds(project: Project | null | undefined): string[] {
+		if (!project?.doclinks) return [];
+		const links: Doclink[] = Array.isArray(project.doclinks)
+			? project.doclinks
+			: (project.doclinks as any).items ?? [];
+		return links
+			.filter((l: Doclink) => l.documentId && !l.deletedAt)
+			.map((l: Doclink) => l.documentId);
+	}
+
+	async function getProjectDocumentIds(): Promise<string[]> {
+		const pid = dashboard.projectId;
+		if (!pid) return [];
+
+		const project = validatedTopicStore.at<Project>(`projects/${pid}`);
+		const storeIds = extractDocumentIds(project);
+		if (storeIds.length > 0) return storeIds;
+
+		try {
+			const token = getIdToken();
+			const result = await gql<{ listDoclinks: { items: Doclink[] } }>(
+				Q_LIST_DOCLINKS,
+				{ parentId: pid, limit: 100 },
+				token
+			);
+			const items = result?.listDoclinks?.items ?? [];
+			const ids = items
+				.filter((d) => d.documentId && !d.deletedAt)
+				.map((d) => d.documentId);
+			log.info(`Fetched ${ids.length} documentIds via direct query (store was empty)`);
+			return ids;
+		} catch (err) {
+			log.warn('Failed to fetch documentIds fallback:', err);
+			return [];
+		}
+	}
 
 	function getIdToken(): string {
 		const token = ($page?.data as Record<string, unknown>)?.idToken as string | undefined
 			?? authStore.idToken;
 		if (!token) throw new Error('Not authenticated');
 		return token;
-	}
-
-	let jobClient: JobSubmissionClient | null = null;
-
-	async function getJobClient(): Promise<JobSubmissionClient> {
-		if (!jobClient) {
-			jobClient = await createJobSubmissionClientWithAppSync();
-		}
-		return jobClient;
 	}
 
 	const serviceMap = new Map<string, unknown>();
@@ -199,7 +226,9 @@
 				qc
 			);
 
-			const jobRequest = {
+			const documentIds = await getProjectDocumentIds();
+
+			const inputValues: Record<string, unknown> = {
 				prompt: data.userPrompt,
 				systemInstruction: data.systemInstruction,
 				model: data.model || 'GEMINI_2_5_FLASH',
@@ -209,36 +238,45 @@
 				...(data.temperature !== undefined && { temperature: data.temperature }),
 				...(data.maxTokens !== undefined && { maxTokens: data.maxTokens }),
 				...(data.topP !== undefined && { topP: data.topP }),
-				...(data.frequencyPenalty !== undefined && { frequencyPenalty: data.frequencyPenalty })
+				...(data.frequencyPenalty !== undefined && { frequencyPenalty: data.frequencyPenalty }),
+				...(documentIds.length > 0 && { documentIds })
 			};
 
-			const client = await getJobClient();
-			const job = await client.submitJob(
-				{ request: JSON.stringify(jobRequest), priority: PRIORITY_LEVELS.MEDIUM },
+			const handle = await aiService.submitExecution(
+				{
+					projectId: dashboard.projectId ?? '',
+					promptId,
+					inputValues,
+					...(documentIds.length > 0 && { documentIds }),
+					priority: 'MEDIUM'
+				},
 				token
 			);
 
-			log.info(`AI job submitted for widget ${widgetId}:`, job.id);
+			log.info(`AI execution submitted for widget ${widgetId}`);
 
 			const topic = getWidgetTopic(kind as any, widgetId);
-			const { jobUpdateStore: jus } = await import('$lib/stores/jobUpdateStore.svelte');
-			const updatesStore = jus.subscribeToJobUpdates(job.id);
-			const unsub = updatesStore.subscribe((updates) => {
-				if (!updates || updates.length === 0) return;
-				const latest = updates[0];
-				if ((latest.status === 'COMPLETED' || latest.status === 'COMPLETE') && latest.result) {
+			const statusTopic = getAiStatusTopic(topic);
+			validatedTopicStore.publish(statusTopic, { generating: true });
+
+			handle.result.then((rawOutput) => {
+				if (rawOutput) {
 					try {
-						const parsed = JSON.parse(latest.result);
-						const output = parsed.output_parsed ?? parsed;
+						const parsed = JSON.parse(rawOutput);
+						const rawOutput_ = parsed.output_parsed ?? parsed;
+						const promptConfig = getWidgetPromptConfig(kind);
+						const output = promptConfig?.mapAiOutput ? promptConfig.mapAiOutput(rawOutput_) : rawOutput_;
 						validatedTopicStore.publish(topic, output);
 					} catch (err) {
 						log.error('Failed to parse AI result:', err);
 					}
-					unsub();
-				} else if (latest.status === 'FAILED' || latest.status === 'ERROR') {
-					log.error('AI job failed:', latest.result);
-					unsub();
 				}
+				validatedTopicStore.publish(statusTopic, { generating: false });
+			}).catch((err) => {
+				log.error('AI execution failed:', err);
+				validatedTopicStore.publish(statusTopic, { generating: false, error: err instanceof Error ? err.message : String(err) });
+			}).finally(() => {
+				handle.destroy();
 			});
 		},
 

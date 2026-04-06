@@ -48,7 +48,6 @@ import { calculateAdjustedNoiNode } from './processes/calculateAdjustedNoi';
 import { calculateNetCashFlowAfterTaxNode } from './processes/calculateNetCashFlowAfterTax';
 import { calculateCapRateSpreadNode } from './processes/calculateCapRateSpread';
 import { calculateValueAddPotentialNode } from './processes/calculateValueAddPotential';
-import { aiQueryNode } from './ai/aiQueryNode';
 import { investmentReportNode } from './outputs/investmentReport';
 import { financialSummaryNode } from './outputs/financialSummary';
 import { analysisReportNode } from './outputs/analysisReport';
@@ -107,8 +106,6 @@ export const elementTypes = [
 	calculateNetCashFlowAfterTaxNode,
 	calculateCapRateSpreadNode,
 	calculateValueAddPotentialNode,
-	// AI Nodes
-	aiQueryNode,
 	// Output Nodes
 	workflowOutputNode, // Special: single workflow output sink
 	investmentReportNode,

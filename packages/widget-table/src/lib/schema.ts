@@ -24,3 +24,14 @@ export const tableWidgetDataSchema = z.object({
 
 export type TableWidgetData = z.infer<typeof tableWidgetDataSchema>;
 export type ColumnDef = z.infer<typeof columnDefSchema>;
+
+export const tableAiOutputSchema = z.object({
+	columns: z.array(z.object({
+		key: z.string().describe('Column identifier/key'),
+		label: z.string().optional().describe('Display label for the column header'),
+		type: z.enum(['text', 'number', 'currency', 'percent']).optional().describe('Data type for formatting')
+	})).describe('Column definitions for the table'),
+	rows: z.array(z.record(z.unknown())).describe('Array of row objects keyed by column key')
+});
+
+export type TableAiOutput = z.infer<typeof tableAiOutputSchema>;

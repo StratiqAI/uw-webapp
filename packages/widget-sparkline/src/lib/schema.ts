@@ -7,3 +7,10 @@ export const sparklineWidgetDataSchema = z.object({
 });
 
 export type SparklineWidgetData = z.infer<typeof sparklineWidgetDataSchema>;
+
+export const sparklineAiOutputSchema = z.object({
+	values: z.array(z.number()).describe('Numeric data points for the sparkline'),
+	label: z.string().nullable().optional().describe('Label describing the data trend')
+});
+
+export type SparklineAiOutput = z.infer<typeof sparklineAiOutputSchema>;

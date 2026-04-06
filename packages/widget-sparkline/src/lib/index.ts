@@ -1,5 +1,5 @@
 import { defineWidget } from '@stratiqai/dashboard-widget-sdk';
-import { sparklineWidgetDataSchema } from './schema.js';
+import { sparklineWidgetDataSchema, sparklineAiOutputSchema } from './schema.js';
 import SparklineWidget from './SparklineWidget.svelte';
 
 export const sparklineWidget = defineWidget({
@@ -13,9 +13,20 @@ export const sparklineWidget = defineWidget({
 		color: '#3b82f6'
 	},
 	defaultSize: { colSpan: 4, rowSpan: 1 },
-	palette: { icon: '〰', category: 'charts' }
+	palette: { icon: '〰', category: 'charts' },
+	promptConfig: {
+		defaultPrompt: 'Generate sparkline data showing a recent trend',
+		systemInstruction:
+			'You are a data analyst. Return an array of numeric data points representing a recent trend, plus an optional label.',
+		model: 'GEMINI_2_5_FLASH',
+		aiOutputSchema: sparklineAiOutputSchema,
+		mapAiOutput: (out) => ({
+			values: out.values,
+			label: out.label ?? null
+		})
+	}
 });
 
-export { sparklineWidgetDataSchema } from './schema.js';
-export type { SparklineWidgetData } from './schema.js';
+export { sparklineWidgetDataSchema, sparklineAiOutputSchema } from './schema.js';
+export type { SparklineWidgetData, SparklineAiOutput } from './schema.js';
 export { default as SparklineWidget } from './SparklineWidget.svelte';

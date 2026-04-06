@@ -2,8 +2,10 @@
 	import type { TableWidgetData, ColumnDef } from './schema.js';
 	import {
 		useReactiveValidatedTopic,
+		useAiGenerationStatus,
 		getDashboardWidgetHost,
 		FlipCard,
+		AiStatusOverlay,
 		WidgetConfigureBack,
 		useWidgetConfigure,
 		type StandardWidgetProps
@@ -24,6 +26,7 @@
 	const host = getDashboardWidgetHost();
 	const topic = $derived(host.getWidgetTopic('table', widgetId, topicOverride));
 	const dataStream = useReactiveValidatedTopic<TableWidgetData>(() => topic);
+	const aiStatus = useAiGenerationStatus(() => topic);
 	const EMPTY_ROWS: Record<string, unknown>[] = [];
 	let widgetData = $derived<TableWidgetData>({
 		rows: EMPTY_ROWS,
@@ -172,6 +175,11 @@
 >
 	{#snippet front()}
 		<div class="table-widget flex h-full flex-col overflow-hidden">
+			{#if aiStatus.generating || aiStatus.error}
+				<div class="px-4 py-4">
+					<AiStatusOverlay generating={aiStatus.generating} error={aiStatus.error} {darkMode} />
+				</div>
+			{:else}
 			{#if widgetData.searchable}
 				<div class="flex items-center gap-2 border-b px-3 py-1.5 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
 					<svg class="h-3.5 w-3.5 shrink-0 {darkMode ? 'text-slate-500' : 'text-slate-400'}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -263,6 +271,7 @@
 					</div>
 				</div>
 			{/if}
+			{/if}
 		</div>
 	{/snippet}
 	{#snippet back()}
@@ -272,6 +281,7 @@
 			darkMode={darkMode}
 			theme={theme}
 			topicOverride={topicOverride}
+			showAITab={true}
 			onApply={() => configure.applyConfig()}
 			onCancel={() => configure.cancelConfig()}
 		>

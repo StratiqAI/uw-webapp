@@ -2,9 +2,11 @@
 	import type { ParagraphWidgetData } from './schema.js';
 	import {
 		FlipCard,
+		AiStatusOverlay,
 		WidgetConfigureBack,
 		useWidgetConfigure,
 		useReactiveValidatedTopic,
+		useAiGenerationStatus,
 		getDashboardWidgetHost,
 		type StandardWidgetProps
 	} from '@stratiqai/dashboard-widget-sdk';
@@ -22,6 +24,7 @@
 	const host = getDashboardWidgetHost();
 	const topic = $derived(host.getWidgetTopic('paragraph', widgetId, topicOverride));
 	const dataStream = useReactiveValidatedTopic<ParagraphWidgetData>(() => topic);
+	const aiStatus = useAiGenerationStatus(() => topic);
 
 	let widgetData = $derived<ParagraphWidgetData>({
 		title: dataStream.current?.title ?? data.title,
@@ -56,7 +59,9 @@
 <FlipCard isFlipped={configure.isFlipped} {shellClass} {flipBackClass}>
 	{#snippet front()}
 		<div class="relative h-full overflow-auto px-4 py-4">
-			{#if widgetData.content}
+			{#if aiStatus.generating || aiStatus.error}
+				<AiStatusOverlay generating={aiStatus.generating} error={aiStatus.error} {darkMode} />
+			{:else if widgetData.content}
 				<div
 					class="prose max-w-none text-[0.9375rem] leading-relaxed {darkMode
 						? 'prose-invert text-slate-200'

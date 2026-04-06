@@ -19,3 +19,14 @@ export const lineChartWidgetDataSchema = z.object({
 });
 
 export type LineChartWidgetData = z.infer<typeof lineChartWidgetDataSchema>;
+
+export const lineChartAiOutputSchema = z.object({
+	labels: z.array(z.string()).describe('Labels for each data point on the x-axis'),
+	datasets: z.array(z.object({
+		label: z.string().describe('Name of the data series'),
+		data: z.array(z.number()).describe('Numeric values for each label'),
+		color: z.string().nullable().optional().describe('Hex color for the line')
+	})).describe('One or more line series')
+});
+
+export type LineChartAiOutput = z.infer<typeof lineChartAiOutputSchema>;

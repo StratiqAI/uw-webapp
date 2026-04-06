@@ -8,3 +8,10 @@ export const imageWidgetDataSchema = z.object({
 });
 
 export type ImageWidgetData = z.infer<typeof imageWidgetDataSchema>;
+
+export const imageAiOutputSchema = z.object({
+	src: z.string().describe('URL of the image to display'),
+	alt: z.string().describe('Alt text describing the image')
+});
+
+export type ImageAiOutput = z.infer<typeof imageAiOutputSchema>;

@@ -11,3 +11,11 @@ export const mapWidgetDataSchema = z.object({
 });
 
 export type MapWidgetData = z.infer<typeof mapWidgetDataSchema>;
+
+export const mapAiOutputSchema = z.object({
+	lat: z.number().describe('Latitude of the map center'),
+	lon: z.number().describe('Longitude of the map center'),
+	zoom: z.number().describe('Zoom level (0-20)')
+});
+
+export type MapAiOutput = z.infer<typeof mapAiOutputSchema>;

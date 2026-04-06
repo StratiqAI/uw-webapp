@@ -16,3 +16,17 @@ export declare function useReactiveValidatedTopic<T = unknown>(topic: () => stri
  * widget kind has no registered output schema.
  */
 export declare function publishWidgetOutput(kind: string, widgetId: string, data: unknown): boolean;
+export interface AiGenerationStatus {
+    generating: boolean;
+    error?: string;
+}
+/** Build the topic path used to track AI generation state for a widget. */
+export declare function getAiStatusTopic(widgetTopic: string): string;
+/**
+ * Reactive hook that tracks the AI generation status for a widget.
+ * Returns `{ generating, error }` — both reactive.
+ */
+export declare function useAiGenerationStatus(topic: () => string): {
+    readonly generating: boolean;
+    readonly error: string | undefined;
+};

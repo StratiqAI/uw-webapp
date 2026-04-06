@@ -5,6 +5,9 @@
 	import type { ChatMessage, AIAction } from '$lib/types/chat';
 	import { parseActionsFromReply } from '$lib/types/chat';
 	import { ui } from '$lib/stores/ui.svelte';
+	import { aiService } from '$lib/services/ai';
+	import type { UsageContext } from '$lib/services/ai';
+	import { authStore } from '$lib/stores/auth.svelte';
 
 	let { model: initialModel }: { onActions?: (actions: AIAction[]) => void; model?: string } =
 		$props();
@@ -131,27 +134,27 @@
 
 		loading = true;
 		try {
-			const payload = {
-				model,
-				messages: messages.map(({ role, content }) => ({ role, content }))
+			const usage: UsageContext = {
+				tenantId: authStore.currentUser?.tenant ?? 'default',
+				ownerId: authStore.currentUser?.sub ?? '',
+				featureSource: 'chat'
 			};
-			const res = await fetch('/api/chat', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(payload)
-			});
-			const data = await res.json();
-			if (!res.ok || data.error) {
-				push('assistant', `⚠️ ${data.error || res.statusText}`);
-				return;
-			}
-			const reply: string = data.reply ?? '';
+
+			const response = await aiService.query(
+				{
+					model,
+					messages: messages.map(({ role, content }) => ({ role: role as 'user' | 'assistant' | 'system', content }))
+				},
+				usage
+			);
+
+			const reply = response.content ?? '';
 			push('assistant', reply);
 
 			const actions = parseActionsFromReply(reply);
 			if (actions.length) onActions?.(actions);
 		} catch (e: any) {
-			push('assistant', `⚠️ Network error: ${e?.message ?? e}`);
+			push('assistant', `Error: ${e?.message ?? e}`);
 		} finally {
 			loading = false;
 		}

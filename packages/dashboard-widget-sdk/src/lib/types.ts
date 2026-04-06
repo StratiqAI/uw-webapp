@@ -33,6 +33,8 @@ export interface WidgetPromptConfig {
 	systemInstruction?: string;
 	model?: string;
 	aiOutputSchema: z.ZodSchema;
+	/** Transform raw AI output into the shape the widget's zodSchema expects. */
+	mapAiOutput?: (aiOutput: Record<string, unknown>) => Record<string, unknown>;
 }
 
 /**

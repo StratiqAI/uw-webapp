@@ -38,3 +38,38 @@ export function publishWidgetOutput(kind: string, widgetId: string, data: unknow
 	}
 	return host.publishWidgetOutput(kind, widgetId, data);
 }
+
+// ---------------------------------------------------------------------------
+// AI generation status — convention-based topic for widget loading indicators
+// ---------------------------------------------------------------------------
+
+export interface AiGenerationStatus {
+	generating: boolean;
+	error?: string;
+}
+
+const AI_STATUS_SUFFIX = '/__ai_status';
+
+/** Build the topic path used to track AI generation state for a widget. */
+export function getAiStatusTopic(widgetTopic: string): string {
+	return widgetTopic + AI_STATUS_SUFFIX;
+}
+
+/**
+ * Reactive hook that tracks the AI generation status for a widget.
+ * Returns `{ generating, error }` — both reactive.
+ */
+export function useAiGenerationStatus(topic: () => string) {
+	const host = getDashboardWidgetHost();
+	const store = host.validatedTopicStore;
+
+	const status = $derived.by(() => {
+		const _ = store.tree;
+		return store.at<AiGenerationStatus>(getAiStatusTopic(topic()));
+	});
+
+	return {
+		get generating() { return status?.generating ?? false; },
+		get error() { return status?.error; }
+	};
+}

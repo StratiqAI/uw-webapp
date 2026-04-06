@@ -15,7 +15,8 @@ export const paragraphWidget = defineWidget({
             'Structure your response as well-formatted content. ' +
             'Use markdown if it improves readability.',
         model: 'GEMINI_2_5_FLASH',
-        aiOutputSchema: paragraphAiOutputSchema
+        aiOutputSchema: paragraphAiOutputSchema,
+        mapAiOutput: (out) => ({ title: null, content: out.text ?? '', markdown: true })
     }
 });
 export { paragraphWidgetDataSchema, paragraphAiOutputSchema } from './schema.js';

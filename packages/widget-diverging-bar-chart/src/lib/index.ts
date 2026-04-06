@@ -1,5 +1,5 @@
 import { defineWidget } from '@stratiqai/dashboard-widget-sdk';
-import { divergingBarChartWidgetDataSchema } from './schema.js';
+import { divergingBarChartWidgetDataSchema, divergingBarChartAiOutputSchema } from './schema.js';
 import DivergingBarChartWidget from './DivergingBarChartWidget.svelte';
 
 export const divergingBarChartWidget = defineWidget({
@@ -14,9 +14,20 @@ export const divergingBarChartWidget = defineWidget({
 		negativeColor: '#ef4444'
 	},
 	defaultSize: { colSpan: 6, rowSpan: 3 },
-	palette: { icon: '↔', category: 'charts' }
+	palette: { icon: '↔', category: 'charts' },
+	promptConfig: {
+		defaultPrompt: 'Generate a diverging bar chart comparing positive and negative values',
+		systemInstruction:
+			'You are a data visualization assistant. Return diverging bar chart data with labels and positive/negative values.',
+		model: 'GEMINI_2_5_FLASH',
+		aiOutputSchema: divergingBarChartAiOutputSchema,
+		mapAiOutput: (out) => ({
+			labels: out.labels,
+			values: out.values
+		})
+	}
 });
 
-export { divergingBarChartWidgetDataSchema } from './schema.js';
-export type { DivergingBarChartWidgetData } from './schema.js';
+export { divergingBarChartWidgetDataSchema, divergingBarChartAiOutputSchema } from './schema.js';
+export type { DivergingBarChartWidgetData, DivergingBarChartAiOutput } from './schema.js';
 export { default as DivergingBarChartWidget } from './DivergingBarChartWidget.svelte';

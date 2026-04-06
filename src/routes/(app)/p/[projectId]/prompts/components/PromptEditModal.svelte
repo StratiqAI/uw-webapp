@@ -9,9 +9,10 @@
 	} from '@stratiqai/dashboard-widget-sdk';
 	import JsonSchemaPickerModal from '$lib/components/schemas/JsonSchemaPickerModal.svelte';
 	import { Q_GET_JSON_SCHEMA } from '$lib/services/graphql/jsonSchemaOperations';
-	import { M_GENERATE_PROMPT_DRAFT } from '$lib/services/graphql/promptOperations';
 	import type { IGraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
 	import { getTemplateStrForEditor, parseTemplateToAIQueryData, type AIQueryData } from '../PromptService';
+	import { aiService } from '$lib/services/ai';
+	import { authStore } from '$lib/stores/auth.svelte';
 	import { createLogger } from '$lib/utils/logger';
 
 	const log = createLogger('prompts');
@@ -208,24 +209,20 @@
 	}
 
 	async function handleAiGenerate() {
-		if (!queryClient || !aiGenerateDescription.trim() || aiGenerating) return;
+		if (!aiGenerateDescription.trim() || aiGenerating) return;
 		aiGenerating = true;
 		aiGenerateError = '';
 		try {
-			const result = await queryClient.query<{
-				generatePromptDraft: {
-					prompt: string;
-					systemInstruction: string | null;
-					jsonSchema: string | null;
-					suggestedName: string | null;
-				} | null;
-			}>(M_GENERATE_PROMPT_DRAFT, { input: { description: aiGenerateDescription.trim() } });
-
-			const draft = result?.generatePromptDraft;
-			if (!draft) {
-				aiGenerateError = 'No result returned from AI';
+			const token = authStore.idToken;
+			if (!token) {
+				aiGenerateError = 'Not authenticated';
 				return;
 			}
+
+			const draft = await aiService.generateDraft(
+				{ description: aiGenerateDescription.trim() },
+				token
+			);
 
 			if (draft.suggestedName) templateName = draft.suggestedName;
 			aiQueryPrompt = draft.prompt;
