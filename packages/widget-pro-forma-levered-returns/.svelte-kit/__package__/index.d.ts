@@ -16,5 +16,5 @@ export declare const proFormaLeveredReturnsWidget: import("@stratiqai/dashboard-
     interestOnly: boolean;
     propertyName?: string | undefined;
 }>;
-export type { ProFormaLeveredReturnsConfig, ProFormaLeveredReturnsInput } from './schema.js';
-export { proFormaLeveredReturnsConfigSchema, proFormaLeveredReturnsInputSchema } from './schema.js';
+export type { ProFormaLeveredReturnsConfig, ProFormaLeveredReturnsInput, ProFormaLeveredReturnsAiOutput } from './schema.js';
+export { proFormaLeveredReturnsConfigSchema, proFormaLeveredReturnsInputSchema, proFormaLeveredReturnsAiOutputSchema } from './schema.js';

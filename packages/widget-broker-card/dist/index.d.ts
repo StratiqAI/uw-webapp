@@ -8,5 +8,6 @@ export declare const brokerCardWidget: import("@stratiqai/dashboard-widget-sdk")
     initials?: string | null | undefined;
     avatarUrl?: string | null | undefined;
 }>;
-export { brokerCardWidgetDataSchema, type BrokerCardWidgetData } from './schema.js';
+export { brokerCardWidgetDataSchema, brokerCardAiOutputSchema } from './schema.js';
+export type { BrokerCardWidgetData, BrokerCardAiOutput } from './schema.js';
 export { default as BrokerCardWidget } from './BrokerCardWidget.svelte';

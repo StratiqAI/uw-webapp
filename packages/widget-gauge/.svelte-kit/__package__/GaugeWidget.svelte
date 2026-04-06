@@ -1,7 +1,12 @@
 <script lang="ts">
 	import type { GaugeWidgetData } from './schema.js';
 	import {
+		FlipCard,
+		AiStatusOverlay,
+		WidgetConfigureBack,
+		useWidgetConfigure,
 		useReactiveValidatedTopic,
+		useAiGenerationStatus,
 		getDashboardWidgetHost,
 		type StandardWidgetProps
 	} from '@stratiqai/dashboard-widget-sdk';
@@ -11,12 +16,16 @@
 		data,
 		widgetId = 'gauge-widget-default',
 		topicOverride,
-		darkMode = false
+		darkMode = false,
+		theme,
+		onUpdateConfig,
+		onConfigureReady
 	}: StandardWidgetProps<GaugeWidgetData> = $props();
 
 	const host = getDashboardWidgetHost();
 	const topic = $derived(host.getWidgetTopic('gauge', widgetId, topicOverride));
 	const dataStream = useReactiveValidatedTopic<GaugeWidgetData>(() => topic);
+	const aiStatus = useAiGenerationStatus(() => topic);
 	const widgetData = $derived<GaugeWidgetData>(
 		dataStream.current ||
 			data || {
@@ -25,6 +34,16 @@
 				max: 100
 			}
 	);
+
+	const configure = useWidgetConfigure<GaugeWidgetData>({
+		data: () => widgetData,
+		get onUpdateConfig() { return onUpdateConfig; },
+		get onConfigureReady() { return onConfigureReady; }
+	});
+
+	const shellClass = $derived(darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white');
+	const flipBackClass = $derived(darkMode ? 'border-slate-600 bg-slate-900' : 'border-slate-200 bg-slate-50');
+	const resolvedTheme = $derived(theme ?? (darkMode ? 'dark' : 'light'));
 
 	let containerEl: SVGSVGElement | null = $state(null);
 
@@ -122,20 +141,40 @@
 	});
 </script>
 
-<div
-	class="gauge-widget h-full min-h-[140px] flex flex-col {darkMode ? 'bg-slate-800/80' : 'bg-white/80'} rounded-xl p-3 shadow-inner"
->
-	{#if widgetData != null}
-		<div class="flex-1 min-h-0 w-full flex items-center justify-center">
-			<svg
-				bind:this={containerEl}
-				class="w-full h-full"
-				style="min-height: 120px;"
-			></svg>
+<FlipCard isFlipped={configure.isFlipped} {shellClass} {flipBackClass}>
+	{#snippet front()}
+		<div
+			class="gauge-widget h-full min-h-[140px] flex flex-col {darkMode ? 'bg-slate-800/80' : 'bg-white/80'} rounded-xl p-3 shadow-inner"
+		>
+			{#if aiStatus.generating || aiStatus.error}
+				<div class="flex h-full items-center justify-center px-4 py-4">
+					<AiStatusOverlay generating={aiStatus.generating} error={aiStatus.error} {darkMode} />
+				</div>
+			{:else if widgetData != null}
+				<div class="flex-1 min-h-0 w-full flex items-center justify-center">
+					<svg
+						bind:this={containerEl}
+						class="w-full h-full"
+						style="min-height: 120px;"
+					></svg>
+				</div>
+			{:else}
+				<div class="flex-1 flex items-center justify-center">
+					<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'}">No data.</p>
+				</div>
+			{/if}
 		</div>
-	{:else}
-		<div class="flex-1 flex items-center justify-center">
-			<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'}">No data.</p>
-		</div>
-	{/if}
-</div>
+	{/snippet}
+	{#snippet back()}
+		<WidgetConfigureBack
+			kind="gauge"
+			{widgetId}
+			{darkMode}
+			theme={resolvedTheme}
+			{topicOverride}
+			showAITab={true}
+			onApply={() => configure.applyConfig()}
+			onCancel={configure.cancelConfig}
+		/>
+	{/snippet}
+</FlipCard>

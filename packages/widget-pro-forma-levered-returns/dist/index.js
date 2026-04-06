@@ -1,5 +1,5 @@
 import { defineWidget } from '@stratiqai/dashboard-widget-sdk';
-import { proFormaLeveredReturnsConfigSchema, proFormaLeveredReturnsInputSchema } from './schema.js';
+import { proFormaLeveredReturnsConfigSchema, proFormaLeveredReturnsInputSchema, proFormaLeveredReturnsAiOutputSchema } from './schema.js';
 import ProFormaLeveredReturnsWidget from './ProFormaLeveredReturnsWidget.svelte';
 export const proFormaLeveredReturnsWidget = defineWidget({
     kind: 'proFormaLeveredReturns',
@@ -25,6 +25,29 @@ export const proFormaLeveredReturnsWidget = defineWidget({
         interestOnly: false,
         leveredDiscountRate: 0.12
     },
-    defaultSize: { colSpan: 12, rowSpan: 2 }
+    defaultSize: { colSpan: 12, rowSpan: 2 },
+    promptConfig: {
+        defaultPrompt: 'Generate levered return assumptions for this property investment',
+        systemInstruction: 'You are a commercial real estate underwriter. Return levered return assumptions including purchase price, income, expenses, loan terms, terminal cap rate, and discount rate.',
+        model: 'GEMINI_2_5_FLASH',
+        aiOutputSchema: proFormaLeveredReturnsAiOutputSchema,
+        mapAiOutput: (out) => ({
+            purchasePrice: out.purchasePrice,
+            acquisitionCosts: 180_000,
+            initialCapEx: 0,
+            egiYear1: out.egiYear1,
+            egiGrowthRate: out.egiGrowthRate,
+            totalOpexYear1: out.totalOpexYear1,
+            opexGrowthRate: out.opexGrowthRate,
+            terminalCapRate: out.terminalCapRate,
+            costOfSalePercent: 0.03,
+            projectionYears: out.projectionYears,
+            loanLtv: out.loanLtv,
+            loanInterestRate: out.loanInterestRate,
+            amortizationYears: out.amortizationYears,
+            interestOnly: false,
+            leveredDiscountRate: out.leveredDiscountRate
+        })
+    }
 });
-export { proFormaLeveredReturnsConfigSchema, proFormaLeveredReturnsInputSchema } from './schema.js';
+export { proFormaLeveredReturnsConfigSchema, proFormaLeveredReturnsInputSchema, proFormaLeveredReturnsAiOutputSchema } from './schema.js';

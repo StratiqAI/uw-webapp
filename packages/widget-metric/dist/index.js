@@ -1,5 +1,5 @@
 import { defineWidget } from '@stratiqai/dashboard-widget-sdk';
-import { metricWidgetDataSchema } from './schema.js';
+import { metricWidgetDataSchema, metricAiOutputSchema } from './schema.js';
 import MetricWidget from './MetricWidget.svelte';
 export const metricWidget = defineWidget({
     kind: 'metric',
@@ -7,7 +7,21 @@ export const metricWidget = defineWidget({
     zodSchema: metricWidgetDataSchema,
     component: MetricWidget,
     defaultData: { label: '\u2014', value: '\u2014' },
-    defaultSize: { colSpan: 2, rowSpan: 1 }
+    defaultSize: { colSpan: 2, rowSpan: 1 },
+    promptConfig: {
+        defaultPrompt: 'Provide the key financial metric for this property',
+        systemInstruction: 'You are a commercial real estate analyst. ' +
+            'Return a single key metric with its label, value, unit, and period-over-period change.',
+        model: 'GEMINI_2_5_FLASH',
+        aiOutputSchema: metricAiOutputSchema,
+        mapAiOutput: (out) => ({
+            label: out.label ?? '',
+            value: out.value ?? '',
+            unit: out.unit ?? null,
+            change: out.change ?? null,
+            changeType: out.changeType ?? null
+        })
+    }
 });
-export { metricWidgetDataSchema } from './schema.js';
+export { metricWidgetDataSchema, metricAiOutputSchema } from './schema.js';
 export { default as MetricWidget } from './MetricWidget.svelte';

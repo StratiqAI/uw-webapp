@@ -59,3 +59,20 @@ export declare const lqAnalysisConfigSchema: z.ZodObject<{
     localBandHigh?: number | undefined;
 }>;
 export type LqAnalysisConfig = z.infer<typeof lqAnalysisConfigSchema>;
+export declare const lqAnalysisAiOutputSchema: z.ZodObject<{
+    city: z.ZodString;
+    state: z.ZodString;
+    regionLabel: z.ZodString;
+    year: z.ZodNumber;
+}, "strip", z.ZodTypeAny, {
+    city: string;
+    state: string;
+    year: number;
+    regionLabel: string;
+}, {
+    city: string;
+    state: string;
+    year: number;
+    regionLabel: string;
+}>;
+export type LqAnalysisAiOutput = z.infer<typeof lqAnalysisAiOutputSchema>;

@@ -5,7 +5,9 @@
 		type StandardWidgetProps,
 		FlipCard,
 		WidgetConfigureBack,
-		useWidgetConfigure
+		useWidgetConfigure,
+		AiStatusOverlay,
+		useAiGenerationStatus
 	} from '@stratiqai/dashboard-widget-sdk';
 	import type { Mapbox3dConfig } from './schema.js';
 	import { DEMO_MAPBOX_3D_CONFIG } from './demoData.js';
@@ -25,6 +27,7 @@
 	const host = getDashboardWidgetHost();
 	const topic = () => host.getWidgetTopic('mapbox3d', widgetId, topicOverride);
 	const topicData = useReactiveValidatedTopic<Mapbox3dConfig>(topic);
+	const aiStatus = useAiGenerationStatus(() => topic);
 
 	const cfg = $derived<Mapbox3dConfig>({
 		...DEMO_MAPBOX_3D_CONFIG,
@@ -35,8 +38,8 @@
 
 	const configure = useWidgetConfigure<Mapbox3dConfig>({
 		data: () => cfg,
-		onUpdateConfig,
-		onConfigureReady
+		onUpdateConfig: (d) => onUpdateConfig?.(d),
+		onConfigureReady: (fn) => onConfigureReady?.(fn)
 	});
 
 	const inputFieldClass = $derived(
@@ -173,8 +176,12 @@
 	const muted = $derived(darkMode ? 'text-slate-400' : 'text-slate-700');
 	const borderColor = $derived(darkMode ? 'border-slate-700' : 'border-slate-200');
 
-	const flipShellClass = darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white';
-	const flipBackClass = darkMode ? 'border-slate-600 bg-slate-900' : 'border-slate-200 bg-slate-50';
+	const flipShellClass = $derived(
+		darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'
+	);
+	const flipBackClass = $derived(
+		darkMode ? 'border-slate-600 bg-slate-900' : 'border-slate-200 bg-slate-50'
+	);
 </script>
 
 <FlipCard
@@ -183,6 +190,11 @@
 	flipBackClass={flipBackClass}
 >
 	{#snippet front()}
+		{#if aiStatus.generating || aiStatus.error}
+			<div class="flex h-full items-center justify-center px-4 py-4">
+				<AiStatusOverlay generating={aiStatus.generating} error={aiStatus.error} {darkMode} />
+			</div>
+		{:else}
 		<div class="flex h-full flex-col overflow-hidden rounded-lg border shadow-sm {shell}">
 			<!-- Header -->
 			<div class="shrink-0 border-b px-4 py-2.5 {borderColor}">
@@ -228,9 +240,11 @@
 				{/if}
 			</div>
 		</div>
+		{/if}
 	{/snippet}
 	{#snippet back()}
 		<WidgetConfigureBack
+			showAITab={true}
 			kind="mapbox3d"
 			widgetId={widgetId}
 			darkMode={darkMode}

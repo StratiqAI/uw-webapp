@@ -7,5 +7,6 @@ export declare const metricWidget: import("@stratiqai/dashboard-widget-sdk").Wid
     changeType?: "increase" | "decrease" | null | undefined;
     unit?: string | null | undefined;
 }>;
-export { metricWidgetDataSchema, type MetricWidgetData } from './schema.js';
+export { metricWidgetDataSchema, metricAiOutputSchema } from './schema.js';
+export type { MetricWidgetData, MetricAiOutput } from './schema.js';
 export { default as MetricWidget } from './MetricWidget.svelte';

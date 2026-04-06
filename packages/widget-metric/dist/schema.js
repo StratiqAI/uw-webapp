@@ -10,3 +10,10 @@ export const metricWidgetDataSchema = z.object({
     changeType: z.enum(['increase', 'decrease']).nullable().optional(),
     unit: z.string().nullable().optional()
 });
+export const metricAiOutputSchema = z.object({
+    label: z.string().describe('Short label describing the metric'),
+    value: z.union([z.string(), z.number()]).describe('The metric value'),
+    unit: z.string().nullable().optional().describe('Unit of measurement (e.g. %, $, sqft)'),
+    change: z.number().nullable().optional().describe('Percentage change from previous period'),
+    changeType: z.enum(['increase', 'decrease']).nullable().optional().describe('Direction of change')
+});

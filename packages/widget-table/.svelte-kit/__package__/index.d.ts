@@ -15,5 +15,6 @@ export declare const tableWidget: import("@stratiqai/dashboard-widget-sdk").Widg
         width?: string | undefined;
     }[] | undefined;
 }>;
-export { tableWidgetDataSchema, type TableWidgetData, type ColumnDef } from './schema.js';
+export { tableWidgetDataSchema, tableAiOutputSchema } from './schema.js';
+export type { TableWidgetData, TableAiOutput, ColumnDef } from './schema.js';
 export { default as TableWidget } from './TableWidget.svelte';

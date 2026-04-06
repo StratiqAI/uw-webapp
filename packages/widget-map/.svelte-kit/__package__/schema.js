@@ -8,3 +8,8 @@ export const mapWidgetDataSchema = z.object({
     mapType: z.enum(['leaflet', 'google', 'mapbox']),
     apiKey: z.string()
 });
+export const mapAiOutputSchema = z.object({
+    lat: z.number().describe('Latitude of the map center'),
+    lon: z.number().describe('Longitude of the map center'),
+    zoom: z.number().describe('Zoom level (0-20)')
+});

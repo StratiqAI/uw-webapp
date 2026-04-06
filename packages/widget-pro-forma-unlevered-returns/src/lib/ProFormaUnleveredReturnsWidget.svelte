@@ -5,6 +5,8 @@
 		FlipCard,
 		WidgetConfigureBack,
 		useWidgetConfigure,
+		AiStatusOverlay,
+		useAiGenerationStatus,
 		type StandardWidgetProps
 	} from '@stratiqai/dashboard-widget-sdk';
 	import { fmt, pct, proFormaTheme, irr, npv, equityMultiple } from '@stratiqai/widget-pro-forma-base';
@@ -29,6 +31,7 @@
 
 	const host = getDashboardWidgetHost();
 	const topic = () => host.getWidgetTopic('proFormaUnleveredReturns', widgetId, topicOverride);
+	const aiStatus = useAiGenerationStatus(() => topic);
 	const topicData = useReactiveValidatedTopic<ProFormaUnleveredReturnsInput>(topic);
 
 	const widgetData = $derived<ProFormaUnleveredReturnsConfig>({
@@ -78,6 +81,11 @@
 
 <FlipCard isFlipped={configure.isFlipped} shellClass={t.shell} flipBackClass={t.flipBackBg}>
 	{#snippet front()}
+		{#if aiStatus.generating || aiStatus.error}
+			<div class="flex h-full items-center justify-center px-4 py-4">
+				<AiStatusOverlay generating={aiStatus.generating} error={aiStatus.error} {darkMode} />
+			</div>
+		{:else}
 		<table class="w-full border-collapse text-sm">
 			<thead>
 				<tr>
@@ -134,6 +142,7 @@
 		<div class="shrink-0 border-t px-4 py-2.5 text-[11px] {t.summaryBorder} {t.muted}">
 			Discount rate (NPV) {pct(mergedConfig.unleveredDiscountRate)} · Based on unlevered before-tax cash flows
 		</div>
+	{/if}
 	{/snippet}
 
 	{#snippet back()}
@@ -143,6 +152,7 @@
 			{darkMode}
 			theme={theme ?? 'dark'}
 			{topicOverride}
+			showAITab={true}
 			onApply={() => configure.applyConfig({
 				...configure.draft,
 				propertyName: configure.draft.propertyName?.trim() || undefined

@@ -25,3 +25,13 @@ export const proFormaNoiConfigSchema = z.object({
 });
 
 export type ProFormaNoiConfig = z.infer<typeof proFormaNoiConfigSchema>;
+
+export const proFormaNoiAiOutputSchema = z.object({
+	egiYear1: z.number().describe('Year 1 effective gross income'),
+	egiGrowthRate: z.number().describe('Annual EGI growth rate'),
+	totalOpexYear1: z.number().describe('Year 1 total operating expenses'),
+	opexGrowthRate: z.number().describe('Annual OpEx growth rate'),
+	projectionYears: z.number().describe('Number of projection years')
+});
+
+export type ProFormaNoiAiOutput = z.infer<typeof proFormaNoiAiOutputSchema>;

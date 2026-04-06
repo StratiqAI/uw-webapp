@@ -10,3 +10,11 @@ export declare const schemaWidgetDataSchema: z.ZodObject<{
     data?: unknown;
 }>;
 export type SchemaWidgetData = z.infer<typeof schemaWidgetDataSchema>;
+export declare const schemaAiOutputSchema: z.ZodObject<{
+    data: z.ZodRecord<z.ZodString, z.ZodUnknown>;
+}, "strip", z.ZodTypeAny, {
+    data: Record<string, unknown>;
+}, {
+    data: Record<string, unknown>;
+}>;
+export type SchemaAiOutput = z.infer<typeof schemaAiOutputSchema>;

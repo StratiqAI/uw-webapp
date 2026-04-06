@@ -54,7 +54,12 @@
 <script lang="ts">
 	import type { MapWidgetData } from './schema.js';
 	import {
+		FlipCard,
+		AiStatusOverlay,
+		WidgetConfigureBack,
+		useWidgetConfigure,
 		useReactiveValidatedTopic,
+		useAiGenerationStatus,
 		getDashboardWidgetHost,
 		HostServices,
 		type StandardWidgetProps,
@@ -65,13 +70,27 @@
 		data,
 		widgetId = 'map-widget-default',
 		topicOverride,
-		darkMode = false
+		darkMode = false,
+		theme,
+		onUpdateConfig,
+		onConfigureReady
 	}: StandardWidgetProps<MapWidgetData> = $props();
 
 	const host = getDashboardWidgetHost();
 	const topic = $derived(host.getWidgetTopic('map', widgetId, topicOverride));
 	const dataStream = useReactiveValidatedTopic<MapWidgetData>(() => topic);
+	const aiStatus = useAiGenerationStatus(() => topic);
 	let widgetData = $derived<MapWidgetData>(dataStream.current || data);
+
+	const configure = useWidgetConfigure<MapWidgetData>({
+		data: () => widgetData,
+		get onUpdateConfig() { return onUpdateConfig; },
+		get onConfigureReady() { return onConfigureReady; }
+	});
+
+	const shellClass = $derived(darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white');
+	const flipBackClass = $derived(darkMode ? 'border-slate-600 bg-slate-900' : 'border-slate-200 bg-slate-50');
+	const resolvedTheme = $derived(theme ?? (darkMode ? 'dark' : 'light'));
 
 	const hostConfig = host.services?.get<HostConfig>(HostServices.CONFIG);
 	const apiKey = $derived(widgetData.apiKey || hostConfig?.geoapifyApiKey || '');
@@ -138,4 +157,28 @@
 	});
 </script>
 
-<div class="h-full w-full" bind:this={mapContainer}></div>
+<FlipCard isFlipped={configure.isFlipped} {shellClass} {flipBackClass}>
+	{#snippet front()}
+		<div class="h-full w-full">
+			{#if aiStatus.generating || aiStatus.error}
+				<div class="flex h-full items-center justify-center px-4 py-4">
+					<AiStatusOverlay generating={aiStatus.generating} error={aiStatus.error} {darkMode} />
+				</div>
+			{:else}
+				<div class="h-full w-full" bind:this={mapContainer}></div>
+			{/if}
+		</div>
+	{/snippet}
+	{#snippet back()}
+		<WidgetConfigureBack
+			kind="map"
+			{widgetId}
+			{darkMode}
+			theme={resolvedTheme}
+			{topicOverride}
+			showAITab={true}
+			onApply={() => configure.applyConfig()}
+			onCancel={configure.cancelConfig}
+		/>
+	{/snippet}
+</FlipCard>

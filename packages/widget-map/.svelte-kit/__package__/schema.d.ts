@@ -25,3 +25,17 @@ export declare const mapWidgetDataSchema: z.ZodObject<{
     description?: string | null | undefined;
 }>;
 export type MapWidgetData = z.infer<typeof mapWidgetDataSchema>;
+export declare const mapAiOutputSchema: z.ZodObject<{
+    lat: z.ZodNumber;
+    lon: z.ZodNumber;
+    zoom: z.ZodNumber;
+}, "strip", z.ZodTypeAny, {
+    lat: number;
+    lon: number;
+    zoom: number;
+}, {
+    lat: number;
+    lon: number;
+    zoom: number;
+}>;
+export type MapAiOutput = z.infer<typeof mapAiOutputSchema>;

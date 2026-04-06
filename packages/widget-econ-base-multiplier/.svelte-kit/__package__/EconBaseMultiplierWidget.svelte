@@ -5,6 +5,8 @@
 		FlipCard,
 		WidgetConfigureBack,
 		useWidgetConfigure,
+		AiStatusOverlay,
+		useAiGenerationStatus,
 		type StandardWidgetProps
 	} from '@stratiqai/dashboard-widget-sdk';
 	import type { EconBaseMultiplierConfig, EconBaseIndustry } from './schema.js';
@@ -23,6 +25,7 @@
 	const host = getDashboardWidgetHost();
 	const topic = () => host.getWidgetTopic('econBaseMultiplier', widgetId, topicOverride);
 	const topicData = useReactiveValidatedTopic<EconBaseMultiplierConfig>(topic);
+	const aiStatus = useAiGenerationStatus(() => topic);
 
 	const widgetData = $derived<EconBaseMultiplierConfig>({
 		regionLabel: data.regionLabel,
@@ -146,6 +149,11 @@
 	flipBackClass={flipBackClass}
 >
 	{#snippet front()}
+		{#if aiStatus.generating || aiStatus.error}
+			<div class="flex h-full items-center justify-center px-4 py-4">
+				<AiStatusOverlay generating={aiStatus.generating} error={aiStatus.error} {darkMode} />
+			</div>
+		{:else}
 		<div class="flex h-full min-h-0 flex-col overflow-hidden {darkMode ? 'text-slate-100' : 'text-slate-900'}">
 			<div class="flex shrink-0 items-start justify-between border-b px-4 py-3 {borderColor}">
 				<div>
@@ -277,9 +285,11 @@
 				</p>
 			</div>
 		</div>
+		{/if}
 	{/snippet}
 	{#snippet back()}
 		<WidgetConfigureBack
+			showAITab={true}
 			kind="econBaseMultiplier"
 			{widgetId}
 			{darkMode}

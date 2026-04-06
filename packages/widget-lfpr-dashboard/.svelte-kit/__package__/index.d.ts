@@ -21,6 +21,6 @@ export declare const lfprDashboardWidget: import("@stratiqai/dashboard-widget-sd
     }[];
     title?: string | undefined;
 }>;
-export type { LfprDashboardConfig, LfprTrendYear, LfprDriver } from './schema.js';
-export { lfprDashboardConfigSchema, lfprTrendYearSchema, lfprDriverSchema } from './schema.js';
+export type { LfprDashboardConfig, LfprDashboardAiOutput, LfprTrendYear, LfprDriver } from './schema.js';
+export { lfprDashboardConfigSchema, lfprDashboardAiOutputSchema, lfprTrendYearSchema, lfprDriverSchema } from './schema.js';
 export { DEMO_LFPR_CONFIG } from './demoData.js';

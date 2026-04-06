@@ -17,6 +17,6 @@ export declare const proFormaOpExWidget: import("@stratiqai/dashboard-widget-sdk
     projectionYears: number;
     propertyName?: string | undefined;
 }>;
-export type { ProFormaOpExConfig, ProFormaOpExInput, CustomExpenseRow, UnitType } from './schema.js';
-export { proFormaOpExConfigSchema, proFormaOpExInputSchema } from './schema.js';
+export type { ProFormaOpExConfig, ProFormaOpExInput, ProFormaOpExAiOutput, CustomExpenseRow, UnitType } from './schema.js';
+export { proFormaOpExConfigSchema, proFormaOpExInputSchema, proFormaOpExAiOutputSchema } from './schema.js';
 export { computeOpExProjections, type OpExYearProjection } from './calculations.js';

@@ -14,6 +14,14 @@ export const locationQuotientWidgetDataSchema = z.object({
 
 export type LocationQuotientWidgetData = z.infer<typeof locationQuotientWidgetDataSchema>;
 
+export const locationQuotientAiOutputSchema = z.object({
+	areaFips: z.string().describe('FIPS code for the area'),
+	year: z.number().describe('Data year'),
+	regionLabel: z.string().describe('Human-readable region name')
+});
+
+export type LocationQuotientAiOutput = z.infer<typeof locationQuotientAiOutputSchema>;
+
 export interface QcewSectorAggregate {
 	industry_code: string;
 	industry_title: string;

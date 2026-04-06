@@ -8,6 +8,7 @@ export type { HostConfig } from './services.js';
 export { useHostService, useExternalData } from './useExternalData.svelte.js';
 export type { UseExternalDataOptions, ExternalDataResult } from './useExternalData.svelte.js';
 export { default as FlipCard } from './FlipCard.svelte';
+export { default as AiStatusOverlay } from './AiStatusOverlay.svelte';
 export { default as WidgetConfigureBack } from './WidgetConfigureBack.svelte';
 export { useWidgetConfigure } from './useWidgetConfigure.svelte.js';
 export type { NestedSchemaNodeType, NestedItemSchema, NestedSchemaPropertyNode } from './promptSchemaTypes.js';

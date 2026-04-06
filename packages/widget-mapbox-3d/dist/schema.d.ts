@@ -103,3 +103,20 @@ export declare const mapbox3dConfigSchema: z.ZodObject<{
     } | undefined;
 }>;
 export type Mapbox3dConfig = z.infer<typeof mapbox3dConfigSchema>;
+export declare const mapbox3dAiOutputSchema: z.ZodObject<{
+    center: z.ZodTuple<[z.ZodNumber, z.ZodNumber], null>;
+    zoom: z.ZodNumber;
+    pitch: z.ZodOptional<z.ZodNumber>;
+    bearing: z.ZodOptional<z.ZodNumber>;
+}, "strip", z.ZodTypeAny, {
+    center: [number, number];
+    zoom: number;
+    pitch?: number | undefined;
+    bearing?: number | undefined;
+}, {
+    center: [number, number];
+    zoom: number;
+    pitch?: number | undefined;
+    bearing?: number | undefined;
+}>;
+export type Mapbox3dAiOutput = z.infer<typeof mapbox3dAiOutputSchema>;

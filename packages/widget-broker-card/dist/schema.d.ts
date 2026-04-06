@@ -29,3 +29,23 @@ export declare const brokerCardWidgetDataSchema: z.ZodObject<{
     avatarUrl?: string | null | undefined;
 }>;
 export type BrokerCardWidgetData = z.infer<typeof brokerCardWidgetDataSchema>;
+export declare const brokerCardAiOutputSchema: z.ZodObject<{
+    fullName: z.ZodString;
+    company: z.ZodString;
+    phone: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    email: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    initials: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+}, "strip", z.ZodTypeAny, {
+    fullName: string;
+    company: string;
+    phone?: string | null | undefined;
+    email?: string | null | undefined;
+    initials?: string | null | undefined;
+}, {
+    fullName: string;
+    company: string;
+    phone?: string | null | undefined;
+    email?: string | null | undefined;
+    initials?: string | null | undefined;
+}>;
+export type BrokerCardAiOutput = z.infer<typeof brokerCardAiOutputSchema>;

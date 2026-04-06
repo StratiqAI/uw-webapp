@@ -2,9 +2,11 @@
 	import type { JsonViewerWidgetData } from './schema.js';
 	import {
 		FlipCard,
+		AiStatusOverlay,
 		WidgetConfigureBack,
 		useWidgetConfigure,
 		useReactiveValidatedTopic,
+		useAiGenerationStatus,
 		getDashboardWidgetHost,
 		type StandardWidgetProps
 	} from '@stratiqai/dashboard-widget-sdk';
@@ -22,6 +24,7 @@
 	const host = getDashboardWidgetHost();
 	const topic = $derived(host.getWidgetTopic('jsonViewer', widgetId, topicOverride));
 	const dataStream = useReactiveValidatedTopic<JsonViewerWidgetData>(() => topic);
+	const aiStatus = useAiGenerationStatus(() => topic);
 	let widgetData = $derived<JsonViewerWidgetData>(dataStream.current || data);
 
 	const configure = useWidgetConfigure<JsonViewerWidgetData>({
@@ -63,6 +66,11 @@
 <FlipCard isFlipped={configure.isFlipped} {shellClass} {flipBackClass}>
 	{#snippet front()}
 		<div class="json-viewer flex h-full flex-col overflow-hidden">
+			{#if aiStatus.generating || aiStatus.error}
+				<div class="px-4 py-4">
+					<AiStatusOverlay generating={aiStatus.generating} error={aiStatus.error} {darkMode} />
+				</div>
+			{:else}
 			<div
 				class="flex items-center justify-between border-b px-3 py-1.5 {darkMode ? 'border-slate-700' : 'border-slate-200'}"
 			>
@@ -83,7 +91,8 @@
 				class="flex-1 overflow-auto whitespace-pre-wrap break-all p-3 font-mono text-xs leading-relaxed {darkMode
 					? 'bg-slate-900 text-emerald-400'
 					: 'bg-slate-50 text-slate-800'}"
-			>{formatted}</pre>
+			>{formatted}		</pre>
+			{/if}
 		</div>
 	{/snippet}
 	{#snippet back()}
@@ -93,6 +102,7 @@
 			{darkMode}
 			theme={resolvedTheme}
 			{topicOverride}
+			showAITab={true}
 			onApply={() => configure.applyConfig()}
 			onCancel={configure.cancelConfig}
 		/>

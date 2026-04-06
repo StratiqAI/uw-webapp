@@ -5,6 +5,8 @@
 		FlipCard,
 		WidgetConfigureBack,
 		useWidgetConfigure,
+		AiStatusOverlay,
+		useAiGenerationStatus,
 		type StandardWidgetProps
 	} from '@stratiqai/dashboard-widget-sdk';
 	import type { LfprDashboardConfig, LfprDriver } from './schema.js';
@@ -23,6 +25,7 @@
 	const host = getDashboardWidgetHost();
 	const topic = () => host.getWidgetTopic('lfprDashboard', widgetId, topicOverride);
 	const topicData = useReactiveValidatedTopic<LfprDashboardConfig>(topic);
+	const aiStatus = useAiGenerationStatus(() => topic);
 
 	const cfg = $derived<LfprDashboardConfig>({
 		...DEMO_LFPR_CONFIG,
@@ -114,6 +117,11 @@
 	flipBackClass={flipBackClass}
 >
 	{#snippet front()}
+		{#if aiStatus.generating || aiStatus.error}
+			<div class="flex h-full items-center justify-center px-4 py-4">
+				<AiStatusOverlay generating={aiStatus.generating} error={aiStatus.error} {darkMode} />
+			</div>
+		{:else}
 		<div class="flex h-full min-h-0 flex-col overflow-hidden {darkMode ? 'text-slate-100' : 'text-slate-900'}">
 			<div class="shrink-0 border-b px-4 py-3 {borderColor}">
 				<h2 class="text-[10px] font-semibold uppercase tracking-wider {muted}">
@@ -268,9 +276,11 @@
 				</div>
 			</div>
 		</div>
+		{/if}
 	{/snippet}
 	{#snippet back()}
 		<WidgetConfigureBack
+			showAITab={true}
 			kind="lfprDashboard"
 			{widgetId}
 			{darkMode}

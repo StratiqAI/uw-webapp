@@ -1,5 +1,5 @@
 import { defineWidget } from '@stratiqai/dashboard-widget-sdk';
-import { proFormaOpExConfigSchema, proFormaOpExInputSchema } from './schema.js';
+import { proFormaOpExConfigSchema, proFormaOpExInputSchema, proFormaOpExAiOutputSchema } from './schema.js';
 import ProFormaOpExWidget from './ProFormaOpExWidget.svelte';
 
 export const proFormaOpExWidget = defineWidget({
@@ -23,9 +23,23 @@ export const proFormaOpExWidget = defineWidget({
 		projectionYears: 5,
 		propertyName: ''
 	},
-	defaultSize: { colSpan: 12, rowSpan: 3 }
+	defaultSize: { colSpan: 12, rowSpan: 3 },
+	promptConfig: {
+		defaultPrompt: 'Generate operating expense assumptions for this property',
+		systemInstruction:
+			'You are a commercial real estate underwriter. Return OpEx pro forma assumptions including base expenses, growth rate, management fee, and reserves.',
+		model: 'GEMINI_2_5_FLASH',
+		aiOutputSchema: proFormaOpExAiOutputSchema,
+		mapAiOutput: (out) => ({
+			baseOperatingExpenses: out.baseOperatingExpenses as number,
+			expenseGrowthRate: out.expenseGrowthRate as number,
+			managementFeeRate: out.managementFeeRate as number,
+			reservePerUnit: out.reservePerUnit as number,
+			projectionYears: out.projectionYears as number
+		})
+	}
 });
 
-export type { ProFormaOpExConfig, ProFormaOpExInput, CustomExpenseRow, UnitType } from './schema.js';
-export { proFormaOpExConfigSchema, proFormaOpExInputSchema } from './schema.js';
+export type { ProFormaOpExConfig, ProFormaOpExInput, ProFormaOpExAiOutput, CustomExpenseRow, UnitType } from './schema.js';
+export { proFormaOpExConfigSchema, proFormaOpExInputSchema, proFormaOpExAiOutputSchema } from './schema.js';
 export { computeOpExProjections, type OpExYearProjection } from './calculations.js';

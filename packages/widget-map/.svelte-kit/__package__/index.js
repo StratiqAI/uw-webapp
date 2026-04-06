@@ -1,5 +1,5 @@
 import { defineWidget } from '@stratiqai/dashboard-widget-sdk';
-import { mapWidgetDataSchema } from './schema.js';
+import { mapWidgetDataSchema, mapAiOutputSchema } from './schema.js';
 import MapWidget from './MapWidget.svelte';
 export const mapWidget = defineWidget({
     kind: 'map',
@@ -16,7 +16,20 @@ export const mapWidget = defineWidget({
         apiKey: ''
     },
     defaultSize: { colSpan: 8, rowSpan: 4 },
-    palette: { icon: '🗺', category: 'content' }
+    palette: { icon: '🗺', category: 'content' },
+    promptConfig: {
+        defaultPrompt: 'Determine the geographic coordinates for this property location',
+        systemInstruction: 'You are a geolocation assistant. Return latitude, longitude, and an appropriate zoom level for the property.',
+        model: 'GEMINI_2_5_FLASH',
+        aiOutputSchema: mapAiOutputSchema,
+        mapAiOutput: (out) => ({
+            lat: out.lat,
+            lon: out.lon,
+            zoom: out.zoom,
+            mapType: 'leaflet',
+            apiKey: ''
+        })
+    }
 });
-export { mapWidgetDataSchema } from './schema.js';
+export { mapWidgetDataSchema, mapAiOutputSchema } from './schema.js';
 export { default as MapWidget } from './MapWidget.svelte';

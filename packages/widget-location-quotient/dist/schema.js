@@ -8,3 +8,8 @@ export const locationQuotientWidgetDataSchema = z.object({
     localBandLow: z.number().positive().optional(),
     localBandHigh: z.number().positive().optional()
 });
+export const locationQuotientAiOutputSchema = z.object({
+    areaFips: z.string().describe('FIPS code for the area'),
+    year: z.number().describe('Data year'),
+    regionLabel: z.string().describe('Human-readable region name')
+});

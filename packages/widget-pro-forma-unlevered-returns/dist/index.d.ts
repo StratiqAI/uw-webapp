@@ -12,5 +12,5 @@ export declare const proFormaUnleveredReturnsWidget: import("@stratiqai/dashboar
     costOfSalePercent: number;
     propertyName?: string | undefined;
 }>;
-export type { ProFormaUnleveredReturnsConfig, ProFormaUnleveredReturnsInput } from './schema.js';
-export { proFormaUnleveredReturnsConfigSchema, proFormaUnleveredReturnsInputSchema } from './schema.js';
+export type { ProFormaUnleveredReturnsConfig, ProFormaUnleveredReturnsInput, ProFormaUnleveredReturnsAiOutput } from './schema.js';
+export { proFormaUnleveredReturnsConfigSchema, proFormaUnleveredReturnsInputSchema, proFormaUnleveredReturnsAiOutputSchema } from './schema.js';

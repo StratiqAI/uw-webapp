@@ -1,5 +1,5 @@
 import { defineWidget } from '@stratiqai/dashboard-widget-sdk';
-import { proFormaLeveredCfConfigSchema, proFormaLeveredCfInputSchema } from './schema.js';
+import { proFormaLeveredCfConfigSchema, proFormaLeveredCfInputSchema, proFormaLeveredCfAiOutputSchema } from './schema.js';
 import ProFormaLeveredCfWidget from './ProFormaLeveredCfWidget.svelte';
 
 export const proFormaLeveredCfWidget = defineWidget({
@@ -25,11 +25,34 @@ export const proFormaLeveredCfWidget = defineWidget({
 		amortizationYears: 30,
 		interestOnly: false
 	},
-	defaultSize: { colSpan: 12, rowSpan: 3 }
+	defaultSize: { colSpan: 12, rowSpan: 3 },
+	promptConfig: {
+		defaultPrompt: 'Generate levered cash flow assumptions for this property',
+		systemInstruction:
+			'You are a commercial real estate underwriter. Return levered cash flow assumptions including purchase price, income, expenses, loan terms, and exit assumptions.',
+		model: 'GEMINI_2_5_FLASH',
+		aiOutputSchema: proFormaLeveredCfAiOutputSchema,
+		mapAiOutput: (out) => ({
+			purchasePrice: out.purchasePrice as number,
+			acquisitionCosts: 180_000,
+			initialCapEx: 0,
+			egiYear1: out.egiYear1 as number,
+			egiGrowthRate: out.egiGrowthRate as number,
+			totalOpexYear1: out.totalOpexYear1 as number,
+			opexGrowthRate: out.opexGrowthRate as number,
+			terminalCapRate: out.terminalCapRate as number,
+			costOfSalePercent: 0.03,
+			projectionYears: out.projectionYears as number,
+			loanLtv: out.loanLtv as number,
+			loanInterestRate: out.loanInterestRate as number,
+			amortizationYears: out.amortizationYears as number,
+			interestOnly: false
+		})
+	}
 });
 
-export type { ProFormaLeveredCfConfig, ProFormaLeveredCfInput } from './schema.js';
-export { proFormaLeveredCfConfigSchema, proFormaLeveredCfInputSchema } from './schema.js';
+export type { ProFormaLeveredCfConfig, ProFormaLeveredCfInput, ProFormaLeveredCfAiOutput } from './schema.js';
+export { proFormaLeveredCfConfigSchema, proFormaLeveredCfInputSchema, proFormaLeveredCfAiOutputSchema } from './schema.js';
 export {
 	computeLeveredProjections,
 	extractLeveredCashFlows,

@@ -19,3 +19,10 @@ export const proFormaNoiConfigSchema = z.object({
     /** When true, front table shows EGI and Total OpEx rows above NOI. */
     showBreakdown: z.boolean().default(false)
 });
+export const proFormaNoiAiOutputSchema = z.object({
+    egiYear1: z.number().describe('Year 1 effective gross income'),
+    egiGrowthRate: z.number().describe('Annual EGI growth rate'),
+    totalOpexYear1: z.number().describe('Year 1 total operating expenses'),
+    opexGrowthRate: z.number().describe('Annual OpEx growth rate'),
+    projectionYears: z.number().describe('Number of projection years')
+});

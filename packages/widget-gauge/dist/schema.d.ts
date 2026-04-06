@@ -22,3 +22,23 @@ export declare const gaugeWidgetDataSchema: z.ZodObject<{
     color?: string | null | undefined;
 }>;
 export type GaugeWidgetData = z.infer<typeof gaugeWidgetDataSchema>;
+export declare const gaugeAiOutputSchema: z.ZodObject<{
+    value: z.ZodNumber;
+    min: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    max: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    label: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    unit: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+}, "strip", z.ZodTypeAny, {
+    value: number;
+    min?: number | null | undefined;
+    max?: number | null | undefined;
+    label?: string | null | undefined;
+    unit?: string | null | undefined;
+}, {
+    value: number;
+    min?: number | null | undefined;
+    max?: number | null | undefined;
+    label?: string | null | undefined;
+    unit?: string | null | undefined;
+}>;
+export type GaugeAiOutput = z.infer<typeof gaugeAiOutputSchema>;

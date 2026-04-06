@@ -5,6 +5,8 @@
 		FlipCard,
 		WidgetConfigureBack,
 		useWidgetConfigure,
+		AiStatusOverlay,
+		useAiGenerationStatus,
 		type StandardWidgetProps
 	} from '@stratiqai/dashboard-widget-sdk';
 	import { fmt, pct, proFormaTheme } from '@stratiqai/widget-pro-forma-base';
@@ -26,6 +28,7 @@
 
 	const host = getDashboardWidgetHost();
 	const topic = () => host.getWidgetTopic('proFormaLeveredCf', widgetId, topicOverride);
+	const aiStatus = useAiGenerationStatus(() => topic);
 	const topicData = useReactiveValidatedTopic<ProFormaLeveredCfInput>(topic);
 
 	const widgetData = $derived<ProFormaLeveredCfConfig>({
@@ -82,13 +85,18 @@
 
 	const configure = useWidgetConfigure<ProFormaLeveredCfConfig>({
 		data: () => widgetData,
-		onUpdateConfig,
-		onConfigureReady
+		onUpdateConfig: (d) => onUpdateConfig?.(d),
+		onConfigureReady: (fn) => onConfigureReady?.(fn)
 	});
 </script>
 
 <FlipCard isFlipped={configure.isFlipped} shellClass={t.shell} flipBackClass={t.flipBackBg}>
 	{#snippet front()}
+		{#if aiStatus.generating || aiStatus.error}
+			<div class="flex h-full items-center justify-center px-4 py-4">
+				<AiStatusOverlay generating={aiStatus.generating} error={aiStatus.error} {darkMode} />
+			</div>
+		{:else}
 		<table class="w-full border-collapse text-sm">
 			<thead>
 				<tr>
@@ -180,6 +188,7 @@
 			<span>{mergedConfig.interestOnly ? 'I/O' : `${mergedConfig.amortizationYears}yr amort`}</span>
 			<span>Payoff Y{N} ${fmt(result.remainingLoanAtSale)}</span>
 		</div>
+	{/if}
 	{/snippet}
 
 	{#snippet back()}
@@ -189,6 +198,7 @@
 			{darkMode}
 			theme={theme ?? 'dark'}
 			{topicOverride}
+			showAITab={true}
 			onApply={() => configure.applyConfig({
 				...configure.draft,
 				propertyName: configure.draft.propertyName?.trim() || undefined

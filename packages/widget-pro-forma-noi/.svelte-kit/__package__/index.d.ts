@@ -7,6 +7,6 @@ export declare const proFormaNoiWidget: import("@stratiqai/dashboard-widget-sdk"
     showBreakdown: boolean;
     propertyName?: string | undefined;
 }>;
-export type { ProFormaNoiConfig, ProFormaNoiInput } from './schema.js';
-export { proFormaNoiConfigSchema, proFormaNoiInputSchema } from './schema.js';
+export type { ProFormaNoiConfig, ProFormaNoiInput, ProFormaNoiAiOutput } from './schema.js';
+export { proFormaNoiConfigSchema, proFormaNoiInputSchema, proFormaNoiAiOutputSchema } from './schema.js';
 export { computeNoiProjections, type NoiYearProjection } from './calculations.js';

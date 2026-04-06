@@ -19,3 +19,18 @@ export const proFormaLeveredCfConfigSchema = proFormaUnleveredCfConfigSchema.ext
 });
 
 export type ProFormaLeveredCfConfig = z.infer<typeof proFormaLeveredCfConfigSchema>;
+
+export const proFormaLeveredCfAiOutputSchema = z.object({
+	purchasePrice: z.number().describe('Property purchase price'),
+	egiYear1: z.number().describe('Year 1 effective gross income'),
+	egiGrowthRate: z.number().describe('Annual EGI growth rate'),
+	totalOpexYear1: z.number().describe('Year 1 total operating expenses'),
+	opexGrowthRate: z.number().describe('Annual OpEx growth rate'),
+	terminalCapRate: z.number().describe('Terminal (exit) cap rate'),
+	loanLtv: z.number().describe('Loan-to-value ratio (e.g. 0.65)'),
+	loanInterestRate: z.number().describe('Annual loan interest rate (e.g. 0.065)'),
+	amortizationYears: z.number().describe('Loan amortization period in years'),
+	projectionYears: z.number().describe('Number of projection years')
+});
+
+export type ProFormaLeveredCfAiOutput = z.infer<typeof proFormaLeveredCfAiOutputSchema>;

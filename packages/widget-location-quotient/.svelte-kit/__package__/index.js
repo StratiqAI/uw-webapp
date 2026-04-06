@@ -1,5 +1,5 @@
 import { defineWidget } from '@stratiqai/dashboard-widget-sdk';
-import { locationQuotientWidgetDataSchema } from './schema.js';
+import { locationQuotientWidgetDataSchema, locationQuotientAiOutputSchema } from './schema.js';
 import LocationQuotientWidget from './LocationQuotientWidget.svelte';
 export const locationQuotientWidget = defineWidget({
     kind: 'locationQuotient',
@@ -16,7 +16,22 @@ export const locationQuotientWidget = defineWidget({
         localBandHigh: 1.08
     },
     defaultSize: { colSpan: 12, rowSpan: 4 },
-    palette: { icon: '📍', category: 'data' }
+    palette: { icon: '📍', category: 'data' },
+    promptConfig: {
+        defaultPrompt: 'Determine the area FIPS code and year for location quotient analysis',
+        systemInstruction: 'You are a geographic data assistant. Return the area FIPS code, data year, and region label for a location quotient analysis.',
+        model: 'GEMINI_2_5_FLASH',
+        aiOutputSchema: locationQuotientAiOutputSchema,
+        mapAiOutput: (out) => ({
+            areaFips: out.areaFips,
+            year: out.year,
+            regionLabel: out.regionLabel,
+            sortOrder: 'lq_desc',
+            exportBaseThreshold: 1.08,
+            localBandLow: 0.92,
+            localBandHigh: 1.08
+        })
+    }
 });
-export { locationQuotientWidgetDataSchema } from './schema.js';
+export { locationQuotientWidgetDataSchema, locationQuotientAiOutputSchema } from './schema.js';
 export { default as LocationQuotientWidget } from './LocationQuotientWidget.svelte';

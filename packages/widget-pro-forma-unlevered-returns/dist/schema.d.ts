@@ -53,3 +53,32 @@ export declare const proFormaUnleveredReturnsConfigSchema: z.ZodObject<{
     costOfSalePercent?: number | undefined;
 }>;
 export type ProFormaUnleveredReturnsConfig = z.infer<typeof proFormaUnleveredReturnsConfigSchema>;
+export declare const proFormaUnleveredReturnsAiOutputSchema: z.ZodObject<{
+    purchasePrice: z.ZodNumber;
+    egiYear1: z.ZodNumber;
+    egiGrowthRate: z.ZodNumber;
+    totalOpexYear1: z.ZodNumber;
+    opexGrowthRate: z.ZodNumber;
+    terminalCapRate: z.ZodNumber;
+    unleveredDiscountRate: z.ZodNumber;
+    projectionYears: z.ZodNumber;
+}, "strip", z.ZodTypeAny, {
+    egiYear1: number;
+    purchasePrice: number;
+    unleveredDiscountRate: number;
+    projectionYears: number;
+    egiGrowthRate: number;
+    totalOpexYear1: number;
+    opexGrowthRate: number;
+    terminalCapRate: number;
+}, {
+    egiYear1: number;
+    purchasePrice: number;
+    unleveredDiscountRate: number;
+    projectionYears: number;
+    egiGrowthRate: number;
+    totalOpexYear1: number;
+    opexGrowthRate: number;
+    terminalCapRate: number;
+}>;
+export type ProFormaUnleveredReturnsAiOutput = z.infer<typeof proFormaUnleveredReturnsAiOutputSchema>;

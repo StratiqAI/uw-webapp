@@ -1,5 +1,5 @@
 import { defineWidget } from '@stratiqai/dashboard-widget-sdk';
-import { heatmapWidgetDataSchema } from './schema.js';
+import { heatmapWidgetDataSchema, heatmapAiOutputSchema } from './schema.js';
 import HeatmapWidget from './HeatmapWidget.svelte';
 export const heatmapWidget = defineWidget({
     kind: 'heatmap',
@@ -18,7 +18,18 @@ export const heatmapWidget = defineWidget({
         ]
     },
     defaultSize: { colSpan: 6, rowSpan: 4 },
-    palette: { icon: '🔥', category: 'charts' }
+    palette: { icon: '🔥', category: 'charts' },
+    promptConfig: {
+        defaultPrompt: 'Generate a heatmap showing intensity across categories and time periods',
+        systemInstruction: 'You are a data visualization assistant. Return a 2D matrix of values with row and column labels for a heatmap.',
+        model: 'GEMINI_2_5_FLASH',
+        aiOutputSchema: heatmapAiOutputSchema,
+        mapAiOutput: (out) => ({
+            rows: out.rows,
+            cols: out.cols,
+            values: out.values
+        })
+    }
 });
-export { heatmapWidgetDataSchema } from './schema.js';
+export { heatmapWidgetDataSchema, heatmapAiOutputSchema } from './schema.js';
 export { default as HeatmapWidget } from './HeatmapWidget.svelte';

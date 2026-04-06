@@ -31,3 +31,10 @@ export const proFormaOpExConfigSchema = z.object({
     projectionYears: z.number().int().min(1).max(10).default(5),
     propertyName: z.string().optional()
 });
+export const proFormaOpExAiOutputSchema = z.object({
+    baseOperatingExpenses: z.number().describe('Annual base operating expenses'),
+    expenseGrowthRate: z.number().describe('Annual expense growth rate (e.g. 0.03)'),
+    managementFeeRate: z.number().describe('Management fee as % of EGI (e.g. 0.04)'),
+    reservePerUnit: z.number().describe('Reserve per unit per year'),
+    projectionYears: z.number().describe('Number of projection years (1-10)')
+});

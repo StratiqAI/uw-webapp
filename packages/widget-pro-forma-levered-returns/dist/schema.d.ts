@@ -69,3 +69,41 @@ export declare const proFormaLeveredReturnsConfigSchema: z.ZodObject<{
     interestOnly?: boolean | undefined;
 }>;
 export type ProFormaLeveredReturnsConfig = z.infer<typeof proFormaLeveredReturnsConfigSchema>;
+export declare const proFormaLeveredReturnsAiOutputSchema: z.ZodObject<{
+    purchasePrice: z.ZodNumber;
+    egiYear1: z.ZodNumber;
+    egiGrowthRate: z.ZodNumber;
+    totalOpexYear1: z.ZodNumber;
+    opexGrowthRate: z.ZodNumber;
+    terminalCapRate: z.ZodNumber;
+    loanLtv: z.ZodNumber;
+    loanInterestRate: z.ZodNumber;
+    amortizationYears: z.ZodNumber;
+    leveredDiscountRate: z.ZodNumber;
+    projectionYears: z.ZodNumber;
+}, "strip", z.ZodTypeAny, {
+    leveredDiscountRate: number;
+    projectionYears: number;
+    purchasePrice: number;
+    egiYear1: number;
+    egiGrowthRate: number;
+    totalOpexYear1: number;
+    opexGrowthRate: number;
+    terminalCapRate: number;
+    loanLtv: number;
+    loanInterestRate: number;
+    amortizationYears: number;
+}, {
+    leveredDiscountRate: number;
+    projectionYears: number;
+    purchasePrice: number;
+    egiYear1: number;
+    egiGrowthRate: number;
+    totalOpexYear1: number;
+    opexGrowthRate: number;
+    terminalCapRate: number;
+    loanLtv: number;
+    loanInterestRate: number;
+    amortizationYears: number;
+}>;
+export type ProFormaLeveredReturnsAiOutput = z.infer<typeof proFormaLeveredReturnsAiOutputSchema>;

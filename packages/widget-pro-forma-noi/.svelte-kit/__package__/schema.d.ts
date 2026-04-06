@@ -43,3 +43,23 @@ export declare const proFormaNoiConfigSchema: z.ZodObject<{
     showBreakdown?: boolean | undefined;
 }>;
 export type ProFormaNoiConfig = z.infer<typeof proFormaNoiConfigSchema>;
+export declare const proFormaNoiAiOutputSchema: z.ZodObject<{
+    egiYear1: z.ZodNumber;
+    egiGrowthRate: z.ZodNumber;
+    totalOpexYear1: z.ZodNumber;
+    opexGrowthRate: z.ZodNumber;
+    projectionYears: z.ZodNumber;
+}, "strip", z.ZodTypeAny, {
+    egiYear1: number;
+    totalOpexYear1: number;
+    egiGrowthRate: number;
+    opexGrowthRate: number;
+    projectionYears: number;
+}, {
+    egiYear1: number;
+    totalOpexYear1: number;
+    egiGrowthRate: number;
+    opexGrowthRate: number;
+    projectionYears: number;
+}>;
+export type ProFormaNoiAiOutput = z.infer<typeof proFormaNoiAiOutputSchema>;

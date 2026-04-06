@@ -7,6 +7,6 @@ export declare const mapWidget: import("@stratiqai/dashboard-widget-sdk").Widget
     title?: string | null | undefined;
     description?: string | null | undefined;
 }>;
-export { mapWidgetDataSchema } from './schema.js';
-export type { MapWidgetData } from './schema.js';
+export { mapWidgetDataSchema, mapAiOutputSchema } from './schema.js';
+export type { MapWidgetData, MapAiOutput } from './schema.js';
 export { default as MapWidget } from './MapWidget.svelte';

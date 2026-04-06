@@ -35,9 +35,14 @@ export function publishWidgetOutput(kind, widgetId, data) {
     return host.publishWidgetOutput(kind, widgetId, data);
 }
 const AI_STATUS_SUFFIX = '/__ai_status';
+/** Build the topic path used to track AI generation state for a widget. */
 export function getAiStatusTopic(widgetTopic) {
     return widgetTopic + AI_STATUS_SUFFIX;
 }
+/**
+ * Reactive hook that tracks the AI generation status for a widget.
+ * Returns `{ generating, error }` — both reactive.
+ */
 export function useAiGenerationStatus(topic) {
     const host = getDashboardWidgetHost();
     const store = host.validatedTopicStore;

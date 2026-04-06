@@ -1,5 +1,5 @@
 import { defineWidget } from '@stratiqai/dashboard-widget-sdk';
-import { proFormaNoiConfigSchema, proFormaNoiInputSchema } from './schema.js';
+import { proFormaNoiConfigSchema, proFormaNoiInputSchema, proFormaNoiAiOutputSchema } from './schema.js';
 import ProFormaNoiWidget from './ProFormaNoiWidget.svelte';
 export const proFormaNoiWidget = defineWidget({
     kind: 'proFormaNoi',
@@ -16,7 +16,21 @@ export const proFormaNoiWidget = defineWidget({
         propertyName: '',
         showBreakdown: false
     },
-    defaultSize: { colSpan: 12, rowSpan: 2 }
+    defaultSize: { colSpan: 12, rowSpan: 2 },
+    promptConfig: {
+        defaultPrompt: 'Generate NOI assumptions for this property',
+        systemInstruction: 'You are a commercial real estate underwriter. Return net operating income assumptions including EGI, OpEx, and growth rates.',
+        model: 'GEMINI_2_5_FLASH',
+        aiOutputSchema: proFormaNoiAiOutputSchema,
+        mapAiOutput: (out) => ({
+            egiYear1: out.egiYear1,
+            egiGrowthRate: out.egiGrowthRate,
+            totalOpexYear1: out.totalOpexYear1,
+            opexGrowthRate: out.opexGrowthRate,
+            projectionYears: out.projectionYears,
+            showBreakdown: false
+        })
+    }
 });
-export { proFormaNoiConfigSchema, proFormaNoiInputSchema } from './schema.js';
+export { proFormaNoiConfigSchema, proFormaNoiInputSchema, proFormaNoiAiOutputSchema } from './schema.js';
 export { computeNoiProjections } from './calculations.js';

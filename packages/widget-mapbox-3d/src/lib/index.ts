@@ -1,5 +1,5 @@
 import { defineWidget } from '@stratiqai/dashboard-widget-sdk';
-import { mapbox3dConfigSchema } from './schema.js';
+import { mapbox3dConfigSchema, mapbox3dAiOutputSchema } from './schema.js';
 import Mapbox3dWidget from './Mapbox3dWidget.svelte';
 import { DEMO_MAPBOX_3D_CONFIG } from './demoData.js';
 
@@ -10,9 +10,23 @@ export const mapbox3dWidget = defineWidget({
 	component: Mapbox3dWidget,
 	defaultData: DEMO_MAPBOX_3D_CONFIG,
 	defaultSize: { colSpan: 8, rowSpan: 5 },
-	palette: { icon: '🗺', category: 'map' }
+	palette: { icon: '🗺', category: 'map' },
+	promptConfig: {
+		defaultPrompt: 'Determine the best 3D map view for this property location',
+		systemInstruction:
+			'You are a geospatial visualization assistant. Return map center coordinates, zoom level, pitch, and bearing for an optimal 3D view.',
+		model: 'GEMINI_2_5_FLASH',
+		aiOutputSchema: mapbox3dAiOutputSchema,
+		mapAiOutput: (out) => ({
+			...DEMO_MAPBOX_3D_CONFIG,
+			center: out.center,
+			zoom: out.zoom as number,
+			pitch: out.pitch ?? DEMO_MAPBOX_3D_CONFIG.pitch,
+			bearing: out.bearing ?? DEMO_MAPBOX_3D_CONFIG.bearing
+		})
+	}
 });
 
-export type { Mapbox3dConfig, Mapbox3dModel } from './schema.js';
-export { mapbox3dConfigSchema, mapbox3dModelSchema } from './schema.js';
+export type { Mapbox3dConfig, Mapbox3dModel, Mapbox3dAiOutput } from './schema.js';
+export { mapbox3dConfigSchema, mapbox3dModelSchema, mapbox3dAiOutputSchema } from './schema.js';
 export { DEMO_MAPBOX_3D_CONFIG } from './demoData.js';

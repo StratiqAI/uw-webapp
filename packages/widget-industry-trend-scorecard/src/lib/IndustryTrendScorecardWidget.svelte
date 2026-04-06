@@ -5,6 +5,8 @@
 		FlipCard,
 		WidgetConfigureBack,
 		useWidgetConfigure,
+		AiStatusOverlay,
+		useAiGenerationStatus,
 		type StandardWidgetProps
 	} from '@stratiqai/dashboard-widget-sdk';
 	import type { IndustryTrendScorecardConfig, IndustryData, QuarterMetrics } from './schema.js';
@@ -47,6 +49,7 @@
 	const host = getDashboardWidgetHost();
 	const topic = () => host.getWidgetTopic('industryTrendScorecard', widgetId, topicOverride);
 	const topicData = useReactiveValidatedTopic<IndustryTrendScorecardConfig>(topic);
+	const aiStatus = useAiGenerationStatus(() => topic);
 
 	const widgetData = $derived<IndustryTrendScorecardConfig>({
 		quarters: data.quarters?.length ? data.quarters : DEMO_QUARTERS,
@@ -355,6 +358,11 @@
 	flipBackClass={flipBackClass}
 >
 	{#snippet front()}
+		{#if aiStatus.generating || aiStatus.error}
+			<div class="flex h-full items-center justify-center px-4 py-4">
+				<AiStatusOverlay generating={aiStatus.generating} error={aiStatus.error} {darkMode} />
+			</div>
+		{:else}
 		<div class="flex h-full min-h-0 flex-col overflow-hidden {darkMode ? 'text-slate-100' : 'text-slate-900'}">
 			<div class="flex shrink-0 flex-wrap gap-1.5 border-b px-4 py-2.5 {borderColor}">
 				{#each (['emp', 'lq', 'wage', 'estab'] as const) as tab}
@@ -500,9 +508,11 @@
 				</table>
 			</div>
 		</div>
+		{/if}
 	{/snippet}
 	{#snippet back()}
 		<WidgetConfigureBack
+			showAITab={true}
 			kind="industryTrendScorecard"
 			{widgetId}
 			{darkMode}

@@ -24,3 +24,24 @@ export const industryTrendScorecardConfigSchema = z.object({
     industries: z.array(industryDataSchema).min(0),
     weights: scoreWeightsSchema
 });
+export const industryTrendScorecardAiOutputSchema = z.object({
+    quarters: z.array(z.string()).describe('Quarter labels e.g. ["2024-Q1", "2024-Q2"]'),
+    industries: z.array(z.object({
+        name: z.string().describe('Industry name'),
+        naicsCode: z.string().describe('NAICS code'),
+        color: z.string().describe('Hex color for the industry'),
+        lqTrend: z.enum(['rising', 'stable', 'falling']).describe('Location quotient trend direction'),
+        data: z.array(z.object({
+            empYoy: z.number().describe('Employment year-over-year change %'),
+            lqValue: z.number().describe('Location quotient value'),
+            wageYoy: z.number().describe('Wage year-over-year change %'),
+            estabYoy: z.number().describe('Establishment year-over-year change %')
+        })).describe('Quarterly metrics')
+    })).describe('Array of industries with trend data'),
+    weights: z.object({
+        emp: z.number().describe('Employment weight (0-100)'),
+        lq: z.number().describe('LQ weight (0-100)'),
+        wage: z.number().describe('Wage weight (0-100)'),
+        estab: z.number().describe('Establishment weight (0-100)')
+    }).describe('Score weights summing to 100')
+});

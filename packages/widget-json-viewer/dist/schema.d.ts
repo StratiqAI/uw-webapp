@@ -13,3 +13,11 @@ export declare const jsonViewerWidgetDataSchema: z.ZodObject<{
     json?: unknown;
 }>;
 export type JsonViewerWidgetData = z.infer<typeof jsonViewerWidgetDataSchema>;
+export declare const jsonViewerAiOutputSchema: z.ZodObject<{
+    data: z.ZodRecord<z.ZodString, z.ZodUnknown>;
+}, "strip", z.ZodTypeAny, {
+    data: Record<string, unknown>;
+}, {
+    data: Record<string, unknown>;
+}>;
+export type JsonViewerAiOutput = z.infer<typeof jsonViewerAiOutputSchema>;

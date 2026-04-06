@@ -99,4 +99,24 @@ export declare const proFormaOpExConfigSchema: z.ZodObject<{
     propertyName?: string | undefined;
 }>;
 export type ProFormaOpExConfig = z.infer<typeof proFormaOpExConfigSchema>;
+export declare const proFormaOpExAiOutputSchema: z.ZodObject<{
+    baseOperatingExpenses: z.ZodNumber;
+    expenseGrowthRate: z.ZodNumber;
+    managementFeeRate: z.ZodNumber;
+    reservePerUnit: z.ZodNumber;
+    projectionYears: z.ZodNumber;
+}, "strip", z.ZodTypeAny, {
+    baseOperatingExpenses: number;
+    expenseGrowthRate: number;
+    managementFeeRate: number;
+    reservePerUnit: number;
+    projectionYears: number;
+}, {
+    baseOperatingExpenses: number;
+    expenseGrowthRate: number;
+    managementFeeRate: number;
+    reservePerUnit: number;
+    projectionYears: number;
+}>;
+export type ProFormaOpExAiOutput = z.infer<typeof proFormaOpExAiOutputSchema>;
 export {};

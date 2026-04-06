@@ -25,3 +25,11 @@ export const proFormaRevenueConfigSchema = z.object({
     projectionYears: z.number().int().min(1).max(10).default(5),
     propertyName: z.string().optional()
 });
+export const proFormaRevenueAiOutputSchema = z.object({
+    totalUnits: z.number().describe('Total number of units'),
+    marketRentPerUnit: z.number().describe('Market rent per unit per month'),
+    rentGrowthRate: z.number().describe('Annual rent growth rate (e.g. 0.03 for 3%)'),
+    vacancyRate: z.number().describe('Vacancy rate (e.g. 0.05 for 5%)'),
+    otherIncomeAnnual: z.number().describe('Annual other income amount'),
+    projectionYears: z.number().describe('Number of projection years (1-10)')
+});

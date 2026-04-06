@@ -2,9 +2,11 @@
 	import type { MetricWidgetData } from './schema.js';
 	import {
 		FlipCard,
+		AiStatusOverlay,
 		WidgetConfigureBack,
 		useWidgetConfigure,
 		useReactiveValidatedTopic,
+		useAiGenerationStatus,
 		getDashboardWidgetHost,
 		type StandardWidgetProps
 	} from '@stratiqai/dashboard-widget-sdk';
@@ -22,6 +24,7 @@
 	const host = getDashboardWidgetHost();
 	const topic = $derived(host.getWidgetTopic('metric', widgetId, topicOverride));
 	const dataStream = useReactiveValidatedTopic<MetricWidgetData>(() => topic);
+	const aiStatus = useAiGenerationStatus(() => topic);
 	let widgetData = $derived<MetricWidgetData>(dataStream.current || data);
 
 	const configure = useWidgetConfigure<MetricWidgetData>({
@@ -34,8 +37,8 @@
 		}
 	});
 
-	const shellClass = $derived(darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white');
-	const flipBackClass = $derived(darkMode ? 'border-slate-600 bg-slate-900' : 'border-slate-200 bg-slate-50');
+	const shellClass = $derived(darkMode ? 'bg-slate-800' : 'bg-white');
+	const flipBackClass = $derived(darkMode ? 'bg-slate-900' : 'bg-slate-50');
 	const inputClass = $derived(
 		darkMode
 			? 'w-full rounded-md border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500'
@@ -47,6 +50,9 @@
 <FlipCard isFlipped={configure.isFlipped} {shellClass} {flipBackClass}>
 	{#snippet front()}
 		<div class="metric-widget flex h-full flex-col justify-center">
+			{#if aiStatus.generating || aiStatus.error}
+				<AiStatusOverlay generating={aiStatus.generating} error={aiStatus.error} {darkMode} />
+			{:else}
 			<p class="mb-1 text-sm {darkMode ? 'text-slate-300' : 'text-slate-600'}">{widgetData.label}</p>
 			<p class="text-3xl font-bold {darkMode ? 'text-slate-100' : 'text-slate-900'}">
 				{widgetData.value}{widgetData.unit ? ` ${widgetData.unit}` : ''}
@@ -81,6 +87,7 @@
 					{Math.abs(widgetData.change)}%
 				</p>
 			{/if}
+			{/if}
 		</div>
 	{/snippet}
 	{#snippet back()}
@@ -90,6 +97,7 @@
 			{darkMode}
 			theme={resolvedTheme}
 			{topicOverride}
+			showAITab={true}
 			onApply={() => configure.applyConfig()}
 			onCancel={configure.cancelConfig}
 		>

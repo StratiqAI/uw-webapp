@@ -60,3 +60,26 @@ export declare const proFormaRevenueConfigSchema: z.ZodObject<{
     propertyName?: string | undefined;
 }>;
 export type ProFormaRevenueConfig = z.infer<typeof proFormaRevenueConfigSchema>;
+export declare const proFormaRevenueAiOutputSchema: z.ZodObject<{
+    totalUnits: z.ZodNumber;
+    marketRentPerUnit: z.ZodNumber;
+    rentGrowthRate: z.ZodNumber;
+    vacancyRate: z.ZodNumber;
+    otherIncomeAnnual: z.ZodNumber;
+    projectionYears: z.ZodNumber;
+}, "strip", z.ZodTypeAny, {
+    totalUnits: number;
+    marketRentPerUnit: number;
+    otherIncomeAnnual: number;
+    rentGrowthRate: number;
+    vacancyRate: number;
+    projectionYears: number;
+}, {
+    totalUnits: number;
+    marketRentPerUnit: number;
+    otherIncomeAnnual: number;
+    rentGrowthRate: number;
+    vacancyRate: number;
+    projectionYears: number;
+}>;
+export type ProFormaRevenueAiOutput = z.infer<typeof proFormaRevenueAiOutputSchema>;

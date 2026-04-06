@@ -1,5 +1,5 @@
 import { defineWidget } from '@stratiqai/dashboard-widget-sdk';
-import { jsonViewerWidgetDataSchema } from './schema.js';
+import { jsonViewerWidgetDataSchema, jsonViewerAiOutputSchema } from './schema.js';
 import JsonViewerWidget from './JsonViewerWidget.svelte';
 export const jsonViewerWidget = defineWidget({
     kind: 'jsonViewer',
@@ -7,7 +7,17 @@ export const jsonViewerWidget = defineWidget({
     zodSchema: jsonViewerWidgetDataSchema,
     component: JsonViewerWidget,
     defaultData: { title: null, description: null, json: {} },
-    defaultSize: { colSpan: 6, rowSpan: 3 }
+    defaultSize: { colSpan: 6, rowSpan: 3 },
+    promptConfig: {
+        defaultPrompt: 'Generate structured JSON data about this property',
+        systemInstruction: 'You are a data structuring assistant. ' +
+            'Return well-organized JSON data with meaningful keys and values.',
+        model: 'GEMINI_2_5_FLASH',
+        aiOutputSchema: jsonViewerAiOutputSchema,
+        mapAiOutput: (out) => ({
+            json: out.data ?? {}
+        })
+    }
 });
-export { jsonViewerWidgetDataSchema } from './schema.js';
+export { jsonViewerWidgetDataSchema, jsonViewerAiOutputSchema } from './schema.js';
 export { default as JsonViewerWidget } from './JsonViewerWidget.svelte';

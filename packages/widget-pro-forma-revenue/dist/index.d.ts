@@ -10,6 +10,6 @@ export declare const proFormaRevenueWidget: import("@stratiqai/dashboard-widget-
     projectionYears: number;
     propertyName?: string | undefined;
 }>;
-export type { ProFormaRevenueConfig, ProFormaRevenueInput, UnitType } from './schema.js';
-export { proFormaRevenueConfigSchema, proFormaRevenueInputSchema } from './schema.js';
+export type { ProFormaRevenueConfig, ProFormaRevenueInput, ProFormaRevenueAiOutput, UnitType } from './schema.js';
+export { proFormaRevenueConfigSchema, proFormaRevenueInputSchema, proFormaRevenueAiOutputSchema } from './schema.js';
 export { computeRevenueProjections, type YearProjection } from './calculations.js';

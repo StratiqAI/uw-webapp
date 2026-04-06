@@ -4,3 +4,7 @@ export const sparklineWidgetDataSchema = z.object({
     label: z.string().nullable().optional(),
     color: z.string().nullable().optional()
 });
+export const sparklineAiOutputSchema = z.object({
+    values: z.array(z.number()).describe('Numeric data points for the sparkline'),
+    label: z.string().nullable().optional().describe('Label describing the data trend')
+});

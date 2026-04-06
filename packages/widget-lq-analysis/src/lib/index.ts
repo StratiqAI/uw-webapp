@@ -1,5 +1,5 @@
 import { defineWidget, HostServices } from '@stratiqai/dashboard-widget-sdk';
-import { lqAnalysisConfigSchema, lqAnalysisInputSchema } from './schema.js';
+import { lqAnalysisConfigSchema, lqAnalysisInputSchema, lqAnalysisAiOutputSchema } from './schema.js';
 import LqAnalysisWidget from './LqAnalysisWidget.svelte';
 
 export const lqAnalysisWidget = defineWidget({
@@ -19,9 +19,26 @@ export const lqAnalysisWidget = defineWidget({
 		localBandHigh: 1.08
 	},
 	defaultSize: { colSpan: 12, rowSpan: 4 },
-	capabilities: [HostServices.SUPABASE]
+	capabilities: [HostServices.SUPABASE],
+	promptConfig: {
+		defaultPrompt: 'Identify the best metro area and year for location quotient analysis',
+		systemInstruction:
+			'You are an economic research assistant. Return city, state, region label, and year for running a location quotient analysis.',
+		model: 'GEMINI_2_5_FLASH',
+		aiOutputSchema: lqAnalysisAiOutputSchema,
+		mapAiOutput: (out) => ({
+			city: out.city,
+			state: out.state,
+			regionLabel: out.regionLabel,
+			year: out.year,
+			sortOrder: 'lq_desc',
+			exportBaseThreshold: 1.08,
+			localBandLow: 0.92,
+			localBandHigh: 1.08
+		})
+	}
 });
 
-export type { LqAnalysisConfig, LqAnalysisInput, LqAnalysisSortOrder } from './schema.js';
-export { lqAnalysisConfigSchema, lqAnalysisInputSchema } from './schema.js';
+export type { LqAnalysisConfig, LqAnalysisInput, LqAnalysisSortOrder, LqAnalysisAiOutput } from './schema.js';
+export { lqAnalysisConfigSchema, lqAnalysisInputSchema, lqAnalysisAiOutputSchema } from './schema.js';
 export type { QcewSectorAggregate, LoadLocationQuotientParams } from './qcewSupabase.js';

@@ -66,3 +66,38 @@ export declare const proFormaLeveredCfConfigSchema: z.ZodObject<{
     costOfSalePercent?: number | undefined;
 }>;
 export type ProFormaLeveredCfConfig = z.infer<typeof proFormaLeveredCfConfigSchema>;
+export declare const proFormaLeveredCfAiOutputSchema: z.ZodObject<{
+    purchasePrice: z.ZodNumber;
+    egiYear1: z.ZodNumber;
+    egiGrowthRate: z.ZodNumber;
+    totalOpexYear1: z.ZodNumber;
+    opexGrowthRate: z.ZodNumber;
+    terminalCapRate: z.ZodNumber;
+    loanLtv: z.ZodNumber;
+    loanInterestRate: z.ZodNumber;
+    amortizationYears: z.ZodNumber;
+    projectionYears: z.ZodNumber;
+}, "strip", z.ZodTypeAny, {
+    egiYear1: number;
+    totalOpexYear1: number;
+    purchasePrice: number;
+    loanLtv: number;
+    loanInterestRate: number;
+    amortizationYears: number;
+    projectionYears: number;
+    egiGrowthRate: number;
+    opexGrowthRate: number;
+    terminalCapRate: number;
+}, {
+    egiYear1: number;
+    totalOpexYear1: number;
+    purchasePrice: number;
+    loanLtv: number;
+    loanInterestRate: number;
+    amortizationYears: number;
+    projectionYears: number;
+    egiGrowthRate: number;
+    opexGrowthRate: number;
+    terminalCapRate: number;
+}>;
+export type ProFormaLeveredCfAiOutput = z.infer<typeof proFormaLeveredCfAiOutputSchema>;

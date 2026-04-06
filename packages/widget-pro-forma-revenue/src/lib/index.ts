@@ -1,5 +1,5 @@
 import { defineWidget } from '@stratiqai/dashboard-widget-sdk';
-import { proFormaRevenueConfigSchema, proFormaRevenueInputSchema } from './schema.js';
+import { proFormaRevenueConfigSchema, proFormaRevenueInputSchema, proFormaRevenueAiOutputSchema } from './schema.js';
 import ProFormaRevenueWidget from './ProFormaRevenueWidget.svelte';
 
 export const proFormaRevenueWidget = defineWidget({
@@ -20,9 +20,27 @@ export const proFormaRevenueWidget = defineWidget({
 		projectionYears: 5,
 		propertyName: ''
 	},
-	defaultSize: { colSpan: 12, rowSpan: 3 }
+	defaultSize: { colSpan: 12, rowSpan: 3 },
+	promptConfig: {
+		defaultPrompt: 'Generate revenue assumptions for this property',
+		systemInstruction:
+			'You are a commercial real estate underwriter. Return revenue pro forma assumptions including units, rent, growth rates, and vacancy.',
+		model: 'GEMINI_2_5_FLASH',
+		aiOutputSchema: proFormaRevenueAiOutputSchema,
+		mapAiOutput: (out) => ({
+			unitType: 'units',
+			totalUnits: out.totalUnits as number,
+			totalSqFt: 0,
+			marketRentPerUnit: out.marketRentPerUnit as number,
+			rentGrowthRate: out.rentGrowthRate as number,
+			vacancyRate: out.vacancyRate as number,
+			otherIncomeAnnual: out.otherIncomeAnnual as number,
+			otherIncomeGrowthRate: 0.02,
+			projectionYears: out.projectionYears as number
+		})
+	}
 });
 
-export type { ProFormaRevenueConfig, ProFormaRevenueInput, UnitType } from './schema.js';
-export { proFormaRevenueConfigSchema, proFormaRevenueInputSchema } from './schema.js';
+export type { ProFormaRevenueConfig, ProFormaRevenueInput, ProFormaRevenueAiOutput, UnitType } from './schema.js';
+export { proFormaRevenueConfigSchema, proFormaRevenueInputSchema, proFormaRevenueAiOutputSchema } from './schema.js';
 export { computeRevenueProjections, type YearProjection } from './calculations.js';

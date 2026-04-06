@@ -14,3 +14,16 @@ export const proFormaUnleveredReturnsConfigSchema = proFormaUnleveredCfConfigSch
 });
 
 export type ProFormaUnleveredReturnsConfig = z.infer<typeof proFormaUnleveredReturnsConfigSchema>;
+
+export const proFormaUnleveredReturnsAiOutputSchema = z.object({
+	purchasePrice: z.number().describe('Property purchase price'),
+	egiYear1: z.number().describe('Year 1 effective gross income'),
+	egiGrowthRate: z.number().describe('Annual EGI growth rate'),
+	totalOpexYear1: z.number().describe('Year 1 total operating expenses'),
+	opexGrowthRate: z.number().describe('Annual OpEx growth rate'),
+	terminalCapRate: z.number().describe('Terminal (exit) cap rate'),
+	unleveredDiscountRate: z.number().describe('Hurdle rate for unlevered NPV'),
+	projectionYears: z.number().describe('Number of projection years')
+});
+
+export type ProFormaUnleveredReturnsAiOutput = z.infer<typeof proFormaUnleveredReturnsAiOutputSchema>;

@@ -19,3 +19,11 @@ export const tableWidgetDataSchema = z.object({
     pageSize: z.number().optional().default(10),
     searchable: z.boolean().optional().default(true)
 });
+export const tableAiOutputSchema = z.object({
+    columns: z.array(z.object({
+        key: z.string().describe('Column identifier/key'),
+        label: z.string().optional().describe('Display label for the column header'),
+        type: z.enum(['text', 'number', 'currency', 'percent']).optional().describe('Data type for formatting')
+    })).describe('Column definitions for the table'),
+    rows: z.array(z.record(z.unknown())).describe('Array of row objects keyed by column key')
+});

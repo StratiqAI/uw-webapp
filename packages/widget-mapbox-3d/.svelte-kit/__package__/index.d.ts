@@ -19,6 +19,6 @@ export declare const mapbox3dWidget: import("@stratiqai/dashboard-widget-sdk").W
         castShadows?: boolean | undefined;
     } | undefined;
 }>;
-export type { Mapbox3dConfig, Mapbox3dModel } from './schema.js';
-export { mapbox3dConfigSchema, mapbox3dModelSchema } from './schema.js';
+export type { Mapbox3dConfig, Mapbox3dModel, Mapbox3dAiOutput } from './schema.js';
+export { mapbox3dConfigSchema, mapbox3dModelSchema, mapbox3dAiOutputSchema } from './schema.js';
 export { DEMO_MAPBOX_3D_CONFIG } from './demoData.js';

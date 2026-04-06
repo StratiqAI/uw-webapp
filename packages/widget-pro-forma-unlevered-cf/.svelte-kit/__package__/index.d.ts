@@ -11,6 +11,6 @@ export declare const proFormaUnleveredCfWidget: import("@stratiqai/dashboard-wid
     costOfSalePercent: number;
     propertyName?: string | undefined;
 }>;
-export type { ProFormaUnleveredCfConfig, ProFormaUnleveredCfInput } from './schema.js';
-export { proFormaUnleveredCfConfigSchema, proFormaUnleveredCfInputSchema } from './schema.js';
+export type { ProFormaUnleveredCfConfig, ProFormaUnleveredCfInput, ProFormaUnleveredCfAiOutput } from './schema.js';
+export { proFormaUnleveredCfConfigSchema, proFormaUnleveredCfInputSchema, proFormaUnleveredCfAiOutputSchema } from './schema.js';
 export { computeUnleveredProjections, extractUnleveredCashFlows, type UnleveredYearColumn } from './calculations.js';

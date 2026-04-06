@@ -5,6 +5,8 @@
 		FlipCard,
 		WidgetConfigureBack,
 		useWidgetConfigure,
+		AiStatusOverlay,
+		useAiGenerationStatus,
 		type StandardWidgetProps
 	} from '@stratiqai/dashboard-widget-sdk';
 	import { fmt, fmtDeduction, pct, proFormaTheme } from '@stratiqai/widget-pro-forma-base';
@@ -26,6 +28,7 @@
 
 	const host = getDashboardWidgetHost();
 	const topic = () => host.getWidgetTopic('proFormaRevenue', widgetId, topicOverride);
+	const aiStatus = useAiGenerationStatus(() => topic);
 	const topicData = useReactiveValidatedTopic<ProFormaRevenueInput>(topic);
 
 	const widgetData = $derived<ProFormaRevenueConfig>({
@@ -70,6 +73,11 @@
 
 <FlipCard isFlipped={configure.isFlipped} shellClass={t.shell} flipBackClass={t.flipBackBg}>
 	{#snippet front()}
+		{#if aiStatus.generating || aiStatus.error}
+			<div class="flex h-full items-center justify-center px-4 py-4">
+				<AiStatusOverlay generating={aiStatus.generating} error={aiStatus.error} {darkMode} />
+			</div>
+		{:else}
 		<table class="w-full border-collapse text-sm">
 			<thead>
 				<tr>
@@ -171,6 +179,7 @@
 				<span>Other Income ${mergedConfig.otherIncomeAnnual.toLocaleString()}/yr</span>
 			{/if}
 		</div>
+	{/if}
 	{/snippet}
 
 	{#snippet back()}
@@ -180,6 +189,7 @@
 			{darkMode}
 			theme={theme ?? 'dark'}
 			{topicOverride}
+			showAITab={true}
 			onApply={() => configure.applyConfig({
 				...configure.draft,
 				propertyName: configure.draft.propertyName?.trim() || undefined

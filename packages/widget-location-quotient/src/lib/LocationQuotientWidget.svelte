@@ -8,6 +8,8 @@
 		getDashboardWidgetHost,
 		HostServices,
 		FlipCard,
+		AiStatusOverlay,
+		useAiGenerationStatus,
 		type StandardWidgetProps
 	} from '@stratiqai/dashboard-widget-sdk';
 	import type { SupabaseClient } from '@supabase/supabase-js';
@@ -36,7 +38,7 @@
 	let {
 		data,
 		widgetId = 'lq-widget-default',
-		topicOverride: _topicOverride,
+		topicOverride,
 		darkMode = false,
 		refreshSignal = 0,
 		onConfigureReady,
@@ -44,6 +46,8 @@
 	}: StandardWidgetProps<LocationQuotientWidgetData> = $props();
 
 	const host = getDashboardWidgetHost();
+	const topic = () => host.getWidgetTopic('locationQuotient', widgetId, topicOverride);
+	const aiStatus = useAiGenerationStatus(() => topic);
 	const sbClient = host.services?.get<SupabaseClient>(HostServices.SUPABASE) ?? null;
 
 	const widgetData = $derived<LocationQuotientWidgetData>({
@@ -247,6 +251,11 @@
 
 <FlipCard {isFlipped} shellClass={shell} flipBackClass={darkMode ? 'border-slate-600 bg-slate-900' : 'border-slate-200 bg-slate-50'}>
 	{#snippet front()}
+		{#if aiStatus.generating || aiStatus.error}
+			<div class="flex h-full items-center justify-center px-4 py-4">
+				<AiStatusOverlay generating={aiStatus.generating} error={aiStatus.error} {darkMode} />
+			</div>
+		{:else}
 		<div class="absolute h-full w-full overflow-auto rounded-lg {shell} shadow-sm flex flex-col">
 			<div class="flex flex-shrink-0 flex-col gap-3 border-b px-4 py-3 {darkMode ? 'border-slate-700' : 'border-slate-200'} sm:flex-row sm:items-start sm:justify-between">
 				<div>
@@ -347,6 +356,7 @@
 				</p>
 			</div>
 		</div>
+		{/if}
 	{/snippet}
 	{#snippet back()}
 		<div class="flex min-h-full flex-col items-center px-4 py-5 sm:px-6">

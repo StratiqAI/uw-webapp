@@ -3,6 +3,6 @@ export declare const sparklineWidget: import("@stratiqai/dashboard-widget-sdk").
     label?: string | null | undefined;
     color?: string | null | undefined;
 }>;
-export { sparklineWidgetDataSchema } from './schema.js';
-export type { SparklineWidgetData } from './schema.js';
+export { sparklineWidgetDataSchema, sparklineAiOutputSchema } from './schema.js';
+export type { SparklineWidgetData, SparklineAiOutput } from './schema.js';
 export { default as SparklineWidget } from './SparklineWidget.svelte';

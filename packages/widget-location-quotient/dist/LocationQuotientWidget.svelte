@@ -8,13 +8,14 @@
 		getDashboardWidgetHost,
 		HostServices,
 		FlipCard,
+		AiStatusOverlay,
+		useAiGenerationStatus,
 		type StandardWidgetProps
 	} from '@stratiqai/dashboard-widget-sdk';
 	import type { SupabaseClient } from '@supabase/supabase-js';
 	import { SupabaseWidgetBase } from './SupabaseWidgetBase.svelte.js';
 	import { loadLocationQuotientData } from './qcewSupabase.js';
 
-	const DEFAULT_WIDGET_ID = 'lq-widget-default';
 	const DEFAULT_EXPORT_BASE_THRESHOLD = 1.08;
 	const DEFAULT_LOCAL_BAND_LOW = 0.92;
 	const DEFAULT_LOCAL_BAND_HIGH = 1.08;
@@ -36,8 +37,8 @@
 
 	let {
 		data,
-		widgetId = DEFAULT_WIDGET_ID,
-		topicOverride: _topicOverride,
+		widgetId = 'lq-widget-default',
+		topicOverride,
 		darkMode = false,
 		refreshSignal = 0,
 		onConfigureReady,
@@ -45,6 +46,8 @@
 	}: StandardWidgetProps<LocationQuotientWidgetData> = $props();
 
 	const host = getDashboardWidgetHost();
+	const topic = () => host.getWidgetTopic('locationQuotient', widgetId, topicOverride);
+	const aiStatus = useAiGenerationStatus(() => topic);
 	const sbClient = host.services?.get<SupabaseClient>(HostServices.SUPABASE) ?? null;
 
 	const widgetData = $derived<LocationQuotientWidgetData>({
@@ -217,11 +220,7 @@
 		isFlipped = false;
 	}
 
-	const shell = $derived(
-		darkMode
-			? 'bg-slate-900 text-slate-100 border-slate-700'
-			: 'bg-white text-slate-900 border-slate-200'
-	);
+	const shell = $derived(darkMode ? 'bg-slate-900 text-slate-100 border-slate-700' : 'bg-white text-slate-900 border-slate-200');
 	const muted = $derived(darkMode ? 'text-slate-400' : 'text-slate-700');
 	const card = $derived(darkMode ? 'bg-slate-800/80 border-slate-600' : 'bg-slate-50 border-slate-200');
 	const lqValueClass = $derived(darkMode ? 'text-slate-200' : 'text-slate-900');
@@ -252,19 +251,20 @@
 
 <FlipCard {isFlipped} shellClass={shell} flipBackClass={darkMode ? 'border-slate-600 bg-slate-900' : 'border-slate-200 bg-slate-50'}>
 	{#snippet front()}
+		{#if aiStatus.generating || aiStatus.error}
+			<div class="flex h-full items-center justify-center px-4 py-4">
+				<AiStatusOverlay generating={aiStatus.generating} error={aiStatus.error} {darkMode} />
+			</div>
+		{:else}
 		<div class="absolute h-full w-full overflow-auto rounded-lg {shell} shadow-sm flex flex-col">
 			<div class="flex flex-shrink-0 flex-col gap-3 border-b px-4 py-3 {darkMode ? 'border-slate-700' : 'border-slate-200'} sm:flex-row sm:items-start sm:justify-between">
 				<div>
 					<h2 class="text-lg font-bold tracking-tight">Location quotient analysis</h2>
-					<p class="mt-0.5 text-sm {muted}">
-						{widgetData.regionLabel} · Source: BLS QCEW
-					</p>
+					<p class="mt-0.5 text-sm {muted}">{widgetData.regionLabel} · Source: BLS QCEW</p>
 				</div>
 				<div class="flex flex-wrap items-center gap-2">
 					<select
-						class="rounded-md border px-2 py-1.5 text-sm {darkMode
-							? 'border-slate-600 bg-slate-800 text-slate-100'
-							: 'border-slate-300 bg-white'}"
+						class="rounded-md border px-2 py-1.5 text-sm {darkMode ? 'border-slate-600 bg-slate-800 text-slate-100' : 'border-slate-300 bg-white'}"
 						value={widgetData.areaFips}
 						onchange={(e) => onFrontRegionChange(e.currentTarget.value)}
 					>
@@ -276,12 +276,9 @@
 						{/if}
 					</select>
 					<select
-						class="rounded-md border px-2 py-1.5 text-sm {darkMode
-							? 'border-slate-600 bg-slate-800 text-slate-100'
-							: 'border-slate-300 bg-white'}"
+						class="rounded-md border px-2 py-1.5 text-sm {darkMode ? 'border-slate-600 bg-slate-800 text-slate-100' : 'border-slate-300 bg-white'}"
 						value={widgetData.sortOrder}
-						onchange={(e) =>
-							patchData({ sortOrder: e.currentTarget.value as LocationQuotientSortOrder })}
+						onchange={(e) => patchData({ sortOrder: e.currentTarget.value as LocationQuotientSortOrder })}
 					>
 						<option value="lq_desc">Sort: LQ high-low</option>
 						<option value="lq_asc">Sort: LQ low-high</option>
@@ -291,11 +288,7 @@
 			</div>
 
 			{#if supabase.error}
-				<div
-					class="mx-4 mt-3 rounded-md border px-3 py-2 text-sm {darkMode
-						? 'border-amber-600/50 bg-amber-950/40 text-amber-100'
-						: 'border-amber-400/70 bg-amber-50 text-amber-950'}"
-				>
+				<div class="mx-4 mt-3 rounded-md border px-3 py-2 text-sm {darkMode ? 'border-amber-600/50 bg-amber-950/40 text-amber-100' : 'border-amber-400/70 bg-amber-50 text-amber-950'}">
 					{supabase.error}
 				</div>
 			{/if}
@@ -337,9 +330,7 @@
 							{@const delta = s.lq_avg - 1}
 							{@const halfPct = (Math.abs(delta) / barScale) * 50}
 							<div class="grid grid-cols-[minmax(0,1fr)_minmax(120px,2fr)_52px_auto] items-center gap-2 text-sm">
-								<div class="truncate pr-1 text-xs font-medium" title={s.industry_title}>
-									{s.industry_title}
-								</div>
+								<div class="truncate pr-1 text-xs font-medium" title={s.industry_title}>{s.industry_title}</div>
 								<div class="relative h-7 rounded {darkMode ? 'bg-slate-950/40' : 'bg-slate-200/90'}">
 									<div class="pointer-events-none absolute inset-y-0 left-1/2 z-10 w-px {barMidlineClass}" aria-hidden="true"></div>
 									{#if delta >= 0}
@@ -348,64 +339,37 @@
 										<div class="absolute inset-y-1 right-1/2 rounded-l {c.bar}" style="width: {Math.min(halfPct, 50)}%; max-width: 50%"></div>
 									{/if}
 								</div>
-								<div class="text-right text-xs font-mono tabular-nums font-semibold {lqValueClass}">
-									{s.lq_avg.toFixed(2)}
-								</div>
-								<span class="whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium {c.badge}">
-									{st.label}
-								</span>
+								<div class="text-right text-xs font-mono tabular-nums font-semibold {lqValueClass}">{s.lq_avg.toFixed(2)}</div>
+								<span class="whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium {c.badge}">{st.label}</span>
 							</div>
 						{/each}
 					</div>
 				{/if}
-
 				<div class="mt-4 flex flex-wrap items-center gap-4 border-t pt-3 text-[11px] {darkMode ? 'border-slate-600' : 'border-slate-200'} {muted}">
-					<span class="inline-flex items-center gap-1.5">
-						<span class="h-2.5 w-2.5 rounded-sm bg-emerald-500"></span> Export base (LQ &gt; {widgetData.localBandHigh})
-					</span>
-					<span class="inline-flex items-center gap-1.5">
-						<span class="h-2.5 w-2.5 rounded-sm bg-sky-500"></span> Meets local
-					</span>
-					<span class="inline-flex items-center gap-1.5">
-						<span class="h-2.5 w-2.5 rounded-sm bg-amber-500"></span> Import dependent
-					</span>
-					<span class="inline-flex items-center gap-1.5">
-						<span class="h-3 w-px {legendMidlineClass}"></span> National avg (LQ = 1)
-					</span>
+					<span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-emerald-500"></span> Export base (LQ &gt; {widgetData.localBandHigh})</span>
+					<span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-sky-500"></span> Meets local</span>
+					<span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-amber-500"></span> Import dependent</span>
+					<span class="inline-flex items-center gap-1.5"><span class="h-3 w-px {legendMidlineClass}"></span> National avg (LQ = 1)</span>
 				</div>
 				<p class="mt-2 text-[10px] leading-relaxed {muted}">
-					LQ = (local industry emp ÷ total local emp) ÷ (national industry emp ÷ national emp). Source:
-					quarterly QCEW in Supabase.
+					LQ = (local industry emp ÷ total local emp) ÷ (national industry emp ÷ national emp). Source: quarterly QCEW in Supabase.
 				</p>
 			</div>
 		</div>
+		{/if}
 	{/snippet}
 	{#snippet back()}
 		<div class="flex min-h-full flex-col items-center px-4 py-5 sm:px-6">
 			<div class="flex w-full max-w-lg flex-1 flex-col">
 				<header class="mb-4 shrink-0 text-center sm:text-left">
-					<h3 class="text-lg font-bold {darkMode ? 'text-slate-100' : 'text-slate-900'}">
-						Configure location quotient
-					</h3>
-					<p class="mt-1 text-sm {muted}">
-						Supabase RPC over quarterly QCEW data.
-					</p>
+					<h3 class="text-lg font-bold {darkMode ? 'text-slate-100' : 'text-slate-900'}">Configure location quotient</h3>
+					<p class="mt-1 text-sm {muted}">Supabase RPC over quarterly QCEW data.</p>
 				</header>
-
 				<section class={cfgPanelClass} aria-label="Widget configuration">
 					<form class="flex flex-col gap-3" onsubmit={(e) => { e.preventDefault(); applyConfig(); }}>
 						<label class="block">
 							<span class={cfgLabelClass}>Preset MSA</span>
-							<select
-								class={cfgFieldClass}
-								value={draftAreaFips}
-								onchange={(e) => {
-									const fips = e.currentTarget.value;
-									draftAreaFips = fips;
-									const p = REGION_PRESETS.find((r) => r.fips === fips);
-									if (p) draftRegionLabel = p.label;
-								}}
-							>
+							<select class={cfgFieldClass} value={draftAreaFips} onchange={(e) => { const fips = e.currentTarget.value; draftAreaFips = fips; const p = REGION_PRESETS.find((r) => r.fips === fips); if (p) draftRegionLabel = p.label; }}>
 								{#if !REGION_PRESETS.some((r) => r.fips === draftAreaFips)}
 									<option value={draftAreaFips}>Custom ({draftAreaFips})</option>
 								{/if}

@@ -25,3 +25,9 @@ export const lqAnalysisConfigSchema = z.object({
     localBandLow: z.number().positive().optional(),
     localBandHigh: z.number().positive().optional()
 });
+export const lqAnalysisAiOutputSchema = z.object({
+    city: z.string().describe('City name'),
+    state: z.string().describe('State abbreviation'),
+    regionLabel: z.string().describe('Full region label'),
+    year: z.number().describe('Data year')
+});

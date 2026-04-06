@@ -10,6 +10,6 @@ export declare const lqAnalysisWidget: import("@stratiqai/dashboard-widget-sdk")
     localBandLow?: number | undefined;
     localBandHigh?: number | undefined;
 }>;
-export type { LqAnalysisConfig, LqAnalysisInput, LqAnalysisSortOrder } from './schema.js';
-export { lqAnalysisConfigSchema, lqAnalysisInputSchema } from './schema.js';
+export type { LqAnalysisConfig, LqAnalysisInput, LqAnalysisSortOrder, LqAnalysisAiOutput } from './schema.js';
+export { lqAnalysisConfigSchema, lqAnalysisInputSchema, lqAnalysisAiOutputSchema } from './schema.js';
 export type { QcewSectorAggregate, LoadLocationQuotientParams } from './qcewSupabase.js';

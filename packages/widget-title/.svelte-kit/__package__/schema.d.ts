@@ -13,3 +13,14 @@ export declare const titleWidgetDataSchema: z.ZodObject<{
     alignment?: "left" | "center" | "right" | null | undefined;
 }>;
 export type TitleWidgetData = z.infer<typeof titleWidgetDataSchema>;
+export declare const titleAiOutputSchema: z.ZodObject<{
+    title: z.ZodString;
+    subtitle: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+}, "strip", z.ZodTypeAny, {
+    title: string;
+    subtitle?: string | null | undefined;
+}, {
+    title: string;
+    subtitle?: string | null | undefined;
+}>;
+export type TitleAiOutput = z.infer<typeof titleAiOutputSchema>;

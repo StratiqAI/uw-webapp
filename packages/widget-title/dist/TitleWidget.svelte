@@ -2,9 +2,11 @@
 	import type { TitleWidgetData } from './schema.js';
 	import {
 		FlipCard,
+		AiStatusOverlay,
 		WidgetConfigureBack,
 		useWidgetConfigure,
 		useReactiveValidatedTopic,
+		useAiGenerationStatus,
 		getDashboardWidgetHost,
 		type StandardWidgetProps
 	} from '@stratiqai/dashboard-widget-sdk';
@@ -22,6 +24,7 @@
 	const host = getDashboardWidgetHost();
 	const topic = $derived(host.getWidgetTopic('title', widgetId, topicOverride));
 	const dataStream = useReactiveValidatedTopic<TitleWidgetData>(() => topic);
+	const aiStatus = useAiGenerationStatus(() => topic);
 	let widgetData = $derived<TitleWidgetData>(dataStream.current || data);
 
 	const configure = useWidgetConfigure<TitleWidgetData>({
@@ -57,6 +60,9 @@
 		<div
 			class="title-widget relative flex h-full flex-col justify-center overflow-hidden px-6 {alignClass} {darkMode ? 'bg-transparent' : 'bg-transparent'}"
 		>
+			{#if aiStatus.generating || aiStatus.error}
+				<AiStatusOverlay generating={aiStatus.generating} error={aiStatus.error} {darkMode} />
+			{:else}
 			{#if darkMode}
 				<div
 					class="pointer-events-none absolute inset-0"
@@ -80,6 +86,7 @@
 					</div>
 				{/if}
 			</div>
+			{/if}
 		</div>
 	{/snippet}
 	{#snippet back()}
@@ -89,6 +96,7 @@
 			{darkMode}
 			theme={resolvedTheme}
 			{topicOverride}
+			showAITab={true}
 			onApply={() => configure.applyConfig()}
 			onCancel={configure.cancelConfig}
 		>

@@ -34,3 +34,12 @@ export const lqAnalysisConfigSchema = z.object({
 });
 
 export type LqAnalysisConfig = z.infer<typeof lqAnalysisConfigSchema>;
+
+export const lqAnalysisAiOutputSchema = z.object({
+	city: z.string().describe('City name'),
+	state: z.string().describe('State abbreviation'),
+	regionLabel: z.string().describe('Full region label'),
+	year: z.number().describe('Data year')
+});
+
+export type LqAnalysisAiOutput = z.infer<typeof lqAnalysisAiOutputSchema>;

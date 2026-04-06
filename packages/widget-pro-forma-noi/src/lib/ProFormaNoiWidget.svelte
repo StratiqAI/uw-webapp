@@ -5,6 +5,8 @@
 		FlipCard,
 		WidgetConfigureBack,
 		useWidgetConfigure,
+		AiStatusOverlay,
+		useAiGenerationStatus,
 		type StandardWidgetProps
 	} from '@stratiqai/dashboard-widget-sdk';
 	import { fmt, pct, proFormaTheme } from '@stratiqai/widget-pro-forma-base';
@@ -26,6 +28,7 @@
 
 	const host = getDashboardWidgetHost();
 	const topic = () => host.getWidgetTopic('proFormaNoi', widgetId, topicOverride);
+	const aiStatus = useAiGenerationStatus(() => topic);
 	const topicData = useReactiveValidatedTopic<ProFormaNoiInput>(topic);
 
 	const widgetData = $derived<ProFormaNoiConfig>({
@@ -73,6 +76,11 @@
 
 <FlipCard isFlipped={configure.isFlipped} shellClass={t.shell} flipBackClass={t.flipBackBg}>
 	{#snippet front()}
+		{#if aiStatus.generating || aiStatus.error}
+			<div class="flex h-full items-center justify-center px-4 py-4">
+				<AiStatusOverlay generating={aiStatus.generating} error={aiStatus.error} {darkMode} />
+			</div>
+		{:else}
 		<table class="w-full border-collapse text-sm">
 			<thead>
 				<tr>
@@ -140,6 +148,7 @@
 			<span>EGI Y1 ${mergedConfig.egiYear1.toLocaleString()} · Growth {pct(mergedConfig.egiGrowthRate)}/yr</span>
 			<span>OpEx Y1 ${mergedConfig.totalOpexYear1.toLocaleString()} · Growth {pct(mergedConfig.opexGrowthRate)}/yr</span>
 		</div>
+	{/if}
 	{/snippet}
 
 	{#snippet back()}
@@ -149,6 +158,7 @@
 			{darkMode}
 			theme={theme ?? 'dark'}
 			{topicOverride}
+			showAITab={true}
 			onApply={() => configure.applyConfig({
 				...configure.draft,
 				propertyName: configure.draft.propertyName?.trim() || undefined

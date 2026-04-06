@@ -33,3 +33,14 @@ export const proFormaRevenueConfigSchema = z.object({
 });
 
 export type ProFormaRevenueConfig = z.infer<typeof proFormaRevenueConfigSchema>;
+
+export const proFormaRevenueAiOutputSchema = z.object({
+	totalUnits: z.number().describe('Total number of units'),
+	marketRentPerUnit: z.number().describe('Market rent per unit per month'),
+	rentGrowthRate: z.number().describe('Annual rent growth rate (e.g. 0.03 for 3%)'),
+	vacancyRate: z.number().describe('Vacancy rate (e.g. 0.05 for 5%)'),
+	otherIncomeAnnual: z.number().describe('Annual other income amount'),
+	projectionYears: z.number().describe('Number of projection years (1-10)')
+});
+
+export type ProFormaRevenueAiOutput = z.infer<typeof proFormaRevenueAiOutputSchema>;

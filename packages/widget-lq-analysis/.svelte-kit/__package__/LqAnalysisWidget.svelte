@@ -7,6 +7,8 @@
 		useExternalData,
 		HostServices,
 		getDashboardWidgetHost,
+		AiStatusOverlay,
+		useAiGenerationStatus,
 		type StandardWidgetProps
 	} from '@stratiqai/dashboard-widget-sdk';
 	import type { LqAnalysisConfig, LqAnalysisInput, LqAnalysisSortOrder } from './schema.js';
@@ -40,6 +42,7 @@
 	const host = getDashboardWidgetHost();
 	const topic = () => host.getWidgetTopic('lqAnalysis', widgetId, topicOverride);
 	const topicData = useReactiveValidatedTopic<LqAnalysisInput>(topic);
+	const aiStatus = useAiGenerationStatus(() => topic);
 
 	const widgetData = $derived<LqAnalysisConfig>({
 		city: data.city,
@@ -234,6 +237,11 @@
 <div class="h-full min-h-[320px]">
 	<FlipCard isFlipped={configure.isFlipped} {shellClass} {flipBackClass}>
 		{#snippet front()}
+			{#if aiStatus.generating || aiStatus.error}
+				<div class="flex h-full items-center justify-center px-4 py-4">
+					<AiStatusOverlay generating={aiStatus.generating} error={aiStatus.error} {darkMode} />
+				</div>
+			{:else}
 			<div class="flex h-full min-h-0 w-full flex-col overflow-auto {frontText}">
 				<div
 					class="flex flex-shrink-0 flex-col gap-3 border-b px-4 py-3 {darkMode
@@ -407,9 +415,11 @@
 					</p>
 				</div>
 			</div>
+			{/if}
 		{/snippet}
 		{#snippet back()}
 			<WidgetConfigureBack
+				showAITab={true}
 				kind="lqAnalysis"
 				{widgetId}
 				{darkMode}

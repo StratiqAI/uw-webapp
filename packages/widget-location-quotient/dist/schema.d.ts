@@ -26,6 +26,20 @@ export declare const locationQuotientWidgetDataSchema: z.ZodObject<{
     localBandHigh?: number | undefined;
 }>;
 export type LocationQuotientWidgetData = z.infer<typeof locationQuotientWidgetDataSchema>;
+export declare const locationQuotientAiOutputSchema: z.ZodObject<{
+    areaFips: z.ZodString;
+    year: z.ZodNumber;
+    regionLabel: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    areaFips: string;
+    year: number;
+    regionLabel: string;
+}, {
+    areaFips: string;
+    year: number;
+    regionLabel: string;
+}>;
+export type LocationQuotientAiOutput = z.infer<typeof locationQuotientAiOutputSchema>;
 export interface QcewSectorAggregate {
     industry_code: string;
     industry_title: string;

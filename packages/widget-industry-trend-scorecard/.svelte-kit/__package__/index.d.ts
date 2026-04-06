@@ -19,6 +19,6 @@ export declare const industryTrendScorecardWidget: import("@stratiqai/dashboard-
         estab: number;
     };
 }>;
-export type { IndustryTrendScorecardConfig, IndustryData, QuarterMetrics, ScoreWeights, LqTrend } from './schema.js';
-export { industryTrendScorecardConfigSchema, industryDataSchema, quarterMetricsSchema, scoreWeightsSchema } from './schema.js';
+export type { IndustryTrendScorecardConfig, IndustryTrendScorecardAiOutput, IndustryData, QuarterMetrics, ScoreWeights, LqTrend } from './schema.js';
+export { industryTrendScorecardConfigSchema, industryTrendScorecardAiOutputSchema, industryDataSchema, quarterMetricsSchema, scoreWeightsSchema } from './schema.js';
 export { DEMO_INDUSTRIES, DEMO_QUARTERS, DEMO_WEIGHTS } from './demoData.js';

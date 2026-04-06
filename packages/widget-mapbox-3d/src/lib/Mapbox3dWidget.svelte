@@ -5,7 +5,9 @@
 		type StandardWidgetProps,
 		FlipCard,
 		WidgetConfigureBack,
-		useWidgetConfigure
+		useWidgetConfigure,
+		AiStatusOverlay,
+		useAiGenerationStatus
 	} from '@stratiqai/dashboard-widget-sdk';
 	import type { Mapbox3dConfig } from './schema.js';
 	import { DEMO_MAPBOX_3D_CONFIG } from './demoData.js';
@@ -25,6 +27,7 @@
 	const host = getDashboardWidgetHost();
 	const topic = () => host.getWidgetTopic('mapbox3d', widgetId, topicOverride);
 	const topicData = useReactiveValidatedTopic<Mapbox3dConfig>(topic);
+	const aiStatus = useAiGenerationStatus(() => topic);
 
 	const cfg = $derived<Mapbox3dConfig>({
 		...DEMO_MAPBOX_3D_CONFIG,
@@ -187,6 +190,11 @@
 	flipBackClass={flipBackClass}
 >
 	{#snippet front()}
+		{#if aiStatus.generating || aiStatus.error}
+			<div class="flex h-full items-center justify-center px-4 py-4">
+				<AiStatusOverlay generating={aiStatus.generating} error={aiStatus.error} {darkMode} />
+			</div>
+		{:else}
 		<div class="flex h-full flex-col overflow-hidden rounded-lg border shadow-sm {shell}">
 			<!-- Header -->
 			<div class="shrink-0 border-b px-4 py-2.5 {borderColor}">
@@ -232,9 +240,11 @@
 				{/if}
 			</div>
 		</div>
+		{/if}
 	{/snippet}
 	{#snippet back()}
 		<WidgetConfigureBack
+			showAITab={true}
 			kind="mapbox3d"
 			widgetId={widgetId}
 			darkMode={darkMode}

@@ -83,3 +83,34 @@ export declare const tableWidgetDataSchema: z.ZodObject<{
 }>;
 export type TableWidgetData = z.infer<typeof tableWidgetDataSchema>;
 export type ColumnDef = z.infer<typeof columnDefSchema>;
+export declare const tableAiOutputSchema: z.ZodObject<{
+    columns: z.ZodArray<z.ZodObject<{
+        key: z.ZodString;
+        label: z.ZodOptional<z.ZodString>;
+        type: z.ZodOptional<z.ZodEnum<["text", "number", "currency", "percent"]>>;
+    }, "strip", z.ZodTypeAny, {
+        key: string;
+        label?: string | undefined;
+        type?: "number" | "text" | "currency" | "percent" | undefined;
+    }, {
+        key: string;
+        label?: string | undefined;
+        type?: "number" | "text" | "currency" | "percent" | undefined;
+    }>, "many">;
+    rows: z.ZodArray<z.ZodRecord<z.ZodString, z.ZodUnknown>, "many">;
+}, "strip", z.ZodTypeAny, {
+    columns: {
+        key: string;
+        label?: string | undefined;
+        type?: "number" | "text" | "currency" | "percent" | undefined;
+    }[];
+    rows: Record<string, unknown>[];
+}, {
+    columns: {
+        key: string;
+        label?: string | undefined;
+        type?: "number" | "text" | "currency" | "percent" | undefined;
+    }[];
+    rows: Record<string, unknown>[];
+}>;
+export type TableAiOutput = z.infer<typeof tableAiOutputSchema>;

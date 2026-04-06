@@ -21,3 +21,9 @@ export const mapbox3dConfigSchema = z.object({
     clipPolygon: z.array(z.array(z.tuple([z.number(), z.number()]))).optional(),
     model: mapbox3dModelSchema.optional()
 });
+export const mapbox3dAiOutputSchema = z.object({
+    center: z.tuple([z.number(), z.number()]).describe('Map center [longitude, latitude]'),
+    zoom: z.number().describe('Zoom level'),
+    pitch: z.number().optional().describe('Camera pitch angle in degrees'),
+    bearing: z.number().optional().describe('Camera bearing in degrees')
+});
