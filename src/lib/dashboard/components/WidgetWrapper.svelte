@@ -191,8 +191,8 @@
 		widget.type === 'brokerCard'
 			? 'min-h-0 flex-1 overflow-hidden p-0'
 			: displayTitle
-				? 'p-4'
-				: 'h-full p-4'
+				? 'p-2'
+				: 'h-full p-2'
 	);
 
 	const widgetBodyBgClass = $derived(
