@@ -24,6 +24,18 @@ import type { LfprDashboardConfig } from '@stratiqai/widget-lfpr-dashboard';
 import { lfprDashboardConfigSchema as LfprDashboardConfigSchema } from '@stratiqai/widget-lfpr-dashboard';
 import type { Mapbox3dConfig } from '@stratiqai/widget-mapbox-3d';
 import { mapbox3dConfigSchema as Mapbox3dConfigSchema } from '@stratiqai/widget-mapbox-3d';
+import { imageWidgetDataSchema as ImageWidgetDataSchema } from '@stratiqai/widget-image';
+import { lineChartWidgetDataSchema as LineChartWidgetDataSchema } from '@stratiqai/widget-line-chart';
+import { barChartWidgetDataSchema as BarChartWidgetDataSchema } from '@stratiqai/widget-bar-chart';
+import { donutChartWidgetDataSchema as DonutChartWidgetDataSchema } from '@stratiqai/widget-donut-chart';
+import { areaChartWidgetDataSchema as AreaChartWidgetDataSchema } from '@stratiqai/widget-area-chart';
+import { gaugeWidgetDataSchema as GaugeWidgetDataSchema } from '@stratiqai/widget-gauge';
+import { sparklineWidgetDataSchema as SparklineWidgetDataSchema } from '@stratiqai/widget-sparkline';
+import { heatmapWidgetDataSchema as HeatmapWidgetDataSchema } from '@stratiqai/widget-heatmap';
+import { divergingBarChartWidgetDataSchema as DivergingBarChartWidgetDataSchema } from '@stratiqai/widget-diverging-bar-chart';
+import { mapWidgetDataSchema as MapWidgetDataSchema } from '@stratiqai/widget-map';
+import { schemaWidgetDataSchema as SchemaWidgetDataSchema } from '@stratiqai/widget-schema';
+import { locationQuotientWidgetDataSchema as LocationQuotientWidgetDataSchema } from '@stratiqai/widget-location-quotient';
 import { createLogger } from '$lib/utils/logger';
 
 const log = createLogger('widgets');
@@ -52,116 +64,23 @@ export const TitleWidgetDataSchema = z.object({
 	alignment: z.enum(['left', 'center', 'right']).nullable().optional()
 });
 
-export const ImageWidgetDataSchema = z.object({
-	title: z.string().nullable().optional(),
-	src: z.string().url(),
-	alt: z.string(),
-	objectFit: z.enum(['cover', 'contain', 'fill']).nullable().optional()
-});
-
-export const LineChartWidgetDataSchema = z.object({
-	datasets: z.array(
-		z.object({
-			label: z.string(),
-			data: z.array(z.number()),
-			color: z.string().nullable().optional()
-		})
-	),
-	labels: z.array(z.string()),
-	options: z
-		.object({
-			responsive: z.boolean().nullable().optional(),
-			maintainAspectRatio: z.boolean().nullable().optional()
-		})
-		.nullable()
-		.optional()
-});
-
-export const BarChartWidgetDataSchema = z.object({
-	datasets: z.array(
-		z.object({
-			label: z.string(),
-			data: z.array(z.number()),
-			backgroundColor: z.string().nullable().optional()
-		})
-	),
-	labels: z.array(z.string()),
-	orientation: z.enum(['vertical', 'horizontal']).nullable().optional()
-});
-
-export const DonutChartWidgetDataSchema = z.object({
-	labels: z.array(z.string()),
-	values: z.array(z.number()),
-	colors: z.array(z.string()).nullable().optional(),
-	centerLabel: z.string().nullable().optional()
-});
-
-export const AreaChartWidgetDataSchema = z.object({
-	labels: z.array(z.string()),
-	datasets: z.array(
-		z.object({
-			label: z.string(),
-			data: z.array(z.number()),
-			color: z.string().nullable().optional()
-		})
-	)
-});
-
-export const GaugeWidgetDataSchema = z.object({
-	value: z.number(),
-	min: z.number().nullable().optional(),
-	max: z.number().nullable().optional(),
-	label: z.string().nullable().optional(),
-	unit: z.string().nullable().optional(),
-	color: z.string().nullable().optional()
-});
-
-export const SparklineWidgetDataSchema = z.object({
-	values: z.array(z.number()),
-	label: z.string().nullable().optional(),
-	color: z.string().nullable().optional()
-});
-
-export const HeatmapWidgetDataSchema = z.object({
-	rows: z.array(z.string()),
-	cols: z.array(z.string()),
-	values: z.array(z.array(z.number()))
-});
-
-export const DivergingBarChartWidgetDataSchema = z.object({
-	labels: z.array(z.string()),
-	values: z.array(z.number()),
-	positiveColor: z.string().nullable().optional(),
-	negativeColor: z.string().nullable().optional()
-});
-
-export { MetricWidgetDataSchema, JsonViewerWidgetDataSchema, BrokerCardWidgetDataSchema };
-
-export const MapWidgetDataSchema = z.object({
-	title: z.string().nullable().optional(),
-	description: z.string().nullable().optional(),
-	lat: z.number().min(-90).max(90),
-	lon: z.number().min(-180).max(180),
-	zoom: z.number().min(0).max(20),
-	mapType: z.enum(['leaflet', 'google', 'mapbox']),
-	apiKey: z.string()
-});
-
-export const SchemaWidgetDataSchema = z.object({
-	schemaId: z.string(),
-	data: z.unknown().optional()
-});
-
-/** Must stay aligned with `LocationQuotientWidgetConfig` in `./widget.ts`. */
-export const LocationQuotientWidgetDataSchema = z.object({
-	areaFips: z.string().min(1),
-	year: z.number().int().min(2025).max(2100),
-	regionLabel: z.string().min(1),
-	sortOrder: z.enum(['lq_desc', 'lq_asc', 'name_asc']),
-	exportBaseThreshold: z.number().positive(),
-	localBandLow: z.number().positive().optional(),
-	localBandHigh: z.number().positive().optional()
-});
+export {
+	ImageWidgetDataSchema,
+	LineChartWidgetDataSchema,
+	BarChartWidgetDataSchema,
+	DonutChartWidgetDataSchema,
+	AreaChartWidgetDataSchema,
+	GaugeWidgetDataSchema,
+	SparklineWidgetDataSchema,
+	HeatmapWidgetDataSchema,
+	DivergingBarChartWidgetDataSchema,
+	MetricWidgetDataSchema,
+	JsonViewerWidgetDataSchema,
+	BrokerCardWidgetDataSchema,
+	MapWidgetDataSchema,
+	SchemaWidgetDataSchema,
+	LocationQuotientWidgetDataSchema
+};
 
 // ===== Schema Registry =====
 
@@ -208,18 +127,18 @@ export function getWidgetSchema(widgetType: string): z.ZodSchema | undefined {
 export type ParagraphWidgetData = z.infer<typeof ParagraphWidgetDataSchema>;
 export type TableWidgetData = z.infer<typeof TableWidgetDataSchema>;
 export type TitleWidgetData = z.infer<typeof TitleWidgetDataSchema>;
-export type ImageWidgetData = z.infer<typeof ImageWidgetDataSchema>;
-export type LineChartWidgetData = z.infer<typeof LineChartWidgetDataSchema>;
-export type BarChartWidgetData = z.infer<typeof BarChartWidgetDataSchema>;
-export type DonutChartWidgetData = z.infer<typeof DonutChartWidgetDataSchema>;
-export type AreaChartWidgetData = z.infer<typeof AreaChartWidgetDataSchema>;
-export type GaugeWidgetData = z.infer<typeof GaugeWidgetDataSchema>;
-export type SparklineWidgetData = z.infer<typeof SparklineWidgetDataSchema>;
-export type HeatmapWidgetData = z.infer<typeof HeatmapWidgetDataSchema>;
-export type DivergingBarChartWidgetData = z.infer<typeof DivergingBarChartWidgetDataSchema>;
-export type MapWidgetData = z.infer<typeof MapWidgetDataSchema>;
-export type SchemaWidgetData = z.infer<typeof SchemaWidgetDataSchema>;
-export type LocationQuotientWidgetData = z.infer<typeof LocationQuotientWidgetDataSchema>;
+export type { ImageWidgetData } from '@stratiqai/widget-image';
+export type { LineChartWidgetData } from '@stratiqai/widget-line-chart';
+export type { BarChartWidgetData } from '@stratiqai/widget-bar-chart';
+export type { DonutChartWidgetData } from '@stratiqai/widget-donut-chart';
+export type { AreaChartWidgetData } from '@stratiqai/widget-area-chart';
+export type { GaugeWidgetData } from '@stratiqai/widget-gauge';
+export type { SparklineWidgetData } from '@stratiqai/widget-sparkline';
+export type { HeatmapWidgetData } from '@stratiqai/widget-heatmap';
+export type { DivergingBarChartWidgetData } from '@stratiqai/widget-diverging-bar-chart';
+export type { MapWidgetData } from '@stratiqai/widget-map';
+export type { SchemaWidgetData } from '@stratiqai/widget-schema';
+export type { LocationQuotientWidgetData } from '@stratiqai/widget-location-quotient';
 export type LqAnalysisWidgetData = z.infer<typeof LqAnalysisConfigSchema>;
 export type EconBaseMultiplierWidgetData = z.infer<typeof EconBaseMultiplierConfigSchema>;
 export type IndustryTrendScorecardWidgetData = z.infer<typeof IndustryTrendScorecardConfigSchema>;

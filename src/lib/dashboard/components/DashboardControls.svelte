@@ -344,39 +344,15 @@
 	}
 
 	const widgetTypes = $derived.by(() => {
-		const builtIn: Array<{ type: string; label: string; icon: string; category: string }> = [
-			{ type: 'title', label: 'Title', icon: '📝', category: 'content' },
-			{ type: 'paragraph', label: 'Paragraph', icon: '📄', category: 'content' },
-			{ type: 'image', label: 'Image', icon: '🖼', category: 'content' },
-			{ type: 'table', label: 'Table', icon: '📋', category: 'content' },
-			{ type: 'map', label: 'Map', icon: '🗺', category: 'content' },
-			{ type: 'lineChart', label: 'Line Chart', icon: '📈', category: 'charts' },
-			{ type: 'barChart', label: 'Bar Chart', icon: '📊', category: 'charts' },
-			{ type: 'donutChart', label: 'Donut Chart', icon: '🍩', category: 'charts' },
-			{ type: 'areaChart', label: 'Area Chart', icon: '📉', category: 'charts' },
-			{ type: 'gauge', label: 'Gauge', icon: '⏱', category: 'charts' },
-			{ type: 'sparkline', label: 'Sparkline', icon: '〰', category: 'charts' },
-			{ type: 'heatmap', label: 'Heatmap', icon: '🔥', category: 'charts' },
-			{ type: 'divergingBarChart', label: 'Diverging Bar', icon: '↔', category: 'charts' },
-			{ type: 'schema', label: 'Schema Widget', icon: '📋', category: 'data' },
-			{ type: 'locationQuotient', label: 'Location Quotient', icon: '📍', category: 'data' },
-		];
-
-		const builtInTypes = new Set(builtIn.map(b => b.type));
-
-		const fromRegistry = getRegisteredManifests()
-			.filter(m => !builtInTypes.has(m.kind))
-			.map(m => {
-				const pal = (m as unknown as { palette?: { icon?: string; category?: string } }).palette;
-				return {
-					type: m.kind,
-					label: m.displayName,
-					icon: pal?.icon ?? '🧩',
-					category: pal?.category ?? 'packages'
-				};
-			});
-
-		return [...builtIn, ...fromRegistry];
+		return getRegisteredManifests().map(m => {
+			const pal = (m as unknown as { palette?: { icon?: string; category?: string } }).palette;
+			return {
+				type: m.kind,
+				label: m.displayName,
+				icon: pal?.icon ?? '🧩',
+				category: pal?.category ?? 'other'
+			};
+		});
 	});
 </script>
 

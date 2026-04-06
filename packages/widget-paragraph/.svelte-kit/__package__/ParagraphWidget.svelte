@@ -78,6 +78,7 @@
 			{darkMode}
 			theme={resolvedTheme}
 			{topicOverride}
+			showAITab={true}
 			onApply={() => configure.applyConfig()}
 			onCancel={configure.cancelConfig}
 		>
@@ -87,7 +88,7 @@
 						>Content</span
 					>
 					<textarea
-						class="{inputClass} mt-1 block min-h-[6rem] resize-y"
+						class="{inputClass} mt-1 block min-h-24 resize-y"
 						bind:value={configure.draft.content}
 					></textarea>
 				</label>

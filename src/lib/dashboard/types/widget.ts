@@ -132,126 +132,72 @@ export interface ParagraphWidget extends BaseWidget {
 	};
 }
 
+import type { ImageWidgetData } from '@stratiqai/widget-image';
+import type { LineChartWidgetData } from '@stratiqai/widget-line-chart';
+import type { BarChartWidgetData } from '@stratiqai/widget-bar-chart';
+import type { DonutChartWidgetData } from '@stratiqai/widget-donut-chart';
+import type { AreaChartWidgetData } from '@stratiqai/widget-area-chart';
+import type { GaugeWidgetData } from '@stratiqai/widget-gauge';
+import type { SparklineWidgetData } from '@stratiqai/widget-sparkline';
+import type { HeatmapWidgetData } from '@stratiqai/widget-heatmap';
+import type { DivergingBarChartWidgetData } from '@stratiqai/widget-diverging-bar-chart';
+import type { MapWidgetData } from '@stratiqai/widget-map';
+import type { SchemaWidgetData } from '@stratiqai/widget-schema';
+import type { LocationQuotientWidgetData } from '@stratiqai/widget-location-quotient';
+
 export interface ImageWidget extends BaseWidget {
 	type: 'image';
-	data: {
-		title?: string;
-		src: string;
-		alt: string;
-		objectFit?: 'cover' | 'contain' | 'fill';
-	};
+	data: ImageWidgetData;
 }
 
 export interface LineChartWidget extends BaseWidget {
 	type: 'lineChart';
-	data: {
-		datasets: Array<{
-			label: string;
-			data: number[];
-			color?: string;
-		}>;
-		labels: string[];
-		options?: {
-			responsive?: boolean;
-			maintainAspectRatio?: boolean;
-		};
-	};
+	data: LineChartWidgetData;
 }
 
 export interface BarChartWidget extends BaseWidget {
 	type: 'barChart';
-	data: {
-		datasets: Array<{
-			label: string;
-			data: number[];
-			backgroundColor?: string;
-		}>;
-		labels: string[];
-		orientation?: 'vertical' | 'horizontal';
-	};
+	data: BarChartWidgetData;
 }
 
 export interface DonutChartWidget extends BaseWidget {
 	type: 'donutChart';
-	data: {
-		labels: string[];
-		values: number[];
-		colors?: string[];
-		centerLabel?: string;
-	};
+	data: DonutChartWidgetData;
 }
 
 export interface AreaChartWidget extends BaseWidget {
 	type: 'areaChart';
-	data: {
-		labels: string[];
-		datasets: Array<{
-			label: string;
-			data: number[];
-			color?: string;
-		}>;
-	};
+	data: AreaChartWidgetData;
 }
 
 export interface GaugeWidget extends BaseWidget {
 	type: 'gauge';
-	data: {
-		value: number;
-		min?: number;
-		max?: number;
-		label?: string;
-		unit?: string;
-		color?: string;
-	};
+	data: GaugeWidgetData;
 }
 
 export interface SparklineWidget extends BaseWidget {
 	type: 'sparkline';
-	data: {
-		values: number[];
-		label?: string;
-		color?: string;
-	};
+	data: SparklineWidgetData;
 }
 
 export interface HeatmapWidget extends BaseWidget {
 	type: 'heatmap';
-	data: {
-		rows: string[];
-		cols: string[];
-		values: number[][];
-	};
+	data: HeatmapWidgetData;
 }
 
 export interface DivergingBarChartWidget extends BaseWidget {
 	type: 'divergingBarChart';
-	data: {
-		labels: string[];
-		values: number[]; // can be negative (left) or positive (right) from center
-		positiveColor?: string;
-		negativeColor?: string;
-	};
+	data: DivergingBarChartWidgetData;
 }
 
 export interface MapWidget extends BaseWidget {
 	type: 'map';
-	data: {
-		title?: string;
-		description?: string;
-		lat: number;
-		lon: number;
-		zoom: number;
-		mapType: 'leaflet' | 'google' | 'mapbox';
-		apiKey: string;
-	};
+	data: MapWidgetData;
 }
 
 export interface SchemaWidget extends BaseWidget {
 	type: 'schema';
-	data: {
-		schemaId: string; // Schema ID from ValidatedTopicStore
-		data?: unknown; // Optional initial data
-	};
+	data: SchemaWidgetData;
 }
 
 export interface MetricWidget extends BaseWidget {
@@ -269,32 +215,11 @@ export interface BrokerCardWidget extends BaseWidget {
 	data: BrokerCardWidgetData;
 }
 
-/** Sort mode for the sector list (UI only; does not change the RPC). */
-export type LocationQuotientSortOrder = 'lq_desc' | 'lq_asc' | 'name_asc';
-
-/**
- * Persisted configuration for {@link LocationQuotientWidget}: configure-panel inputs and dashboard `data`.
- * Drives reactive UI (labels, sort, LQ bands). A subset {@link LocationQuotientRpcInput} triggers Supabase RPC refetch.
- */
-export interface LocationQuotientWidgetConfig {
-	areaFips: string;
-	year: number;
-	regionLabel: string;
-	sortOrder: LocationQuotientSortOrder;
-	exportBaseThreshold: number;
-	localBandLow?: number;
-	localBandHigh?: number;
-}
-
-/**
- * Arguments passed to `loadLocationQuotientData` / QCEW Supabase RPC.
- * When `areaFips` or `year` change in {@link LocationQuotientWidgetConfig}, the widget should refetch.
- */
-export type LocationQuotientRpcInput = Pick<LocationQuotientWidgetConfig, 'areaFips' | 'year'>;
+export type { LocationQuotientSortOrder } from '@stratiqai/widget-location-quotient';
 
 export interface LocationQuotientWidget extends BaseWidget {
 	type: 'locationQuotient';
-	data: LocationQuotientWidgetConfig;
+	data: LocationQuotientWidgetData;
 }
 
 export interface LqAnalysisWidgetDef extends BaseWidget {

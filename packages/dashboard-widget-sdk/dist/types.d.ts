@@ -98,6 +98,24 @@ export interface ServiceStatus {
     name: string;
     available: boolean;
 }
+/** Data shape passed between the host and the PromptEditor on the AI tab. */
+export interface WidgetPromptEditData {
+    promptId?: string;
+    name: string;
+    description: string;
+    userPrompt: string;
+    systemInstruction: string;
+    model: string;
+    responseFormatType: 'text' | 'json_object' | 'json_schema';
+    schemaProperties: Record<string, Record<string, unknown>>;
+    schemaRequired: string[];
+    fieldOrder: string[];
+    temperature?: number;
+    maxTokens?: number;
+    topP?: number;
+    frequencyPenalty?: number;
+    stopSequences: string;
+}
 /**
  * Contract that the host app must satisfy and inject via `setDashboardWidgetHost()`.
  * Widget packages read this through `getDashboardWidgetHost()` at runtime.
@@ -110,6 +128,13 @@ export interface DashboardWidgetHost {
         registerSchema(topicPattern: string, jsonSchema: unknown): void;
         /** Read-merge-publish: update specific fields without clobbering the rest. */
         patch(topic: string, partial: Record<string, unknown>): boolean;
+        /** Look up a registered schema definition by its id. */
+        getSchemaById?(id: string): {
+            name?: string;
+            description?: string;
+        } | undefined;
+        /** Look up the raw JSON Schema object for a registered schema by id. */
+        getJsonSchemaById?(id: string): Record<string, unknown> | undefined;
     };
     getWidgetTopic(kind: string, widgetId: string, topicOverride?: string): string;
     /**
@@ -129,6 +154,10 @@ export interface DashboardWidgetHost {
     streams?: HostStreamCatalog;
     /** Enter or exit fullscreen for a widget. */
     setWidgetFullscreen?(widgetId: string, fullscreen: boolean): void;
+    /** Load the widget's prompt data for editing. Returns null if widget has no prompt config. */
+    loadWidgetPrompt?(kind: string, widgetId: string): Promise<WidgetPromptEditData | null>;
+    /** Save prompt changes and run AI to populate the widget with new data. */
+    saveAndRunWidgetPrompt?(kind: string, widgetId: string, data: WidgetPromptEditData): Promise<void>;
     /** Snapshot of which host services are available. */
     getServiceStatus?(): ServiceStatus[];
 }

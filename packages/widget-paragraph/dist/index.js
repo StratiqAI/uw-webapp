@@ -14,7 +14,7 @@ export const paragraphWidget = defineWidget({
         systemInstruction: 'You are a helpful assistant that writes clear, informative paragraphs. ' +
             'Structure your response as well-formatted content. ' +
             'Use markdown if it improves readability.',
-        model: 'gpt-5-nano',
+        model: 'GEMINI_2_5_FLASH',
         aiOutputSchema: paragraphAiOutputSchema
     }
 });

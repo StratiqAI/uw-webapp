@@ -52,21 +52,9 @@ const WIDGET_NAMES: Record<WidgetType, string> = {
 	mapbox3d: 'Mapbox 3D Model'
 };
 
-export const WIDGET_TYPES: WidgetType[] = [
-	'table',
-	'image',
-	'lineChart',
-	'barChart',
-	'donutChart',
-	'areaChart',
-	'gauge',
-	'sparkline',
-	'heatmap',
-	'divergingBarChart',
-	'map',
-	'schema',
-	'locationQuotient'
-];
+/** Built-in widget types registered via the old hardcoded loop. Empty now that
+ *  all widgets are packaged; kept for backwards compat of the export. */
+export const WIDGET_TYPES: WidgetType[] = [];
 
 let schemasRegistered = false;
 

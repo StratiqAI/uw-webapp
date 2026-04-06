@@ -2,5 +2,6 @@
 export const HostServices = {
     SUPABASE: 'supabase',
     FETCH: 'fetch',
-    MCP: 'mcp'
+    MCP: 'mcp',
+    CONFIG: 'config'
 };

@@ -6,22 +6,55 @@
 	import GhostIndicator from '$lib/dashboard/components/GhostIndicator.svelte';
 	import { getGridPositionFromCoordinates } from '$lib/dashboard/utils/grid';
 	import { createDropHandlers } from '$lib/dashboard/utils/dragDrop';
-	import { DEFAULT_WIDGET_SIZES, getDefaultDataForWidget } from '$lib/dashboard/setup/defaultDashboardValues';
+	import { getDefaultDataForWidget, getDefaultSizeForWidget } from '$lib/dashboard/setup/defaultDashboardValues';
 	import type { Widget, WidgetType } from '$lib/dashboard/types/widget';
-	import { setDashboardWidgetHost, HostServices } from '@stratiqai/dashboard-widget-sdk';
+	import { setDashboardWidgetHost, HostServices, parseJsonSchemaToBuilderState, buildSchemaPreview } from '@stratiqai/dashboard-widget-sdk';
+	import type { WidgetPromptEditData } from '@stratiqai/dashboard-widget-sdk';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import { getWidgetTopic, getWidgetTopicsByType } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { getWidgetPromptConfig } from '$lib/dashboard/setup/widgetRegistry';
 	import { streamCatalog } from '$lib/stores/streamCatalog.svelte';
 	import { createSupabaseBrowserClient } from '$lib/services/supabase/browser';
 	import { generateWidgetId } from '$lib/dashboard/utils/idGenerator';
 	import { themeStore } from '$lib/stores/themeStore.svelte';
+	import { authStore } from '$lib/stores/auth.svelte';
+	import { page } from '$app/stores';
+	import { GraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
+	import {
+		ensureWidgetInstancePrompt,
+		getWidgetInstancePromptForEditing,
+		updateWidgetInstancePrompt
+	} from '$lib/services/widgetPromptService';
+	import {
+		createJobSubmissionClientWithAppSync,
+		PRIORITY_LEVELS,
+		type JobSubmissionClient
+	} from '$lib/dashboard/services/jobManager';
+	import { PUBLIC_GEOAPIFY_API_KEY } from '$env/static/public';
 	import { createLogger } from '$lib/utils/logger';
 
 	const log = createLogger('dashboard');
 
+	function getIdToken(): string {
+		const token = ($page?.data as Record<string, unknown>)?.idToken as string | undefined
+			?? authStore.idToken;
+		if (!token) throw new Error('Not authenticated');
+		return token;
+	}
+
+	let jobClient: JobSubmissionClient | null = null;
+
+	async function getJobClient(): Promise<JobSubmissionClient> {
+		if (!jobClient) {
+			jobClient = await createJobSubmissionClientWithAppSync();
+		}
+		return jobClient;
+	}
+
 	const serviceMap = new Map<string, unknown>();
 	const sbClient = createSupabaseBrowserClient();
 	if (sbClient) serviceMap.set('supabase', sbClient);
+	serviceMap.set('config', { geoapifyApiKey: PUBLIC_GEOAPIFY_API_KEY ?? '' });
 
 	setDashboardWidgetHost({
 		validatedTopicStore: {
@@ -34,7 +67,9 @@
 				const current = validatedTopicStore.at<Record<string, unknown>>(topic);
 				const merged = { ...(current ?? {}), ...partial };
 				return validatedTopicStore.publish(topic, merged);
-			}
+			},
+			getSchemaById: (id: string) => validatedTopicStore.getSchemaById(id),
+			getJsonSchemaById: (id: string) => validatedTopicStore.getJsonSchemaById(id)
 		},
 		getWidgetTopic,
 		services: {
@@ -93,6 +128,118 @@
 
 		setWidgetFullscreen(widgetId: string, fullscreen: boolean) {
 			dashboard.setFullscreenWidget(fullscreen ? widgetId : null);
+		},
+
+		async loadWidgetPrompt(kind: string, widgetId: string): Promise<WidgetPromptEditData | null> {
+			const promptConfig = getWidgetPromptConfig(kind);
+			if (!promptConfig) return null;
+
+			const token = getIdToken();
+
+			const qc = new GraphQLQueryClient(token);
+			const w = dashboard.widgets.find((w) => w.id === widgetId);
+			const existingPromptId = (w as any)?.promptId as string | undefined;
+
+			const instance = await ensureWidgetInstancePrompt(
+				kind, widgetId, w?.data?.title ?? undefined, undefined, existingPromptId, qc
+			);
+
+			if (!existingPromptId && instance.promptId) {
+				dashboard.updateWidget(widgetId, { promptId: instance.promptId } as any);
+			}
+
+			const editing = await getWidgetInstancePromptForEditing(instance.promptId, qc);
+			if (!editing) return null;
+
+			const builderState = editing.schemaDefinition
+				? parseJsonSchemaToBuilderState(editing.schemaDefinition)
+				: { properties: {}, required: [] as string[], fieldOrder: [] as string[] };
+
+			return {
+				promptId: editing.promptId,
+				name: editing.name,
+				description: editing.description,
+				userPrompt: editing.prompt,
+				systemInstruction: editing.systemInstruction,
+				model: editing.model,
+				responseFormatType: 'json_schema',
+				schemaProperties: builderState.properties,
+				schemaRequired: builderState.required,
+				fieldOrder: builderState.fieldOrder,
+				stopSequences: ''
+			};
+		},
+
+		async saveAndRunWidgetPrompt(kind: string, widgetId: string, data: WidgetPromptEditData): Promise<void> {
+			const token = getIdToken();
+
+			const qc = new GraphQLQueryClient(token);
+			const w = dashboard.widgets.find((w) => w.id === widgetId);
+			const promptId = data.promptId ?? (w as any)?.promptId;
+			if (!promptId) throw new Error('No prompt ID — load prompt first');
+
+			const editing = await getWidgetInstancePromptForEditing(promptId, qc);
+			const jsonSchemaId = editing?.jsonSchemaId;
+
+			const schemaDef = Object.keys(data.schemaProperties).length > 0
+				? buildSchemaPreview(data.schemaProperties, data.schemaRequired)
+				: undefined;
+
+			await updateWidgetInstancePrompt(
+				promptId,
+				{
+					name: data.name,
+					description: data.description,
+					prompt: data.userPrompt,
+					systemInstruction: data.systemInstruction,
+					model: data.model,
+					schemaDefinition: schemaDef
+				},
+				jsonSchemaId,
+				qc
+			);
+
+			const jobRequest = {
+				prompt: data.userPrompt,
+				systemInstruction: data.systemInstruction,
+				model: data.model || 'GEMINI_2_5_FLASH',
+				widgetKind: kind,
+				widgetId,
+				...(schemaDef && { responseFormat: { type: 'json_schema', schema: schemaDef } }),
+				...(data.temperature !== undefined && { temperature: data.temperature }),
+				...(data.maxTokens !== undefined && { maxTokens: data.maxTokens }),
+				...(data.topP !== undefined && { topP: data.topP }),
+				...(data.frequencyPenalty !== undefined && { frequencyPenalty: data.frequencyPenalty })
+			};
+
+			const client = await getJobClient();
+			const job = await client.submitJob(
+				{ request: JSON.stringify(jobRequest), priority: PRIORITY_LEVELS.MEDIUM },
+				token
+			);
+
+			log.info(`AI job submitted for widget ${widgetId}:`, job.id);
+
+			const topic = getWidgetTopic(kind as any, widgetId);
+			const { jobUpdateStore: jus } = await import('$lib/stores/jobUpdateStore.svelte');
+			const updatesStore = jus.subscribeToJobUpdates(job.id);
+			const unsub = updatesStore.subscribe((updates) => {
+				if (!updates || updates.length === 0) return;
+				const latest = updates[0];
+				if ((latest.status === 'COMPLETED' || latest.status === 'COMPLETE') && latest.result) {
+					try {
+						const parsed = JSON.parse(latest.result);
+						const output = parsed.output_parsed ?? parsed;
+						validatedTopicStore.publish(topic, output);
+					} catch (err) {
+						log.error('Failed to parse AI result:', err);
+					}
+					unsub();
+				} else if (latest.status === 'FAILED' || latest.status === 'ERROR') {
+					log.error('AI job failed:', latest.result);
+					unsub();
+				}
+			});
 		},
 
 		getServiceStatus() {
@@ -202,7 +349,7 @@
 						topicDragStore.set(null);
 						return;
 					}
-				const size = DEFAULT_WIDGET_SIZES[widgetType] ?? { colSpan: 4, rowSpan: 2 };
+				const size = getDefaultSizeForWidget(widgetType);
 				const newId = generateWidgetId();
 					const data = getDefaultDataForWidget({ type: widgetType, id: newId } as Widget);
 					const widget: Widget = {
@@ -321,7 +468,7 @@
 	{:else if topicDropGhost}
 		<GhostIndicator
 			position={topicDropGhost.position}
-			size={DEFAULT_WIDGET_SIZES[topicDropGhost.widgetType]}
+			size={getDefaultSizeForWidget(topicDropGhost.widgetType)}
 		/>
 	{/if}
 </GridContainer>
