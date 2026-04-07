@@ -64,8 +64,8 @@
 		type WorkflowDefinitionInput
 	} from '../services/serialization/workflowSerializationService';
 	import { gql } from '$lib/services/realtime/graphql/requestHandler';
-	import { Q_GET_JSON_SCHEMA } from '$lib/services/graphql/jsonSchemaOperations';
-	import { ensureJsonSchemaEntity } from '$lib/services/graphql/jsonSchemaService';
+	import { Q_GET_ENTITY_DEFINITION } from '$lib/services/graphql/entityDefinitionOperations';
+	import { ensureEntityDefinition } from '$lib/services/graphql/entityDefinitionService';
 	import { GraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
 	import WorkflowSwitcher from '$lib/dashboard/components/WorkflowSwitcher.svelte';
 	import {
@@ -146,8 +146,8 @@
 	let showingWorkflowJSON = $state(false);
 	let showingOutputSchema = $state(false);
 	let outputSchema = $state<Record<string, unknown> | null>(null);
-	let workflowJsonSchemaId = $state<string | null>(null);
-	let nodeJsonSchemaIds = $state<Record<string, string>>({});
+	let workflowEntityDefinitionId = $state<string | null>(null);
+	let nodeEntityDefinitionIds = $state<Record<string, string>>({});
 	let canvasRef: any = null;
 
 	let darkMode = $derived.by(() => darkModeStore.darkMode);
@@ -436,8 +436,8 @@
 		gridElements = [];
 		connections = [];
 		outputSchema = null;
-		workflowJsonSchemaId = null;
-		nodeJsonSchemaIds = {};
+		workflowEntityDefinitionId = null;
+		nodeEntityDefinitionIds = {};
 
 		try {
 			// Prefer loading from ui field if available, otherwise fall back to definition
@@ -509,9 +509,9 @@
 					fromSide: e.sourcePort ?? 'right',
 					toSide: e.targetPort ?? 'left'
 				}));
-				if ((workflow as any).jsonSchemaId) {
-					workflowJsonSchemaId = (workflow as any).jsonSchemaId;
-				}
+			if ((workflow as any).entityDefinitionId) {
+				workflowEntityDefinitionId = (workflow as any).entityDefinitionId;
+			}
 			} else {
 				log.error('Workflow has no ui or definition (expected definition.nodes and definition.edges)');
 				return;
@@ -567,9 +567,9 @@
 			if (workflow.ui && workflow.definition) {
 				const def = workflow.definition as { nodes?: Array<{ id: string; kind: string; configuration?: any; config?: any; aiConfig?: any; processConfig?: any; toolsConfig?: any; options?: any }>; edges?: unknown[] };
 				if (Array.isArray(def.nodes) && Array.isArray(def.edges)) {
-					if ((workflow as any).jsonSchemaId) {
-						workflowJsonSchemaId = (workflow as any).jsonSchemaId;
-					}
+				if ((workflow as any).entityDefinitionId) {
+					workflowEntityDefinitionId = (workflow as any).entityDefinitionId;
+				}
 					for (const node of def.nodes || []) {
 						const gridElement = newElements.find((el) => el.id === node.id);
 						if (!gridElement) continue;
@@ -581,21 +581,21 @@
 									model: config.model ?? '',
 									systemPrompt: config.systemPrompt
 								};
-							if (config.jsonSchemaId && data.idToken) {
-								nodeJsonSchemaIds[gridElement.id] = config.jsonSchemaId;
-								try {
-									const schemaResult = await gql<{ getJsonSchema: { schemaDefinition?: string } | null }>(
-										Q_GET_JSON_SCHEMA,
-										{ id: config.jsonSchemaId },
+						if (config.entityDefinitionId && data.idToken) {
+							nodeEntityDefinitionIds[gridElement.id] = config.entityDefinitionId;
+							try {
+								const schemaResult = await gql<{ getEntityDefinition: { schemaDefinition?: string } | null }>(
+									Q_GET_ENTITY_DEFINITION,
+									{ id: config.entityDefinitionId },
 										data.idToken
 									);
-									const raw = schemaResult?.getJsonSchema?.schemaDefinition;
-									if (raw) {
-										const schemaObj = typeof raw === 'string' ? JSON.parse(raw) : raw;
-										gridElement.aiQueryData.responseFormat = { type: 'json_schema' as const, schema: schemaObj };
-									}
-								} catch (e) {
-									log.warn('Failed to fetch node JsonSchema:', config.jsonSchemaId, e);
+								const raw = schemaResult?.getEntityDefinition?.schemaDefinition;
+								if (raw) {
+									const schemaObj = typeof raw === 'string' ? JSON.parse(raw) : raw;
+									gridElement.aiQueryData.responseFormat = { type: 'json_schema' as const, schema: schemaObj };
+								}
+							} catch (e) {
+								log.warn('Failed to fetch node EntityDefinition:', config.entityDefinitionId, e);
 								}
 							}
 							}
@@ -620,19 +620,19 @@
 			gridElements = newElements;
 			connections = newConnections;
 
-			if (workflowJsonSchemaId && data.idToken) {
-				try {
-					const schemaResult = await gql<{ getJsonSchema: { schemaDefinition?: string } | null }>(
-						Q_GET_JSON_SCHEMA,
-						{ id: workflowJsonSchemaId },
-						data.idToken
-					);
-					const raw = schemaResult?.getJsonSchema?.schemaDefinition;
-					if (raw) {
-						outputSchema = typeof raw === 'string' ? JSON.parse(raw) : raw;
-					}
-				} catch (e) {
-					log.warn('Failed to fetch workflow JsonSchema:', workflowJsonSchemaId, e);
+		if (workflowEntityDefinitionId && data.idToken) {
+			try {
+				const schemaResult = await gql<{ getEntityDefinition: { schemaDefinition?: string } | null }>(
+					Q_GET_ENTITY_DEFINITION,
+					{ id: workflowEntityDefinitionId },
+					data.idToken
+				);
+				const raw = schemaResult?.getEntityDefinition?.schemaDefinition;
+				if (raw) {
+					outputSchema = typeof raw === 'string' ? JSON.parse(raw) : raw;
+				}
+			} catch (e) {
+				log.warn('Failed to fetch workflow EntityDefinition:', workflowEntityDefinitionId, e);
 				}
 			}
 		} catch (error) {
@@ -820,34 +820,34 @@
 			const queryClient = new GraphQLQueryClient(data.idToken);
 
 			// Persist workflow-level output schema as a JsonSchema entity if needed
-			if (outputSchema && Object.keys(outputSchema).length > 0) {
-				workflowJsonSchemaId = await ensureJsonSchemaEntity(
-					queryClient,
-					{ name: 'Workflow Output Schema', schemaDefinition: outputSchema },
-					workflowJsonSchemaId ?? undefined
-				);
-			}
+		if (outputSchema && Object.keys(outputSchema).length > 0) {
+			workflowEntityDefinitionId = await ensureEntityDefinition(
+				queryClient,
+				{ name: 'Workflow Output Schema', schemaDefinition: outputSchema },
+				workflowEntityDefinitionId ?? undefined
+			);
+		}
 
 			// Persist node-level AI schemas, reusing existing entity IDs
-			const resolvedNodeSchemaIds: Record<string, string> = {};
-			for (const el of gridElements) {
-				if (el.aiQueryData?.responseFormat?.type === 'json_schema' && el.aiQueryData.responseFormat.schema) {
-					const entityId = await ensureJsonSchemaEntity(
-						queryClient,
-						{ name: `AI Node Schema (${el.type.label ?? el.id})`, schemaDefinition: el.aiQueryData.responseFormat.schema },
-						nodeJsonSchemaIds[el.id]
+		const resolvedNodeSchemaIds: Record<string, string> = {};
+		for (const el of gridElements) {
+			if (el.aiQueryData?.responseFormat?.type === 'json_schema' && el.aiQueryData.responseFormat.schema) {
+				const entityId = await ensureEntityDefinition(
+					queryClient,
+					{ name: `AI Node Schema (${el.type.label ?? el.id})`, schemaDefinition: el.aiQueryData.responseFormat.schema },
+					nodeEntityDefinitionIds[el.id]
 					);
 					resolvedNodeSchemaIds[el.id] = entityId;
 				}
 			}
-			nodeJsonSchemaIds = { ...nodeJsonSchemaIds, ...resolvedNodeSchemaIds };
+			nodeEntityDefinitionIds = { ...nodeEntityDefinitionIds, ...resolvedNodeSchemaIds };
 
-			const { definition, jsonSchemaId: resolvedSchemaId } = buildWorkflowDefinitionInput(
-				gridElements,
-				connections,
-				workflowJsonSchemaId,
-				resolvedNodeSchemaIds
-			);
+		const { definition, entityDefinitionId: resolvedSchemaId } = buildWorkflowDefinitionInput(
+			gridElements,
+			connections,
+			workflowEntityDefinitionId,
+			resolvedNodeSchemaIds
+		);
 
 			// Generate UI structure (layout)
 			const workflowUI = generateWorkflowUI();
@@ -861,13 +861,13 @@
 					return;
 				}
 
-				const input: { name: string; definition: ReturnType<typeof definitionToApiVariables>; ui: typeof workflowUI; jsonSchemaId?: string } = {
-					name: workflow.name,
-					definition: definitionToApiVariables(definition),
-					ui: workflowUI
-				};
-				if (resolvedSchemaId) {
-					input.jsonSchemaId = resolvedSchemaId;
+			const input: { name: string; definition: ReturnType<typeof definitionToApiVariables>; ui: typeof workflowUI; entityDefinitionId?: string } = {
+				name: workflow.name,
+				definition: definitionToApiVariables(definition),
+				ui: workflowUI
+			};
+			if (resolvedSchemaId) {
+				input.entityDefinitionId = resolvedSchemaId;
 				}
 
 				// CompositeKeyInput requires both id and parentId for child entities
@@ -902,14 +902,14 @@
 				toastStore.success('Workflow updated successfully!');
 			} else {
 				// Create new workflow
-				const input: { name: string; definition: ReturnType<typeof definitionToApiVariables>; ui: typeof workflowUI; parentId: string; jsonSchemaId?: string } = {
-					name: 'New Workflow',
-					definition: definitionToApiVariables(definition),
-					ui: workflowUI,
-					parentId: selectedProjectId
-				};
-				if (resolvedSchemaId) {
-					input.jsonSchemaId = resolvedSchemaId;
+			const input: { name: string; definition: ReturnType<typeof definitionToApiVariables>; ui: typeof workflowUI; parentId: string; entityDefinitionId?: string } = {
+				name: 'New Workflow',
+				definition: definitionToApiVariables(definition),
+				ui: workflowUI,
+				parentId: selectedProjectId
+			};
+			if (resolvedSchemaId) {
+				input.entityDefinitionId = resolvedSchemaId;
 				}
 
 				log.debug('[saveWorkflow] Creating new workflow:', { input });
@@ -1535,9 +1535,9 @@
 			{darkMode}
 			bind:outputSchema={outputSchema}
 			queryClient={data.idToken ? new GraphQLQueryClient(data.idToken) : undefined}
-			selectedJsonSchemaId={workflowJsonSchemaId ?? undefined}
-			onSave={(pickedSchemaId) => {
-				if (pickedSchemaId) workflowJsonSchemaId = pickedSchemaId;
+		selectedEntityDefinitionId={workflowEntityDefinitionId ?? undefined}
+		onSave={(pickedSchemaId) => {
+			if (pickedSchemaId) workflowEntityDefinitionId = pickedSchemaId;
 				saveWorkflow();
 			}}
 			onClose={() => (showingOutputSchema = false)}

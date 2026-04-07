@@ -8,7 +8,7 @@
 		parseJsonSchemaToBuilderState
 	} from '@stratiqai/dashboard-widget-sdk';
 	import JsonSchemaPickerModal from '$lib/components/schemas/JsonSchemaPickerModal.svelte';
-	import { Q_GET_JSON_SCHEMA } from '$lib/services/graphql/jsonSchemaOperations';
+	import { Q_GET_ENTITY_DEFINITION } from '$lib/services/graphql/entityDefinitionOperations';
 	import type { IGraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
 	import { getTemplateStrForEditor, parseTemplateToAIQueryData, type AIQueryData } from '../PromptService';
 	import { aiService } from '$lib/services/ai';
@@ -57,9 +57,9 @@
 			name: string;
 			description: string;
 			aiQueryData: AIQueryData;
-			jsonSchemaId?: string;
-			schemaData?: { name: string; description?: string; schemaDefinition: unknown };
-		}) => void | Promise<void>;
+		entityDefinitionId?: string;
+		schemaData?: { name: string; description?: string; schemaDefinition: unknown };
+	}) => void | Promise<void>;
 		onCancel?: () => void;
 	} = $props();
 
@@ -113,9 +113,9 @@
 		if (template) {
 			templateName = template.name || '';
 			templateDescription = template.description || '';
-			currentJsonSchemaId = (template as { jsonSchemaId?: string }).jsonSchemaId ?? undefined;
-			if (currentJsonSchemaId && queryClient) {
-				loadJsonSchemaById(currentJsonSchemaId);
+		currentJsonSchemaId = (template as { entityDefinitionId?: string }).entityDefinitionId ?? undefined;
+		if (currentJsonSchemaId && queryClient) {
+			loadJsonSchemaById(currentJsonSchemaId);
 			}
 
 			const templateStr = getTemplateStrForEditor(template);
@@ -190,12 +190,12 @@
 	async function loadJsonSchemaById(id: string) {
 		if (!queryClient) return;
 		try {
-			const result = await queryClient.query<{ getJsonSchema: { id: string; schemaDefinition: string } | null }>(
-				Q_GET_JSON_SCHEMA,
-				{ id }
-			);
-			if (result?.getJsonSchema?.schemaDefinition) {
-				applySchemaDefinitionToForm(result.getJsonSchema.schemaDefinition);
+		const result = await queryClient.query<{ getEntityDefinition: { id: string; schemaDefinition: string } | null }>(
+			Q_GET_ENTITY_DEFINITION,
+			{ id }
+		);
+		if (result?.getEntityDefinition?.schemaDefinition) {
+			applySchemaDefinitionToForm(result.getEntityDefinition.schemaDefinition);
 			}
 		} catch (e) {
 			log.error('Failed to load JsonSchema:', e);
@@ -313,7 +313,7 @@
 				name: templateName.trim(),
 				description: templateDescription.trim(),
 				aiQueryData,
-				...(currentJsonSchemaId && { jsonSchemaId: currentJsonSchemaId }),
+				...(currentJsonSchemaId && { entityDefinitionId: currentJsonSchemaId }),
 				...(schemaData && { schemaData })
 			});
 		} catch (err) {

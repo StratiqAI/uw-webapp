@@ -14,14 +14,14 @@
 		darkMode = false,
 		outputSchema = $bindable(null),
 		queryClient,
-		selectedJsonSchemaId,
+		selectedEntityDefinitionId,
 		onSave,
 		onClose
 	}: {
 		darkMode?: boolean;
 		outputSchema?: Record<string, unknown> | null;
 		queryClient?: IGraphQLQueryClient;
-		selectedJsonSchemaId?: string;
+		selectedEntityDefinitionId?: string;
 		onSave?: (pickedSchemaId?: string) => void;
 		onClose?: () => void;
 	} = $props();
@@ -500,7 +500,7 @@
 	<JsonSchemaPickerModal
 		{darkMode}
 		{queryClient}
-		selectedSchemaId={pickedSchemaId ?? selectedJsonSchemaId}
+		selectedSchemaId={pickedSchemaId ?? selectedEntityDefinitionId}
 		onselect={(schema) => handlePickFromLibrary(schema)}
 		onclose={() => (showPicker = false)}
 	/>

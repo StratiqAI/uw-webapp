@@ -19,7 +19,7 @@
 	);
 
 	let schemaJson = $derived.by(() => {
-		const raw = definition.normalizedJsonSchema ?? definition.jsonSchema;
+		const raw = (definition as any).normalizedSchema ?? (definition as any).normalizedJsonSchema ?? (definition as any).jsonSchema;
 		if (!raw) return null;
 		try {
 			const obj = typeof raw === 'string' ? JSON.parse(raw) : raw;

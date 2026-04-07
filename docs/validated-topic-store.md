@@ -773,6 +773,7 @@ Realtime updates only reflect **future** `saveEntityInstance` calls. Plan also:
 
 ### 13.6 Related documentation
 
+- [Dashboard data & cloud sync](./dashboard-data-and-sync.md) — `MultiTabDashboardState`, `DashboardSyncManager`, `DashboardLayout` GraphQL, widget topic snapshots
 - [AppSync realtime & ValidatedTopicStore](./AppSync-realtime-and-ValidatedTopicStore.md) — `AppSyncWsClient`, `appSyncClientStore`, `SubscriptionSpec`, bridge to this store
 - Platform ontology architecture: stratiqai-platform `environments/docs-src/internal/architecture/ontology-graph.md` (DynamoDB + resolvers).
 - Types package: `stratiqai-types-simple` ontology GraphQL files and schema fingerprinting docs under `docs/ontology/`.

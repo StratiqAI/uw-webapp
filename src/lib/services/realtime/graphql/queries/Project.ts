@@ -93,7 +93,7 @@ export const Q_GET_PROJECT = `
                   model
                   topK
                   systemPrompt
-                  jsonSchemaId
+                  entityDefinitionId
                 }
                 ... on ToolsNodeConfig {
                   options
@@ -111,7 +111,7 @@ export const Q_GET_PROJECT = `
               targetPort
             }
           }
-          jsonSchemaId
+          entityDefinitionId
           ui {
             elements {
               id

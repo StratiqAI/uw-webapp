@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import {
-		Q_LIST_JSON_SCHEMAS,
-		M_CREATE_JSON_SCHEMA,
-		M_UPDATE_JSON_SCHEMA,
-		M_DELETE_JSON_SCHEMA
-	} from '$lib/services/graphql/jsonSchemaOperations';
+		Q_LIST_ENTITY_DEFINITIONS,
+		M_CREATE_ENTITY_DEFINITION,
+		M_UPDATE_ENTITY_DEFINITION,
+		M_DELETE_ENTITY_DEFINITION
+	} from '$lib/services/graphql/entityDefinitionOperations';
 	import type { IGraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
 
 	interface JsonSchemaItem {
@@ -15,7 +15,7 @@
 		schemaDefinition: string;
 		ownerId: string;
 		sharingMode: string;
-		sourceJsonSchemaId?: string;
+		sourceEntityDefinitionId?: string;
 		createdAt?: string;
 		updatedAt?: string;
 	}
@@ -64,9 +64,9 @@
 		error = null;
 		try {
 			const result = await queryClient.query<{
-				listJsonSchemas: { items: JsonSchemaItem[]; nextToken?: string };
-			}>(Q_LIST_JSON_SCHEMAS, { scope: 'ALL_TENANT', limit: 200 });
-			schemas = result?.listJsonSchemas?.items ?? [];
+				listEntityDefinitions: { items: JsonSchemaItem[]; nextToken?: string };
+			}>(Q_LIST_ENTITY_DEFINITIONS, { scope: 'ALL_TENANT', limit: 200 });
+			schemas = result?.listEntityDefinitions?.items ?? [];
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load schemas';
 		} finally {
@@ -104,23 +104,23 @@
 	async function startCopyOnWrite(schema: JsonSchemaItem) {
 		formSaving = true;
 		try {
-			const result = await queryClient.query<{ createJsonSchema: JsonSchemaItem }>(
-				M_CREATE_JSON_SCHEMA,
-				{
-					input: {
-						name: `${schema.name} (My Copy)`,
-						description: schema.description || undefined,
-						schemaDefinition:
-							typeof schema.schemaDefinition === 'string'
-								? schema.schemaDefinition
-								: JSON.stringify(schema.schemaDefinition),
-						sharingMode: 'PRIVATE',
-						sourceJsonSchemaId: schema.id
-					}
+		const result = await queryClient.query<{ createEntityDefinition: JsonSchemaItem }>(
+			M_CREATE_ENTITY_DEFINITION,
+			{
+				input: {
+					name: `${schema.name} (My Copy)`,
+					description: schema.description || undefined,
+					schemaDefinition:
+						typeof schema.schemaDefinition === 'string'
+							? schema.schemaDefinition
+							: JSON.stringify(schema.schemaDefinition),
+					sharingMode: 'PRIVATE',
+					sourceEntityDefinitionId: schema.id
 				}
-			);
-			if (result?.createJsonSchema) {
-				const copy = result.createJsonSchema;
+			}
+		);
+		if (result?.createEntityDefinition) {
+			const copy = result.createEntityDefinition;
 				schemas = [copy, ...schemas];
 				editingSchema = copy;
 				showCreateForm = true;
@@ -156,8 +156,8 @@
 
 		try {
 			if (editingSchema) {
-				const result = await queryClient.query<{ updateJsonSchema: JsonSchemaItem }>(
-					M_UPDATE_JSON_SCHEMA,
+			const result = await queryClient.query<{ updateEntityDefinition: JsonSchemaItem }>(
+				M_UPDATE_ENTITY_DEFINITION,
 					{
 						id: editingSchema.id,
 						input: {
@@ -167,14 +167,14 @@
 						}
 					}
 				);
-				if (result?.updateJsonSchema) {
-					schemas = schemas.map((s) =>
-						s.id === editingSchema!.id ? result.updateJsonSchema : s
+			if (result?.updateEntityDefinition) {
+				schemas = schemas.map((s) =>
+					s.id === editingSchema!.id ? result.updateEntityDefinition : s
 					);
 				}
 			} else {
-				const result = await queryClient.query<{ createJsonSchema: JsonSchemaItem }>(
-					M_CREATE_JSON_SCHEMA,
+			const result = await queryClient.query<{ createEntityDefinition: JsonSchemaItem }>(
+				M_CREATE_ENTITY_DEFINITION,
 					{
 						input: {
 							name: formName.trim(),
@@ -184,8 +184,8 @@
 						}
 					}
 				);
-				if (result?.createJsonSchema) {
-					schemas = [result.createJsonSchema, ...schemas];
+			if (result?.createEntityDefinition) {
+				schemas = [result.createEntityDefinition, ...schemas];
 				}
 			}
 			showCreateForm = false;
@@ -201,7 +201,7 @@
 		if (isSystemOwned(schema)) return;
 		if (!confirm(`Delete "${schema.name}"?`)) return;
 		try {
-			await queryClient.query(M_DELETE_JSON_SCHEMA, { id: schema.id });
+			await queryClient.query(M_DELETE_ENTITY_DEFINITION, { id: schema.id });
 			schemas = schemas.filter((s) => s.id !== schema.id);
 		} catch (e) {
 			error = `Delete failed: ${e instanceof Error ? e.message : String(e)}`;
@@ -342,7 +342,7 @@
 													System
 												</span>
 											{/if}
-											{#if schema.sourceJsonSchemaId}
+											{#if schema.sourceEntityDefinitionId}
 												<span class="shrink-0 px-1.5 py-0.5 text-[10px] font-medium rounded {darkMode ? 'bg-sky-500/15 text-sky-400 border border-sky-500/20' : 'bg-sky-50 text-sky-600 border border-sky-200'}">
 													Copy
 												</span>

@@ -206,7 +206,7 @@
 			if (!promptId) throw new Error('No prompt ID — load prompt first');
 
 			const editing = await getWidgetInstancePromptForEditing(promptId, qc);
-			const jsonSchemaId = editing?.jsonSchemaId;
+			const entityDefinitionId = editing?.entityDefinitionId;
 
 			const schemaDef = Object.keys(data.schemaProperties).length > 0
 				? buildSchemaPreview(data.schemaProperties, data.schemaRequired)
@@ -222,7 +222,7 @@
 					model: data.model,
 					schemaDefinition: schemaDef
 				},
-				jsonSchemaId,
+				entityDefinitionId,
 				qc
 			);
 

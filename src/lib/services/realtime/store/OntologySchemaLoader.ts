@@ -2,14 +2,16 @@
  * OntologySchemaLoader
  *
  * Fetches entity definitions from AppSync and registers their
- * `normalizedJsonSchema` as VTS schemas so instance data published to
+ * `normalizedSchema` as VTS schemas so instance data published to
  * `ontology/p/+/def/{defId}/inst/+/data` is validated at the store boundary.
  *
  * Also publishes definition metadata to VTS at the definition topic.
  */
 
 import type { EntityDefinition } from '@stratiqai/types-simple';
-import { Q_LIST_ENTITY_DEFINITIONS } from '@stratiqai/types-simple';
+import {
+	Q_LIST_ENTITY_DEFINITIONS_BY_PROJECT,
+} from '$lib/services/graphql/entityDefinitionOperations';
 import type { IGraphQLQueryClient } from './GraphQLQueryClient';
 import type { SchemaRegistration } from '$lib/stores/validatedTopicStore';
 import type { JsonSchemaDefinition } from '$lib/types/models';
@@ -42,10 +44,10 @@ export class OntologySchemaLoader {
 	 */
 	async loadDefinitions(projectId: string): Promise<EntityDefinition[]> {
 		const result = await this.queryClient.query<{
-			listEntityDefinitions: EntityDefinition[] | null;
-		}>(Q_LIST_ENTITY_DEFINITIONS, { projectId });
+			listEntityDefinitionsByProject: { items: EntityDefinition[]; nextToken?: string } | null;
+		}>(Q_LIST_ENTITY_DEFINITIONS_BY_PROJECT, { projectId });
 
-		const defs = result.listEntityDefinitions ?? [];
+		const defs = result.listEntityDefinitionsByProject?.items ?? [];
 
 		for (const def of defs) {
 			this.registerDefinitionSchema(def);
@@ -62,12 +64,13 @@ export class OntologySchemaLoader {
 	registerDefinitionSchema(def: EntityDefinition): void {
 		this.definitions.set(def.id, def);
 
-		if (def.normalizedJsonSchema) {
+		const normalizedRaw = (def as any).normalizedSchema ?? (def as any).normalizedJsonSchema;
+		if (normalizedRaw) {
 			try {
 				const parsed: JsonSchemaDefinition =
-					typeof def.normalizedJsonSchema === 'string'
-						? JSON.parse(def.normalizedJsonSchema)
-						: def.normalizedJsonSchema;
+					typeof normalizedRaw === 'string'
+						? JSON.parse(normalizedRaw)
+						: normalizedRaw;
 
 				this.store.registerSchema({
 					id: `ontology:def:${def.id}`,
@@ -82,7 +85,9 @@ export class OntologySchemaLoader {
 			}
 		}
 
-		this.store.publish(toOntologyDefTopic(def.projectId, def.id), def);
+		if (def.projectId) {
+			this.store.publish(toOntologyDefTopic(def.projectId, def.id), def);
+		}
 	}
 
 	/**

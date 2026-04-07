@@ -19,13 +19,15 @@ import type {
 } from '@stratiqai/types-simple';
 import {
 	Q_LIST_ENTITY_INSTANCES_BY_DEFINITION,
-	S_ON_DEFINITION_SAVED,
-	S_ON_DEFINITION_DELETED,
 	S_ON_PROJECT_INSTANCES_CHANGED,
 	S_ON_INSTANCE_DELETED,
 	M_SAVE_ENTITY_INSTANCE,
 	M_DELETE_ENTITY_INSTANCE,
 } from '@stratiqai/types-simple';
+import {
+	S_ON_PROJECT_ENTITY_DEFINITION_CHANGED,
+	S_ON_PROJECT_ENTITY_DEFINITION_DELETED,
+} from '$lib/services/graphql/entityDefinitionOperations';
 
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 import type { SubscriptionSpec } from '../types';
@@ -164,19 +166,19 @@ export class OntologySyncManager extends BaseSyncManager {
 
 	#setupSubscriptions(client: AppSyncWsClient, projectId: string): void {
 		this.#addSub('def-saved', {
-			query: S_ON_DEFINITION_SAVED,
+			query: S_ON_PROJECT_ENTITY_DEFINITION_CHANGED,
 			variables: { projectId },
-			path: 'onDefinitionSaved',
+			path: 'onProjectEntityDefinitionChanged',
 			next: (def: any) => {
-				log.debug('Definition saved:', def.id);
+				log.debug('Definition changed:', def.id);
 				this.schemaLoader?.registerDefinitionSchema(def);
 			},
 		}, client);
 
 		this.#addSub('def-deleted', {
-			query: S_ON_DEFINITION_DELETED,
+			query: S_ON_PROJECT_ENTITY_DEFINITION_DELETED,
 			variables: { projectId },
-			path: 'onDefinitionDeleted',
+			path: 'onProjectEntityDefinitionDeleted',
 			next: (def: any) => {
 				log.debug('Definition deleted:', def.id);
 				this.schemaLoader?.unregisterDefinitionSchema(def.id, projectId);

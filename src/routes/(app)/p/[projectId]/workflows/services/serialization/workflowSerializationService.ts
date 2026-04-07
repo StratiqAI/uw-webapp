@@ -126,21 +126,21 @@ function categoryToKind(category: string): WorkflowNodeKind {
 export function buildWorkflowDefinitionInput(
 	gridElements: GridElement[],
 	connections: Connection[],
-	jsonSchemaId?: string | null,
-	nodeJsonSchemaIds?: Record<string, string>
-): { definition: WorkflowDefinitionInput; jsonSchemaId?: string } {
+	entityDefinitionId?: string | null,
+	nodeEntityDefinitionIds?: Record<string, string>
+): { definition: WorkflowDefinitionInput; entityDefinitionId?: string } {
 	const nodes: WorkflowNodeInput[] = gridElements.map((el) => {
 		const kind = categoryToKind(el.type.type);
 		let configuration: Record<string, unknown>;
 		if (kind === 'AI' && el.aiQueryData) {
-			const nodeSchemaId = nodeJsonSchemaIds?.[el.id];
+			const nodeSchemaId = nodeEntityDefinitionIds?.[el.id];
 			configuration = {
 				__typename: 'AINodeConfig',
 				prompt: el.aiQueryData.prompt,
 				model: el.aiQueryData.model,
 				topK: el.aiQueryData.maxTokens ?? undefined,
 				systemPrompt: el.aiQueryData.systemPrompt ?? undefined,
-				...(nodeSchemaId && { jsonSchemaId: nodeSchemaId })
+				...(nodeSchemaId && { entityDefinitionId: nodeSchemaId })
 			};
 		} else if (kind === 'PROCESS' && (el.nodeOptions != null || el.output !== undefined)) {
 			configuration = {
@@ -181,12 +181,12 @@ export function buildWorkflowDefinitionInput(
 
 	const result: {
 		definition: WorkflowDefinitionInput;
-		jsonSchemaId?: string;
+		entityDefinitionId?: string;
 	} = {
 		definition: { nodes, edges }
 	};
-	if (jsonSchemaId) {
-		result.jsonSchemaId = jsonSchemaId;
+	if (entityDefinitionId) {
+		result.entityDefinitionId = entityDefinitionId;
 	}
 	return result;
 }

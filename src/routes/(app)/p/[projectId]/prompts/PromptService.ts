@@ -3,7 +3,7 @@
  *
  * Provides utilities for managing Prompt entities in the library,
  * including CRUD operations and data transformation between AIQueryData and
- * Prompt uses flat `prompt` / `systemInstruction` (API); references JsonSchema by jsonSchemaId.
+ * Prompt uses flat `prompt` / `systemInstruction` (API); references EntityDefinition by entityDefinitionId.
  */
 
 import type { Prompt, Project } from '@stratiqai/types-simple';
@@ -14,7 +14,7 @@ import {
 	M_UPDATE_PROMPT,
 	Q_LIST_PROMPTS
 } from '$lib/services/graphql/promptOperations';
-import { ensureJsonSchemaEntity } from '$lib/services/graphql/jsonSchemaService';
+import { ensureEntityDefinition } from '$lib/services/graphql/entityDefinitionService';
 import type { IGraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
 
 /**
@@ -140,8 +140,8 @@ export async function fetchProjectWithPromptTemplates(
 
 /**
  * Create a new prompt.
- * If jsonSchemaId is provided, it references an existing JsonSchema entity.
- * If schemaData is provided instead, a new JsonSchema entity is created first.
+ * If entityDefinitionId is provided, it references an existing EntityDefinition entity.
+ * If schemaData is provided instead, a new EntityDefinition entity is created first.
  */
 export async function createPromptTemplate(
 	queryClient: IGraphQLQueryClient,
@@ -149,14 +149,14 @@ export async function createPromptTemplate(
 	name: string,
 	aiQueryData: AIQueryData,
 	description?: string,
-	jsonSchemaId?: string,
+	entityDefinitionId?: string,
 	schemaData?: { name: string; description?: string; schemaDefinition: unknown }
 ): Promise<Prompt> {
 	const variableNames = extractPromptVariableNames(aiQueryData.prompt);
 
-	let resolvedJsonSchemaId = jsonSchemaId;
-	if (!resolvedJsonSchemaId && schemaData && 'schemaDefinition' in schemaData) {
-		resolvedJsonSchemaId = await ensureJsonSchemaEntity(queryClient, {
+	let resolvedEntityDefinitionId = entityDefinitionId;
+	if (!resolvedEntityDefinitionId && schemaData && 'schemaDefinition' in schemaData) {
+		resolvedEntityDefinitionId = await ensureEntityDefinition(queryClient, {
 			name: schemaData.name || name,
 			description: schemaData.description,
 			schemaDefinition: schemaData.schemaDefinition
@@ -173,8 +173,8 @@ export async function createPromptTemplate(
 		sharingMode: 'PRIVATE'
 	};
 
-	if (resolvedJsonSchemaId) {
-		input.jsonSchemaId = resolvedJsonSchemaId;
+	if (resolvedEntityDefinitionId) {
+		input.entityDefinitionId = resolvedEntityDefinitionId;
 	}
 
 	const response = await queryClient.query<{
@@ -218,8 +218,8 @@ export function extractPromptVariableNames(text: string): string[] {
 
 /**
  * Update an existing prompt (parentId kept for API compatibility but not used).
- * Uses jsonSchemaId to reference JsonSchema entities.
- * If schemaData is provided and no jsonSchemaId, a JsonSchema entity is created/updated.
+ * Uses entityDefinitionId to reference EntityDefinition entities.
+ * If schemaData is provided and no entityDefinitionId, an EntityDefinition entity is created/updated.
  */
 export async function updatePromptTemplate(
 	queryClient: IGraphQLQueryClient,
@@ -228,9 +228,9 @@ export async function updatePromptTemplate(
 		name?: string;
 		aiQueryData?: AIQueryData;
 		description?: string;
-		jsonSchemaId?: string;
+		entityDefinitionId?: string;
 		schemaData?: { name: string; description?: string; schemaDefinition: unknown };
-		existingJsonSchemaId?: string;
+		existingEntityDefinitionId?: string;
 	},
 	_parentId?: string
 ): Promise<Prompt> {
@@ -254,19 +254,19 @@ export async function updatePromptTemplate(
 		input.model = typeof updates.aiQueryData.model === 'string' ? updates.aiQueryData.model : String(updates.aiQueryData.model);
 	}
 
-	if (updates.jsonSchemaId) {
-		input.jsonSchemaId = updates.jsonSchemaId;
+	if (updates.entityDefinitionId) {
+		input.entityDefinitionId = updates.entityDefinitionId;
 	} else if (updates.schemaData && 'schemaDefinition' in updates.schemaData) {
-		const resolvedId = await ensureJsonSchemaEntity(
+		const resolvedId = await ensureEntityDefinition(
 			queryClient,
 			{
 				name: updates.schemaData.name || (updates.name ?? 'Schema'),
 				description: updates.schemaData.description,
 				schemaDefinition: updates.schemaData.schemaDefinition
 			},
-			updates.existingJsonSchemaId
+			updates.existingEntityDefinitionId
 		);
-		input.jsonSchemaId = resolvedId;
+		input.entityDefinitionId = resolvedId;
 	}
 
 	const response = await queryClient.query<{

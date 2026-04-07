@@ -1,7 +1,7 @@
 /**
  * Widget Prompt Service
  *
- * Manages the two-tier Prompt/JsonSchema entity lifecycle for AI-enabled widgets:
+ * Manages the two-tier Prompt/EntityDefinition entity lifecycle for AI-enabled widgets:
  *   Tier 1 — Kind-level templates (created once at app startup per widget kind)
  *   Tier 2 — Per-instance entities (cloned from templates when a widget first uses AI)
  *
@@ -15,7 +15,7 @@ import {
 	getRegisteredManifests,
 	getWidgetPromptConfig
 } from '$lib/dashboard/setup/widgetRegistry';
-import { ensureJsonSchemaEntity } from '$lib/services/graphql/jsonSchemaService';
+import { ensureEntityDefinition } from '$lib/services/graphql/entityDefinitionService';
 import {
 	Q_GET_PROMPT,
 	Q_LIST_PROMPTS,
@@ -23,9 +23,9 @@ import {
 	M_UPDATE_PROMPT
 } from '$lib/services/graphql/promptOperations';
 import {
-	Q_LIST_JSON_SCHEMAS,
-	Q_GET_JSON_SCHEMA
-} from '$lib/services/graphql/jsonSchemaOperations';
+	Q_LIST_ENTITY_DEFINITIONS,
+	Q_GET_ENTITY_DEFINITION
+} from '$lib/services/graphql/entityDefinitionOperations';
 import type { IGraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
 import { extractPromptVariables } from '@stratiqai/dashboard-widget-sdk';
 import { createLogger } from '$lib/utils/logger';
@@ -38,7 +38,7 @@ const log = createLogger('widget-prompt-svc');
 
 interface TemplateCache {
 	templatePromptId: string;
-	templateJsonSchemaId: string;
+	templateEntityDefinitionId: string;
 }
 
 const templateCache = new Map<string, TemplateCache>();
@@ -49,7 +49,7 @@ const templateCache = new Map<string, TemplateCache>();
 
 /**
  * Ensure all registered widget kinds with promptConfig have
- * template Prompt + JsonSchema entities in the cloud.
+ * template Prompt + EntityDefinition entities in the cloud.
  * Called once from +layout.svelte onMount.
  */
 export async function syncWidgetTemplates(queryClient: IGraphQLQueryClient): Promise<void> {
@@ -92,14 +92,13 @@ async function ensureWidgetTemplate(
 	if (existing) {
 		const entry: TemplateCache = {
 			templatePromptId: existing.id,
-			templateJsonSchemaId: (existing as unknown as Record<string, string>).jsonSchemaId ?? ''
+			templateEntityDefinitionId: (existing as unknown as Record<string, string>).entityDefinitionId ?? ''
 		};
 		templateCache.set(kind, entry);
 		return entry;
 	}
 
-	// Create template JsonSchema
-	const templateJsonSchemaId = await ensureJsonSchemaEntity(queryClient, {
+	const templateEntityDefinitionId = await ensureEntityDefinition(queryClient, {
 		name: templateSchemaName,
 		description: `Default output schema for ${kind} widgets`,
 		schemaDefinition: schemaDef
@@ -114,7 +113,7 @@ async function ensureWidgetTemplate(
 		prompt: promptConfig.defaultPrompt,
 		systemInstruction: promptConfig.systemInstruction ?? undefined,
 		model: promptConfig.model ?? 'GEMINI_2_5_FLASH',
-		jsonSchemaId: templateJsonSchemaId,
+		entityDefinitionId: templateEntityDefinitionId,
 		sharingMode: 'PRIVATE',
 		...(variableNames.length > 0 && { inputVariables: variableNames })
 	};
@@ -130,7 +129,7 @@ async function ensureWidgetTemplate(
 
 	const entry: TemplateCache = {
 		templatePromptId: result.createPrompt.id,
-		templateJsonSchemaId
+		templateEntityDefinitionId
 	};
 	templateCache.set(kind, entry);
 	return entry;
@@ -142,11 +141,11 @@ async function ensureWidgetTemplate(
 
 export interface WidgetInstancePrompt {
 	promptId: string;
-	jsonSchemaId: string;
+	entityDefinitionId: string;
 }
 
 /**
- * Ensure a widget instance has its own Prompt + JsonSchema entities.
+ * Ensure a widget instance has its own Prompt + EntityDefinition entities.
  * If existingPromptId is provided and valid, returns it.
  * Otherwise clones from the kind-level template.
  */
@@ -165,10 +164,10 @@ export async function ensureWidgetInstancePrompt(
 				{ id: existingPromptId }
 			);
 			if (existing?.getPrompt) {
-				return {
-					promptId: existing.getPrompt.id,
-					jsonSchemaId: (existing.getPrompt as unknown as Record<string, string>).jsonSchemaId ?? ''
-				};
+			return {
+				promptId: existing.getPrompt.id,
+				entityDefinitionId: (existing.getPrompt as unknown as Record<string, string>).entityDefinitionId ?? ''
+			};
 			}
 		} catch {
 			log.warn(`Instance prompt ${existingPromptId} not found, creating new one`);
@@ -186,14 +185,13 @@ export async function ensureWidgetInstancePrompt(
 		? `${widgetTitle} Output`
 		: `widget:${kind}:${widgetId}:output`;
 
-	// Clone template JsonSchema for this instance
 	let templateSchemaDef: unknown;
 	try {
 		const schemaResult = await queryClient.query<{
-			getJsonSchema: { schemaDefinition: string } | null;
-		}>(Q_GET_JSON_SCHEMA, { id: template.templateJsonSchemaId });
-		templateSchemaDef = schemaResult?.getJsonSchema?.schemaDefinition
-			? JSON.parse(schemaResult.getJsonSchema.schemaDefinition)
+			getEntityDefinition: { schemaDefinition: string } | null;
+		}>(Q_GET_ENTITY_DEFINITION, { id: template.templateEntityDefinitionId });
+		templateSchemaDef = schemaResult?.getEntityDefinition?.schemaDefinition
+			? JSON.parse(schemaResult.getEntityDefinition.schemaDefinition)
 			: undefined;
 	} catch {
 		log.warn('Could not fetch template schema definition, using manifest schema');
@@ -207,7 +205,7 @@ export async function ensureWidgetInstancePrompt(
 		templateSchemaDef = jsonSchema;
 	}
 
-	const instanceJsonSchemaId = await ensureJsonSchemaEntity(queryClient, {
+	const instanceEntityDefinitionId = await ensureEntityDefinition(queryClient, {
 		name: instanceSchemaName,
 		description: widgetDescription || `Output schema for ${kind} widget ${widgetId}`,
 		schemaDefinition: templateSchemaDef
@@ -236,7 +234,7 @@ export async function ensureWidgetInstancePrompt(
 		systemInstruction:
 			templatePrompt?.systemInstruction ?? promptConfig.systemInstruction ?? undefined,
 		model: templatePrompt?.model ?? promptConfig.model ?? 'GEMINI_2_5_FLASH',
-		jsonSchemaId: instanceJsonSchemaId,
+		entityDefinitionId: instanceEntityDefinitionId,
 		sharingMode: 'PRIVATE',
 		...(variableNames.length > 0 && { inputVariables: variableNames })
 	};
@@ -252,7 +250,7 @@ export async function ensureWidgetInstancePrompt(
 
 	return {
 		promptId: result.createPrompt.id,
-		jsonSchemaId: instanceJsonSchemaId
+		entityDefinitionId: instanceEntityDefinitionId
 	};
 }
 
@@ -267,7 +265,7 @@ export interface WidgetPromptForEditing {
 	prompt: string;
 	systemInstruction: string;
 	model: string;
-	jsonSchemaId: string;
+	entityDefinitionId: string;
 	schemaDefinition?: unknown;
 }
 
@@ -285,15 +283,15 @@ export async function getWidgetInstancePromptForEditing(
 	const p = result?.getPrompt;
 	if (!p) return null;
 
-	const jsonSchemaId = (p as unknown as Record<string, string>).jsonSchemaId ?? '';
+	const entityDefinitionId = (p as unknown as Record<string, string>).entityDefinitionId ?? '';
 	let schemaDefinition: unknown;
-	if (jsonSchemaId) {
+	if (entityDefinitionId) {
 		try {
 			const schemaResult = await queryClient.query<{
-				getJsonSchema: { schemaDefinition: string } | null;
-			}>(Q_GET_JSON_SCHEMA, { id: jsonSchemaId });
-			if (schemaResult?.getJsonSchema?.schemaDefinition) {
-				schemaDefinition = JSON.parse(schemaResult.getJsonSchema.schemaDefinition);
+				getEntityDefinition: { schemaDefinition: string } | null;
+			}>(Q_GET_ENTITY_DEFINITION, { id: entityDefinitionId });
+			if (schemaResult?.getEntityDefinition?.schemaDefinition) {
+				schemaDefinition = JSON.parse(schemaResult.getEntityDefinition.schemaDefinition);
 			}
 		} catch {
 			log.warn('Could not fetch linked schema for editing');
@@ -307,7 +305,7 @@ export async function getWidgetInstancePromptForEditing(
 		prompt: p.prompt ?? '',
 		systemInstruction: p.systemInstruction ?? '',
 		model: p.model ?? 'GEMINI_2_5_FLASH',
-		jsonSchemaId,
+		entityDefinitionId,
 		schemaDefinition
 	};
 }
@@ -325,7 +323,7 @@ export async function updateWidgetInstancePrompt(
 		model?: string;
 		schemaDefinition?: unknown;
 	},
-	jsonSchemaId: string | undefined,
+	entityDefinitionId: string | undefined,
 	queryClient: IGraphQLQueryClient
 ): Promise<void> {
 	const promptUpdate: Record<string, unknown> = {};
@@ -343,14 +341,14 @@ export async function updateWidgetInstancePrompt(
 		await queryClient.query(M_UPDATE_PROMPT, { id: promptId, input: promptUpdate });
 	}
 
-	if (updates.schemaDefinition !== undefined && jsonSchemaId) {
-		await ensureJsonSchemaEntity(
+	if (updates.schemaDefinition !== undefined && entityDefinitionId) {
+		await ensureEntityDefinition(
 			queryClient,
 			{
 				name: updates.name ? `${updates.name} Output` : 'Structured output',
 				schemaDefinition: updates.schemaDefinition
 			},
-			jsonSchemaId
+			entityDefinitionId
 		);
 	}
 }
@@ -372,8 +370,8 @@ export interface CompatiblePromptInfo {
 /**
  * List all prompts compatible with a widget kind's expected schema.
  * Compatibility tiers:
- *   1. Exact ID match (prompt's jsonSchemaId === template's)
- *   2. Derived schema (sourceJsonSchemaId chains back to template)
+ *   1. Exact ID match (prompt's entityDefinitionId === template's)
+ *   2. Derived schema (sourceEntityDefinitionId chains back to template)
  *   3. Structural match (schema contains required output properties)
  */
 export async function listCompatiblePrompts(
@@ -384,7 +382,7 @@ export async function listCompatiblePrompts(
 	if (!promptConfig) return [];
 
 	const template = templateCache.get(kind);
-	const templateSchemaId = template?.templateJsonSchemaId;
+	const templateSchemaId = template?.templateEntityDefinitionId;
 
 	const [promptsResult, schemasResult] = await Promise.all([
 		queryClient.query<{ listPrompts: { items: Prompt[] } }>(Q_LIST_PROMPTS, {
@@ -392,19 +390,19 @@ export async function listCompatiblePrompts(
 			limit: 200
 		}),
 		queryClient.query<{
-			listJsonSchemas: {
+			listEntityDefinitions: {
 				items: Array<{
 					id: string;
 					name: string;
 					schemaDefinition: string;
-					sourceJsonSchemaId?: string;
+					sourceEntityDefinitionId?: string;
 				}>;
 			};
-		}>(Q_LIST_JSON_SCHEMAS, { scope: 'ALL_TENANT', limit: 200 })
+		}>(Q_LIST_ENTITY_DEFINITIONS, { scope: 'ALL_TENANT', limit: 200 })
 	]);
 
 	const allPrompts = promptsResult?.listPrompts?.items ?? [];
-	const allSchemas = schemasResult?.listJsonSchemas?.items ?? [];
+	const allSchemas = schemasResult?.listEntityDefinitions?.items ?? [];
 	const schemaMap = new Map(allSchemas.map((s) => [s.id, s]));
 
 	// Build required property names from the manifest's Zod schema
@@ -420,20 +418,20 @@ export async function listCompatiblePrompts(
 	const results: Array<CompatiblePromptInfo & { tier: number }> = [];
 
 	for (const prompt of allPrompts) {
-		const pJsonSchemaId = (prompt as unknown as Record<string, string>).jsonSchemaId;
-		if (!pJsonSchemaId) continue;
+		const pEntityDefinitionId = (prompt as unknown as Record<string, string>).entityDefinitionId;
+		if (!pEntityDefinitionId) continue;
 
-		const linkedSchema = schemaMap.get(pJsonSchemaId);
+		const linkedSchema = schemaMap.get(pEntityDefinitionId);
 		if (!linkedSchema) continue;
 
 		let tier = -1;
 
 		// Tier 1: exact match
-		if (templateSchemaId && pJsonSchemaId === templateSchemaId) {
+		if (templateSchemaId && pEntityDefinitionId === templateSchemaId) {
 			tier = 1;
 		}
 		// Tier 2: derived
-		else if (templateSchemaId && linkedSchema.sourceJsonSchemaId === templateSchemaId) {
+		else if (templateSchemaId && linkedSchema.sourceEntityDefinitionId === templateSchemaId) {
 			tier = 2;
 		}
 		// Tier 3: structural match

@@ -3,7 +3,7 @@
  *
  * Given a projectId and definitionId, reactively resolves which registered
  * widget schemas are structurally compatible with the entity definition's
- * normalizedJsonSchema stored in VTS.
+ * normalizedSchema stored in VTS.
  */
 
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
@@ -39,12 +39,13 @@ export function useOntologyWidgetMatch(projectId: string, definitionId: string) 
 		const _ = store.schemaVersion;
 		const defTopic = toOntologyDefTopic(projectId, definitionId);
 		const def = store.at<EntityDefinition>(defTopic);
-		if (!def?.normalizedJsonSchema) return [];
+		const normalizedRaw = (def as any)?.normalizedSchema ?? (def as any)?.normalizedJsonSchema;
+		if (!normalizedRaw) return [];
 
 		const defSchema =
-			typeof def.normalizedJsonSchema === 'string'
-				? JSON.parse(def.normalizedJsonSchema)
-				: def.normalizedJsonSchema;
+			typeof normalizedRaw === 'string'
+				? JSON.parse(normalizedRaw)
+				: normalizedRaw;
 
 		const allSchemas = store.getRegisteredSchemas();
 		return allSchemas
@@ -77,12 +78,13 @@ export function useReactiveOntologyWidgetMatch(
 
 		const defTopic = toOntologyDefTopic(pid, did);
 		const def = store.at<EntityDefinition>(defTopic);
-		if (!def?.normalizedJsonSchema) return [];
+		const normalizedRaw = (def as any)?.normalizedSchema ?? (def as any)?.normalizedJsonSchema;
+		if (!normalizedRaw) return [];
 
 		const defSchema =
-			typeof def.normalizedJsonSchema === 'string'
-				? JSON.parse(def.normalizedJsonSchema)
-				: def.normalizedJsonSchema;
+			typeof normalizedRaw === 'string'
+				? JSON.parse(normalizedRaw)
+				: normalizedRaw;
 
 		const allSchemas = store.getRegisteredSchemas();
 		return allSchemas

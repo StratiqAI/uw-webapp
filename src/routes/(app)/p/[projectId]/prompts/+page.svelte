@@ -176,7 +176,7 @@
 		name: string;
 		description: string;
 		aiQueryData: AIQueryData;
-		jsonSchemaId?: string;
+		entityDefinitionId?: string;
 		schemaData?: { name: string; description?: string; schemaDefinition: unknown };
 	}) {
 		if (!queryClient) {
@@ -194,7 +194,7 @@
 					saveData.name,
 					saveData.aiQueryData,
 					saveData.description || undefined,
-					saveData.jsonSchemaId,
+					saveData.entityDefinitionId,
 					saveData.schemaData
 				);
 
@@ -209,9 +209,9 @@
 						name: saveData.name,
 						aiQueryData: saveData.aiQueryData,
 						description: saveData.description || undefined,
-						jsonSchemaId: saveData.jsonSchemaId,
+						entityDefinitionId: saveData.entityDefinitionId,
 						schemaData: saveData.schemaData,
-						existingJsonSchemaId: (editingTemplate as { jsonSchemaId?: string }).jsonSchemaId
+						existingEntityDefinitionId: (editingTemplate as { entityDefinitionId?: string }).entityDefinitionId
 					}
 				);
 

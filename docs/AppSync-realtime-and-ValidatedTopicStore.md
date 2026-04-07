@@ -284,4 +284,5 @@ Initial data still comes from **queries** (`listEntityDefinitions`, `getEntityIn
 | Document | Contents |
 |----------|----------|
 | [validated-topic-store.md](./validated-topic-store.md) | Full ValidatedTopicStore API, hooks, TopicStoreSync, stream catalog, startup order |
+| [dashboard-data-and-sync.md](./dashboard-data-and-sync.md) | Dashboard layout model, `DashboardLayout` AppSync entity, `DashboardSyncManager`, localStorage, reconciliation |
 | [Step 2 - ontology-graphql-architecture.md](../../stratiqai-types-simple/docs/ontology/Step%202%20-%20ontology-graphql-architecture.md) | Backend ontology GraphQL, DynamoDB, resolvers (types-simple package) |
