@@ -35,7 +35,12 @@
 	let definitions = $derived.by((): Array<{ id: string; data: EntityDefinition }> => {
 		void store.tree;
 		if (!projectId) return [];
-		return store.getAllAt<EntityDefinition>(`ontology/p/${projectId}/def`);
+		const path = `ontology/p/${projectId}/def`;
+		const result = store.getAllAt<EntityDefinition>(path);
+		// #region agent log
+		console.warn('[DEBUG-aba2b8] H-D definitions derived',{projectId,path,resultCount:result.length,resultIds:result.map(r=>r.id)});
+		// #endregion
+		return result;
 	});
 
 	let selectedDefinition = $derived.by((): EntityDefinition | undefined => {
@@ -104,6 +109,10 @@
 		const token = data.idToken;
 		if (!token || !pid) return;
 
+		// #region agent log
+		console.warn('[DEBUG-aba2b8] H-A/B effect starting OntologySyncManager',{pid,hasToken:!!token});
+		// #endregion
+
 		isLoading = true;
 		selectedDefId = null;
 
@@ -118,8 +127,14 @@
 					return;
 				}
 				syncManager = mgr;
+				// #region agent log
+				console.warn('[DEBUG-aba2b8] H-A/B OntologySyncManager created successfully',{pid,mgrStatus:mgr.status});
+				// #endregion
 				log.debug('OntologySyncManager ready for project', pid);
 			} catch (err) {
+				// #region agent log
+				console.warn('[DEBUG-aba2b8] H-A/B OntologySyncManager.create FAILED',{pid,error:err instanceof Error?err.message:String(err),stack:err instanceof Error?err.stack:undefined});
+				// #endregion
 				if (!cancelled) {
 					log.error('Failed to initialize OntologySyncManager:', err);
 				}
@@ -131,6 +146,9 @@
 		})();
 
 		return () => {
+			// #region agent log
+			console.warn('[DEBUG-aba2b8] H-SUB4 effect cleanup running', JSON.stringify({pid,hasMgr:!!mgr,mgrStatus:mgr?.status,wasCancelled:cancelled}));
+			// #endregion
 			cancelled = true;
 			if (mgr) {
 				mgr.cleanup();

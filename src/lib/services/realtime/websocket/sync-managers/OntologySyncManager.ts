@@ -170,6 +170,16 @@ export class OntologySyncManager extends BaseSyncManager {
 			variables: { projectId },
 			path: 'onProjectEntityDefinitionChanged',
 			next: (def: any) => {
+				// #region agent log
+				console.warn('[DEBUG-aba2b8] H-B subscription event received',{defId:def?.id,defName:def?.name,projectId:def?.projectId,hasSchemaLoader:!!this.schemaLoader,defKeys:def?Object.keys(def):null});
+				// #endregion
+				if (!def || !def.id) {
+					log.debug('Subscription delivered null definition (likely non-nullable field error); refetching via HTTP');
+					this.doRefetch().catch((err) =>
+						log.error('Refetch after null subscription event failed:', err),
+					);
+					return;
+				}
 				log.debug('Definition changed:', def.id);
 				this.schemaLoader?.registerDefinitionSchema(def);
 			},
@@ -180,6 +190,13 @@ export class OntologySyncManager extends BaseSyncManager {
 			variables: { projectId },
 			path: 'onProjectEntityDefinitionDeleted',
 			next: (def: any) => {
+				if (!def || !def.id) {
+					log.debug('Subscription delivered null definition for delete; refetching via HTTP');
+					this.doRefetch().catch((err) =>
+						log.error('Refetch after null subscription event failed:', err),
+					);
+					return;
+				}
 				log.debug('Definition deleted:', def.id);
 				this.schemaLoader?.unregisterDefinitionSchema(def.id, projectId);
 			},

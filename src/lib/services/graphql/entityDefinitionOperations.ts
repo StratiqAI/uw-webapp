@@ -25,7 +25,8 @@ export const ENTITY_DEFINITION_FIELDS = gql`
 			name
 			dataType
 			description
-			required
+			path
+			isList
 		}
 	}
 `;

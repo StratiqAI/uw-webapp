@@ -301,6 +301,9 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 		const code = 'code' in evt ? evt.code : 'N/A';
 		const reason = 'reason' in evt ? evt.reason : 'Connection Error';
 		const wasAcked = this.isAcked;
+		// #region agent log
+		console.warn('[DEBUG-aba2b8] H-SUB5 WS close event', JSON.stringify({code,reason,wasAcked,intentionalClose:this.intentionalClose,activeSubCount:this.activeSubscriptions.size}));
+		// #endregion
 
 		if (!wasAcked) {
 			this.rejectReady(
@@ -324,6 +327,9 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 	}
 
 	private cleanupConnection(): void {
+		// #region agent log
+		console.warn('[DEBUG-aba2b8] H-SUB5 cleanupConnection called', JSON.stringify({wasAcked:this.isAcked,activeSubCount:this.activeSubscriptions.size,specCount:this.subscriptionSpecs.length,intentionalClose:this.intentionalClose}));
+		// #endregion
 		this.isAcked = false;
 		this.detachWebSocketEventListeners();
 
@@ -459,6 +465,9 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 	}
 
 	private handleDataMessage(msg: AppSyncMessage): void {
+		// #region agent log
+		console.warn('[DEBUG-aba2b8] H-SUB1/2 DATA msg received', JSON.stringify({subId:msg.id,hasPayload:!!msg.payload,payloadKeys:msg.payload?Object.keys(msg.payload):[],dataType:typeof msg.payload?.data,activeSubIds:[...this.activeSubscriptions.keys()],matchesSub:msg.id?this.activeSubscriptions.has(msg.id):false}));
+		// #endregion
 		if (this.queue.length >= MAX_QUEUE_SIZE) {
 			log.warn('Message queue full. Dropping data message.');
 			return;
@@ -468,6 +477,9 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 	}
 
 	private handleErrorMessage(msg: AppSyncMessage): void {
+		// #region agent log
+		console.warn('[DEBUG-aba2b8] H-SUB2 WS ERROR msg', JSON.stringify({subId:msg.id,hasPayload:!!msg.payload,payload:msg.payload,hasSub:msg.id?this.activeSubscriptions.has(msg.id):false}));
+		// #endregion
 		if (msg.id) {
 			const sub = this.activeSubscriptions.get(msg.id);
 			sub?.error?.(msg.payload ?? msg);
@@ -491,6 +503,9 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 				for (const msg of this.queue) {
 					if (msg.id && msg.payload) {
 						const sub = this.activeSubscriptions.get(msg.id);
+						// #region agent log
+						console.warn('[DEBUG-aba2b8] H-SUB3 flush dispatch', JSON.stringify({subId:msg.id,hasSub:!!sub,dataKeys:msg.payload.data?Object.keys(msg.payload.data):[],dataType:typeof msg.payload.data,errors:msg.payload.errors??null}));
+						// #endregion
 						sub?.next?.(msg.payload.data);
 					}
 				}
@@ -552,6 +567,9 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 			next: (payload: any) => {
 				try {
 					const picked = selector(payload);
+					// #region agent log
+					console.warn('[DEBUG-aba2b8] H-SUB3 selector result', JSON.stringify({specPath:spec.path,payloadType:typeof payload,payloadKeys:payload&&typeof payload==='object'?Object.keys(payload):[],pickedType:typeof picked,pickedIsUndefined:picked===undefined,pickedId:picked?.id}));
+					// #endregion
 					if (picked !== undefined) spec.next(picked);
 				} catch (e) {
 					const errorHandler = spec.error ?? log.error.bind(log);
@@ -561,6 +579,9 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 			error: spec.error ?? ((e: unknown) => log.error('Managed subscription error', e))
 		});
 
+		// #region agent log
+		{let qs='';try{qs=typeof spec.query==='string'?spec.query:print(spec.query)}catch(e){qs='print-error'}console.warn('[DEBUG-aba2b8] H-SUB1 subscription registered', JSON.stringify({subId:handle.id,specPath:spec.path,specVars:spec.variables,querySnippet:qs.substring(0,500)}));}
+		// #endregion
 		this.specToHandleMap.set(spec, handle);
 	}
 }

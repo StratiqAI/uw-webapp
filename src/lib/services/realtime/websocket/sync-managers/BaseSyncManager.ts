@@ -12,13 +12,11 @@
  *   doRefetch()            — re-run HTTP queries after reconnect
  */
 
-import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from '$env/static/public';
 import {
-	getAppSyncWsClient,
-	initAppSyncWsClient,
 	destroyAppSyncWsClient,
 	type AppSyncWsClient
 } from '../wsClient';
+import { ensureConnection } from '$lib/stores/appSyncClientStore';
 import { GraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
 import { createLogger } from '$lib/utils/logger';
 
@@ -83,9 +81,11 @@ export abstract class BaseSyncManager {
 			}
 
 			this.queryClient = new GraphQLQueryClient(idToken);
-			this.subscriptionClient = this.initWsClient(idToken);
+			this.subscriptionClient = await this.initWsClient(idToken);
 
-			await this.subscriptionClient.ready();
+			// #region agent log
+			console.warn('[DEBUG-aba2b8] H-HANG after initWsClient resolved', { managerName: this.managerName, hasClient: !!this.subscriptionClient });
+			// #endregion
 
 			await this.doInitialize(options);
 
@@ -162,20 +162,13 @@ export abstract class BaseSyncManager {
 	}
 
 	/**
-	 * Acquires (or reuses) the singleton WS client and registers the
-	 * reconnect callback so doRefetch() fires automatically.
+	 * Acquires (or reuses) the singleton WS client via the shared
+	 * appSyncClientStore, which coordinates token tracking to avoid
+	 * race conditions where a stale reference is destroyed.
 	 */
-	protected initWsClient(idToken: string): AppSyncWsClient {
-		const existing = getAppSyncWsClient();
-		this.ownsWsClient = !existing;
-
-		const client =
-			existing ??
-			initAppSyncWsClient({
-				graphqlHttpUrl: PUBLIC_GRAPHQL_HTTP_ENDPOINT,
-				auth: { mode: 'cognito', idToken },
-				getToken: async () => idToken
-			});
+	protected async initWsClient(idToken: string): Promise<AppSyncWsClient> {
+		const client = await ensureConnection(idToken);
+		this.ownsWsClient = false;
 
 		this.reconnectCleanup = client.registerOnReconnect(() => {
 			this.handleReconnect();

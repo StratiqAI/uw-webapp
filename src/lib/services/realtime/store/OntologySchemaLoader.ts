@@ -47,6 +47,10 @@ export class OntologySchemaLoader {
 			listEntityDefinitionsByProject: { items: EntityDefinition[]; nextToken?: string } | null;
 		}>(Q_LIST_ENTITY_DEFINITIONS_BY_PROJECT, { projectId });
 
+		// #region agent log
+		console.warn('[DEBUG-aba2b8] H-A loadDefinitions result',{projectId,rawResult:result,hasListKey:!!result?.listEntityDefinitionsByProject,itemCount:result?.listEntityDefinitionsByProject?.items?.length ?? 'null'});
+		// #endregion
+
 		const defs = result.listEntityDefinitionsByProject?.items ?? [];
 
 		for (const def of defs) {
@@ -86,7 +90,11 @@ export class OntologySchemaLoader {
 		}
 
 		if (def.projectId) {
-			this.store.publish(toOntologyDefTopic(def.projectId, def.id), def);
+			const topic = toOntologyDefTopic(def.projectId, def.id);
+			const ok = this.store.publish(topic, def);
+			// #region agent log
+			console.warn('[DEBUG-aba2b8] H-C registerDefinitionSchema publish',{defId:def.id,defName:def.name,projectId:def.projectId,topic,publishOk:ok});
+			// #endregion
 		}
 	}
 
