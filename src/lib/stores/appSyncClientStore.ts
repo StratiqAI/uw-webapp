@@ -7,9 +7,9 @@
  * - Dynamically managing subscriptions as components mount/unmount
  * - Automatically handling connection lifecycle and reconnection
  * 
- * For comprehensive usage documentation, see:
- * @see {@link ../../../docs/application_stores/appSyncClientStore.md}
- * @see {@link ../../../docs/validated-topic-store.md#13-appsync-realtime-and-ontology-integration-planning} — wiring subscriptions into ValidatedTopicStore (ontology planning)
+ * Canonical docs:
+ * @see {@link ../../../docs/AppSync-realtime-and-ValidatedTopicStore.md} — AppSyncWsClient, this store, ValidatedTopicStore bridge
+ * @see {@link ../../../docs/validated-topic-store.md} — ValidatedTopicStore API
  */
 
 import { AppSyncWsClient } from '$lib/services/realtime/websocket/AppSyncWsClient';
