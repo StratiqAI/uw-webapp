@@ -12,6 +12,7 @@
 	import InstanceTable from '$lib/ontology/InstanceTable.svelte';
 	import InstanceDetailPanel from '$lib/ontology/InstanceDetailPanel.svelte';
 	import DefinitionDetail from '$lib/ontology/DefinitionDetail.svelte';
+	import WidgetGallery from '$lib/ontology/WidgetGallery.svelte';
 	import ActivityIndicator from '$lib/ontology/ActivityIndicator.svelte';
 	import { createLogger } from '$lib/utils/logger';
 
@@ -222,14 +223,24 @@
 				{/if}
 			</div>
 
-			<!-- Right: Definition Detail -->
+			<!-- Right: Definition Detail or Widget Gallery -->
 			{#if selectedDefinition}
 				<div class="flex w-80 shrink-0 flex-col overflow-hidden border-l {darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-white'}">
-					<DefinitionDetail
-						definition={selectedDefinition}
-						projectId={projectId ?? ''}
-						{darkMode}
-					/>
+					{#if selectedInstance}
+						<WidgetGallery
+							definition={selectedDefinition}
+							instance={selectedInstance}
+							{darkMode}
+							projectId={projectId ?? ''}
+							onback={() => selectedInstanceId = null}
+						/>
+					{:else}
+						<DefinitionDetail
+							definition={selectedDefinition}
+							projectId={projectId ?? ''}
+							{darkMode}
+						/>
+					{/if}
 				</div>
 			{/if}
 		</div>
