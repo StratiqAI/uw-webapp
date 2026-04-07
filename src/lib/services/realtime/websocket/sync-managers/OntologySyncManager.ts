@@ -42,7 +42,9 @@ import { getBrowserClientId } from '$lib/services/realtime/store/browserClientId
 import {
 	toOntologyDefTopic,
 	toOntologyInstDataTopic,
+	toOntologyInstMetaTopic,
 	extractInstanceData,
+	extractInstanceMeta,
 } from '$lib/services/realtime/store/ontologyClientHelpers';
 import { createLogger } from '$lib/utils/logger';
 
@@ -167,6 +169,10 @@ export class OntologySyncManager {
 						toOntologyInstDataTopic(projectId, def.id, inst.id),
 						flat,
 					);
+					store.publish(
+						toOntologyInstMetaTopic(projectId, def.id, inst.id),
+						extractInstanceMeta(inst),
+					);
 				}
 			} catch (err) {
 				log.error(`Failed to load instances for definition ${def.id}:`, err);
@@ -211,6 +217,10 @@ export class OntologySyncManager {
 					toOntologyInstDataTopic(projectId, inst.definitionId, inst.id),
 					flat,
 				);
+				store.publish(
+					toOntologyInstMetaTopic(projectId, inst.definitionId, inst.id),
+					extractInstanceMeta(inst),
+				);
 			},
 		} as SubscriptionSpec<EntityInstance>, client);
 
@@ -249,6 +259,10 @@ export class OntologySyncManager {
 		store.publish(
 			toOntologyInstDataTopic(inst.projectId, inst.definitionId, inst.id),
 			flat,
+		);
+		store.publish(
+			toOntologyInstMetaTopic(inst.projectId, inst.definitionId, inst.id),
+			extractInstanceMeta(inst),
 		);
 
 		return inst;

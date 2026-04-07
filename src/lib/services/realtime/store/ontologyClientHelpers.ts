@@ -29,6 +29,14 @@ export function toOntologyInstDataTopic(
 	return `ontology/p/${projectId}/def/${definitionId}/inst/${instanceId}/data`;
 }
 
+export function toOntologyInstMetaTopic(
+	projectId: string,
+	definitionId: string,
+	instanceId: string,
+): string {
+	return `ontology/p/${projectId}/def/${definitionId}/inst/${instanceId}/meta`;
+}
+
 /**
  * VTS schema pattern that matches all instance-data topics for a given
  * definition, regardless of projectId or instanceId.
@@ -104,7 +112,23 @@ export function flatMapToEav(
  * This is what gets published to VTS at the instance data topic.
  */
 export function extractInstanceData(instance: EntityInstance): Record<string, unknown> {
-	return eavToFlatMap(instance.values);
+	return eavToFlatMap(instance.values as Array<PropertyValue | null> | null | undefined);
+}
+
+export interface InstanceMeta {
+	label: string | null;
+	updatedAt: string | null;
+}
+
+/**
+ * Extract metadata (label, updatedAt) from an EntityInstance.
+ * Published to a sibling VTS topic so the UI can display/edit label.
+ */
+export function extractInstanceMeta(instance: EntityInstance): InstanceMeta {
+	return {
+		label: instance.label ?? null,
+		updatedAt: instance.updatedAt ?? null,
+	};
 }
 
 // ---------------------------------------------------------------------------

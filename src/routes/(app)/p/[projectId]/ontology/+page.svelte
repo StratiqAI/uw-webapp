@@ -1,7 +1,8 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { EntityDefinition } from '@stratiqai/types-simple';
-	import { onMount, onDestroy } from 'svelte';
+	import { onDestroy } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
@@ -9,6 +10,7 @@
 	import TopBar from '$lib/components/layout/TopBar.svelte';
 	import DefinitionSidebar from '$lib/ontology/DefinitionSidebar.svelte';
 	import InstanceTable from '$lib/ontology/InstanceTable.svelte';
+	import InstanceDetailPanel from '$lib/ontology/InstanceDetailPanel.svelte';
 	import DefinitionDetail from '$lib/ontology/DefinitionDetail.svelte';
 	import ActivityIndicator from '$lib/ontology/ActivityIndicator.svelte';
 	import { createLogger } from '$lib/utils/logger';
@@ -41,19 +43,43 @@
 		return store.at<EntityDefinition>(`ontology/p/${projectId}/def/${selectedDefId}`);
 	});
 
-	let instances = $derived.by((): Array<{ id: string; data: Record<string, unknown> }> => {
+	let selectedInstanceId = $state<string | null>(null);
+
+	let instances = $derived.by((): Array<{
+		id: string;
+		data: Record<string, unknown>;
+		label: string | null;
+		updatedAt: string | null;
+	}> => {
 		void store.tree;
 		if (!projectId || !selectedDefId) return [];
 		const instParent = `ontology/p/${projectId}/def/${selectedDefId}/inst`;
 		const rawEntries = store.getAllAt<Record<string, unknown>>(instParent);
-		const result: Array<{ id: string; data: Record<string, unknown> }> = [];
+		const result: Array<{
+			id: string;
+			data: Record<string, unknown>;
+			label: string | null;
+			updatedAt: string | null;
+		}> = [];
 		for (const entry of rawEntries) {
 			if (entry.data && typeof entry.data === 'object' && 'data' in entry.data) {
-				result.push({ id: entry.id, data: entry.data.data as Record<string, unknown> });
+				const meta = (entry.data as Record<string, unknown>).meta as
+					| { label?: string | null; updatedAt?: string | null }
+					| undefined;
+				result.push({
+					id: entry.id,
+					data: entry.data.data as Record<string, unknown>,
+					label: meta?.label ?? null,
+					updatedAt: meta?.updatedAt ?? null,
+				});
 			}
 		}
 		return result;
 	});
+
+	let selectedInstance = $derived(
+		selectedInstanceId ? instances.find((i) => i.id === selectedInstanceId) ?? null : null
+	);
 
 	let defCount = $derived(definitions.length);
 	let instCount = $derived(instances.length);
@@ -61,21 +87,54 @@
 
 	function handleSelectDef(id: string) {
 		selectedDefId = id;
+		selectedInstanceId = null;
 	}
 
-	onMount(async () => {
-		if (data.idToken && projectId) {
+	function handleProjectChange(newProjectId: string | null) {
+		if (!newProjectId || newProjectId === projectId) return;
+		goto(`/p/${newProjectId}/ontology`);
+	}
+
+	$effect(() => {
+		const pid = projectId;
+		const token = data.idToken;
+		if (!token || !pid) return;
+
+		isLoading = true;
+		selectedDefId = null;
+
+		let cancelled = false;
+		let mgr: OntologySyncManager | null = null;
+
+		(async () => {
 			try {
-				syncManager = await OntologySyncManager.create({
-					idToken: data.idToken,
-					projectId
-				});
-				log.debug('OntologySyncManager ready');
+				mgr = await OntologySyncManager.create({ idToken: token, projectId: pid });
+				if (cancelled) {
+					mgr.cleanup();
+					return;
+				}
+				syncManager = mgr;
+				log.debug('OntologySyncManager ready for project', pid);
 			} catch (err) {
-				log.error('Failed to initialize OntologySyncManager:', err);
+				if (!cancelled) {
+					log.error('Failed to initialize OntologySyncManager:', err);
+				}
+			} finally {
+				if (!cancelled) {
+					isLoading = false;
+				}
 			}
-		}
-		isLoading = false;
+		})();
+
+		return () => {
+			cancelled = true;
+			if (mgr) {
+				mgr.cleanup();
+			} else {
+				syncManager?.cleanup();
+			}
+			syncManager = null;
+		};
 	});
 
 	onDestroy(() => {
@@ -85,7 +144,7 @@
 </script>
 
 <div class="flex h-screen w-full flex-col overflow-hidden {darkMode ? 'bg-slate-900' : 'bg-slate-50'} transition-colors">
-	<TopBar pageTitle="Ontology Explorer">
+	<TopBar pageTitle="Ontology Explorer" onProjectChange={handleProjectChange}>
 		{#snippet tabs()}
 			<div class="flex items-center gap-2">
 				<span class="rounded-full px-2 py-0.5 text-xs font-medium {darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'}">
@@ -122,14 +181,34 @@
 				/>
 			</div>
 
-			<!-- Center: Instance Table -->
+			<!-- Center: Instance Table + Detail Panel -->
 			<div class="flex flex-1 flex-col overflow-hidden {darkMode ? 'bg-slate-900' : 'bg-slate-50'}">
 				{#if selectedDefinition}
-					<InstanceTable
-						definition={selectedDefinition}
-						{instances}
-						{darkMode}
-					/>
+					<div class="flex flex-1 flex-col overflow-hidden">
+						<div class="min-h-0 flex-1 overflow-hidden">
+							<InstanceTable
+								definition={selectedDefinition}
+								{instances}
+								{darkMode}
+								{syncManager}
+								projectId={projectId ?? ''}
+								{selectedInstanceId}
+								onselect={(id: string | null) => selectedInstanceId = id}
+							/>
+						</div>
+						{#if selectedInstance && selectedDefinition}
+							<div class="shrink-0 border-t {darkMode ? 'border-slate-700' : 'border-slate-200'}">
+								<InstanceDetailPanel
+									instance={selectedInstance}
+									definition={selectedDefinition}
+									{darkMode}
+									{syncManager}
+									projectId={projectId ?? ''}
+									onclose={() => selectedInstanceId = null}
+								/>
+							</div>
+						{/if}
+					</div>
 				{:else}
 					<div class="flex flex-1 items-center justify-center">
 						<div class="text-center">
@@ -148,7 +227,7 @@
 				<div class="flex w-80 shrink-0 flex-col overflow-hidden border-l {darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-white'}">
 					<DefinitionDetail
 						definition={selectedDefinition}
-						{projectId}
+						projectId={projectId ?? ''}
 						{darkMode}
 					/>
 				</div>
