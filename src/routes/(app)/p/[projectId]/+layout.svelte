@@ -135,7 +135,7 @@
 		return m ? m[0] : '';
 	});
 
-	const pagesWithOwnTopBar = ['/dashboard', '/prompts', '/workflows'];
+	const pagesWithOwnTopBar = ['/dashboard', '/prompts', '/workflows', '/ontology'];
 	const showLayoutTopBar = $derived(
 		!pagesWithOwnTopBar.some((seg) => currentPath.includes(seg))
 	);
@@ -146,6 +146,7 @@
 		if (currentPath.includes('/dashboard')) return 'Dashboard';
 		if (currentPath.includes('/prompts')) return 'Prompt Library';
 		if (currentPath.includes('/workflows')) return 'Workflows';
+		if (currentPath.includes('/ontology')) return 'Ontology Explorer';
 		return 'Workspace';
 	});
 
