@@ -8,11 +8,10 @@
  *   4. Subscribes to real-time changes (create/update/delete) via wsClient.ts
  *   5. Implements echo cancellation using a per-tab senderId
  *
- * Follows the same lifecycle pattern as WorkflowSyncManager:
- *   private constructor -> static create() / createInactive() -> initialize()
+ * Extends BaseSyncManager for unified lifecycle, auto-reconnect refetch,
+ * and shared WS client acquisition.
  */
 
-import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from '$env/static/public';
 import type {
 	EntityDefinition,
 	EntityInstance,
@@ -29,14 +28,8 @@ import {
 } from '@stratiqai/types-simple';
 
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
-import {
-	getAppSyncWsClient,
-	initAppSyncWsClient,
-	destroyAppSyncWsClient,
-	type AppSyncWsClient,
-} from '../wsClient';
 import type { SubscriptionSpec } from '../types';
-import { GraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
+import type { AppSyncWsClient } from '../wsClient';
 import { OntologySchemaLoader } from '$lib/services/realtime/store/OntologySchemaLoader';
 import { getBrowserClientId } from '$lib/services/realtime/store/browserClientId';
 import {
@@ -46,42 +39,29 @@ import {
 	extractInstanceData,
 	extractInstanceMeta,
 } from '$lib/services/realtime/store/ontologyClientHelpers';
+import { BaseSyncManager, type BaseSyncManagerOptions } from './BaseSyncManager';
 import { createLogger } from '$lib/utils/logger';
 
 const log = createLogger('ontology-sync');
 
 export const store = validatedTopicStore;
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export type OntologyManagerOptions = {
-	idToken: string;
+export interface OntologyManagerOptions extends BaseSyncManagerOptions {
 	projectId: string;
-};
+}
 
-type ManagerStatus = 'inactive' | 'initializing' | 'ready' | 'error';
-
-// ---------------------------------------------------------------------------
-// OntologySyncManager
-// ---------------------------------------------------------------------------
-
-export class OntologySyncManager {
-	private queryClient: GraphQLQueryClient | null = null;
-	private subscriptionClient: AppSyncWsClient | null = null;
+export class OntologySyncManager extends BaseSyncManager {
 	private schemaLoader: OntologySchemaLoader | null = null;
-	private ownsWsClient = false;
 	private projectId = '';
 	private senderId: string;
-	private activeSubscriptions = new Map<string, SubscriptionSpec<unknown>>();
+	private activeSubscriptions = new Map<string, SubscriptionSpec<any>>();
 
-	private _status: ManagerStatus = 'inactive';
-	private _loading = false;
-	private _error: string | null = null;
-	private initializationPromise: Promise<void> | null = null;
+	protected get managerName() {
+		return 'OntologySyncManager';
+	}
 
 	private constructor() {
+		super();
 		this.senderId = getBrowserClientId();
 	}
 
@@ -95,67 +75,61 @@ export class OntologySyncManager {
 		return mgr;
 	}
 
-	// -----------------------------------------------------------------------
-	// Initialization
-	// -----------------------------------------------------------------------
+	protected async doInitialize(options: OntologyManagerOptions): Promise<void> {
+		const { projectId } = options;
+		if (!projectId) throw new Error('OntologySyncManager requires a projectId.');
 
-	async initialize({ idToken, projectId }: OntologyManagerOptions): Promise<void> {
-		if (this.initializationPromise) return this.initializationPromise;
-		if (this._status === 'ready') this.cleanup();
+		this.projectId = projectId;
+		// #region agent log
+		fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7fe1b0'},body:JSON.stringify({sessionId:'7fe1b0',location:'OntologySyncManager.ts:doInitialize-start',message:'doInitialize called',data:{projectId,hasQueryClient:!!this.queryClient,hasSubClient:!!this.subscriptionClient},timestamp:Date.now(),hypothesisId:'H-A'})}).catch(()=>{});
+		// #endregion
 
-		this._status = 'initializing';
+		const schemaLoader = new OntologySchemaLoader(store, this.queryClient!);
+		const definitions = await schemaLoader.loadDefinitions(projectId);
+		// #region agent log
+		fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7fe1b0'},body:JSON.stringify({sessionId:'7fe1b0',location:'OntologySyncManager.ts:doInitialize-afterDefs',message:'definitions loaded',data:{defCount:definitions.length,defNames:definitions.map(d=>d.name)},timestamp:Date.now(),hypothesisId:'H-E'})}).catch(()=>{});
+		// #endregion
 
-		this.initializationPromise = this.#runWithStatus(async () => {
-			if (!idToken) throw new Error('OntologySyncManager requires an idToken.');
-			if (!projectId) throw new Error('OntologySyncManager requires a projectId.');
+		await this.#loadInstances(projectId, definitions);
 
-			this.projectId = projectId;
-			const queryClient = new GraphQLQueryClient(idToken);
+		this.schemaLoader = schemaLoader;
 
-			const existingClient = getAppSyncWsClient();
-			const ownsWsClient = !existingClient;
-			const subscriptionClient =
-				existingClient ??
-				initAppSyncWsClient({
-					graphqlHttpUrl: PUBLIC_GRAPHQL_HTTP_ENDPOINT,
-					auth: { mode: 'cognito', idToken },
-				});
-
-			await subscriptionClient.ready();
-
-			const schemaLoader = new OntologySchemaLoader(store, queryClient);
-			const definitions = await schemaLoader.loadDefinitions(projectId);
-
-			await this.#loadInstances(queryClient, projectId, definitions);
-
-			this.queryClient = queryClient;
-			this.subscriptionClient = subscriptionClient;
-			this.schemaLoader = schemaLoader;
-			this.ownsWsClient = ownsWsClient;
-
-			this.#setupSubscriptions(subscriptionClient, projectId);
-
-			this._status = 'ready';
-		}, 'Failed to initialize ontology sync').finally(() => {
-			this.initializationPromise = null;
-			if (this._error) this._status = 'error';
-		});
-
-		return this.initializationPromise;
+		this.#setupSubscriptions(this.subscriptionClient!, projectId);
+		// #region agent log
+		fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7fe1b0'},body:JSON.stringify({sessionId:'7fe1b0',location:'OntologySyncManager.ts:doInitialize-complete',message:'doInitialize complete',data:{projectId,status:'success'},timestamp:Date.now(),hypothesisId:'H-A'})}).catch(()=>{});
+		// #endregion
 	}
 
-	// -----------------------------------------------------------------------
-	// Instance loading (HTTP)
-	// -----------------------------------------------------------------------
+	protected doCleanup(): void {
+		if (this.subscriptionClient) {
+			for (const spec of this.activeSubscriptions.values()) {
+				this.subscriptionClient.removeSubscription(spec);
+			}
+		}
+		this.activeSubscriptions.clear();
+		this.schemaLoader = null;
+		this.projectId = '';
+	}
+
+	protected async doRefetch(): Promise<void> {
+		if (!this.queryClient || !this.projectId) return;
+
+		const definitions = await this.schemaLoader!.loadDefinitions(this.projectId);
+		await this.#loadInstances(this.projectId, definitions);
+	}
+
+	// ── Instance loading (HTTP) ───────────────────────────────────────
 
 	async #loadInstances(
-		queryClient: GraphQLQueryClient,
 		projectId: string,
 		definitions: EntityDefinition[],
 	): Promise<void> {
+		// #region agent log
+		fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7fe1b0'},body:JSON.stringify({sessionId:'7fe1b0',location:'OntologySyncManager.ts:#loadInstances',message:'loadInstances called',data:{projectId,defCount:definitions.length,defIds:definitions.map(d=>d.id)},timestamp:Date.now(),hypothesisId:'H-B'})}).catch(()=>{});
+		// #endregion
 		for (const def of definitions) {
 			try {
-				const result = await queryClient.query<{
+				const result = await this.queryClient!.query<{
 					listEntityInstancesByDefinition: EntityInstance[] | null;
 				}>(Q_LIST_ENTITY_INSTANCES_BY_DEFINITION, {
 					projectId,
@@ -163,53 +137,57 @@ export class OntologySyncManager {
 				});
 
 				const instances = result.listEntityInstancesByDefinition ?? [];
+				// #region agent log
+				fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7fe1b0'},body:JSON.stringify({sessionId:'7fe1b0',location:'OntologySyncManager.ts:#loadInstances-query',message:'query result',data:{defId:def.id,defName:def.name,instanceCount:instances.length,rawResultKeys:Object.keys(result),hasNulls:instances.some(i=>!i)},timestamp:Date.now(),hypothesisId:'H-B'})}).catch(()=>{});
+				// #endregion
 				for (const inst of instances) {
+					if (!inst) continue;
 					const flat = extractInstanceData(inst);
-					store.publish(
-						toOntologyInstDataTopic(projectId, def.id, inst.id),
-						flat,
-					);
-					store.publish(
-						toOntologyInstMetaTopic(projectId, def.id, inst.id),
-						extractInstanceMeta(inst),
-					);
+					const dataTopic = toOntologyInstDataTopic(projectId, def.id, inst.id);
+					const dataOk = store.publish(dataTopic, flat, { source: 'http' });
+					const metaTopic = toOntologyInstMetaTopic(projectId, def.id, inst.id);
+					const metaOk = store.publish(metaTopic, extractInstanceMeta(inst), { source: 'http' });
+					// #region agent log
+					fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7fe1b0'},body:JSON.stringify({sessionId:'7fe1b0',location:'OntologySyncManager.ts:#loadInstances-publish',message:'publish result',data:{instId:inst.id,dataTopic,dataOk,metaTopic,metaOk,flatKeys:Object.keys(flat),storeErrors:!dataOk?store.getErrors(dataTopic):null},timestamp:Date.now(),hypothesisId:'H-C'})}).catch(()=>{});
+					// #endregion
 				}
 			} catch (err) {
+				// #region agent log
+				fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7fe1b0'},body:JSON.stringify({sessionId:'7fe1b0',location:'OntologySyncManager.ts:#loadInstances-error',message:'query failed',data:{defId:def.id,error:err instanceof Error?err.message:String(err)},timestamp:Date.now(),hypothesisId:'H-B'})}).catch(()=>{});
+				// #endregion
 				log.error(`Failed to load instances for definition ${def.id}:`, err);
 			}
 		}
 	}
 
-	// -----------------------------------------------------------------------
-	// Subscriptions (WebSocket)
-	// -----------------------------------------------------------------------
+	// ── Subscriptions (WebSocket) ─────────────────────────────────────
 
 	#setupSubscriptions(client: AppSyncWsClient, projectId: string): void {
 		this.#addSub('def-saved', {
 			query: S_ON_DEFINITION_SAVED,
 			variables: { projectId },
 			path: 'onDefinitionSaved',
-			next: (def: EntityDefinition) => {
+			next: (def: any) => {
 				log.debug('Definition saved:', def.id);
 				this.schemaLoader?.registerDefinitionSchema(def);
 			},
-		} as SubscriptionSpec<EntityDefinition>, client);
+		}, client);
 
 		this.#addSub('def-deleted', {
 			query: S_ON_DEFINITION_DELETED,
 			variables: { projectId },
 			path: 'onDefinitionDeleted',
-			next: (def: { id: string; projectId: string }) => {
+			next: (def: any) => {
 				log.debug('Definition deleted:', def.id);
 				this.schemaLoader?.unregisterDefinitionSchema(def.id, projectId);
 			},
-		} as SubscriptionSpec<{ id: string; projectId: string }>, client);
+		}, client);
 
 		this.#addSub('inst-changed', {
 			query: S_ON_PROJECT_INSTANCES_CHANGED,
 			variables: { projectId },
 			path: 'onProjectInstancesChanged',
-			next: (inst: EntityInstance) => {
+			next: (inst: any) => {
 				if (inst.senderId === this.senderId) return;
 
 				const flat = extractInstanceData(inst);
@@ -222,32 +200,30 @@ export class OntologySyncManager {
 					extractInstanceMeta(inst),
 				);
 			},
-		} as SubscriptionSpec<EntityInstance>, client);
+		}, client);
 
 		this.#addSub('inst-deleted', {
 			query: S_ON_INSTANCE_DELETED,
 			variables: { projectId },
 			path: 'onInstanceDeleted',
-			next: (inst: { id: string; definitionId: string }) => {
+			next: (inst: any) => {
 				log.debug('Instance deleted:', inst.id);
 				store.delete(
 					toOntologyInstDataTopic(projectId, inst.definitionId, inst.id),
 				);
 			},
-		} as SubscriptionSpec<{ id: string; definitionId: string }>, client);
+		}, client);
 	}
 
-	#addSub(key: string, spec: SubscriptionSpec<unknown>, client: AppSyncWsClient): void {
+	#addSub(key: string, spec: SubscriptionSpec<any>, client: AppSyncWsClient): void {
 		client.addSubscription(spec);
 		this.activeSubscriptions.set(key, spec);
 	}
 
-	// -----------------------------------------------------------------------
-	// Mutation helpers (inject senderId automatically)
-	// -----------------------------------------------------------------------
+	// ── Mutation helpers ──────────────────────────────────────────────
 
 	async saveInstance(input: Omit<SaveInstanceInput, 'senderId'>): Promise<EntityInstance> {
-		this.#ensureReady();
+		this.ensureReady();
 		const fullInput: SaveInstanceInput = { ...input, senderId: this.senderId };
 
 		const result = await this.queryClient!.query<{
@@ -269,7 +245,7 @@ export class OntologySyncManager {
 	}
 
 	async deleteInstance(projectId: string, instanceId: string, definitionId: string): Promise<void> {
-		this.#ensureReady();
+		this.ensureReady();
 		await this.queryClient!.query(M_DELETE_ENTITY_INSTANCE, {
 			projectId,
 			id: instanceId,
@@ -278,70 +254,7 @@ export class OntologySyncManager {
 		store.delete(toOntologyInstDataTopic(projectId, definitionId, instanceId));
 	}
 
-	// -----------------------------------------------------------------------
-	// Lifecycle & state
-	// -----------------------------------------------------------------------
-
-	cleanup(): void {
-		if (this.subscriptionClient) {
-			for (const spec of this.activeSubscriptions.values()) {
-				this.subscriptionClient.removeSubscription(spec);
-			}
-		}
-		this.activeSubscriptions.clear();
-
-		if (this.ownsWsClient) {
-			destroyAppSyncWsClient();
-		}
-
-		this.queryClient = null;
-		this.subscriptionClient = null;
-		this.schemaLoader = null;
-		this.ownsWsClient = false;
-		this.projectId = '';
-		this._status = 'inactive';
-		this._loading = false;
-		this._error = null;
-		this.initializationPromise = null;
-	}
-
-	get status(): ManagerStatus {
-		return this._status;
-	}
-
-	get isReady(): boolean {
-		return this._status === 'ready';
-	}
-
-	get isLoading(): boolean {
-		return this._loading;
-	}
-
-	get lastError(): string | null {
-		return this._error;
-	}
-
 	getSchemaLoader(): OntologySchemaLoader | null {
 		return this.schemaLoader;
-	}
-
-	#ensureReady(): void {
-		if (this._status !== 'ready' || !this.queryClient) {
-			throw new Error(`OntologySyncManager is not ready. Current status: ${this._status}`);
-		}
-	}
-
-	async #runWithStatus<T>(action: () => Promise<T>, fallbackMessage: string): Promise<T> {
-		this._loading = true;
-		this._error = null;
-		try {
-			return await action();
-		} catch (err: unknown) {
-			const errorMessage = err instanceof Error ? err.message : fallbackMessage;
-			this._error = errorMessage;
-			throw err instanceof Error ? err : new Error(errorMessage);
-		} finally {
-			this._loading = false;
-		}
 	}
 }

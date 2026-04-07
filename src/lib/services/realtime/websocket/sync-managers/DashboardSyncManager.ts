@@ -1,4 +1,14 @@
-import { PUBLIC_GRAPHQL_HTTP_ENDPOINT } from '$env/static/public';
+/**
+ * DashboardSyncManager
+ *
+ * Manages a single DashboardLayout entity per project.
+ * Extends BaseSyncManager for unified lifecycle, auto-reconnect refetch,
+ * and shared WS client acquisition.
+ *
+ * Now publishes layout data to ValidatedTopicStore and uses SubscriptionSpec
+ * pattern (addSubscription/removeSubscription) instead of raw subscribe().
+ */
+
 import type { DashboardLayout } from '@stratiqai/types-simple';
 import {
 	Q_LIST_DASHBOARD_LAYOUTS,
@@ -7,47 +17,38 @@ import {
 	S_ON_CREATE_DASHBOARD_LAYOUT,
 	S_ON_UPDATE_DASHBOARD_LAYOUT
 } from '@stratiqai/types-simple';
-import {
-	getAppSyncWsClient,
-	initAppSyncWsClient,
-	destroyAppSyncWsClient,
-	type AppSyncWsClient
-} from '../wsClient';
-import { GraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
+import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
+import type { SubscriptionSpec } from '../types';
+import { BaseSyncManager, type BaseSyncManagerOptions } from './BaseSyncManager';
 import { createLogger } from '$lib/utils/logger';
 
 const log = createLogger('sync');
 
-export type DashboardSyncManagerOptions = {
-	idToken: string;
+export const store = validatedTopicStore;
+
+function dashboardTopic(projectId: string): string {
+	return `dashboards/${projectId}`;
+}
+
+export interface DashboardSyncManagerOptions extends BaseSyncManagerOptions {
 	projectId: string;
-};
+}
 
-type ManagerStatus = 'inactive' | 'initializing' | 'ready' | 'error';
-
-/**
- * Manages a single DashboardLayout entity per project.
- *
- * Unlike ProjectSyncManager (which syncs a list of entities to ValidatedTopicStore),
- * this manages a singleton-per-project that feeds directly into DashboardStore.
- */
-export class DashboardSyncManager {
-	private queryClient: GraphQLQueryClient | null = null;
-	private subscriptionClient: AppSyncWsClient | null = null;
-	private ownsWsClient = false;
-
-	private _status: ManagerStatus = 'inactive';
-	private _error: string | null = null;
-	private initializationPromise: Promise<void> | null = null;
-
+export class DashboardSyncManager extends BaseSyncManager {
 	private projectId: string | null = null;
 	private layoutId: string | null = null;
-	private updateSubHandle: { id: string; unsubscribe(): void } | null = null;
-	private createSubHandle: { id: string; unsubscribe(): void } | null = null;
+	private updateSpec: SubscriptionSpec<any> | null = null;
+	private createSpec: SubscriptionSpec<any> | null = null;
 
 	private onRemoteUpdate: ((layout: DashboardLayout) => void) | null = null;
 
-	private constructor() {}
+	protected get managerName() {
+		return 'DashboardSyncManager';
+	}
+
+	private constructor() {
+		super();
+	}
 
 	static createInactive(): DashboardSyncManager {
 		return new DashboardSyncManager();
@@ -59,47 +60,38 @@ export class DashboardSyncManager {
 		return manager;
 	}
 
-	async initialize({ idToken, projectId }: DashboardSyncManagerOptions): Promise<void> {
-		if (this.initializationPromise) return this.initializationPromise;
-		if (this._status === 'ready') this.cleanup();
-
-		this._status = 'initializing';
+	protected async doInitialize(options: DashboardSyncManagerOptions): Promise<void> {
+		const { projectId } = options;
+		if (!projectId) throw new Error('DashboardSyncManager requires a projectId.');
 		this.projectId = projectId;
+	}
 
-		this.initializationPromise = (async () => {
-			try {
-				if (!idToken) throw new Error('DashboardSyncManager requires an idToken.');
+	protected doCleanup(): void {
+		if (this.updateSpec && this.subscriptionClient) {
+			this.subscriptionClient.removeSubscription(this.updateSpec);
+		}
+		if (this.createSpec && this.subscriptionClient) {
+			this.subscriptionClient.removeSubscription(this.createSpec);
+		}
+		this.updateSpec = null;
+		this.createSpec = null;
+		this.onRemoteUpdate = null;
+		this.layoutId = null;
+		this.projectId = null;
+	}
 
-				this.queryClient = new GraphQLQueryClient(idToken);
-
-				const existingClient = getAppSyncWsClient();
-				this.ownsWsClient = !existingClient;
-				this.subscriptionClient =
-					existingClient ??
-					initAppSyncWsClient({
-						graphqlHttpUrl: PUBLIC_GRAPHQL_HTTP_ENDPOINT,
-						auth: { mode: 'cognito', idToken }
-					});
-
-				await this.subscriptionClient.ready();
-				this._status = 'ready';
-			} catch (err: unknown) {
-				const msg = err instanceof Error ? err.message : 'Failed to initialize DashboardSyncManager';
-				this._error = msg;
-				this._status = 'error';
-				throw err instanceof Error ? err : new Error(msg);
-			}
-		})();
-
-		try {
-			await this.initializationPromise;
-		} finally {
-			this.initializationPromise = null;
+	protected async doRefetch(): Promise<void> {
+		if (!this.projectId) return;
+		const layout = await this.loadLayout();
+		if (layout) {
+			store.publish(dashboardTopic(this.projectId), layout, { source: 'http' });
 		}
 	}
 
+	// ── Layout CRUD ───────────────────────────────────────────────────
+
 	async loadLayout(): Promise<DashboardLayout | null> {
-		this.#ensureReady();
+		this.ensureReady();
 
 		const result = await this.queryClient!.query<{
 			listDashboardLayouts: { items: DashboardLayout[]; nextToken: string | null };
@@ -108,17 +100,14 @@ export class DashboardSyncManager {
 		const items = result?.listDashboardLayouts?.items;
 		if (items && items.length > 0) {
 			this.layoutId = items[0].id;
+			store.publish(dashboardTopic(this.projectId!), items[0], { source: 'http' });
 			return items[0];
 		}
 		return null;
 	}
 
-	/**
-	 * Create a layout for this project, but only if one does not already exist.
-	 * If a layout is found, update it with the supplied state instead.
-	 */
 	async createLayout(state: string, version: string): Promise<DashboardLayout> {
-		this.#ensureReady();
+		this.ensureReady();
 
 		const existing = await this.loadLayout();
 		if (existing) {
@@ -130,7 +119,9 @@ export class DashboardSyncManager {
 				key: { id: existing.id, parentId: this.projectId },
 				input: { state, version }
 			});
-			return updated?.updateDashboardLayout ?? existing;
+			const layout = updated?.updateDashboardLayout ?? existing;
+			store.publish(dashboardTopic(this.projectId!), layout, { source: 'http' });
+			return layout;
 		}
 
 		const result = await this.queryClient!.query<{
@@ -140,12 +131,15 @@ export class DashboardSyncManager {
 		});
 
 		const layout = result?.createDashboardLayout;
-		if (layout) this.layoutId = layout.id;
+		if (layout) {
+			this.layoutId = layout.id;
+			store.publish(dashboardTopic(this.projectId!), layout, { source: 'http' });
+		}
 		return layout;
 	}
 
 	async updateLayout(state: string, version: string): Promise<DashboardLayout | null> {
-		this.#ensureReady();
+		this.ensureReady();
 		if (!this.layoutId) {
 			const existing = await this.loadLayout();
 			if (existing) {
@@ -163,87 +157,66 @@ export class DashboardSyncManager {
 			input: { state, version }
 		});
 
-		return result?.updateDashboardLayout ?? null;
+		const layout = result?.updateDashboardLayout ?? null;
+		if (layout) {
+			store.publish(dashboardTopic(this.projectId!), layout, { source: 'http' });
+		}
+		return layout;
 	}
 
-	/**
-	 * Subscribe to remote updates for the current layout.
-	 * Call after loadLayout/createLayout sets layoutId.
-	 */
+	// ── Subscriptions (using SubscriptionSpec pattern) ─────────────────
+
 	setupUpdateSubscription(onUpdate: (layout: DashboardLayout) => void): void {
 		if (!this.subscriptionClient || !this.layoutId) return;
 
 		this.onRemoteUpdate = onUpdate;
 
-		this.updateSubHandle?.unsubscribe();
-		this.updateSubHandle = this.subscriptionClient.subscribe<{ onUpdateDashboardLayout: DashboardLayout }>({
+		if (this.updateSpec) {
+			this.subscriptionClient.removeSubscription(this.updateSpec);
+		}
+
+		this.updateSpec = {
 			query: S_ON_UPDATE_DASHBOARD_LAYOUT,
 			variables: { id: this.layoutId },
-			next: (data) => {
-				const layout = data?.onUpdateDashboardLayout;
-				if (layout && this.onRemoteUpdate) {
-					this.onRemoteUpdate(layout);
+			path: 'onUpdateDashboardLayout',
+			next: (layout: DashboardLayout) => {
+				if (this.projectId) {
+					store.publish(dashboardTopic(this.projectId), layout);
 				}
+				this.onRemoteUpdate?.(layout);
 			},
-			error: (err) => {
-				log.error('Update subscription error:', err);
+			error: (err: unknown) => {
+				log.error('Dashboard update subscription error:', err);
 			}
-		});
+		};
+
+		this.subscriptionClient.addSubscription(this.updateSpec);
 	}
 
-	/**
-	 * Subscribe to new layout creations for the current project.
-	 * Useful during migration when another tab might create the layout.
-	 */
 	setupCreateSubscription(onCreate: (layout: DashboardLayout) => void): void {
 		if (!this.subscriptionClient || !this.projectId) return;
 
-		this.createSubHandle?.unsubscribe();
-		this.createSubHandle = this.subscriptionClient.subscribe<{ onCreateDashboardLayout: DashboardLayout }>({
+		if (this.createSpec) {
+			this.subscriptionClient.removeSubscription(this.createSpec);
+		}
+
+		this.createSpec = {
 			query: S_ON_CREATE_DASHBOARD_LAYOUT,
 			variables: { parentId: this.projectId },
-			next: (data) => {
-				const layout = data?.onCreateDashboardLayout;
-				if (layout) {
-					this.layoutId = layout.id;
-					onCreate(layout);
+			path: 'onCreateDashboardLayout',
+			next: (layout: DashboardLayout) => {
+				this.layoutId = layout.id;
+				if (this.projectId) {
+					store.publish(dashboardTopic(this.projectId), layout);
 				}
+				onCreate(layout);
 			},
-			error: (err) => {
-				log.error('Create subscription error:', err);
+			error: (err: unknown) => {
+				log.error('Dashboard create subscription error:', err);
 			}
-		});
-	}
+		};
 
-	cleanup(): void {
-		this.updateSubHandle?.unsubscribe();
-		this.updateSubHandle = null;
-		this.createSubHandle?.unsubscribe();
-		this.createSubHandle = null;
-
-		if (this.ownsWsClient) destroyAppSyncWsClient();
-
-		this.queryClient = null;
-		this.subscriptionClient = null;
-		this.ownsWsClient = false;
-		this.onRemoteUpdate = null;
-		this.layoutId = null;
-		this.projectId = null;
-		this._status = 'inactive';
-		this._error = null;
-		this.initializationPromise = null;
-	}
-
-	get status(): ManagerStatus {
-		return this._status;
-	}
-
-	get isReady(): boolean {
-		return this._status === 'ready';
-	}
-
-	get lastError(): string | null {
-		return this._error;
+		this.subscriptionClient.addSubscription(this.createSpec);
 	}
 
 	get currentLayoutId(): string | null {
@@ -252,11 +225,5 @@ export class DashboardSyncManager {
 
 	set currentLayoutId(id: string | null) {
 		this.layoutId = id;
-	}
-
-	#ensureReady() {
-		if (this._status !== 'ready' || !this.queryClient) {
-			throw new Error(`DashboardSyncManager is not ready. Current status: ${this._status}`);
-		}
 	}
 }

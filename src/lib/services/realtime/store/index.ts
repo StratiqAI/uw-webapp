@@ -1,10 +1,7 @@
 /**
- * GraphQL Store Publisher Module
- * 
- * Exports for the GraphQL-to-ValidatedTopicStore synchronization system.
+ * GraphQL Store Module Exports
  */
 
-export { GraphQLStorePublisher } from './GraphQLStorePublisher';
 export { GraphQLQueryClient, type IGraphQLQueryClient } from './GraphQLQueryClient';
 export { EntitySyncManager } from './EntitySyncManager';
 export {
@@ -20,7 +17,6 @@ export {
 	createEntitySyncConfig
 } from './EntitySyncHelpers';
 export type {
-	GraphQLStorePublisherOptions,
 	ProjectSyncConfig,
 	SubscriptionConfig,
 	EntitySchemaConfig

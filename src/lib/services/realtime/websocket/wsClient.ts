@@ -1,50 +1,44 @@
 /**
- * AppSync WebSocket Client Implementation (Hardened)
+ * AppSync WebSocket Client — Unified, Hardened, Auto-Reconnecting
  *
- * This module provides a robust, secure, and memory-safe TypeScript implementation
- * of an AppSync WebSocket client for real-time GraphQL subscriptions.
+ * Single source of truth for all AppSync realtime subscriptions in the app.
  *
- * Security & Best Practices Features:
- * - Bounded message queue to prevent DoS via memory exhaustion.
- * - Explicit removal of WebSocket event listeners to prevent memory leaks.
- * - Thorough cleanup of timers and callback references on disconnect.
- * - Defensive error handling around network operations.
- * - Standardized WebSocket close codes.
- * - Readonly state where applicable.
- *
- * @author StratiqAI
- * @version 1.2.0 (Hardened)
- * @since 2024
+ * Features:
+ * - Exponential backoff reconnect (1s → 2s → 4s … 30s cap)
+ * - Subscription restoration after reconnect
+ * - Observable connection state (importable reactive object)
+ * - Token refresh via async getToken() hook
+ * - Bounded message queue (DoS guard)
+ * - Proper listener cleanup to prevent SPA memory leaks
+ * - onReconnect callback registry for sync-manager refetch
  */
 
-// Import only necessary utilities.
-// Assuming logger handles environment-specific logging levels (e.g., no debug logs in prod).
 import { createLogger } from '$lib/utils/logger';
 
 const log = createLogger('realtime');
 import { print } from 'graphql';
 
-// Websocket resources
 import type {
 	TAppSyncWsClient,
 	RealtimeClientOptions,
 	SubscriptionSpec,
 	AppSyncAuth,
-	SubscribeOptions
+	SubscribeOptions,
+	ConnectionState
 } from './types';
 
 import { toRealtimeUrl, base64Url, safeJsonParse, uuid, pluck } from './utils';
+import { setConnectionState, resetConnectionState } from './connectionState.svelte';
 
-// Constants for AppSync Protocol & Client Behavior
+// ── Protocol constants ──────────────────────────────────────────────
+
 const APPSYNC_PROTOCOL = 'graphql-ws';
-const DEFAULT_CONNECTION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
-const KA_CHECK_INTERVAL_MS = 5000; // Check watchdog every 5 seconds
-const MAX_QUEUE_SIZE = 1000; // Prevent memory exhaustion DoS if server floods data
+const DEFAULT_CONNECTION_TIMEOUT_MS = 5 * 60 * 1000;
+const KA_CHECK_INTERVAL_MS = 5000;
+const MAX_QUEUE_SIZE = 1000;
 
-// Standard WebSocket Close Codes
 const WS_CLOSE_NORMAL = 1000;
 const WS_CLOSE_POLICY_VIOLATION = 4008;
-// const WS_CLOSE_INTERNAL_ERROR = 1011; // Unused but good reference
 
 const MSG_TYPE = {
 	CONNECTION_INIT: 'connection_init',
@@ -58,7 +52,14 @@ const MSG_TYPE = {
 	STOP: 'stop'
 } as const;
 
-// Internal interfaces for tighter typing
+// ── Reconnect constants ─────────────────────────────────────────────
+
+const RECONNECT_BASE_MS = 1000;
+const RECONNECT_MAX_MS = 30_000;
+const RECONNECT_MAX_ATTEMPTS = Infinity;
+
+// ── Internal types ──────────────────────────────────────────────────
+
 interface AppSyncMessage<T = any> {
 	id?: string;
 	type: (typeof MSG_TYPE)[keyof typeof MSG_TYPE];
@@ -74,144 +75,109 @@ interface ActiveSubscriptionHandle {
 	unsubscribe: () => void;
 }
 
+// ── Config type ─────────────────────────────────────────────────────
+
 export type AppSyncWsClientConfig = RealtimeClientOptions & {
 	subscriptions?: SubscriptionSpec<any>[];
-	/**
-	 * Optional hook for monitoring raw incoming messages.
-	 * SECURITY WARNING: Do not log these events blindly in production, as they
-	 * may contain sensitive data or tokens in payloads.
-	 */
 	onEvent?: (frame: AppSyncMessage) => void;
 };
 
-export class AppSyncWsClient implements TAppSyncWsClient {
-	public readonly websocket: WebSocket;
-	private readonly httpHost: string;
-	private readonly auth: AppSyncAuth;
-	private readonly onEvent?: (frame: AppSyncMessage) => void;
+// ── Client class ────────────────────────────────────────────────────
 
-	// Connection State
+export class AppSyncWsClient implements TAppSyncWsClient {
+	public websocket: WebSocket | null = null;
+	private readonly graphqlHttpUrl: string;
+	private readonly httpHost: string;
+	private auth: AppSyncAuth;
+	private readonly onEvent?: (frame: AppSyncMessage) => void;
+	private readonly getToken?: () => Promise<string>;
+
+	// Connection state
 	private isAcked = false;
 	private connectionTimeoutMs = DEFAULT_CONNECTION_TIMEOUT_MS;
 	private lastKa = Date.now();
 	private kaTimer: number | null = null;
 
-	// Ready Promise State
-	private readonly readyPromise: Promise<void>;
+	// Ready promise
+	private readyPromise!: Promise<void>;
 	private resolveReady!: () => void;
 	private rejectReady!: (err: Error) => void;
 
-	// Subscription State
+	// Subscriptions
 	private readonly pendingStarts = new Map<string, AppSyncMessage>();
 	private readonly activeSubscriptions = new Map<string, SubscriptionRecord>();
-	// managed specs list is mutable as users can add/remove them
 	private subscriptionSpecs: SubscriptionSpec<any>[] = [];
 	private readonly specToHandleMap = new Map<SubscriptionSpec<any>, ActiveSubscriptionHandle>();
 
-	// Message Queue State
+	// Message queue
 	private queue: AppSyncMessage[] = [];
 	private isFlushScheduled = false;
 
-	// Bound Event Handlers (stored for proper removal to prevent memory leaks)
-	private readonly handleOpenBound: () => void;
-	private readonly handleMessageBound: (evt: MessageEvent) => void;
-	private readonly handleCloseBound: (evt: CloseEvent) => void;
+	// Reconnect
+	private intentionalClose = false;
+	private reconnectAttempt = 0;
+	private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+	private readonly onReconnectCallbacks = new Set<() => void>();
 
-	constructor(options: AppSyncWsClientConfig) {
-		// 1. Environment & Input Validation
+	// Bound handlers
+	private handleOpenBound!: () => void;
+	private handleMessageBound!: (evt: MessageEvent) => void;
+	private handleCloseBound!: (evt: CloseEvent | Event) => void;
+
+	constructor(private readonly config: AppSyncWsClientConfig) {
 		if (typeof window === 'undefined') {
 			throw new Error('AppSync WS client must run in the browser environment.');
 		}
-		if (!options.graphqlHttpUrl) throw new Error('graphqlHttpUrl is required');
-		if (!options.auth) throw new Error('auth configuration is required');
+		if (!config.graphqlHttpUrl) throw new Error('graphqlHttpUrl is required');
+		if (!config.auth) throw new Error('auth configuration is required');
 
-		const { graphqlHttpUrl, auth, onEvent, subscriptions } = options;
+		this.graphqlHttpUrl = config.graphqlHttpUrl;
+		this.auth = config.auth;
+		this.onEvent = config.onEvent;
+		this.getToken = config.getToken;
+		this.subscriptionSpecs = config.subscriptions ? [...config.subscriptions] : [];
 
-		this.auth = auth;
-		this.onEvent = onEvent;
-		this.subscriptionSpecs = subscriptions || [];
+		const httpUrl = new URL(config.graphqlHttpUrl);
+		this.httpHost = httpUrl.host;
 
-		// Pre-bind handlers once for correct add/removeEventListener usage
-		this.handleOpenBound = this.onWsOpen.bind(this);
-		this.handleMessageBound = this.onWsMessage.bind(this);
-		this.handleCloseBound = this.onWsClose.bind(this);
-
-		// 2. Connection Setup
-		try {
-			const httpUrl = new URL(graphqlHttpUrl);
-			this.httpHost = httpUrl.host;
-			const realtimeUrl = toRealtimeUrl(httpUrl);
-
-			// Prepare initial handshake authentication header.
-			// AppSync requires this specific (and somewhat dated) header encapsulation in the protocol URL.
-			const headerSubproto = `header-${base64Url(JSON.stringify(this.getAuthHeaders()))}`;
-
-			// Initialize WebSocket
-			this.websocket = new WebSocket(realtimeUrl, [APPSYNC_PROTOCOL, headerSubproto]);
-			this.websocket.binaryType = 'arraybuffer'; // Best practice, though AppSync uses text frames.
-		} catch (e) {
-			// Catch URL parsing errors or immediate WS creation failures
-			throw new Error(`Failed to initialize AppSync WebSocket: ${(e as Error).message}`);
-		}
-
-		// Initialize ready promise
-		this.readyPromise = new Promise<void>((res, rej) => {
-			this.resolveReady = res;
-			// If connection fails before ACK, this rejection is handled in onWsClose
-			this.rejectReady = rej;
-		});
-
-		this.attachWebSocketEventListeners();
+		this.resetReadyPromise();
+		this.connect();
 	}
 
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	// Public API
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+	// ── Public API ────────────────────────────────────────────────────
 
-	/**
-	 * Returns a promise that resolves when the connection handshake (ack) is complete.
-	 */
 	public ready(): Promise<void> {
 		return this.readyPromise;
 	}
 
-	/**
-	 * Gracefully disconnects the WebSocket, sends a normal close code, and cleans up resources.
-	 */
 	public disconnect(): void {
-		// Calling close() triggers the 'close' event listener, which calls cleanupConnection().
-		// Using 1000 indicates a normal closure (e.g., user navigated away).
+		this.intentionalClose = true;
+		this.cancelReconnect();
+
 		if (
-			this.websocket.readyState === WebSocket.OPEN ||
-			this.websocket.readyState === WebSocket.CONNECTING
+			this.websocket &&
+			(this.websocket.readyState === WebSocket.OPEN ||
+				this.websocket.readyState === WebSocket.CONNECTING)
 		) {
 			this.websocket.close(WS_CLOSE_NORMAL, 'Client initiated disconnect');
 		}
+		this.cleanupConnection();
+		setConnectionState({ status: 'disconnected', error: null, reconnectAttempt: 0 });
 	}
 
-	/**
-	 * Adds a subscription specification to be managed by the client.
-	 */
 	public addSubscription<T>(spec: SubscriptionSpec<T>): void {
-		// Prevent adding duplicate specs references
 		if (this.subscriptionSpecs.includes(spec)) return;
-
 		this.subscriptionSpecs.push(spec);
 
 		if (this.isAcked) {
 			this.setupManagedSubscription(spec);
 		}
-		// If not acked, it will be picked up in handleConnectionAck
 	}
 
-	/**
-	 * Removes a managed subscription specification and unsubscribes from it.
-	 */
 	public removeSubscription<T>(spec: SubscriptionSpec<T>): void {
 		const index = this.subscriptionSpecs.indexOf(spec);
 		if (index > -1) {
 			this.subscriptionSpecs.splice(index, 1);
-
 			const handle = this.specToHandleMap.get(spec);
 			if (handle) {
 				handle.unsubscribe();
@@ -221,18 +187,11 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 	}
 
 	public getSubscriptions(): SubscriptionSpec<any>[] {
-		// Return a shallow copy to prevent external mutation of the internal array
 		return [...this.subscriptionSpecs];
 	}
 
-	/**
-	 * Low-level subscription method.
-	 * Returns a handle with an unsubscribe function.
-	 */
 	public subscribe<T = unknown>(params: SubscribeOptions<T>): { id: string; unsubscribe(): void } {
 		const id = uuid();
-
-		// Register the callback handlers
 		this.activeSubscriptions.set(id, { next: params.next, error: params.error });
 
 		let queryString: string;
@@ -244,15 +203,11 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 			return { id, unsubscribe: () => {} };
 		}
 
-		// AppSync expects auth headers in the extensions of the start message
 		const frame: AppSyncMessage = {
 			id,
 			type: MSG_TYPE.START,
 			payload: {
-				data: JSON.stringify({
-					query: queryString,
-					variables: params.variables ?? {}
-				}),
+				data: JSON.stringify({ query: queryString, variables: params.variables ?? {} }),
 				extensions: { authorization: this.getAuthHeaders() }
 			}
 		};
@@ -263,56 +218,91 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 			this.pendingStarts.set(id, frame);
 		}
 
-		// Return control handle
 		return {
 			id,
 			unsubscribe: () => {
-				// If it's pending and hasn't been sent yet, just remove it from the queue.
 				const wasPending = this.pendingStarts.delete(id);
 				if (!wasPending && this.isAcked) {
-					// If it was already sent and we are connected, send a stop message.
 					this.send({ type: MSG_TYPE.STOP, id });
 				}
-				// Remove local listeners immediately
 				this.activeSubscriptions.delete(id);
 			}
 		};
 	}
 
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	// Internal: Connection Lifecycle & Event Handling
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+	/**
+	 * Register a callback to be invoked after a successful reconnect + ack.
+	 * Returns a cleanup function to unregister.
+	 */
+	public registerOnReconnect(cb: () => void): () => void {
+		this.onReconnectCallbacks.add(cb);
+		return () => {
+			this.onReconnectCallbacks.delete(cb);
+		};
+	}
 
-	private attachWebSocketEventListeners(): void {
-		this.websocket.addEventListener('open', this.handleOpenBound);
-		this.websocket.addEventListener('message', this.handleMessageBound);
-		this.websocket.addEventListener('close', this.handleCloseBound);
-		this.websocket.addEventListener('error', this.handleCloseBound); // Treat errors as closure triggers
+	// ── Connection lifecycle ──────────────────────────────────────────
+
+	private connect(): void {
+		try {
+			setConnectionState({
+				status: this.reconnectAttempt > 0 ? 'reconnecting' : 'connecting',
+				reconnectAttempt: this.reconnectAttempt,
+				error: null
+			});
+
+			const httpUrl = new URL(this.graphqlHttpUrl);
+			const realtimeUrl = toRealtimeUrl(httpUrl);
+			const headerSubproto = `header-${base64Url(JSON.stringify(this.getAuthHeaders()))}`;
+
+			this.websocket = new WebSocket(realtimeUrl, [APPSYNC_PROTOCOL, headerSubproto]);
+			this.websocket.binaryType = 'arraybuffer';
+
+			this.handleOpenBound = this.onWsOpen.bind(this);
+			this.handleMessageBound = this.onWsMessage.bind(this);
+			this.handleCloseBound = this.onWsClose.bind(this);
+
+			this.websocket.addEventListener('open', this.handleOpenBound);
+			this.websocket.addEventListener('message', this.handleMessageBound);
+			this.websocket.addEventListener('close', this.handleCloseBound);
+			this.websocket.addEventListener('error', this.handleCloseBound);
+		} catch (e) {
+			const msg = `Failed to initialize AppSync WebSocket: ${(e as Error).message}`;
+			log.error(msg);
+			setConnectionState({ status: 'disconnected', error: msg });
+			this.scheduleReconnect();
+		}
+	}
+
+	private resetReadyPromise(): void {
+		this.readyPromise = new Promise<void>((res, rej) => {
+			this.resolveReady = res;
+			this.rejectReady = rej;
+		});
 	}
 
 	private detachWebSocketEventListeners(): void {
-		// CRITICAL: Remove listeners to prevent memory leaks in SPAs
+		if (!this.websocket) return;
 		try {
 			this.websocket.removeEventListener('open', this.handleOpenBound);
 			this.websocket.removeEventListener('message', this.handleMessageBound);
 			this.websocket.removeEventListener('close', this.handleCloseBound);
 			this.websocket.removeEventListener('error', this.handleCloseBound);
-		} catch (e) {
-			// Ignore errors if WS is already invalid, just ensure cleanup attempts happen.
+		} catch {
+			// WS may already be invalid
 		}
 	}
 
 	private onWsOpen(): void {
-		// Initiate AppSync handshake immediatly upon connection
 		this.send({ type: MSG_TYPE.CONNECTION_INIT });
 	}
 
 	private onWsClose(evt: CloseEvent | Event): void {
-		// Determine if this was a CloseEvent or just a generic Error event
 		const code = 'code' in evt ? evt.code : 'N/A';
 		const reason = 'reason' in evt ? evt.reason : 'Connection Error';
+		const wasAcked = this.isAcked;
 
-		if (!this.isAcked) {
+		if (!wasAcked) {
 			this.rejectReady(
 				new Error(`WebSocket closed before connection_ack. Code: ${code}, Reason: ${reason}`)
 			);
@@ -323,12 +313,16 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 		}
 
 		this.cleanupConnection();
+
+		if (!this.intentionalClose) {
+			setConnectionState({
+				status: 'reconnecting',
+				error: `Connection lost (code: ${code})`
+			});
+			this.scheduleReconnect();
+		}
 	}
 
-	/**
-	 * Centralized, idempotent cleanup routine for timers, listeners, and state.
-	 * Ensures no memory leaks remain after connection termination.
-	 */
 	private cleanupConnection(): void {
 		this.isAcked = false;
 		this.detachWebSocketEventListeners();
@@ -338,30 +332,64 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 			this.kaTimer = null;
 		}
 
-		// Clean up managed subscription handles
-		for (const handle of this.specToHandleMap.values()) {
-			// We don't call unsubscribe() here because that tries to send network messages.
-			// We just need to ensure internal references are cleared.
-		}
 		this.specToHandleMap.clear();
-
-		// CRITICAL: Clear all maps holding external callbacks to allow GC.
 		this.activeSubscriptions.clear();
 		this.pendingStarts.clear();
 		this.queue = [];
 		this.isFlushScheduled = false;
 	}
 
-	private onWsMessage(evt: MessageEvent): void {
-		// Use safeJsonParse to prevent crashes from malformed server payloads
-		const msg = safeJsonParse<AppSyncMessage>(String(evt.data));
+	// ── Reconnection with exponential backoff ─────────────────────────
 
-		if (!msg || !msg.type) {
-			log.debug('Received invalid or non-JSON message from AppSync protocol');
+	private scheduleReconnect(): void {
+		if (this.intentionalClose) return;
+		if (this.reconnectAttempt >= RECONNECT_MAX_ATTEMPTS) {
+			log.error('Max reconnect attempts reached. Giving up.');
+			setConnectionState({ status: 'disconnected', error: 'Max reconnect attempts reached' });
 			return;
 		}
 
-		// Log non-keep-alive messages for debugging (assuming logger handles redaction in prod)
+		const delay = Math.min(
+			RECONNECT_BASE_MS * Math.pow(2, this.reconnectAttempt),
+			RECONNECT_MAX_MS
+		);
+		const jitter = delay * 0.2 * Math.random();
+		const finalDelay = Math.round(delay + jitter);
+
+		this.reconnectAttempt++;
+		setConnectionState({ reconnectAttempt: this.reconnectAttempt });
+		log.info(`Reconnecting in ${finalDelay}ms (attempt ${this.reconnectAttempt})`);
+
+		this.reconnectTimer = setTimeout(async () => {
+			this.reconnectTimer = null;
+
+			if (this.getToken) {
+				try {
+					const freshToken = await this.getToken();
+					this.auth = { mode: 'cognito', idToken: freshToken };
+				} catch (e) {
+					log.error('Failed to refresh token for reconnect', e);
+				}
+			}
+
+			this.resetReadyPromise();
+			this.connect();
+		}, finalDelay);
+	}
+
+	private cancelReconnect(): void {
+		if (this.reconnectTimer !== null) {
+			clearTimeout(this.reconnectTimer);
+			this.reconnectTimer = null;
+		}
+	}
+
+	// ── Message handling ──────────────────────────────────────────────
+
+	private onWsMessage(evt: MessageEvent): void {
+		const msg = safeJsonParse<AppSyncMessage>(String(evt.data));
+		if (!msg || !msg.type) return;
+
 		if (msg.type !== MSG_TYPE.KA) {
 			log.debug(`[${msg.type}]`, msg);
 		}
@@ -384,82 +412,76 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 			case MSG_TYPE.COMPLETE:
 				this.handleCompleteMessage(msg);
 				break;
-			// case MSG_TYPE.START_ACK:
-			// Unused in standard flow, but could be handled here.
-			// break;
 		}
 	}
 
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	// Internal: Message Processors
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
 	private handleConnectionAck(msg: AppSyncMessage<{ connectionTimeoutMs?: number }>): void {
+		const isReconnect = this.reconnectAttempt > 0;
 		this.isAcked = true;
-		// Allow server to override timeout, fallback to default.
+		this.reconnectAttempt = 0;
 		this.connectionTimeoutMs = msg.payload?.connectionTimeoutMs ?? DEFAULT_CONNECTION_TIMEOUT_MS;
 		this.resolveReady();
 		this.lastKa = Date.now();
 
-		// Start Keep-Alive (KA) watchdog.
-		// AppSync server sends KA periodically; client must ensure it receives them.
+		setConnectionState({
+			status: 'connected',
+			lastConnectedAt: Date.now(),
+			reconnectAttempt: 0,
+			error: null
+		});
+
 		if (this.kaTimer === null) {
 			this.kaTimer = window.setInterval(() => {
-				const timeSinceLastKa = Date.now() - this.lastKa;
-				if (timeSinceLastKa > this.connectionTimeoutMs) {
+				if (Date.now() - this.lastKa > this.connectionTimeoutMs) {
 					log.error('AppSync Keep-Alive timeout exceeded. Closing connection.');
-					// 4008 = Policy Violation (server didn't respect KA policy)
-					this.websocket.close(WS_CLOSE_POLICY_VIOLATION, 'KA Timeout');
+					this.websocket?.close(WS_CLOSE_POLICY_VIOLATION, 'KA Timeout');
 				}
 			}, KA_CHECK_INTERVAL_MS);
 		}
 
-		// Send any subscriptions that were queued before connection was ready
 		for (const frame of this.pendingStarts.values()) {
 			this.send(frame);
 		}
 		this.pendingStarts.clear();
 
-		// Initialize managed subscriptions
 		this.setupManagedSubscriptions();
+
+		if (isReconnect) {
+			log.info('Reconnected successfully. Notifying sync managers.');
+			for (const cb of this.onReconnectCallbacks) {
+				try {
+					cb();
+				} catch (e) {
+					log.error('onReconnect callback error', e);
+				}
+			}
+		}
 	}
 
 	private handleDataMessage(msg: AppSyncMessage): void {
-		// DoS PREVENTION: Bounded queue.
 		if (this.queue.length >= MAX_QUEUE_SIZE) {
-			log.warn('AppSync client message queue full. Dropping incoming data message to prevent memory exhaustion.');
-			// Optional: Could choose to disconnect here if flooding is severe.
+			log.warn('Message queue full. Dropping data message.');
 			return;
 		}
-
 		this.queue.push(msg);
 		this.scheduleFlush();
 	}
 
 	private handleErrorMessage(msg: AppSyncMessage): void {
-		// Error can be connection-level (no id) or subscription-specific (has id)
 		if (msg.id) {
 			const sub = this.activeSubscriptions.get(msg.id);
-			// Provide payload or entire msg if payload is missing
 			sub?.error?.(msg.payload ?? msg);
 		} else {
-			// Global connection error. Log it.
-			// Note: AppSync often sends connection errors just before closing the socket.
 			log.error('AppSync Protocol Error:', msg.payload ?? msg);
 		}
 	}
 
 	private handleCompleteMessage(msg: AppSyncMessage): void {
-		// Server indicating subscription has finished sending data.
 		if (msg.id) {
 			this.activeSubscriptions.delete(msg.id);
 		}
 	}
 
-	/**
-	 * Schedules the microtask queue to flush data messages.
-	 * Uses queueMicrotask to batch rapid incoming messages into a single processing tick.
-	 */
 	private scheduleFlush = () => {
 		if (this.isFlushScheduled) return;
 		this.isFlushScheduled = true;
@@ -475,70 +497,48 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 			} catch (e) {
 				log.error('Error processing subscription data queue', e);
 			} finally {
-				// Always reset queue state even if processing failed
 				this.queue = [];
 				this.isFlushScheduled = false;
 			}
 		});
 	};
 
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	// Internal: Utilities
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+	// ── Utilities ─────────────────────────────────────────────────────
 
-	/**
-	 * Safely sends a message to the WebSocket.
-	 */
 	private send(obj: AppSyncMessage): boolean {
-		if (this.websocket.readyState === WebSocket.OPEN) {
+		if (this.websocket?.readyState === WebSocket.OPEN) {
 			try {
 				this.websocket.send(JSON.stringify(obj));
 				return true;
 			} catch (e) {
-				log.error('Failed to send WebSocket message via network transport', e);
-				// Force close if network transport is broken
+				log.error('Failed to send WebSocket message', e);
 				this.websocket.close(WS_CLOSE_POLICY_VIOLATION, 'Transport Error');
 				return false;
 			}
-		} else {
-			log.debug('Cannot send message, websocket is not OPEN.', obj.type, `ReadyState: ${this.websocket.readyState}`);
-			return false;
 		}
+		log.debug('Cannot send, websocket not OPEN.', obj.type);
+		return false;
 	}
 
-	/**
-	 * Generates the appropriate authentication header object based on the auth mode.
-	 */
 	private getAuthHeaders(): Record<string, string> {
-		// Important: AppSync expects 'host' header for signature verification in some modes.
 		const baseHeaders = { host: this.httpHost };
 		if (this.auth.mode === 'apiKey') {
 			return { ...baseHeaders, 'x-api-key': this.auth.apiKey };
-		} else {
-			// Assuming Cognito UserPools or OIDC or IAM where Authorization header is used.
-			return { ...baseHeaders, Authorization: this.auth.idToken };
 		}
+		return { ...baseHeaders, Authorization: this.auth.idToken };
 	}
 
-	/**
-	 * Iterates through the declarative SubscriptionSpecs and sets them up.
-	 */
 	private setupManagedSubscriptions(): void {
 		for (const spec of this.subscriptionSpecs) {
-			// Avoid setting up duplicates if already active
 			if (!this.specToHandleMap.has(spec)) {
 				this.setupManagedSubscription(spec);
 			}
 		}
 	}
 
-	/**
-	 * Converts a declarative SubscriptionSpec into an active subscription.
-	 */
 	private setupManagedSubscription<T>(spec: SubscriptionSpec<T>): void {
 		log.debug('Setting up managed subscription:', spec);
 
-		// Determine the data selector function
 		let selector = (payload: any) => payload;
 		if (spec.select) {
 			selector = spec.select;
@@ -550,10 +550,8 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 			query: spec.query,
 			variables: spec.variables,
 			next: (payload: any) => {
-				// Wrap user-provided callbacks in try-catch to prevent app crashes
 				try {
 					const picked = selector(payload);
-					// Only fire next if data was actually selected (avoids undefined updates)
 					if (picked !== undefined) spec.next(picked);
 				} catch (e) {
 					const errorHandler = spec.error ?? log.error.bind(log);
@@ -567,20 +565,12 @@ export class AppSyncWsClient implements TAppSyncWsClient {
 	}
 }
 
-// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-// Singleton helpers
-// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// ── Singleton helpers ───────────────────────────────────────────────
 
 let appSyncWsClientSingleton: AppSyncWsClient | null = null;
 
-/**
- * Returns the current singleton instance if it exists.
- */
 export const getAppSyncWsClient = (): AppSyncWsClient | null => appSyncWsClientSingleton;
 
-/**
- * Initializes the singleton if it doesn't exist, otherwise returns it.
- */
 export const initAppSyncWsClient = (options: AppSyncWsClientConfig): AppSyncWsClient => {
 	if (!appSyncWsClientSingleton) {
 		appSyncWsClientSingleton = new AppSyncWsClient(options);
@@ -592,12 +582,10 @@ export const initAppSyncWsClient = (options: AppSyncWsClientConfig): AppSyncWsCl
 	return appSyncWsClientSingleton;
 };
 
-/**
- * Disconnects and clears the singleton instance.
- */
 export const destroyAppSyncWsClient = (): void => {
 	if (appSyncWsClientSingleton) {
 		appSyncWsClientSingleton.disconnect();
 		appSyncWsClientSingleton = null;
 	}
+	resetConnectionState();
 };

@@ -12,10 +12,11 @@
 -->
 
 <script lang="ts">
-	import { getProjectTextsStore, getProjectTablesStore, getProjectImagesStore } from '$lib/stores/projectEntitiesStore';
+	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import { extractMarkdownTables, parseMarkdownTable } from './markdownTableParser';
 	import type { ProjectDocument, ExtractedTable, ViewCategory } from './types';
+	import type { Text, Table, Image } from '@stratiqai/types-simple';
 
 	import CategoryCountBox from './CategoryCountBox.svelte';
 	import DetailPanel from './DetailPanel.svelte';
@@ -31,21 +32,30 @@
 
 	const darkMode = $derived(darkModeStore.darkMode);
 
-	// UI state
 	let selectedCategory = $state<ViewCategory>(null);
 	let isFullscreen = $state(false);
 
-	// Exclusion tracking
 	let excludedTexts = $state<Set<string>>(new Set());
 	let excludedTables = $state<Set<string>>(new Set());
 	let excludedImages = $state<Set<string>>(new Set());
 
-	// Reactive entity stores
-	const textsStore = $derived.by(() => getProjectTextsStore(projectId));
-	const tablesStore = $derived.by(() => getProjectTablesStore(projectId));
-	const imagesStore = $derived.by(() => getProjectImagesStore(projectId));
+	const store = validatedTopicStore;
 
-	// Deduplicate by id -- the API / sync manager can return duplicate entries
+	function collectEntities<T extends { id: string }>(prefix: string): T[] {
+		void store.tree;
+		const results = store.getAllAtArray(`documents/${projectId}`) as Array<{ id: string; data: any }>;
+		const items: T[] = [];
+		for (const entry of results) {
+			if (typeof entry.data === 'object' && entry.data?.id) {
+				const parts = entry.id.split('/');
+				if (parts.length >= 2 && parts[parts.length - 2] === prefix) {
+					items.push(entry.data as T);
+				}
+			}
+		}
+		return items;
+	}
+
 	function dedup<T extends { id: string }>(items: T[]): T[] {
 		const seen = new Set<string>();
 		return items.filter((item) => {
@@ -56,9 +66,9 @@
 	}
 
 	const uniqueDocuments = $derived(dedup<ProjectDocument>(documents));
-	const uniqueTexts = $derived(dedup($textsStore));
-	const uniqueTables = $derived(dedup($tablesStore));
-	const uniqueImages = $derived(dedup($imagesStore));
+	const uniqueTexts = $derived(dedup(collectEntities<Text>('texts')));
+	const uniqueTables = $derived(dedup(collectEntities<Table>('tables')));
+	const uniqueImages = $derived(dedup(collectEntities<Image>('images')));
 
 	// Extract markdown tables from text blocks
 	const extractedTables = $derived.by(() => {

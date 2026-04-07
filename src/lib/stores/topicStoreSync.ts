@@ -4,8 +4,11 @@
  * Cross-tab synchronisation and localStorage persistence for ValidatedTopicStore.
  *
  * - BroadcastChannel sends granular change messages to other same-origin tabs.
- * - localStorage keeps a flat topic→value snapshot so state survives reloads.
- * - UI-created SchemaRegistrations (source === 'ui') are persisted separately.
+ * - localStorage keeps a flat topic→value snapshot for short-lived session recovery
+ *   (e.g. page refresh). Data is only restored if the snapshot is less than
+ *   MAX_RESTORE_AGE_MS old, preventing stale-data bugs.
+ * - UI-created SchemaRegistrations (source === 'ui') are persisted separately
+ *   without a time gate (schemas are structural, not data).
  *
  * Call initTopicStoreSync(store) once at app startup (after schema registration).
  * It returns a cleanup function that closes the channel and clears timers.
@@ -19,12 +22,19 @@ const log = createLogger('store');
 // ── localStorage keys ───────────────────────────────────────────────
 const DATA_KEY = 'vts:data';
 const SCHEMA_KEY = 'vts:schemas';
+const TIMESTAMP_KEY = 'vts:timestamp';
 
 // ── BroadcastChannel name ───────────────────────────────────────────
 const CHANNEL = 'vts-sync';
 
 // ── Debounce for localStorage writes ────────────────────────────────
 const PERSIST_DEBOUNCE_MS = 500;
+
+/**
+ * Maximum age for localStorage data to be considered valid for restore.
+ * Prevents serving stale data from a previous session.
+ */
+const MAX_RESTORE_AGE_MS = 30_000;
 
 // ── Message types sent over BroadcastChannel ────────────────────────
 
@@ -67,6 +77,20 @@ function tryParseJSON<T>(raw: string | null): T | null {
 }
 
 /**
+ * Whether the store is currently restoring from localStorage / BroadcastChannel.
+ * Set true before any restore, cleared once sync managers report ready.
+ * Components can check this to show a loading indicator.
+ */
+export let isRestoring = false;
+
+/**
+ * Call once all sync managers are ready to mark the restore as complete.
+ */
+export function markRestoreComplete(): void {
+	isRestoring = false;
+}
+
+/**
  * Initialise cross-tab sync and localStorage persistence for the given store.
  *
  * Must be called in a browser context (guarded internally; returns a no-op if
@@ -80,19 +104,16 @@ export function initTopicStoreSync(store: ValidatedTopicStore): () => void {
 	const tabId = crypto.randomUUID();
 	const channel = new BroadcastChannel(CHANNEL);
 
-	/** When true, incoming remote changes are being applied — skip re-broadcast. */
 	let isSyncing = false;
 
-	/** In-memory flat map mirroring every topic → value that has been published. */
 	const topicSnapshot = new Map<string, unknown>();
 
-	/** Timer handle for debounced localStorage writes. */
 	let persistTimer: ReturnType<typeof setTimeout> | null = null;
 
 	// ── Restore persisted state ─────────────────────────────────────
 
 	restoreSchemas(store);
-	restoreTopics(store, topicSnapshot);
+	restoreTopicsIfFresh(store, topicSnapshot);
 
 	// ── Listen for local store mutations ────────────────────────────
 
@@ -113,7 +134,6 @@ export function initTopicStoreSync(store: ValidatedTopicStore): () => void {
 				break;
 
 			case 'clear':
-				// Remove all topics under the cleared path
 				for (const key of topicSnapshot.keys()) {
 					if (key === event.path || key.startsWith(event.path + '/')) {
 						topicSnapshot.delete(key);
@@ -185,8 +205,9 @@ export function initTopicStoreSync(store: ValidatedTopicStore): () => void {
 			const obj: Record<string, unknown> = {};
 			for (const [k, v] of topicSnapshot) obj[k] = v;
 			localStorage.setItem(DATA_KEY, JSON.stringify(obj));
+			localStorage.setItem(TIMESTAMP_KEY, String(Date.now()));
 		} catch {
-			// localStorage quota exceeded or unavailable — silently skip
+			// localStorage quota exceeded or unavailable
 		}
 	}
 
@@ -232,10 +253,27 @@ function restoreSchemas(store: ValidatedTopicStore): void {
 	}
 }
 
-function restoreTopics(store: ValidatedTopicStore, snapshot: Map<string, unknown>): void {
+/**
+ * Only restore topic data if the saved snapshot is recent enough.
+ * This prevents stale data from a previous session (e.g. hours ago)
+ * from being served before sync managers can fetch fresh data.
+ */
+function restoreTopicsIfFresh(store: ValidatedTopicStore, snapshot: Map<string, unknown>): void {
+	const savedTimestamp = Number(localStorage.getItem(TIMESTAMP_KEY));
+	if (!savedTimestamp || isNaN(savedTimestamp)) return;
+
+	const age = Date.now() - savedTimestamp;
+	if (age > MAX_RESTORE_AGE_MS) {
+		log.info(`[TopicStoreSync] Skipping localStorage restore — data is ${Math.round(age / 1000)}s old (max ${MAX_RESTORE_AGE_MS / 1000}s)`);
+		localStorage.removeItem(DATA_KEY);
+		localStorage.removeItem(TIMESTAMP_KEY);
+		return;
+	}
+
 	const saved = tryParseJSON<Record<string, unknown>>(localStorage.getItem(DATA_KEY));
 	if (!saved || typeof saved !== 'object') return;
 
+	isRestoring = true;
 	let count = 0;
 	let rejected = 0;
 	for (const [topic, value] of Object.entries(saved)) {
@@ -246,14 +284,13 @@ function restoreTopics(store: ValidatedTopicStore, snapshot: Map<string, unknown
 				count++;
 			} else {
 				rejected++;
-				log.warn(`[TopicStoreSync] Restore rejected by validation: ${topic}`);
 			}
 		} catch {
 			rejected++;
 		}
 	}
 	if (count > 0 || rejected > 0) {
-		log.info(`[TopicStoreSync] Restored ${count} topic(s) from localStorage` +
+		log.info(`[TopicStoreSync] Restored ${count} topic(s) from localStorage (age: ${Math.round(age / 1000)}s)` +
 			(rejected > 0 ? ` (${rejected} rejected)` : ''));
 	}
 }

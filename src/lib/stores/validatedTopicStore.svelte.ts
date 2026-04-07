@@ -85,8 +85,14 @@ export interface SchemaRegistration {
  * External sync layers (e.g. TopicStoreSync) listen via onChange() to persist or
  * broadcast changes without monkey-patching the store.
  */
+export type PublishSource = 'http' | 'subscription' | 'restore' | 'local';
+
+export interface PublishOptions {
+	source?: PublishSource;
+}
+
 export type StoreChangeEvent =
-	| { type: 'publish'; topic: string; value: unknown }
+	| { type: 'publish'; topic: string; value: unknown; source?: PublishSource }
 	| { type: 'delete'; topic: string }
 	| { type: 'clear'; path: string }
 	| { type: 'register-schema'; registration: SchemaRegistration };
@@ -285,6 +291,12 @@ export class ValidatedTopicStore {
 	 * Used by the sync layer to persist/broadcast mutations without modifying store internals.
 	 */
 	#changeListeners = new Set<(event: StoreChangeEvent) => void>();
+
+	/**
+	 * Tracks the last time data was synced from the server (source='http') per topic prefix.
+	 * Used for diagnostics and freshness monitoring.
+	 */
+	#lastSyncedAt = new Map<string, number>();
 
 	#emitChange(event: StoreChangeEvent): void {
 		for (const listener of this.#changeListeners) {
@@ -530,36 +542,46 @@ export class ValidatedTopicStore {
 	 * @param value - The data to publish (will be validated if a schema matches)
 	 * @returns true if data was stored (valid or no schema), false if validation failed
 	 */
-	publish<T = any>(topic: string, value: T): boolean {
+	publish<T = any>(topic: string, value: T, options?: PublishOptions): boolean {
 		const entry = this.#getBestValidator(topic);
 
 		if (entry) {
-			// Schema exists: validate the data
 			const isValid = entry.validate(value);
 			if (!isValid) {
-				// Validation failed: store errors and reject the data
 				this.#errors.set(topic, entry.validate.errors);
 				return false;
 			}
 		}
-		// Validation passed (or no schema): store the data
 
-		// Clear any previous errors (data is now valid)
 		this.#errors.delete(topic);
-
-		// Store the data in the reactive tree (triggers UI updates)
 		this.#setPath(topic, value);
 
-		// Notify programmatic subscribers (for side effects, logging, etc.)
+		const source = options?.source;
+
+		if (source === 'http') {
+			const prefix = topic.split('/').slice(0, 1).join('/');
+			if (prefix) {
+				this.#lastSyncedAt.set(prefix, Date.now());
+			}
+		}
+
 		this.#subscribers.forEach((sub) => {
 			if (sub.regex.test(topic)) {
 				sub.callback(value, topic);
 			}
 		});
 
-		this.#emitChange({ type: 'publish', topic, value });
+		this.#emitChange({ type: 'publish', topic, value, source });
 
 		return true;
+	}
+
+	/**
+	 * Returns the timestamp of the last HTTP-sourced publish for a given topic prefix.
+	 * Useful for diagnostics and determining data freshness.
+	 */
+	getLastSyncedAt(prefix: string): number | null {
+		return this.#lastSyncedAt.get(prefix) ?? null;
 	}
 
 	/**

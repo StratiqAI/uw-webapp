@@ -56,6 +56,9 @@
 		if (!projectId || !selectedDefId) return [];
 		const instParent = `ontology/p/${projectId}/def/${selectedDefId}/inst`;
 		const rawEntries = store.getAllAt<Record<string, unknown>>(instParent);
+		// #region agent log
+		fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7fe1b0'},body:JSON.stringify({sessionId:'7fe1b0',location:'+page.svelte:instances-derived',message:'instances derived eval',data:{projectId,selectedDefId,instParent,rawCount:rawEntries.length,rawIds:rawEntries.map(e=>e.id),rawKeys:rawEntries.slice(0,2).map(e=>({id:e.id,dataKeys:e.data?Object.keys(e.data):[]})),storeNodeAtParent:store.at(instParent)!==undefined},timestamp:Date.now(),hypothesisId:'H-D'})}).catch(()=>{});
+		// #endregion
 		const result: Array<{
 			id: string;
 			data: Record<string, unknown>;

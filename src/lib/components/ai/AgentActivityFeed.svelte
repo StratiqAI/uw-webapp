@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { fly } from 'svelte/transition';
 	import { untrack } from 'svelte';
-	import { getProjectTextsStore, getProjectTablesStore, getProjectImagesStore } from '$lib/stores/projectEntitiesStore';
+	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import { notificationStore } from '$lib/stores/notifications.svelte';
 	import type { Text, Table, Image, Notification } from '@stratiqai/types-simple';
 
@@ -87,9 +87,26 @@
 
 	const { projectId, darkMode }: { projectId: string; darkMode: boolean } = $props();
 
-	const texts = $derived.by(() => getProjectTextsStore(projectId));
-	const tables = $derived.by(() => getProjectTablesStore(projectId));
-	const images = $derived.by(() => getProjectImagesStore(projectId));
+	const store = validatedTopicStore;
+
+	function collectDocEntities<T extends { id: string }>(prefix: string): T[] {
+		void store.tree;
+		const results = store.getAllAtArray(`documents/${projectId}`) as Array<{ id: string; data: any }>;
+		const items: T[] = [];
+		for (const entry of results) {
+			if (typeof entry.data === 'object' && entry.data?.id) {
+				const parts = entry.id.split('/');
+				if (parts.length >= 2 && parts[parts.length - 2] === prefix) {
+					items.push(entry.data as T);
+				}
+			}
+		}
+		return items;
+	}
+
+	const textsList = $derived(collectDocEntities<Text>('texts'));
+	const tablesList = $derived(collectDocEntities<Table>('tables'));
+	const imagesList = $derived(collectDocEntities<Image>('images'));
 
 	let feedEntries = $state<AgentFeedEntry[]>([]);
 	let expandedIds = $state<Set<string>>(new Set());
@@ -281,8 +298,8 @@
 	let imageDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 	$effect(() => {
-		const count = $texts.length;
-		const newest = $texts[0] as Text | undefined;
+		const count = textsList.length;
+		const newest = textsList[0] as Text | undefined;
 		const prev = untrack(() => prevTextCount);
 		if (initialized && count > prev && prev > 0) {
 			if (textDebounceTimer) clearTimeout(textDebounceTimer);
@@ -303,8 +320,8 @@
 	});
 
 	$effect(() => {
-		const count = $tables.length;
-		const newest = $tables[0] as Table | undefined;
+		const count = tablesList.length;
+		const newest = tablesList[0] as Table | undefined;
 		const prev = untrack(() => prevTableCount);
 		if (initialized && count > prev && prev > 0) {
 			if (tableDebounceTimer) clearTimeout(tableDebounceTimer);
@@ -325,8 +342,8 @@
 	});
 
 	$effect(() => {
-		const count = $images.length;
-		const newest = $images[0] as Image | undefined;
+		const count = imagesList.length;
+		const newest = imagesList[0] as Image | undefined;
 		const prev = untrack(() => prevImageCount);
 		if (initialized && count > prev && prev > 0) {
 			if (imageDebounceTimer) clearTimeout(imageDebounceTimer);

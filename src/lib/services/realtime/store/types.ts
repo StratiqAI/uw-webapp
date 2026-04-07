@@ -55,14 +55,11 @@ export interface EntitySchemaConfig {
 }
 
 /**
- * Options for GraphQLStorePublisher constructor
+ * Options for GraphQLStorePublisher (legacy, kept for type compatibility)
  */
 export interface GraphQLStorePublisherOptions {
-	/** Query client for HTTP GraphQL queries */
 	queryClient: import('./GraphQLQueryClient').IGraphQLQueryClient;
-	/** Subscription client for WebSocket GraphQL subscriptions */
-	subscriptionClient: import('../websocket/AppSyncWsClient').AppSyncWsClient;
-	/** ValidatedTopicStore instance - using interface to avoid circular dependency */
+	subscriptionClient: import('../websocket/wsClient').AppSyncWsClient;
 	store: {
 		registerSchema(pattern: string, schema: Schema): void;
 		publish<T = any>(topic: string, value: T): boolean;

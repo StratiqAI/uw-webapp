@@ -1,32 +1,50 @@
 /**
  * DocumentEntitiesSyncManager
- * 
+ *
  * Manages fetching and syncing document entities (texts, tables, images) for a project.
- * This manager fetches documents with their nested entities using getDocument query
- * and populates the projectEntitiesStore.
+ *
+ * Now uses the unified wsClient.ts singleton (via BaseSyncManager) and publishes
+ * all data to ValidatedTopicStore instead of the legacy projectEntitiesStore.
+ *
+ * Topic paths:
+ *   documents/{projectId}/{docId}/texts/{textId}
+ *   documents/{projectId}/{docId}/tables/{tableId}
+ *   documents/{projectId}/{docId}/images/{imageId}
  */
 
 import { browser } from '$app/environment';
 import type { Text, Table, Image } from '@stratiqai/types-simple';
 import { S_ON_CREATE_TEXT, S_ON_CREATE_TABLE, S_ON_CREATE_IMAGE } from '@stratiqai/types-simple';
 import { print } from 'graphql';
-import { gql } from '$lib/services/realtime/graphql/requestHandler';
-import {
-	addProjectText,
-	addProjectTable,
-	addProjectImage,
-	setProjectEntities,
-	clearProjectEntities
-} from '$lib/stores/projectEntitiesStore';
-import { addSubscription, removeSubscription, ensureConnection } from '$lib/stores/appSyncClientStore';
-import type { SubscriptionSpec } from '$lib/services/realtime/websocket/types';
+import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
+import type { SubscriptionSpec } from '../types';
+import { BaseSyncManager, type BaseSyncManagerOptions } from './BaseSyncManager';
 import { createLogger } from '$lib/utils/logger';
 
 const log = createLogger('documents');
 
-/**
- * GraphQL query to fetch a document with its texts, tables, and images
- */
+export const store = validatedTopicStore;
+
+// ── Topic path helpers ──────────────────────────────────────────────
+
+function textTopic(projectId: string, docId: string, textId: string): string {
+	return `documents/${projectId}/${docId}/texts/${textId}`;
+}
+
+function tableTopic(projectId: string, docId: string, tableId: string): string {
+	return `documents/${projectId}/${docId}/tables/${tableId}`;
+}
+
+function imageTopic(projectId: string, docId: string, imageId: string): string {
+	return `documents/${projectId}/${docId}/images/${imageId}`;
+}
+
+function documentBaseTopic(projectId: string): string {
+	return `documents/${projectId}`;
+}
+
+// ── Inline query (kept local to this manager) ───────────────────────
+
 const Q_GET_DOCUMENT_WITH_ENTITIES = `
   query GetDocumentWithEntities($id: ID!) {
     getDocument(id: $id) {
@@ -42,55 +60,21 @@ const Q_GET_DOCUMENT_WITH_ENTITIES = `
       sizeBytes
       texts(limit: 100) {
         items {
-          id
-          entityType
-          tenantId
-          ownerId
-          createdAt
-          updatedAt
-          deletedAt
-          parentId
-          pageNum
-          text
+          id entityType tenantId ownerId createdAt updatedAt deletedAt parentId pageNum text
         }
         nextToken
       }
       tables(limit: 100) {
         items {
-          id
-          entityType
-          tenantId
-          ownerId
-          createdAt
-          updatedAt
-          deletedAt
-          parentId
-          pageNum
-          description
+          id entityType tenantId ownerId createdAt updatedAt deletedAt parentId pageNum description
         }
         nextToken
       }
       images(limit: 100) {
         items {
-          id
-          entityType
-          tenantId
-          ownerId
-          createdAt
-          updatedAt
-          deletedAt
-          s3Bucket
-          s3Key
-          mimeType
-          sizeBytes
-          parentId
-          pageNum
-          imageId
-          topLeftX
-          topLeftY
-          bottomRightX
-          bottomRightY
-          imageAnnotation
+          id entityType tenantId ownerId createdAt updatedAt deletedAt
+          s3Bucket s3Key mimeType sizeBytes parentId pageNum imageId
+          topLeftX topLeftY bottomRightX bottomRightY imageAnnotation
         }
         nextToken
       }
@@ -105,16 +89,10 @@ interface DocumentWithEntities {
 	images?: { items: Image[]; nextToken?: string };
 }
 
-export type DocumentEntitiesManagerOptions = {
-	/** The user's authentication token required for GraphQL requests. */
-	idToken: string;
-	/** The project ID to associate entities with in the store. */
+export interface DocumentEntitiesManagerOptions extends BaseSyncManagerOptions {
 	projectId: string;
-	/** List of document IDs (SHA256 hashes) to fetch entities for. */
 	documentIds: string[];
-};
-
-type ManagerStatus = 'inactive' | 'loading' | 'ready' | 'error';
+}
 
 interface FetchResult {
 	texts: Text[];
@@ -122,47 +100,97 @@ interface FetchResult {
 	images: Image[];
 }
 
-export class DocumentEntitiesSyncManager {
-	private idToken: string | null = null;
+export class DocumentEntitiesSyncManager extends BaseSyncManager {
 	private projectId: string | null = null;
 	private documentIds: string[] = [];
 	private subscriptionSpecs: SubscriptionSpec<any>[] = [];
 
-	// --- Operational State ---
-	private _status: ManagerStatus = 'inactive';
-	private _error: string | null = null;
+	protected get managerName() {
+		return 'DocumentEntitiesSyncManager';
+	}
 
-	private constructor() {}
+	private constructor() {
+		super();
+	}
 
-	/**
-	 * Creates an instance of the manager without initializing it.
-	 */
 	static createInactive(): DocumentEntitiesSyncManager {
 		return new DocumentEntitiesSyncManager();
 	}
 
-	/**
-	 * Creates and initializes an instance of the manager, fetching all entities.
-	 */
 	static async create(options: DocumentEntitiesManagerOptions): Promise<DocumentEntitiesSyncManager> {
 		const manager = new DocumentEntitiesSyncManager();
-		await manager.fetchAll(options);
+		await manager.initialize(options);
 		return manager;
 	}
 
-	/**
-	 * Fetches all entities (texts, tables, images) for a single document using getDocument query.
-	 */
-	private async fetchEntitiesForDocument(documentId: string): Promise<FetchResult> {
-		if (!this.idToken) {
-			throw new Error('idToken is required');
+	protected async doInitialize(options: DocumentEntitiesManagerOptions): Promise<void> {
+		if (!browser) return;
+
+		const { projectId, documentIds } = options;
+		if (!projectId) throw new Error('DocumentEntitiesSyncManager requires a projectId.');
+
+		this.projectId = projectId;
+		this.documentIds = documentIds;
+
+		await this.fetchAndPublishAll();
+	}
+
+	protected doCleanup(): void {
+		this.teardownSubscriptions();
+		if (this.projectId) {
+			store.clearAllAt(documentBaseTopic(this.projectId));
+		}
+		this.projectId = null;
+		this.documentIds = [];
+	}
+
+	protected async doRefetch(): Promise<void> {
+		if (!this.projectId) return;
+		await this.fetchAndPublishAll();
+	}
+
+	// ── Fetch & publish ───────────────────────────────────────────────
+
+	private async fetchAndPublishAll(): Promise<void> {
+		if (!this.projectId) return;
+
+		this.teardownSubscriptions();
+
+		if (this.documentIds.length === 0) {
+			store.clearAllAt(documentBaseTopic(this.projectId));
+			return;
 		}
 
+		const results = await Promise.all(
+			this.documentIds.map((docId) => this.fetchEntitiesForDocument(docId))
+		);
+
+		const projectId = this.projectId;
+		for (let i = 0; i < this.documentIds.length; i++) {
+			const docId = this.documentIds[i];
+			const result = results[i];
+
+			for (const text of result.texts) {
+				store.publish(textTopic(projectId, docId, text.id), text, { source: 'http' });
+			}
+			for (const table of result.tables) {
+				store.publish(tableTopic(projectId, docId, table.id), table, { source: 'http' });
+			}
+			for (const image of result.images) {
+				store.publish(imageTopic(projectId, docId, image.id), image, { source: 'http' });
+			}
+		}
+
+		await Promise.all(
+			this.documentIds.map((docId) => this.setupSubscriptionsForDocument(docId))
+		);
+	}
+
+	private async fetchEntitiesForDocument(documentId: string): Promise<FetchResult> {
 		try {
-			const result = await gql<{ getDocument: DocumentWithEntities | null }>(
+			const result = await this.queryClient!.query<{ getDocument: DocumentWithEntities | null }>(
 				Q_GET_DOCUMENT_WITH_ENTITIES,
-				{ id: documentId },
-				this.idToken
+				{ id: documentId }
 			);
 
 			const document = result.getDocument;
@@ -182,12 +210,10 @@ export class DocumentEntitiesSyncManager {
 		}
 	}
 
-	/**
-	 * Sets up real-time WebSocket subscriptions for a document so new entities
-	 * created during cloud processing are pushed into the store automatically.
-	 */
+	// ── Subscriptions ─────────────────────────────────────────────────
+
 	private async setupSubscriptionsForDocument(documentId: string): Promise<void> {
-		if (!this.idToken || !this.projectId) return;
+		if (!this.subscriptionClient || !this.projectId) return;
 
 		const projectId = this.projectId;
 
@@ -197,10 +223,12 @@ export class DocumentEntitiesSyncManager {
 				variables: { parentId: documentId },
 				path: 'onCreateText',
 				next: (text: Text) => {
-					if (projectId) addProjectText(projectId, text);
+					if (projectId) {
+						store.publish(textTopic(projectId, documentId, text.id), text);
+					}
 				},
-				error: (err: any) => {
-					log.error(`[DocumentEntitiesSyncManager] Text subscription error for ${documentId}:`, err);
+				error: (err: unknown) => {
+					log.error(`Text subscription error for ${documentId}:`, err);
 				}
 			},
 			{
@@ -208,10 +236,12 @@ export class DocumentEntitiesSyncManager {
 				variables: { parentId: documentId },
 				path: 'onCreateTable',
 				next: (table: Table) => {
-					if (projectId) addProjectTable(projectId, table);
+					if (projectId) {
+						store.publish(tableTopic(projectId, documentId, table.id), table);
+					}
 				},
-				error: (err: any) => {
-					log.error(`[DocumentEntitiesSyncManager] Table subscription error for ${documentId}:`, err);
+				error: (err: unknown) => {
+					log.error(`Table subscription error for ${documentId}:`, err);
 				}
 			},
 			{
@@ -219,179 +249,61 @@ export class DocumentEntitiesSyncManager {
 				variables: { parentId: documentId },
 				path: 'onCreateImage',
 				next: (image: Image) => {
-					if (projectId) addProjectImage(projectId, image);
+					if (projectId) {
+						store.publish(imageTopic(projectId, documentId, image.id), image);
+					}
 				},
-				error: (err: any) => {
-					log.error(`[DocumentEntitiesSyncManager] Image subscription error for ${documentId}:`, err);
+				error: (err: unknown) => {
+					log.error(`Image subscription error for ${documentId}:`, err);
 				}
 			}
 		];
 
-		try {
-			await ensureConnection(this.idToken);
-			for (const spec of specs) {
-				await addSubscription(this.idToken, spec);
-			}
-			this.subscriptionSpecs.push(...specs);
-		} catch (err) {
-			log.error(`[DocumentEntitiesSyncManager] Failed to set up subscriptions for ${documentId}:`, err);
+		for (const spec of specs) {
+			this.subscriptionClient.addSubscription(spec);
 		}
+		this.subscriptionSpecs.push(...specs);
 	}
 
-	/**
-	 * Removes all active subscriptions.
-	 */
 	private teardownSubscriptions(): void {
-		for (const spec of this.subscriptionSpecs) {
-			removeSubscription(spec);
+		if (this.subscriptionClient) {
+			for (const spec of this.subscriptionSpecs) {
+				this.subscriptionClient.removeSubscription(spec);
+			}
 		}
 		this.subscriptionSpecs = [];
 	}
 
-	/**
-	 * Fetches all entities for all documents and populates the store.
-	 */
-	async fetchAll(options: DocumentEntitiesManagerOptions): Promise<void> {
-		if (!browser) return;
+	// ── Public helpers ────────────────────────────────────────────────
 
-		const { idToken, projectId, documentIds } = options;
-
-		if (!idToken) {
-			throw new Error('DocumentEntitiesSyncManager requires an idToken.');
-		}
-
-		if (!projectId) {
-			throw new Error('DocumentEntitiesSyncManager requires a projectId.');
-		}
-
-		this.idToken = idToken;
-		this.projectId = projectId;
-		this.documentIds = documentIds;
-		this._status = 'loading';
-		this._error = null;
-
-		try {
-			this.teardownSubscriptions();
-
-			if (documentIds.length === 0) {
-				clearProjectEntities(projectId);
-				this._status = 'ready';
-				return;
-			}
-
-			const results = await Promise.all(
-				documentIds.map(docId => this.fetchEntitiesForDocument(docId))
-			);
-
-			// Batch all fetched entities into a single store write
-			const allTexts: Text[] = [];
-			const allTables: Table[] = [];
-			const allImages: Image[] = [];
-			for (const result of results) {
-				allTexts.push(...result.texts);
-				allTables.push(...result.tables);
-				allImages.push(...result.images);
-			}
-			setProjectEntities(projectId, {
-				texts: allTexts,
-				tables: allTables,
-				images: allImages
-			});
-
-			await Promise.all(
-				documentIds.map(docId => this.setupSubscriptionsForDocument(docId))
-			);
-
-			this._status = 'ready';
-		} catch (err) {
-			log.error('Failed to fetch document entities:', err);
-			this._error = err instanceof Error ? err.message : 'Failed to load document entities';
-			this._status = 'error';
-			throw err;
-		}
-	}
-
-	/**
-	 * Refetch entities for all documents (useful for refresh).
-	 */
 	async refresh(): Promise<void> {
-		if (!this.idToken || !this.projectId) {
-			throw new Error('Manager not initialized. Call fetchAll first.');
+		if (!this.projectId) {
+			throw new Error('Manager not initialized.');
 		}
-
-		await this.fetchAll({
-			idToken: this.idToken,
-			projectId: this.projectId,
-			documentIds: this.documentIds
-		});
+		await this.fetchAndPublishAll();
 	}
 
-	/**
-	 * Add a new document and fetch its entities.
-	 */
 	async addDocument(documentId: string): Promise<void> {
-		if (!this.idToken || !this.projectId) {
-			throw new Error('Manager not initialized. Call fetchAll first.');
+		if (!this.projectId) {
+			throw new Error('Manager not initialized.');
 		}
 
-		if (this.documentIds.includes(documentId)) {
-			return; // Already tracking this document
-		}
-
+		if (this.documentIds.includes(documentId)) return;
 		this.documentIds.push(documentId);
 
-		try {
-			const result = await this.fetchEntitiesForDocument(documentId);
+		const result = await this.fetchEntitiesForDocument(documentId);
+		const projectId = this.projectId;
 
-			for (const text of result.texts) {
-				addProjectText(this.projectId, text);
-			}
-			for (const table of result.tables) {
-				addProjectTable(this.projectId, table);
-			}
-			for (const image of result.images) {
-				addProjectImage(this.projectId, image);
-			}
-
-			await this.setupSubscriptionsForDocument(documentId);
-		} catch (err) {
-			log.error(`Failed to fetch entities for document ${documentId}:`, err);
-			throw err;
+		for (const text of result.texts) {
+			store.publish(textTopic(projectId, documentId, text.id), text, { source: 'http' });
 		}
-	}
-
-	/**
-	 * Cleans up resources.
-	 */
-	cleanup(): void {
-		this.teardownSubscriptions();
-		if (this.projectId) {
-			clearProjectEntities(this.projectId);
+		for (const table of result.tables) {
+			store.publish(tableTopic(projectId, documentId, table.id), table, { source: 'http' });
 		}
-		this.idToken = null;
-		this.projectId = null;
-		this.documentIds = [];
-		this._status = 'inactive';
-		this._error = null;
-	}
+		for (const image of result.images) {
+			store.publish(imageTopic(projectId, documentId, image.id), image, { source: 'http' });
+		}
 
-	/** The current operational status of the manager. */
-	get status(): ManagerStatus {
-		return this._status;
-	}
-
-	/** Returns true if the manager is successfully initialized and ready. */
-	get isReady(): boolean {
-		return this._status === 'ready';
-	}
-
-	/** Returns true if an async operation is currently in progress. */
-	get isLoading(): boolean {
-		return this._status === 'loading';
-	}
-
-	/** Returns the error message from the last failed operation, if any. */
-	get lastError(): string | null {
-		return this._error;
+		await this.setupSubscriptionsForDocument(documentId);
 	}
 }
