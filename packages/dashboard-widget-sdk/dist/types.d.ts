@@ -136,6 +136,19 @@ export interface WidgetPromptEditData {
     frequencyPenalty?: number;
     stopSequences: string;
 }
+/** Raw database records returned by the Debug tab for inspection. */
+export interface WidgetDebugData {
+    widget: Record<string, unknown>;
+    prompt: Record<string, unknown> | null;
+    jsonSchema: Record<string, unknown> | null;
+    entityDefinition: Record<string, unknown> | null;
+    entityInstance: Record<string, unknown> | null;
+    topic: {
+        path: string;
+        data: unknown;
+        schema?: Record<string, unknown>;
+    };
+}
 /**
  * Contract that the host app must satisfy and inject via `setDashboardWidgetHost()`.
  * Widget packages read this through `getDashboardWidgetHost()` at runtime.
@@ -184,4 +197,6 @@ export interface DashboardWidgetHost {
     setRequestedConfigureTab?(widgetId: string, tab: string): void;
     /** Read and clear the pending tab request for a widget (returns undefined when none). */
     consumeRequestedConfigureTab?(widgetId: string): string | undefined;
+    /** Fetch raw DB records for the widget's linked entities (debug/inspection). */
+    loadWidgetDebugData?(kind: string, widgetId: string): Promise<WidgetDebugData | null>;
 }

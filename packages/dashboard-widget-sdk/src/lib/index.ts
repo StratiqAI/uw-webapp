@@ -10,7 +10,8 @@ export type {
 	TopicEntry,
 	StreamEntry,
 	HostStreamCatalog,
-	ServiceStatus
+	ServiceStatus,
+	WidgetDebugData
 } from './types.js';
 export { defineWidget } from './defineWidget.js';
 export { setDashboardWidgetHost, getDashboardWidgetHost } from './context.svelte.js';

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import type { DashboardAppTheme, StreamEntry, WidgetPromptEditData } from './types.js';
+	import type { DashboardAppTheme, StreamEntry, WidgetPromptEditData, WidgetDebugData } from './types.js';
 	import { getDashboardWidgetHost } from './context.svelte.js';
 	import { peekConfigureTab, consumeConfigureTab } from './configureTabSignal.svelte.js';
 	import PromptEditor from './PromptEditor.svelte';
@@ -40,7 +40,8 @@
 	const host = getDashboardWidgetHost();
 
 	const hasAI = $derived(showAITab && !!host.loadWidgetPrompt);
-	let activeTab = $state<'settings' | 'ai'>('settings');
+	const hasDebug = $derived(!!host.loadWidgetDebugData);
+	let activeTab = $state<'settings' | 'ai' | 'debug'>('settings');
 
 	$effect(() => {
 		const pending = peekConfigureTab(widgetId);
@@ -260,6 +261,56 @@
 			aiRunning = false;
 		}
 	}
+
+	// --- Debug tab state ---
+	let debugLoading = $state(false);
+	let debugError = $state('');
+	let debugData = $state<WidgetDebugData | null>(null);
+	let debugCollapsed = $state<Record<string, boolean>>({
+		widget: false,
+		topic: false,
+		prompt: true,
+		jsonSchema: true,
+		entityDefinition: true,
+		entityInstance: true
+	});
+
+	$effect(() => {
+		if (activeTab === 'debug' && !debugData && !debugLoading && !debugError) {
+			loadDebugData();
+		}
+	});
+
+	async function loadDebugData() {
+		if (!host.loadWidgetDebugData) return;
+		debugLoading = true;
+		debugError = '';
+		try {
+			debugData = await host.loadWidgetDebugData(kind, widgetId);
+		} catch (e) {
+			debugError = e instanceof Error ? e.message : 'Failed to load debug data';
+		} finally {
+			debugLoading = false;
+		}
+	}
+
+	function refreshDebugData() {
+		debugData = null;
+		debugError = '';
+		loadDebugData();
+	}
+
+	function toggleDebugSection(key: string) {
+		debugCollapsed[key] = !debugCollapsed[key];
+	}
+
+	function formatJson(value: unknown): string {
+		try {
+			return JSON.stringify(value, null, 2);
+		} catch {
+			return String(value);
+		}
+	}
 </script>
 
 <div class="flex h-full flex-col overflow-auto {panelBg}">
@@ -269,7 +320,7 @@
 			<p class={labelClass}>{kind} &bull; {widgetId}</p>
 		</header>
 
-		{#if hasAI}
+		{#if hasAI || hasDebug}
 			<nav class="flex border-b {sectionBorder}">
 				<button
 					type="button"
@@ -279,14 +330,26 @@
 							: (darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700')}"
 					onclick={() => { activeTab = 'settings'; }}
 				>Settings</button>
-				<button
-					type="button"
-					class="px-4 py-2 text-sm font-medium transition-colors -mb-px
-						{activeTab === 'ai'
-							? (darkMode ? 'border-b-2 border-indigo-400 text-indigo-400' : 'border-b-2 border-indigo-600 text-indigo-600')
-							: (darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700')}"
-					onclick={() => { activeTab = 'ai'; }}
-				>AI</button>
+				{#if hasAI}
+					<button
+						type="button"
+						class="px-4 py-2 text-sm font-medium transition-colors -mb-px
+							{activeTab === 'ai'
+								? (darkMode ? 'border-b-2 border-indigo-400 text-indigo-400' : 'border-b-2 border-indigo-600 text-indigo-600')
+								: (darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700')}"
+						onclick={() => { activeTab = 'ai'; }}
+					>AI</button>
+				{/if}
+				{#if hasDebug}
+					<button
+						type="button"
+						class="ml-auto px-4 py-2 text-sm font-medium transition-colors -mb-px
+							{activeTab === 'debug'
+								? (darkMode ? 'border-b-2 border-amber-400 text-amber-400' : 'border-b-2 border-amber-600 text-amber-600')
+								: (darkMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600')}"
+						onclick={() => { activeTab = 'debug'; }}
+					>Debug</button>
+				{/if}
 			</nav>
 		{/if}
 
@@ -460,6 +523,66 @@
 					generateError={aiError}
 					onGenerate={handleGenerate}
 				/>
+			{/if}
+		{:else if activeTab === 'debug'}
+			{#if debugLoading}
+				<div class="flex items-center justify-center py-12">
+					<svg class="h-5 w-5 animate-spin {darkMode ? 'text-slate-400' : 'text-slate-500'}" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+					<span class="ml-2 text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'}">Loading debug data...</span>
+				</div>
+			{:else if debugError}
+				<div class="rounded-lg border px-4 py-3 text-sm {darkMode ? 'border-red-500/30 bg-red-500/10 text-red-400' : 'border-red-200 bg-red-50 text-red-600'}">
+					{debugError}
+				</div>
+			{:else if debugData}
+				<div class="flex items-center justify-between mb-2">
+					<h4 class={sectionTitle}>Raw Database Records</h4>
+					<button
+						type="button"
+						class="rounded-md px-2 py-1 text-xs {btnSecondary}"
+						onclick={refreshDebugData}
+					>Refresh</button>
+				</div>
+
+				{@const sections = [
+					{ key: 'widget', label: 'Widget', data: debugData.widget, id: debugData.widget?.id },
+					{ key: 'topic', label: 'Topic', data: debugData.topic, id: debugData.topic?.path },
+					{ key: 'prompt', label: 'Prompt', data: debugData.prompt, id: debugData.prompt?.id },
+					{ key: 'jsonSchema', label: 'JsonSchema', data: debugData.jsonSchema, id: debugData.jsonSchema?.id },
+					{ key: 'entityDefinition', label: 'EntityDefinition', data: debugData.entityDefinition, id: debugData.entityDefinition?.id },
+					{ key: 'entityInstance', label: 'EntityInstance', data: debugData.entityInstance, id: debugData.entityInstance?.id }
+				]}
+
+				{#each sections as section (section.key)}
+					<div class="rounded-lg border {darkMode ? 'border-slate-700' : 'border-slate-200'} mb-2 overflow-hidden">
+						<button
+							type="button"
+							class="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium transition-colors
+								{darkMode ? 'bg-slate-800 hover:bg-slate-750 text-slate-200' : 'bg-slate-100 hover:bg-slate-150 text-slate-700'}"
+							onclick={() => toggleDebugSection(section.key)}
+						>
+							<div class="flex items-center gap-2">
+								<span class="inline-block transition-transform {debugCollapsed[section.key] ? '' : 'rotate-90'}">&#9654;</span>
+								<span>{section.label}</span>
+								{#if section.id}
+									<span class="font-mono text-[10px] opacity-50 truncate max-w-48">{section.id}</span>
+								{/if}
+							</div>
+							{#if !section.data}
+								<span class="text-[10px] italic {darkMode ? 'text-slate-500' : 'text-slate-400'}">Not linked</span>
+							{/if}
+						</button>
+						{#if !debugCollapsed[section.key]}
+							<div class="border-t {darkMode ? 'border-slate-700' : 'border-slate-200'}">
+								{#if section.data}
+									<pre class="overflow-auto p-3 text-[11px] leading-relaxed max-h-64 {darkMode ? 'bg-slate-900 text-emerald-300' : 'bg-slate-50 text-slate-700'}">{formatJson(section.data)}</pre>
+								{:else}
+									<div class="px-3 py-2 text-xs italic {darkMode ? 'text-slate-500' : 'text-slate-400'}">No data — entity not linked to this widget</div>
+								{/if}
+							</div>
+						{/if}
+					</div>
+				{/each}
 			{/if}
 		{/if}
 	</div>

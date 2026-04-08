@@ -9,12 +9,12 @@
 	import { getDefaultDataForWidget, getDefaultSizeForWidget } from '$lib/dashboard/setup/defaultDashboardValues';
 	import type { Widget, WidgetType } from '$lib/dashboard/types/widget';
 	import { setDashboardWidgetHost, HostServices, parseJsonSchemaToBuilderState, buildSchemaPreview, getAiStatusTopic } from '@stratiqai/dashboard-widget-sdk';
-	import type { WidgetPromptEditData } from '@stratiqai/dashboard-widget-sdk';
+	import type { WidgetPromptEditData, WidgetDebugData } from '@stratiqai/dashboard-widget-sdk';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import { getWidgetTopic, getWidgetTopicsByType, getWidgetStructuralHash, getTopicsByStructuralHash } from '$lib/dashboard/setup/widgetSchemaRegistration';
 	import { getWidgetPromptConfig } from '$lib/dashboard/setup/widgetRegistry';
 	import { toOntologyInstDataTopic, toOntologyInstMetaTopic, flatToPropertyValues } from '$lib/services/realtime/store/ontologyClientHelpers';
-	import { M_SAVE_ENTITY_INSTANCE } from '@stratiqai/types-simple';
+	import { M_SAVE_ENTITY_INSTANCE, Q_GET_ENTITY_DEFINITION, Q_GET_ENTITY_INSTANCE } from '@stratiqai/types-simple';
 	import type { SaveInstanceInput, EntityInstance } from '@stratiqai/types-simple';
 	import { streamCatalog } from '$lib/stores/streamCatalog.svelte';
 	import { createSupabaseBrowserClient } from '$lib/services/supabase/browser';
@@ -29,6 +29,8 @@
 		updateWidgetInstancePrompt
 	} from '$lib/services/widgetPromptService';
 	import { aiService } from '$lib/services/ai';
+	import { Q_GET_PROMPT } from '$lib/services/graphql/promptOperations';
+	import { Q_GET_JSON_SCHEMA } from '$lib/services/graphql/jsonSchemaOperations';
 	import { PUBLIC_GEOAPIFY_API_KEY } from '$env/static/public';
 	import { createLogger } from '$lib/utils/logger';
 	import { gql } from '$lib/services/realtime/graphql/requestHandler';
@@ -385,6 +387,74 @@
 			const tab = pendingConfigureTabs[widgetId];
 			if (tab !== undefined) delete pendingConfigureTabs[widgetId];
 			return tab;
+		},
+
+		async loadWidgetDebugData(kind: string, widgetId: string): Promise<WidgetDebugData | null> {
+			const w = dashboard.widgets.find((w) => w.id === widgetId);
+			if (!w) return null;
+
+			const token = getIdToken();
+			const qc = new GraphQLQueryClient(token);
+			const projectId = dashboard.projectId ?? '';
+
+			const topicPath = w.topicOverride
+				?? (() => {
+					const instId = w.entityInstanceId;
+					const hash = getWidgetStructuralHash(kind);
+					if (instId && hash && projectId) return toOntologyInstDataTopic(projectId, hash, instId);
+					return `widgets/${kind}/${widgetId}`;
+				})();
+			const topicData = validatedTopicStore.at(topicPath);
+			const topicSchemaReg = validatedTopicStore.getSchemaById?.(topicPath);
+
+			const widgetRaw = JSON.parse(JSON.stringify(w)) as Record<string, unknown>;
+			const { promptId, entityDefinitionId, entityInstanceId } = w;
+
+			const [promptResult, entityDefResult, entityInstResult] = await Promise.allSettled([
+				promptId
+					? qc.query<{ getPrompt: Record<string, unknown> | null }>(Q_GET_PROMPT, { id: promptId })
+					: Promise.resolve(null),
+				entityDefinitionId && projectId
+					? qc.query<{ getEntityDefinition: Record<string, unknown> | null }>(Q_GET_ENTITY_DEFINITION, { projectId, id: entityDefinitionId })
+					: Promise.resolve(null),
+				entityInstanceId && projectId
+					? qc.query<{ getEntityInstance: Record<string, unknown> | null }>(Q_GET_ENTITY_INSTANCE, { projectId, id: entityInstanceId })
+					: Promise.resolve(null),
+			]);
+
+			const prompt = promptResult.status === 'fulfilled'
+				? (promptResult.value as any)?.getPrompt ?? null
+				: null;
+			const jsonSchemaId = prompt?.jsonSchemaId;
+
+			let jsonSchema: Record<string, unknown> | null = null;
+			if (jsonSchemaId) {
+				try {
+					const res = await qc.query<{ getJsonSchema: Record<string, unknown> | null }>(Q_GET_JSON_SCHEMA, { id: jsonSchemaId });
+					jsonSchema = res?.getJsonSchema ?? null;
+				} catch { /* ignore */ }
+			}
+
+			const entityDef = entityDefResult.status === 'fulfilled'
+				? (entityDefResult.value as any)?.getEntityDefinition ?? null
+				: null;
+
+			const entityInst = entityInstResult.status === 'fulfilled'
+				? (entityInstResult.value as any)?.getEntityInstance ?? null
+				: null;
+
+			return {
+				widget: widgetRaw,
+				prompt,
+				jsonSchema,
+				entityDefinition: entityDef,
+				entityInstance: entityInst,
+				topic: {
+					path: topicPath,
+					data: topicData,
+					schema: topicSchemaReg as Record<string, unknown> | undefined,
+				},
+			};
 		}
 	});
 
