@@ -138,7 +138,7 @@
 	);
 
 	const documents = $derived.by(() => {
-		return doclinks
+		return doclinksByDocument
 			.filter((link: Doclink) => link.documentId && link.filename)
 			.map((link: Doclink) => ({
 				id: link.documentId!,

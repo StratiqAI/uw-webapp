@@ -48,6 +48,8 @@ export const Q_GET_PROJECT = `
           status
           linkType
           documentId
+          textEmbeddingStatus
+          imageEmbeddingStatus
           deletedAt
         }
         nextToken
