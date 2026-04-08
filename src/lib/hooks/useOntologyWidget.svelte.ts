@@ -1,7 +1,7 @@
 /**
  * Svelte 5 rune hook for ontology-to-widget matchmaking.
  *
- * Given a projectId and definitionId, reactively resolves which registered
+ * Given a projectId and structuralHash, reactively resolves which registered
  * widget schemas are structurally compatible with the entity definition's
  * normalizedJsonSchema stored in VTS.
  */
@@ -22,22 +22,15 @@ export interface WidgetMatch {
  * Returns a reactive list of widget schemas whose required properties are
  * satisfied by the given entity definition's schema.
  *
- * @example
- * ```svelte
- * <script lang="ts">
- *   import { useOntologyWidgetMatch } from '$lib/hooks/useOntologyWidget.svelte';
- *
- *   const { matches } = useOntologyWidgetMatch('proj-1', 'def-insurance-policy');
- *   // matches is a reactive array of { schemaId, pattern }
- * </script>
- * ```
+ * @param projectId - The project to look up the definition in VTS
+ * @param structuralHash - The structuralHash used as the topic key
  */
-export function useOntologyWidgetMatch(projectId: string, definitionId: string) {
+export function useOntologyWidgetMatch(projectId: string, structuralHash: string) {
 	const store = validatedTopicStore;
 
 	const matches = $derived.by((): WidgetMatch[] => {
 		const _ = store.schemaVersion;
-		const defTopic = toOntologyDefTopic(projectId, definitionId);
+		const defTopic = toOntologyDefTopic(projectId, structuralHash);
 		const def = store.at<EntityDefinition>(defTopic);
 		if (!def?.normalizedJsonSchema) return [];
 
@@ -61,21 +54,21 @@ export function useOntologyWidgetMatch(projectId: string, definitionId: string) 
 }
 
 /**
- * Reactive variant that accepts dynamic projectId / definitionId via closures.
+ * Reactive variant that accepts dynamic projectId / structuralHash via closures.
  */
 export function useReactiveOntologyWidgetMatch(
 	projectId: () => string,
-	definitionId: () => string,
+	structuralHash: () => string,
 ) {
 	const store = validatedTopicStore;
 
 	const matches = $derived.by((): WidgetMatch[] => {
 		const _ = store.schemaVersion;
 		const pid = projectId();
-		const did = definitionId();
-		if (!pid || !did) return [];
+		const hash = structuralHash();
+		if (!pid || !hash) return [];
 
-		const defTopic = toOntologyDefTopic(pid, did);
+		const defTopic = toOntologyDefTopic(pid, hash);
 		const def = store.at<EntityDefinition>(defTopic);
 		if (!def?.normalizedJsonSchema) return [];
 

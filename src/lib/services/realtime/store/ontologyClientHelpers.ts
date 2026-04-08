@@ -14,35 +14,35 @@ import type {
 } from '@stratiqai/types-simple';
 
 // ---------------------------------------------------------------------------
-// Topic path builders
+// Topic path builders (keyed by structuralHash, not definitionId)
 // ---------------------------------------------------------------------------
 
-export function toOntologyDefTopic(projectId: string, definitionId: string): string {
-	return `ontology/p/${projectId}/def/${definitionId}`;
+export function toOntologyDefTopic(projectId: string, structuralHash: string): string {
+	return `ontology/p/${projectId}/schema/${structuralHash}`;
 }
 
 export function toOntologyInstDataTopic(
 	projectId: string,
-	definitionId: string,
+	structuralHash: string,
 	instanceId: string,
 ): string {
-	return `ontology/p/${projectId}/def/${definitionId}/inst/${instanceId}/data`;
+	return `ontology/p/${projectId}/schema/${structuralHash}/inst/${instanceId}/data`;
 }
 
 export function toOntologyInstMetaTopic(
 	projectId: string,
-	definitionId: string,
+	structuralHash: string,
 	instanceId: string,
 ): string {
-	return `ontology/p/${projectId}/def/${definitionId}/inst/${instanceId}/meta`;
+	return `ontology/p/${projectId}/schema/${structuralHash}/inst/${instanceId}/meta`;
 }
 
 /**
  * VTS schema pattern that matches all instance-data topics for a given
- * definition, regardless of projectId or instanceId.
+ * structuralHash, regardless of projectId or instanceId.
  */
-export function buildOntologySchemaPattern(definitionId: string): string {
-	return `ontology/p/+/def/${definitionId}/inst/+/data`;
+export function buildOntologySchemaPattern(structuralHash: string): string {
+	return `ontology/p/+/schema/${structuralHash}/inst/+/data`;
 }
 
 // ---------------------------------------------------------------------------

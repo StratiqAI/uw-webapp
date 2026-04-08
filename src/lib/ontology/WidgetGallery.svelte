@@ -53,7 +53,7 @@
 		const widgetId = generateWidgetId();
 		const config = dashboard.config;
 		const size = manifest.defaultSize;
-		const topic = toOntologyInstDataTopic(projectId, definition.id, instance.id);
+		const topic = toOntologyInstDataTopic(projectId, definition.structuralHash, instance.id);
 
 		const position = findAvailablePosition(
 			size.colSpan,

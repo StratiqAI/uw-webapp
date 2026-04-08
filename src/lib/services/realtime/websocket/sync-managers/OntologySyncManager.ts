@@ -8,6 +8,9 @@
  *   4. Subscribes to real-time changes (create/update/delete) via wsClient.ts
  *   5. Implements echo cancellation using a per-tab senderId
  *
+ * Topic paths use structuralHash (not definitionId):
+ *   ontology/p/{projectId}/schema/{hash}/inst/{instanceId}/data
+ *
  * Extends BaseSyncManager for unified lifecycle, auto-reconnect refetch,
  * and shared WS client acquisition.
  */
@@ -33,14 +36,12 @@ import type { AppSyncWsClient } from '../wsClient';
 import { OntologySchemaLoader } from '$lib/services/realtime/store/OntologySchemaLoader';
 import { getBrowserClientId } from '$lib/services/realtime/store/browserClientId';
 import {
-	toOntologyDefTopic,
 	toOntologyInstDataTopic,
 	toOntologyInstMetaTopic,
 	extractInstanceData,
 	extractInstanceMeta,
 } from '$lib/services/realtime/store/ontologyClientHelpers';
 import { BaseSyncManager, type BaseSyncManagerOptions } from './BaseSyncManager';
-import { SYSTEM_PROJECT_ID } from '$lib/services/widgetPromptService';
 import { createLogger } from '$lib/utils/logger';
 
 const log = createLogger('ontology-sync');
@@ -81,25 +82,17 @@ export class OntologySyncManager extends BaseSyncManager {
 		if (!projectId) throw new Error('OntologySyncManager requires a projectId.');
 
 		this.projectId = projectId;
-		// #region agent log
-		fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7fe1b0'},body:JSON.stringify({sessionId:'7fe1b0',location:'OntologySyncManager.ts:doInitialize-start',message:'doInitialize called',data:{projectId,hasQueryClient:!!this.queryClient,hasSubClient:!!this.subscriptionClient},timestamp:Date.now(),hypothesisId:'H-A'})}).catch(()=>{});
-		// #endregion
 
 		const schemaLoader = new OntologySchemaLoader(store, this.queryClient!);
+		schemaLoader.setPublishProjectId(projectId);
+
 		const definitions = await schemaLoader.loadDefinitions(projectId);
-		const systemDefs = await schemaLoader.loadDefinitions(SYSTEM_PROJECT_ID);
-		// #region agent log
-		fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7fe1b0'},body:JSON.stringify({sessionId:'7fe1b0',location:'OntologySyncManager.ts:doInitialize-afterDefs',message:'definitions loaded',data:{defCount:definitions.length,systemDefCount:systemDefs.length,defNames:definitions.map(d=>d.name)},timestamp:Date.now(),hypothesisId:'H-E'})}).catch(()=>{});
-		// #endregion
 
 		await this.#loadInstances(projectId, definitions);
 
 		this.schemaLoader = schemaLoader;
 
 		this.#setupSubscriptions(this.subscriptionClient!, projectId);
-		// #region agent log
-		fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7fe1b0'},body:JSON.stringify({sessionId:'7fe1b0',location:'OntologySyncManager.ts:doInitialize-complete',message:'doInitialize complete',data:{projectId,status:'success'},timestamp:Date.now(),hypothesisId:'H-A'})}).catch(()=>{});
-		// #endregion
 	}
 
 	protected doCleanup(): void {
@@ -117,7 +110,6 @@ export class OntologySyncManager extends BaseSyncManager {
 		if (!this.queryClient || !this.projectId) return;
 
 		const definitions = await this.schemaLoader!.loadDefinitions(this.projectId);
-		await this.schemaLoader!.loadDefinitions(SYSTEM_PROJECT_ID);
 		await this.#loadInstances(this.projectId, definitions);
 	}
 
@@ -127,10 +119,13 @@ export class OntologySyncManager extends BaseSyncManager {
 		projectId: string,
 		definitions: EntityDefinition[],
 	): Promise<void> {
-		// #region agent log
-		fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7fe1b0'},body:JSON.stringify({sessionId:'7fe1b0',location:'OntologySyncManager.ts:#loadInstances',message:'loadInstances called',data:{projectId,defCount:definitions.length,defIds:definitions.map(d=>d.id)},timestamp:Date.now(),hypothesisId:'H-B'})}).catch(()=>{});
-		// #endregion
 		for (const def of definitions) {
+			const hash = def.structuralHash;
+			if (!hash) {
+				log.warn(`Definition ${def.id} has no structuralHash, skipping instance load`);
+				continue;
+			}
+
 			try {
 				const result = await this.queryClient!.query<{
 					listEntityInstancesByDefinition: EntityInstance[] | null;
@@ -140,24 +135,21 @@ export class OntologySyncManager extends BaseSyncManager {
 				});
 
 				const instances = result.listEntityInstancesByDefinition ?? [];
-				// #region agent log
-				fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7fe1b0'},body:JSON.stringify({sessionId:'7fe1b0',location:'OntologySyncManager.ts:#loadInstances-query',message:'query result',data:{defId:def.id,defName:def.name,instanceCount:instances.length,rawResultKeys:Object.keys(result),hasNulls:instances.some(i=>!i)},timestamp:Date.now(),hypothesisId:'H-B'})}).catch(()=>{});
-				// #endregion
 				for (const inst of instances) {
 					if (!inst) continue;
 					const flat = extractInstanceData(inst);
-					const dataTopic = toOntologyInstDataTopic(projectId, def.id, inst.id);
-					const dataOk = store.publish(dataTopic, flat, { source: 'http' });
-					const metaTopic = toOntologyInstMetaTopic(projectId, def.id, inst.id);
-					const metaOk = store.publish(metaTopic, extractInstanceMeta(inst), { source: 'http' });
-					// #region agent log
-					fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7fe1b0'},body:JSON.stringify({sessionId:'7fe1b0',location:'OntologySyncManager.ts:#loadInstances-publish',message:'publish result',data:{instId:inst.id,dataTopic,dataOk,metaTopic,metaOk,flatKeys:Object.keys(flat),storeErrors:!dataOk?store.getErrors(dataTopic):null},timestamp:Date.now(),hypothesisId:'H-C'})}).catch(()=>{});
-					// #endregion
+					store.publish(
+						toOntologyInstDataTopic(projectId, hash, inst.id),
+						flat,
+						{ source: 'http' },
+					);
+					store.publish(
+						toOntologyInstMetaTopic(projectId, hash, inst.id),
+						extractInstanceMeta(inst),
+						{ source: 'http' },
+					);
 				}
 			} catch (err) {
-				// #region agent log
-				fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7fe1b0'},body:JSON.stringify({sessionId:'7fe1b0',location:'OntologySyncManager.ts:#loadInstances-error',message:'query failed',data:{defId:def.id,error:err instanceof Error?err.message:String(err)},timestamp:Date.now(),hypothesisId:'H-B'})}).catch(()=>{});
-				// #endregion
 				log.error(`Failed to load instances for definition ${def.id}:`, err);
 			}
 		}
@@ -193,13 +185,20 @@ export class OntologySyncManager extends BaseSyncManager {
 			next: (inst: any) => {
 				if (inst.senderId === this.senderId) return;
 
+				const def = this.schemaLoader?.getDefinition(inst.definitionId);
+				const hash = def?.structuralHash;
+				if (!hash) {
+					log.warn(`No structuralHash for definitionId ${inst.definitionId}, skipping instance update`);
+					return;
+				}
+
 				const flat = extractInstanceData(inst);
 				store.publish(
-					toOntologyInstDataTopic(projectId, inst.definitionId, inst.id),
+					toOntologyInstDataTopic(projectId, hash, inst.id),
 					flat,
 				);
 				store.publish(
-					toOntologyInstMetaTopic(projectId, inst.definitionId, inst.id),
+					toOntologyInstMetaTopic(projectId, hash, inst.id),
 					extractInstanceMeta(inst),
 				);
 			},
@@ -211,8 +210,16 @@ export class OntologySyncManager extends BaseSyncManager {
 			path: 'onInstanceDeleted',
 			next: (inst: any) => {
 				log.debug('Instance deleted:', inst.id);
+
+				const def = this.schemaLoader?.getDefinition(inst.definitionId);
+				const hash = def?.structuralHash;
+				if (!hash) {
+					log.warn(`No structuralHash for definitionId ${inst.definitionId}, skipping instance delete`);
+					return;
+				}
+
 				store.delete(
-					toOntologyInstDataTopic(projectId, inst.definitionId, inst.id),
+					toOntologyInstDataTopic(projectId, hash, inst.id),
 				);
 			},
 		}, client);
@@ -234,13 +241,21 @@ export class OntologySyncManager extends BaseSyncManager {
 		}>(M_SAVE_ENTITY_INSTANCE, { input: fullInput });
 
 		const inst = result.saveEntityInstance;
+		const def = this.schemaLoader?.getDefinition(inst.definitionId);
+		const hash = def?.structuralHash;
+		if (!hash) {
+			log.warn(`No structuralHash for definitionId ${inst.definitionId} after saveInstance`);
+			return inst;
+		}
+
+		const publishProjectId = this.projectId || inst.projectId;
 		const flat = extractInstanceData(inst);
 		store.publish(
-			toOntologyInstDataTopic(inst.projectId, inst.definitionId, inst.id),
+			toOntologyInstDataTopic(publishProjectId, hash, inst.id),
 			flat,
 		);
 		store.publish(
-			toOntologyInstMetaTopic(inst.projectId, inst.definitionId, inst.id),
+			toOntologyInstMetaTopic(publishProjectId, hash, inst.id),
 			extractInstanceMeta(inst),
 		);
 
@@ -254,7 +269,11 @@ export class OntologySyncManager extends BaseSyncManager {
 			id: instanceId,
 		});
 
-		store.delete(toOntologyInstDataTopic(projectId, definitionId, instanceId));
+		const def = this.schemaLoader?.getDefinition(definitionId);
+		const hash = def?.structuralHash;
+		if (hash) {
+			store.delete(toOntologyInstDataTopic(projectId, hash, instanceId));
+		}
 	}
 
 	getSchemaLoader(): OntologySchemaLoader | null {
