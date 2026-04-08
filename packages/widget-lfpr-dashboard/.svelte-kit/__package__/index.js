@@ -10,6 +10,7 @@ export const lfprDashboardWidget = defineWidget({
     defaultData: DEMO_LFPR_CONFIG,
     defaultSize: { colSpan: 12, rowSpan: 5 },
     palette: { icon: '👥', category: 'financial' },
+    entityDefinition: { name: 'LFPR Dashboard Output', description: 'Structured output for LFPR dashboard widgets', outputSchema: lfprDashboardAiOutputSchema },
     promptConfig: {
         defaultPrompt: 'Generate labor force participation rate data for the local market',
         systemInstruction: 'You are a labor market analyst. Return LFPR data including population stats, trend data, and growth/drag drivers.',

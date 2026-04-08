@@ -34,6 +34,18 @@ export interface WidgetPromptConfig {
     mapAiOutput?: (aiOutput: Record<string, unknown>) => Record<string, unknown>;
 }
 /**
+ * Declares a structured EntityDefinition that the widget produces.
+ * During registration the host will create (or reuse) a matching
+ * EntityDefinition in the ontology graph so it appears on the
+ * Ontology Explorer page.
+ */
+export interface WidgetEntityDefinitionConfig {
+    name: string;
+    description?: string;
+    /** Zod schema describing the structured output shape. Converted to JSON Schema at registration time. */
+    outputSchema: z.ZodSchema;
+}
+/**
  * Manifest returned by `defineWidget()`. The host dashboard uses this to
  * register schemas, resolve the component, and seed default data/sizing.
  */
@@ -68,6 +80,12 @@ export interface WidgetManifest<TData = unknown> {
     };
     /** AI prompt configuration — if present, the widget supports AI generation. */
     promptConfig?: WidgetPromptConfig;
+    /**
+     * Explicit EntityDefinition for the widget's structured output.
+     * When omitted but `promptConfig` is present, the EntityDefinition is
+     * auto-derived from `promptConfig.aiOutputSchema` for backward compatibility.
+     */
+    entityDefinition?: WidgetEntityDefinitionConfig;
 }
 /** Provides typed access to host-injected service instances. */
 export interface ServiceAccessor {

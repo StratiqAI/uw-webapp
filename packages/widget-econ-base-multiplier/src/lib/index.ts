@@ -14,6 +14,7 @@ export const econBaseMultiplierWidget = defineWidget({
 	},
 	defaultSize: { colSpan: 8, rowSpan: 4 },
 	palette: { icon: '📊', category: 'financial' },
+	entityDefinition: { name: 'Economic Base Multiplier Output', description: 'Structured output for economic base multiplier widgets', outputSchema: econBaseMultiplierAiOutputSchema },
 	promptConfig: {
 		defaultPrompt: 'Generate economic base multiplier data for the local region',
 		systemInstruction:

@@ -24,6 +24,11 @@ export const proFormaOpExWidget = defineWidget({
 		propertyName: ''
 	},
 	defaultSize: { colSpan: 12, rowSpan: 3 },
+	entityDefinition: {
+		name: 'Pro Forma OpEx Output',
+		description: 'Structured output for pro forma OpEx widgets',
+		outputSchema: proFormaOpExAiOutputSchema
+	},
 	promptConfig: {
 		defaultPrompt: 'Generate operating expense assumptions for this property',
 		systemInstruction:

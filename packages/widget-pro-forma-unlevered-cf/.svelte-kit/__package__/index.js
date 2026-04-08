@@ -21,6 +21,11 @@ export const proFormaUnleveredCfWidget = defineWidget({
         propertyName: ''
     },
     defaultSize: { colSpan: 12, rowSpan: 3 },
+    entityDefinition: {
+        name: 'Pro Forma Unlevered CF Output',
+        description: 'Structured output for pro forma unlevered CF widgets',
+        outputSchema: proFormaUnleveredCfAiOutputSchema
+    },
     promptConfig: {
         defaultPrompt: 'Generate unlevered cash flow assumptions for this property',
         systemInstruction: 'You are a commercial real estate underwriter. Return unlevered cash flow assumptions including purchase price, EGI, OpEx, growth rates, and terminal cap rate.',

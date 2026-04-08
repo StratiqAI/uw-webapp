@@ -8,6 +8,7 @@ export const jsonViewerWidget = defineWidget({
     component: JsonViewerWidget,
     defaultData: { title: null, description: null, json: {} },
     defaultSize: { colSpan: 6, rowSpan: 3 },
+    entityDefinition: { name: 'JSON Viewer Output', description: 'Structured output for JSON viewer widgets', outputSchema: jsonViewerAiOutputSchema },
     promptConfig: {
         defaultPrompt: 'Generate structured JSON data about this property',
         systemInstruction: 'You are a data structuring assistant. ' +

@@ -27,6 +27,11 @@ export const proFormaUnleveredReturnsWidget = defineWidget({
 		unleveredDiscountRate: 0.1
 	},
 	defaultSize: { colSpan: 12, rowSpan: 2 },
+	entityDefinition: {
+		name: 'Pro Forma Unlevered Returns Output',
+		description: 'Structured output for pro forma unlevered returns widgets',
+		outputSchema: proFormaUnleveredReturnsAiOutputSchema
+	},
 	promptConfig: {
 		defaultPrompt: 'Generate unlevered return assumptions for this property investment',
 		systemInstruction:

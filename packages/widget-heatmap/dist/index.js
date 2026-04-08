@@ -19,6 +19,7 @@ export const heatmapWidget = defineWidget({
     },
     defaultSize: { colSpan: 6, rowSpan: 4 },
     palette: { icon: '🔥', category: 'charts' },
+    entityDefinition: { name: 'Heatmap Output', description: 'Structured output for heatmap widgets', outputSchema: heatmapAiOutputSchema },
     promptConfig: {
         defaultPrompt: 'Generate a heatmap showing intensity across categories and time periods',
         systemInstruction: 'You are a data visualization assistant. Return a 2D matrix of values with row and column labels for a heatmap.',

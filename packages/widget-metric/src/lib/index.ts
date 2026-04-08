@@ -9,6 +9,11 @@ export const metricWidget = defineWidget({
 	component: MetricWidget,
 	defaultData: { label: '\u2014', value: '\u2014' },
 	defaultSize: { colSpan: 2, rowSpan: 1 },
+	entityDefinition: {
+		name: 'Metric Widget Output',
+		description: 'Structured output for metric widgets',
+		outputSchema: metricAiOutputSchema
+	},
 	promptConfig: {
 		defaultPrompt: 'Provide the key financial metric for this property',
 		systemInstruction:

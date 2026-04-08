@@ -1,4 +1,4 @@
-export type { StandardWidgetProps, WidgetManifest, WidgetPromptConfig, WidgetPromptEditData, DashboardWidgetHost, ServiceAccessor, DashboardAppTheme, TopicEntry, StreamEntry, HostStreamCatalog, ServiceStatus } from './types.js';
+export type { StandardWidgetProps, WidgetManifest, WidgetPromptConfig, WidgetEntityDefinitionConfig, WidgetPromptEditData, DashboardWidgetHost, ServiceAccessor, DashboardAppTheme, TopicEntry, StreamEntry, HostStreamCatalog, ServiceStatus } from './types.js';
 export { defineWidget } from './defineWidget.js';
 export { setDashboardWidgetHost, getDashboardWidgetHost } from './context.svelte.js';
 export { useReactiveValidatedTopic, publishWidgetOutput, useAiGenerationStatus, getAiStatusTopic } from './hooks.svelte.js';

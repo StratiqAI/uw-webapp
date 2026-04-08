@@ -15,6 +15,11 @@ export const barChartWidget = defineWidget({
     },
     defaultSize: { colSpan: 6, rowSpan: 3 },
     palette: { icon: '📊', category: 'charts' },
+    entityDefinition: {
+        name: 'Bar Chart Output',
+        description: 'Structured output for bar chart widgets',
+        outputSchema: barChartAiOutputSchema
+    },
     promptConfig: {
         defaultPrompt: 'Generate a bar chart comparing key property metrics',
         systemInstruction: 'You are a data visualization assistant. Return structured bar chart data with labels and datasets. ' +

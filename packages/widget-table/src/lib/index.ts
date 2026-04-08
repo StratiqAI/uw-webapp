@@ -16,6 +16,11 @@ export const tableWidget = defineWidget({
 	},
 	defaultSize: { colSpan: 6, rowSpan: 3 },
 	palette: { icon: '\u{1F4CB}', category: 'data' },
+	entityDefinition: {
+		name: 'Table Output',
+		description: 'Structured output for table widgets',
+		outputSchema: tableAiOutputSchema
+	},
 	promptConfig: {
 		defaultPrompt: 'Generate a comparison table of key property metrics',
 		systemInstruction:

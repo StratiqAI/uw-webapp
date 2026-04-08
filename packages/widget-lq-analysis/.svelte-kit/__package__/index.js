@@ -19,6 +19,7 @@ export const lqAnalysisWidget = defineWidget({
     },
     defaultSize: { colSpan: 12, rowSpan: 4 },
     capabilities: [HostServices.SUPABASE],
+    entityDefinition: { name: 'LQ Analysis Output', description: 'Structured output for LQ analysis widgets', outputSchema: lqAnalysisAiOutputSchema },
     promptConfig: {
         defaultPrompt: 'Identify the best metro area and year for location quotient analysis',
         systemInstruction: 'You are an economic research assistant. Return city, state, region label, and year for running a location quotient analysis.',

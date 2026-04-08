@@ -9,6 +9,11 @@ export const paragraphWidget = defineWidget({
     defaultData: { title: null, content: '', markdown: false },
     defaultSize: { colSpan: 6, rowSpan: 3 },
     palette: { icon: '📄', category: 'content' },
+    entityDefinition: {
+        name: 'Paragraph Widget Output',
+        description: 'Structured output for paragraph widgets',
+        outputSchema: paragraphAiOutputSchema
+    },
     promptConfig: {
         defaultPrompt: 'Write a paragraph about the economy around the property',
         systemInstruction: 'You are a helpful assistant that writes clear, informative paragraphs. ' +

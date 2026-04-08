@@ -31,6 +31,11 @@ export const proFormaLeveredReturnsWidget = defineWidget({
 		leveredDiscountRate: 0.12
 	},
 	defaultSize: { colSpan: 12, rowSpan: 2 },
+	entityDefinition: {
+		name: 'Pro Forma Levered Returns Output',
+		description: 'Structured output for pro forma levered returns widgets',
+		outputSchema: proFormaLeveredReturnsAiOutputSchema
+	},
 	promptConfig: {
 		defaultPrompt: 'Generate levered return assumptions for this property investment',
 		systemInstruction:

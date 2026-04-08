@@ -16,6 +16,7 @@ export const areaChartWidget = defineWidget({
 	},
 	defaultSize: { colSpan: 6, rowSpan: 3 },
 	palette: { icon: '📉', category: 'charts' },
+	entityDefinition: { name: 'Area Chart Output', description: 'Structured output for area chart widgets', outputSchema: areaChartAiOutputSchema },
 	promptConfig: {
 		defaultPrompt: 'Generate a stacked area chart showing cumulative trends',
 		systemInstruction:

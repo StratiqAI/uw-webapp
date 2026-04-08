@@ -20,6 +20,11 @@ export const proFormaRevenueWidget = defineWidget({
         propertyName: ''
     },
     defaultSize: { colSpan: 12, rowSpan: 3 },
+    entityDefinition: {
+        name: 'Pro Forma Revenue Output',
+        description: 'Structured output for pro forma revenue widgets',
+        outputSchema: proFormaRevenueAiOutputSchema
+    },
     promptConfig: {
         defaultPrompt: 'Generate revenue assumptions for this property',
         systemInstruction: 'You are a commercial real estate underwriter. Return revenue pro forma assumptions including units, rent, growth rates, and vacancy.',

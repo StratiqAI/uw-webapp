@@ -2,6 +2,7 @@ export type {
 	StandardWidgetProps,
 	WidgetManifest,
 	WidgetPromptConfig,
+	WidgetEntityDefinitionConfig,
 	WidgetPromptEditData,
 	DashboardWidgetHost,
 	ServiceAccessor,

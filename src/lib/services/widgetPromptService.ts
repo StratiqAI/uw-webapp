@@ -5,14 +5,22 @@
  *   Tier 1 — Kind-level templates (created once at app startup per widget kind)
  *   Tier 2 — Per-instance entities (cloned from templates when a widget first uses AI)
  *
+ * Registration is idempotent: EntityDefinitions are deduplicated by structural
+ * hash (via ensureEntityDefinition) and template Prompts by name + jsonSchemaId.
+ *
+ * Widgets that declare an `entityDefinition` config without a `promptConfig`
+ * will still get their EntityDefinition registered (visible in Ontology Explorer)
+ * but no Prompt will be created.
+ *
  * Also provides prompt discovery (listCompatiblePrompts) for the PromptChooser UI.
  */
 
 import type { Prompt } from '@stratiqai/types-simple';
-import type { WidgetPromptConfig } from '@stratiqai/dashboard-widget-sdk';
+import type { WidgetPromptConfig, WidgetEntityDefinitionConfig } from '@stratiqai/dashboard-widget-sdk';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import {
 	getRegisteredManifests,
+	getWidgetManifest,
 	getWidgetPromptConfig
 } from '$lib/dashboard/setup/widgetRegistry';
 import { ensureEntityDefinition } from '$lib/services/graphql/entityDefinitionService';
@@ -48,19 +56,81 @@ const templateCache = new Map<string, TemplateCache>();
 // ---------------------------------------------------------------------------
 
 /**
- * Ensure all registered widget kinds with promptConfig have
- * template Prompt + JsonSchema entities in the cloud.
- * Called once from +layout.svelte onMount.
+ * Resolve the Zod schema and metadata for a widget's EntityDefinition.
+ * Prefers the explicit `entityDefinition` config; falls back to deriving
+ * from `promptConfig.aiOutputSchema` for backward compatibility.
+ */
+function resolveEntityDefinitionConfig(
+	kind: string,
+	entityDef?: WidgetEntityDefinitionConfig,
+	promptConfig?: WidgetPromptConfig
+): { name: string; description: string; zodSchema: import('zod').ZodSchema } | null {
+	if (entityDef) {
+		return {
+			name: entityDef.name,
+			description: entityDef.description ?? `Structured output for ${kind} widgets`,
+			zodSchema: entityDef.outputSchema
+		};
+	}
+	if (promptConfig) {
+		return {
+			name: `widget-template:${kind}:output`,
+			description: `Default output schema for ${kind} widgets`,
+			zodSchema: promptConfig.aiOutputSchema
+		};
+	}
+	return null;
+}
+
+/**
+ * Convert a Zod schema to a clean JSON Schema definition object,
+ * stripping the outer `definitions` wrapper that zod-to-json-schema may add.
+ */
+function zodToCleanSchemaDef(zodSchema: import('zod').ZodSchema, refName: string): unknown {
+	const jsonSchema = zodToJsonSchema(zodSchema, {
+		name: refName,
+		$refStrategy: 'none'
+	});
+	const defs = (jsonSchema as Record<string, unknown>).definitions as
+		| Record<string, unknown>
+		| undefined;
+	return defs ? (defs[refName] ?? jsonSchema) : jsonSchema;
+}
+
+/**
+ * Ensure all registered widget kinds with entityDefinition or promptConfig
+ * have their EntityDefinition (and, when applicable, template Prompt)
+ * persisted in the cloud. Called once from +layout.svelte onMount.
  */
 export async function syncWidgetTemplates(queryClient: IGraphQLQueryClient, projectId: string): Promise<void> {
 	const manifests = getRegisteredManifests();
-	const withPrompt = manifests.filter((m) => m.promptConfig);
-	if (withPrompt.length === 0) return;
+	const eligible = manifests.filter((m) => m.entityDefinition || m.promptConfig);
+	if (eligible.length === 0) return;
 
 	await Promise.allSettled(
-		withPrompt.map(async (m) => {
+		eligible.map(async (m) => {
 			try {
-				await ensureWidgetTemplate(m.kind, m.promptConfig!, queryClient, projectId);
+				const defConfig = resolveEntityDefinitionConfig(m.kind, m.entityDefinition, m.promptConfig);
+				if (!defConfig) return;
+
+				const schemaDef = zodToCleanSchemaDef(defConfig.zodSchema, defConfig.name);
+
+				// Always register the EntityDefinition (idempotent via hash)
+				const defResult = await ensureEntityDefinition(queryClient, projectId, {
+					name: defConfig.name,
+					description: defConfig.description,
+					schemaDefinition: schemaDef
+				});
+
+				// If the widget also has a promptConfig, ensure the template Prompt
+				if (m.promptConfig) {
+					await ensureWidgetTemplatePrompt(
+						m.kind,
+						m.promptConfig,
+						defResult.jsonSchemaId,
+						queryClient
+					);
+				}
 			} catch (err) {
 				log.error(`Failed to sync template for widget kind "${m.kind}":`, err);
 			}
@@ -68,46 +138,32 @@ export async function syncWidgetTemplates(queryClient: IGraphQLQueryClient, proj
 	);
 }
 
-async function ensureWidgetTemplate(
+/**
+ * Ensure a kind-level template Prompt exists and is linked to the given
+ * jsonSchemaId. Idempotent: checks by name first, then by jsonSchemaId.
+ */
+async function ensureWidgetTemplatePrompt(
 	kind: string,
 	promptConfig: WidgetPromptConfig,
-	queryClient: IGraphQLQueryClient,
-	projectId: string
+	jsonSchemaId: string,
+	queryClient: IGraphQLQueryClient
 ): Promise<TemplateCache> {
 	const cached = templateCache.get(kind);
 	if (cached) return cached;
 
-	const templateSchemaName = `widget-template:${kind}:output`;
 	const templatePromptName = `widget-template:${kind}`;
 
-	const jsonSchema = zodToJsonSchema(promptConfig.aiOutputSchema, {
-		name: templateSchemaName,
-		$refStrategy: 'none'
-	});
-	const schemaDef = (jsonSchema as Record<string, unknown>).definitions
-		? ((jsonSchema as Record<string, unknown>).definitions as Record<string, unknown>)[templateSchemaName] ?? jsonSchema
-		: jsonSchema;
-
-	// Check if template prompt already exists
-	const existing = await findPromptByName(queryClient, templatePromptName);
+	// Look for an existing template prompt by name or by jsonSchemaId
+	const existing = await findTemplatePrompt(queryClient, templatePromptName, jsonSchemaId);
 	if (existing) {
 		const entry: TemplateCache = {
 			templatePromptId: existing.id,
-			templateJsonSchemaId: (existing as unknown as Record<string, string>).jsonSchemaId ?? ''
+			templateJsonSchemaId: (existing as unknown as Record<string, string>).jsonSchemaId ?? jsonSchemaId
 		};
 		templateCache.set(kind, entry);
 		return entry;
 	}
 
-	// Create EntityDefinition (pipeline auto-creates the linked JsonSchema)
-	const defResult = await ensureEntityDefinition(queryClient, projectId, {
-		name: templateSchemaName,
-		description: `Default output schema for ${kind} widgets`,
-		schemaDefinition: schemaDef
-	});
-	const templateJsonSchemaId = defResult.jsonSchemaId;
-
-	// Create template Prompt
 	const variableNames = extractPromptVariables(promptConfig.defaultPrompt).map((v) => v.name);
 
 	const promptInput: Record<string, unknown> = {
@@ -116,7 +172,7 @@ async function ensureWidgetTemplate(
 		prompt: promptConfig.defaultPrompt,
 		systemInstruction: promptConfig.systemInstruction ?? undefined,
 		model: promptConfig.model ?? 'GEMINI_2_5_FLASH',
-		jsonSchemaId: templateJsonSchemaId,
+		jsonSchemaId,
 		sharingMode: 'PRIVATE',
 		...(variableNames.length > 0 && { inputVariables: variableNames })
 	};
@@ -132,10 +188,37 @@ async function ensureWidgetTemplate(
 
 	const entry: TemplateCache = {
 		templatePromptId: result.createPrompt.id,
-		templateJsonSchemaId
+		templateJsonSchemaId: jsonSchemaId
 	};
 	templateCache.set(kind, entry);
 	return entry;
+}
+
+/**
+ * Internal helper used by ensureWidgetInstancePrompt to get or create the
+ * kind-level template (EntityDefinition + Prompt) before cloning.
+ */
+async function ensureWidgetTemplate(
+	kind: string,
+	promptConfig: WidgetPromptConfig,
+	queryClient: IGraphQLQueryClient,
+	projectId: string
+): Promise<TemplateCache> {
+	const cached = templateCache.get(kind);
+	if (cached) return cached;
+
+	const defConfig = resolveEntityDefinitionConfig(kind, undefined, promptConfig);
+	if (!defConfig) throw new Error(`Widget kind "${kind}" has no schema config`);
+
+	const schemaDef = zodToCleanSchemaDef(defConfig.zodSchema, defConfig.name);
+
+	const defResult = await ensureEntityDefinition(queryClient, projectId, {
+		name: defConfig.name,
+		description: defConfig.description,
+		schemaDefinition: schemaDef
+	});
+
+	return ensureWidgetTemplatePrompt(kind, promptConfig, defResult.jsonSchemaId, queryClient);
 }
 
 // ---------------------------------------------------------------------------
@@ -185,9 +268,9 @@ export async function ensureWidgetInstancePrompt(
 
 	const template = await ensureWidgetTemplate(kind, promptConfig, queryClient, projectId);
 
-	const instanceSchemaName = widgetTitle
-		? `${widgetTitle} Output`
-		: `widget:${kind}:${widgetId}:output`;
+	const manifest = getWidgetManifest(kind);
+	const friendlyName = widgetTitle || manifest?.displayName || kind;
+	const instanceSchemaName = `${friendlyName} Output`;
 
 	// Clone template JsonSchema for this instance
 	let templateSchemaDef: unknown;
@@ -212,7 +295,7 @@ export async function ensureWidgetInstancePrompt(
 
 	const instanceDefResult = await ensureEntityDefinition(queryClient, projectId, {
 		name: instanceSchemaName,
-		description: widgetDescription || `Output schema for ${kind} widget ${widgetId}`,
+		description: widgetDescription || `Output schema for ${friendlyName}`,
 		schemaDefinition: templateSchemaDef
 	});
 	const instanceJsonSchemaId = instanceDefResult.jsonSchemaId;
@@ -229,7 +312,7 @@ export async function ensureWidgetInstancePrompt(
 		log.warn('Could not fetch template prompt, using manifest defaults');
 	}
 
-	const instancePromptName = widgetTitle || `widget:${kind}:${widgetId}`;
+	const instancePromptName = widgetTitle || manifest?.displayName || kind;
 	const promptText = templatePrompt?.prompt ?? promptConfig.defaultPrompt;
 	const variableNames = extractPromptVariables(promptText).map((v) => v.name);
 
@@ -480,16 +563,35 @@ export async function listCompatiblePrompts(
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function findPromptByName(
+/**
+ * Find an existing template prompt by name or by linked jsonSchemaId.
+ * A match on either criterion counts — this avoids creating duplicates
+ * when the template was previously created under a slightly different name
+ * or when the same schema was linked to another prompt.
+ */
+async function findTemplatePrompt(
 	queryClient: IGraphQLQueryClient,
-	name: string
+	name: string,
+	jsonSchemaId?: string
 ): Promise<Prompt | null> {
 	try {
 		const result = await queryClient.query<{ listPrompts: { items: Prompt[] } }>(
 			Q_LIST_PROMPTS,
 			{ scope: 'OWNED_BY_ME', limit: 200 }
 		);
-		return result?.listPrompts?.items?.find((p) => p.name === name) ?? null;
+		const items = result?.listPrompts?.items ?? [];
+
+		const byName = items.find((p) => p.name === name);
+		if (byName) return byName;
+
+		if (jsonSchemaId) {
+			const bySchema = items.find(
+				(p) => (p as unknown as Record<string, string>).jsonSchemaId === jsonSchemaId
+			);
+			if (bySchema) return bySchema;
+		}
+
+		return null;
 	} catch {
 		return null;
 	}

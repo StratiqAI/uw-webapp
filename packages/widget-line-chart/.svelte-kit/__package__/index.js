@@ -15,6 +15,7 @@ export const lineChartWidget = defineWidget({
     },
     defaultSize: { colSpan: 6, rowSpan: 3 },
     palette: { icon: '📈', category: 'charts' },
+    entityDefinition: { name: 'Line Chart Output', description: 'Structured output for line chart widgets', outputSchema: lineChartAiOutputSchema },
     promptConfig: {
         defaultPrompt: 'Generate a line chart showing trends over time',
         systemInstruction: 'You are a data visualization assistant. Return structured line chart data with time-series labels and datasets.',

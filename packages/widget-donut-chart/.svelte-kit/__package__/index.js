@@ -14,6 +14,7 @@ export const donutChartWidget = defineWidget({
     },
     defaultSize: { colSpan: 4, rowSpan: 3 },
     palette: { icon: '🍩', category: 'charts' },
+    entityDefinition: { name: 'Donut Chart Output', description: 'Structured output for donut chart widgets', outputSchema: donutChartAiOutputSchema },
     promptConfig: {
         defaultPrompt: 'Generate a donut chart showing the breakdown of categories',
         systemInstruction: 'You are a data visualization assistant. Return donut chart data with labels, values, and optional colors.',

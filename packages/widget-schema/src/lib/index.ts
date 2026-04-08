@@ -13,6 +13,11 @@ export const schemaWidget = defineWidget({
 	},
 	defaultSize: { colSpan: 6, rowSpan: 3 },
 	palette: { icon: '📋', category: 'data' },
+	entityDefinition: {
+		name: 'Schema Widget Output',
+		description: 'Structured output for schema widgets',
+		outputSchema: schemaAiOutputSchema
+	},
 	promptConfig: {
 		defaultPrompt: 'Generate structured data that conforms to the schema definition',
 		systemInstruction:

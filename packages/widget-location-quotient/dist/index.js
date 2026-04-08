@@ -17,6 +17,7 @@ export const locationQuotientWidget = defineWidget({
     },
     defaultSize: { colSpan: 12, rowSpan: 4 },
     palette: { icon: '📍', category: 'data' },
+    entityDefinition: { name: 'Location Quotient Output', description: 'Structured output for location quotient widgets', outputSchema: locationQuotientAiOutputSchema },
     promptConfig: {
         defaultPrompt: 'Determine the area FIPS code and year for location quotient analysis',
         systemInstruction: 'You are a geographic data assistant. Return the area FIPS code, data year, and region label for a location quotient analysis.',

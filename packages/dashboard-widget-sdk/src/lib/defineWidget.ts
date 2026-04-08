@@ -1,5 +1,10 @@
 import type { z } from 'zod';
-import type { WidgetManifest, WidgetPromptConfig, StandardWidgetProps } from './types.js';
+import type {
+	WidgetManifest,
+	WidgetPromptConfig,
+	WidgetEntityDefinitionConfig,
+	StandardWidgetProps
+} from './types.js';
 import type { Component } from 'svelte';
 
 /**
@@ -26,6 +31,8 @@ export function defineWidget<TData>(config: {
 	palette?: { icon: string; category?: string };
 	/** AI prompt configuration — if present, the widget supports AI generation. */
 	promptConfig?: WidgetPromptConfig;
+	/** Explicit EntityDefinition for structured output. Auto-derived from promptConfig when omitted. */
+	entityDefinition?: WidgetEntityDefinitionConfig;
 }): WidgetManifest<TData> {
 	return {
 		schemaVersion: 'v1',

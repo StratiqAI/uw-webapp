@@ -14,6 +14,7 @@ export const industryTrendScorecardWidget = defineWidget({
     },
     defaultSize: { colSpan: 12, rowSpan: 6 },
     palette: { icon: '📈', category: 'financial' },
+    entityDefinition: { name: 'Industry Trend Scorecard Output', description: 'Structured output for industry trend scorecard widgets', outputSchema: industryTrendScorecardAiOutputSchema },
     promptConfig: {
         defaultPrompt: 'Generate an industry trend scorecard for the local market',
         systemInstruction: 'You are an economic research analyst. Return quarterly industry trend data including employment, location quotient, wage, and establishment year-over-year changes for key industries.',

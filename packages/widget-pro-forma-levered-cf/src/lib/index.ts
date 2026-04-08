@@ -26,6 +26,11 @@ export const proFormaLeveredCfWidget = defineWidget({
 		interestOnly: false
 	},
 	defaultSize: { colSpan: 12, rowSpan: 3 },
+	entityDefinition: {
+		name: 'Pro Forma Levered CF Output',
+		description: 'Structured output for pro forma levered CF widgets',
+		outputSchema: proFormaLeveredCfAiOutputSchema
+	},
 	promptConfig: {
 		defaultPrompt: 'Generate levered cash flow assumptions for this property',
 		systemInstruction:

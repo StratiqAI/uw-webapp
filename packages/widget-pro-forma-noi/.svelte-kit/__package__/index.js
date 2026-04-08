@@ -17,6 +17,11 @@ export const proFormaNoiWidget = defineWidget({
         showBreakdown: false
     },
     defaultSize: { colSpan: 12, rowSpan: 2 },
+    entityDefinition: {
+        name: 'Pro Forma NOI Output',
+        description: 'Structured output for pro forma NOI widgets',
+        outputSchema: proFormaNoiAiOutputSchema
+    },
     promptConfig: {
         defaultPrompt: 'Generate NOI assumptions for this property',
         systemInstruction: 'You are a commercial real estate underwriter. Return net operating income assumptions including EGI, OpEx, and growth rates.',

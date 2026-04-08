@@ -109,6 +109,46 @@
         "colSpan": { "type": "integer", "minimum": 1, "maximum": 12 },
         "rowSpan": { "type": "integer", "minimum": 1, "maximum": 12 }
       }
+    },
+    "entityDefinition": {
+      "type": "object",
+      "required": ["name", "jsonSchema"],
+      "additionalProperties": false,
+      "description": "Structured EntityDefinition registered in the ontology graph. Appears on the Ontology Explorer page. When omitted, auto-derived from prompt.aiOutputSchema if prompt is present.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Human-readable name for the EntityDefinition."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional description of what this entity represents."
+        },
+        "jsonSchema": {
+          "type": "object",
+          "description": "JSON Schema describing the structured output shape."
+        }
+      }
+    },
+    "prompt": {
+      "type": "object",
+      "required": ["defaultPrompt"],
+      "additionalProperties": false,
+      "description": "AI prompt template configuration. When present, a kind-level Prompt entity is created and linked to the entityDefinition's JsonSchema.",
+      "properties": {
+        "defaultPrompt": {
+          "type": "string",
+          "description": "Default prompt template text with optional {{variable}} placeholders."
+        },
+        "systemInstruction": {
+          "type": "string",
+          "description": "System instruction prepended to the prompt."
+        },
+        "model": {
+          "type": "string",
+          "description": "Default AI model identifier (e.g. 'GEMINI_2_5_FLASH')."
+        }
+      }
     }
   }
 }

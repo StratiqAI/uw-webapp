@@ -95,7 +95,7 @@
 	const hostConfig = host.services?.get<HostConfig>(HostServices.CONFIG);
 	const apiKey = $derived(widgetData.apiKey || hostConfig?.geoapifyApiKey || '');
 
-	let mapContainer: HTMLDivElement;
+	let mapContainer = $state<HTMLDivElement | null>(null);
 	let scriptsReady = $state(false);
 
 	$effect(() => {

@@ -14,6 +14,7 @@ export const divergingBarChartWidget = defineWidget({
     },
     defaultSize: { colSpan: 6, rowSpan: 3 },
     palette: { icon: '↔', category: 'charts' },
+    entityDefinition: { name: 'Diverging Bar Output', description: 'Structured output for diverging bar chart widgets', outputSchema: divergingBarChartAiOutputSchema },
     promptConfig: {
         defaultPrompt: 'Generate a diverging bar chart comparing positive and negative values',
         systemInstruction: 'You are a data visualization assistant. Return diverging bar chart data with labels and positive/negative values.',

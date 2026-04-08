@@ -10,6 +10,11 @@ export const mapbox3dWidget = defineWidget({
     defaultData: DEMO_MAPBOX_3D_CONFIG,
     defaultSize: { colSpan: 8, rowSpan: 5 },
     palette: { icon: '🗺', category: 'map' },
+    entityDefinition: {
+        name: 'Mapbox 3D Model Output',
+        description: 'Structured output for mapbox 3D widgets',
+        outputSchema: mapbox3dAiOutputSchema
+    },
     promptConfig: {
         defaultPrompt: 'Determine the best 3D map view for this property location',
         systemInstruction: 'You are a geospatial visualization assistant. Return map center coordinates, zoom level, pitch, and bearing for an optimal 3D view.',

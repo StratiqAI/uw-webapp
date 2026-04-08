@@ -14,6 +14,11 @@ export const sparklineWidget = defineWidget({
 	},
 	defaultSize: { colSpan: 4, rowSpan: 1 },
 	palette: { icon: '〰', category: 'charts' },
+	entityDefinition: {
+		name: 'Sparkline Output',
+		description: 'Structured output for sparkline widgets',
+		outputSchema: sparklineAiOutputSchema
+	},
 	promptConfig: {
 		defaultPrompt: 'Generate sparkline data showing a recent trend',
 		systemInstruction:

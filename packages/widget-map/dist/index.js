@@ -17,6 +17,7 @@ export const mapWidget = defineWidget({
     },
     defaultSize: { colSpan: 8, rowSpan: 4 },
     palette: { icon: '🗺', category: 'content' },
+    entityDefinition: { name: 'Map Output', description: 'Structured output for map widgets', outputSchema: mapAiOutputSchema },
     promptConfig: {
         defaultPrompt: 'Determine the geographic coordinates for this property location',
         systemInstruction: 'You are a geolocation assistant. Return latitude, longitude, and an appropriate zoom level for the property.',

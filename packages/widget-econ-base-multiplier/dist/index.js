@@ -13,6 +13,7 @@ export const econBaseMultiplierWidget = defineWidget({
     },
     defaultSize: { colSpan: 8, rowSpan: 4 },
     palette: { icon: '📊', category: 'financial' },
+    entityDefinition: { name: 'Economic Base Multiplier Output', description: 'Structured output for economic base multiplier widgets', outputSchema: econBaseMultiplierAiOutputSchema },
     promptConfig: {
         defaultPrompt: 'Generate economic base multiplier data for the local region',
         systemInstruction: 'You are an economic analyst. Return industry employment data with NAICS codes, local and national employment counts for computing location quotients and economic base multipliers.',

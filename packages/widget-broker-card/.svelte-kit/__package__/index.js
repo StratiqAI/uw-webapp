@@ -17,6 +17,7 @@ export const brokerCardWidget = defineWidget({
         avatarUrl: null
     },
     defaultSize: { colSpan: 3, rowSpan: 2 },
+    entityDefinition: { name: 'Broker Card Output', description: 'Structured output for broker card widgets', outputSchema: brokerCardAiOutputSchema },
     promptConfig: {
         defaultPrompt: 'Look up broker contact information for the listing agent',
         systemInstruction: 'You are a commercial real estate research assistant. ' +

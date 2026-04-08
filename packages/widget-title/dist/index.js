@@ -9,6 +9,11 @@ export const titleWidget = defineWidget({
     defaultData: { title: 'Untitled', subtitle: null, alignment: 'left' },
     defaultSize: { colSpan: 12, rowSpan: 1 },
     palette: { icon: '📝', category: 'content' },
+    entityDefinition: {
+        name: 'Title Widget Output',
+        description: 'Structured output for title widgets',
+        outputSchema: titleAiOutputSchema
+    },
     promptConfig: {
         defaultPrompt: 'Generate a compelling title and subtitle for a real estate investment report',
         systemInstruction: 'You are a professional copywriter specializing in commercial real estate. ' +

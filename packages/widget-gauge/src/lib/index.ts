@@ -17,6 +17,7 @@ export const gaugeWidget = defineWidget({
 	},
 	defaultSize: { colSpan: 3, rowSpan: 2 },
 	palette: { icon: '⏱', category: 'charts' },
+	entityDefinition: { name: 'Gauge Output', description: 'Structured output for gauge widgets', outputSchema: gaugeAiOutputSchema },
 	promptConfig: {
 		defaultPrompt: 'Generate a gauge showing a key performance indicator',
 		systemInstruction:

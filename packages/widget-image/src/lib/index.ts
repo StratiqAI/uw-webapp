@@ -15,6 +15,7 @@ export const imageWidget = defineWidget({
 	},
 	defaultSize: { colSpan: 6, rowSpan: 4 },
 	palette: { icon: '🖼', category: 'content' },
+	entityDefinition: { name: 'Image Output', description: 'Structured output for image widgets', outputSchema: imageAiOutputSchema },
 	promptConfig: {
 		defaultPrompt: 'Find a relevant image URL for this property or topic',
 		systemInstruction:
