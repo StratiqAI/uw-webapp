@@ -40,6 +40,13 @@ import { createLogger } from '$lib/utils/logger';
 
 const log = createLogger('widget-prompt-svc');
 
+/**
+ * Synthetic project ID used for kind-level widget EntityDefinitions.
+ * Stored in the ontology table under `PROJ#__system__` so they are
+ * visible to every project via the Ontology Explorer.
+ */
+export const SYSTEM_PROJECT_ID = '__system__';
+
 // ---------------------------------------------------------------------------
 // Template cache (in-memory, per session)
 // ---------------------------------------------------------------------------
@@ -101,8 +108,11 @@ function zodToCleanSchemaDef(zodSchema: import('zod').ZodSchema, refName: string
  * Ensure all registered widget kinds with entityDefinition or promptConfig
  * have their EntityDefinition (and, when applicable, template Prompt)
  * persisted in the cloud. Called once from +layout.svelte onMount.
+ *
+ * Kind-level EntityDefinitions are stored under SYSTEM_PROJECT_ID so they
+ * are visible to every project.
  */
-export async function syncWidgetTemplates(queryClient: IGraphQLQueryClient, projectId: string): Promise<void> {
+export async function syncWidgetTemplates(queryClient: IGraphQLQueryClient): Promise<void> {
 	const manifests = getRegisteredManifests();
 	const eligible = manifests.filter((m) => m.entityDefinition || m.promptConfig);
 	if (eligible.length === 0) return;
@@ -115,14 +125,12 @@ export async function syncWidgetTemplates(queryClient: IGraphQLQueryClient, proj
 
 				const schemaDef = zodToCleanSchemaDef(defConfig.zodSchema, defConfig.name);
 
-				// Always register the EntityDefinition (idempotent via hash)
-				const defResult = await ensureEntityDefinition(queryClient, projectId, {
+				const defResult = await ensureEntityDefinition(queryClient, SYSTEM_PROJECT_ID, {
 					name: defConfig.name,
 					description: defConfig.description,
 					schemaDefinition: schemaDef
 				});
 
-				// If the widget also has a promptConfig, ensure the template Prompt
 				if (m.promptConfig) {
 					await ensureWidgetTemplatePrompt(
 						m.kind,
@@ -197,12 +205,12 @@ async function ensureWidgetTemplatePrompt(
 /**
  * Internal helper used by ensureWidgetInstancePrompt to get or create the
  * kind-level template (EntityDefinition + Prompt) before cloning.
+ * Template EntityDefinitions always go to SYSTEM_PROJECT_ID.
  */
 async function ensureWidgetTemplate(
 	kind: string,
 	promptConfig: WidgetPromptConfig,
-	queryClient: IGraphQLQueryClient,
-	projectId: string
+	queryClient: IGraphQLQueryClient
 ): Promise<TemplateCache> {
 	const cached = templateCache.get(kind);
 	if (cached) return cached;
@@ -212,7 +220,7 @@ async function ensureWidgetTemplate(
 
 	const schemaDef = zodToCleanSchemaDef(defConfig.zodSchema, defConfig.name);
 
-	const defResult = await ensureEntityDefinition(queryClient, projectId, {
+	const defResult = await ensureEntityDefinition(queryClient, SYSTEM_PROJECT_ID, {
 		name: defConfig.name,
 		description: defConfig.description,
 		schemaDefinition: schemaDef
@@ -266,7 +274,7 @@ export async function ensureWidgetInstancePrompt(
 		throw new Error(`Widget kind "${kind}" has no promptConfig`);
 	}
 
-	const template = await ensureWidgetTemplate(kind, promptConfig, queryClient, projectId);
+	const template = await ensureWidgetTemplate(kind, promptConfig, queryClient);
 
 	const manifest = getWidgetManifest(kind);
 	const friendlyName = widgetTitle || manifest?.displayName || kind;

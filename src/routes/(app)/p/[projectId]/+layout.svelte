@@ -1,3 +1,7 @@
+<script module lang="ts">
+	let widgetTemplatesSynced = false;
+</script>
+
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import type { LayoutProps } from './$types';
@@ -18,8 +22,6 @@
 	import { createLogger } from '$lib/utils/logger';
 
 	const log = createLogger('projects');
-
-	let widgetTemplatesSynced = false;
 
 	let { children, data }: LayoutProps = $props();
 
@@ -111,10 +113,10 @@
 	});
 
 	$effect(() => {
-		if (!browser || !idToken || !routeProjectId || widgetTemplatesSynced) return;
+		if (!browser || !idToken || widgetTemplatesSynced) return;
 		widgetTemplatesSynced = true;
 		const qc = new GraphQLQueryClient(idToken);
-		syncWidgetTemplates(qc, routeProjectId).catch((err) => {
+		syncWidgetTemplates(qc).catch((err) => {
 			log.error('Failed to sync widget prompt templates:', err);
 		});
 	});

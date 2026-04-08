@@ -40,6 +40,7 @@ import {
 	extractInstanceMeta,
 } from '$lib/services/realtime/store/ontologyClientHelpers';
 import { BaseSyncManager, type BaseSyncManagerOptions } from './BaseSyncManager';
+import { SYSTEM_PROJECT_ID } from '$lib/services/widgetPromptService';
 import { createLogger } from '$lib/utils/logger';
 
 const log = createLogger('ontology-sync');
@@ -86,8 +87,9 @@ export class OntologySyncManager extends BaseSyncManager {
 
 		const schemaLoader = new OntologySchemaLoader(store, this.queryClient!);
 		const definitions = await schemaLoader.loadDefinitions(projectId);
+		const systemDefs = await schemaLoader.loadDefinitions(SYSTEM_PROJECT_ID);
 		// #region agent log
-		fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7fe1b0'},body:JSON.stringify({sessionId:'7fe1b0',location:'OntologySyncManager.ts:doInitialize-afterDefs',message:'definitions loaded',data:{defCount:definitions.length,defNames:definitions.map(d=>d.name)},timestamp:Date.now(),hypothesisId:'H-E'})}).catch(()=>{});
+		fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7fe1b0'},body:JSON.stringify({sessionId:'7fe1b0',location:'OntologySyncManager.ts:doInitialize-afterDefs',message:'definitions loaded',data:{defCount:definitions.length,systemDefCount:systemDefs.length,defNames:definitions.map(d=>d.name)},timestamp:Date.now(),hypothesisId:'H-E'})}).catch(()=>{});
 		// #endregion
 
 		await this.#loadInstances(projectId, definitions);
@@ -115,6 +117,7 @@ export class OntologySyncManager extends BaseSyncManager {
 		if (!this.queryClient || !this.projectId) return;
 
 		const definitions = await this.schemaLoader!.loadDefinitions(this.projectId);
+		await this.schemaLoader!.loadDefinitions(SYSTEM_PROJECT_ID);
 		await this.#loadInstances(this.projectId, definitions);
 	}
 

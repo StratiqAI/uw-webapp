@@ -7,6 +7,7 @@
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import { OntologySyncManager } from '$lib/services/realtime/websocket/sync-managers/OntologySyncManager';
+	import { SYSTEM_PROJECT_ID } from '$lib/services/widgetPromptService';
 	import TopBar from '$lib/components/layout/TopBar.svelte';
 	import DefinitionSidebar from '$lib/ontology/DefinitionSidebar.svelte';
 	import InstanceTable from '$lib/ontology/InstanceTable.svelte';
@@ -35,13 +36,16 @@
 	let definitions = $derived.by((): Array<{ id: string; data: EntityDefinition }> => {
 		void store.tree;
 		if (!projectId) return [];
-		return store.getAllAt<EntityDefinition>(`ontology/p/${projectId}/def`);
+		const systemDefs = store.getAllAt<EntityDefinition>(`ontology/p/${SYSTEM_PROJECT_ID}/def`);
+		const projectDefs = store.getAllAt<EntityDefinition>(`ontology/p/${projectId}/def`);
+		return [...systemDefs, ...projectDefs];
 	});
 
 	let selectedDefinition = $derived.by((): EntityDefinition | undefined => {
 		void store.tree;
 		if (!projectId || !selectedDefId) return undefined;
-		return store.at<EntityDefinition>(`ontology/p/${projectId}/def/${selectedDefId}`);
+		return store.at<EntityDefinition>(`ontology/p/${projectId}/def/${selectedDefId}`)
+			?? store.at<EntityDefinition>(`ontology/p/${SYSTEM_PROJECT_ID}/def/${selectedDefId}`);
 	});
 
 	let selectedInstanceId = $state<string | null>(null);
