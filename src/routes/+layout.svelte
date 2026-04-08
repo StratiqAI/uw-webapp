@@ -3,7 +3,7 @@
 	import type { LayoutData } from './$types';
 	import { themeStore, darkModeStore } from '$lib/stores/themeStore.svelte';
 	import { setContext, onMount, onDestroy, untrack } from 'svelte';
-	import { initializeWidgetSchemas } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { initializeWidgetSchemas, initializeWidgetHashes } from '$lib/dashboard/setup/widgetSchemaRegistration';
 	import { widgets } from 'virtual:stratiqai-widgets';
 	import { registerWidget } from '$lib/dashboard/setup/widgetRegistry';
 	import { browser } from '$app/environment';
@@ -30,6 +30,9 @@
 	if (browser) {
 		try {
 			initializeWidgetSchemas();
+			initializeWidgetHashes().catch((err) =>
+				log.error('Failed to initialize widget hashes:', err)
+			);
 		} catch (error) {
 			log.error('Failed to initialize widget schemas:', error);
 		}

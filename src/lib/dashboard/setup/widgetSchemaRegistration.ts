@@ -6,7 +6,11 @@
  * topic pattern, and JSON Schema for both catalog queries and publish()
  * validation.
  *
- * Call initializeWidgetSchemas() once at app startup.
+ * Also computes and caches structuralHash values for each widget kind,
+ * enabling schema-hash-based topic discovery in the ontology namespace.
+ *
+ * Call initializeWidgetSchemas() once at app startup, then
+ * initializeWidgetHashes() (async) to populate the hash cache.
  */
 
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
@@ -14,6 +18,8 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 import { WidgetDataSchemas } from '$lib/dashboard/types/widgetSchemas';
 import type { WidgetType } from '$lib/dashboard/types/widget';
 import type { JsonSchemaDefinition } from '$lib/types/models';
+import type { RawJsonSchema } from '@stratiqai/types-simple';
+import { computeSchemaHash } from '@stratiqai/types-simple';
 import { getRegisteredManifests, getWidgetManifest } from '$lib/dashboard/setup/widgetRegistry';
 import { createLogger } from '$lib/utils/logger';
 
@@ -138,6 +144,58 @@ export function initializeWidgetSchemas(): void {
 	}
 
 	schemasRegistered = true;
+}
+
+// ---------------------------------------------------------------------------
+// Structural hash cache (populated by initializeWidgetHashes)
+// ---------------------------------------------------------------------------
+
+const widgetStructuralHashes = new Map<string, string>();
+let hashesReady: Promise<void> | null = null;
+
+/**
+ * Compute and cache the structuralHash for every registered widget manifest.
+ * Safe to call multiple times; only the first invocation does work.
+ * Must be called after registerWidget() has been called for all manifests.
+ */
+export function initializeWidgetHashes(): Promise<void> {
+	if (hashesReady) return hashesReady;
+
+	hashesReady = (async () => {
+		const manifests = getRegisteredManifests();
+		await Promise.all(
+			manifests.map(async (manifest) => {
+				const zodSchema = manifest.inputSchema ?? manifest.zodSchema;
+				const jsonSchema = zodToCleanJsonSchema(zodSchema, `${manifest.kind}WidgetData`);
+				try {
+					const hash = await computeSchemaHash(jsonSchema as RawJsonSchema);
+					widgetStructuralHashes.set(manifest.kind, hash);
+					log.debug(`Computed structuralHash for ${manifest.kind}: ${hash.slice(0, 12)}...`);
+				} catch (err) {
+					log.error(`Failed to compute structuralHash for ${manifest.kind}:`, err);
+				}
+			})
+		);
+	})();
+
+	return hashesReady;
+}
+
+/**
+ * Returns the cached structuralHash for a widget kind.
+ * Returns undefined if hashes have not yet been initialized or
+ * if the kind is not registered.
+ */
+export function getWidgetStructuralHash(kind: string): string | undefined {
+	return widgetStructuralHashes.get(kind);
+}
+
+/**
+ * Wait for the hash cache to be fully populated.
+ * Useful for callers that need the hash synchronously after await.
+ */
+export function awaitWidgetHashes(): Promise<void> {
+	return hashesReady ?? Promise.resolve();
 }
 
 /**
