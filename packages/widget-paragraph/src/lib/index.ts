@@ -1,19 +1,19 @@
 import { defineWidget } from '@stratiqai/dashboard-widget-sdk';
-import { paragraphWidgetDataSchema, paragraphAiOutputSchema } from './schema.js';
+import { paragraphSchema } from './schema.js';
 import ParagraphWidget from './ParagraphWidget.svelte';
 
 export const paragraphWidget = defineWidget({
 	kind: 'paragraph',
 	displayName: 'Paragraph Widget',
-	zodSchema: paragraphWidgetDataSchema,
+	zodSchema: paragraphSchema,
 	component: ParagraphWidget,
-	defaultData: { title: null, content: '', markdown: false },
+	defaultData: { title: '', description: '', content: '' },
 	defaultSize: { colSpan: 6, rowSpan: 3 },
 	palette: { icon: '📄', category: 'content' },
 	entityDefinition: {
 		name: 'Paragraph Widget Output',
 		description: 'Structured output for paragraph widgets',
-		outputSchema: paragraphAiOutputSchema
+		outputSchema: paragraphSchema
 	},
 	promptConfig: {
 		defaultPrompt: 'Write a paragraph about the economy around the property',
@@ -22,11 +22,10 @@ export const paragraphWidget = defineWidget({
 			'Structure your response as well-formatted content. ' +
 			'Use markdown if it improves readability.',
 		model: 'GEMINI_2_5_FLASH',
-		aiOutputSchema: paragraphAiOutputSchema,
-		mapAiOutput: (out) => ({ title: null, content: (out.text as string) ?? '', markdown: true })
+		aiOutputSchema: paragraphSchema
 	}
 });
 
-export { paragraphWidgetDataSchema, paragraphAiOutputSchema } from './schema.js';
-export type { ParagraphWidgetData, ParagraphAiOutput } from './schema.js';
+export { paragraphSchema, paragraphWidgetDataSchema, paragraphAiOutputSchema } from './schema.js';
+export type { ParagraphData, ParagraphWidgetData, ParagraphAiOutput } from './schema.js';
 export { default as ParagraphWidget } from './ParagraphWidget.svelte';

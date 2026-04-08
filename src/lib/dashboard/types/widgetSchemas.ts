@@ -45,9 +45,9 @@ export type { MetricWidgetData, JsonViewerWidgetData, BrokerCardWidgetData };
 // ===== Zod Schemas for Widget Data =====
 
 export const ParagraphWidgetDataSchema = z.object({
-	title: z.string().nullable().optional(),
-	content: z.string().min(1, 'Content is required'),
-	markdown: z.boolean().nullable().default(false)
+	title: z.string(),
+	description: z.string(),
+	content: z.string()
 });
 
 export const TableWidgetDataSchema = z.object({

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ParagraphWidgetData } from './schema.js';
+	import type { ParagraphData } from './schema.js';
 	import {
 		FlipCard,
 		AiStatusOverlay,
@@ -19,20 +19,20 @@
 		theme,
 		onUpdateConfig,
 		onConfigureReady
-	}: StandardWidgetProps<ParagraphWidgetData> = $props();
+	}: StandardWidgetProps<ParagraphData> = $props();
 
 	const host = getDashboardWidgetHost();
 	const topic = $derived(host.getWidgetTopic('paragraph', widgetId, topicOverride));
-	const dataStream = useReactiveValidatedTopic<ParagraphWidgetData>(() => topic);
+	const dataStream = useReactiveValidatedTopic<ParagraphData>(() => topic);
 	const aiStatus = useAiGenerationStatus(() => topic);
 
-	let widgetData = $derived<ParagraphWidgetData>({
+	let widgetData = $derived<ParagraphData>({
 		title: dataStream.current?.title ?? data.title,
-		content: dataStream.current?.content ?? data.content,
-		markdown: dataStream.current?.markdown ?? data.markdown ?? false
+		description: dataStream.current?.description ?? data.description,
+		content: dataStream.current?.content ?? data.content
 	});
 
-	const configure = useWidgetConfigure<ParagraphWidgetData>({
+	const configure = useWidgetConfigure<ParagraphData>({
 		data: () => widgetData,
 		get onUpdateConfig() {
 			return onUpdateConfig;
@@ -61,13 +61,35 @@
 		<div class="relative h-full overflow-auto px-4 py-4">
 			{#if aiStatus.generating || aiStatus.error}
 				<AiStatusOverlay generating={aiStatus.generating} error={aiStatus.error} {darkMode} />
-			{:else if widgetData.content}
-				<div
-					class="prose max-w-none text-[0.9375rem] leading-relaxed {darkMode
-						? 'prose-invert text-slate-200'
-						: 'text-slate-700'}"
-				>
-					{@html widgetData.content}
+			{:else if widgetData.title || widgetData.description || widgetData.content}
+				<div class="flex flex-col gap-2">
+					{#if widgetData.title}
+						<h2
+							class="text-lg font-semibold leading-snug {darkMode
+								? 'text-white'
+								: 'text-slate-900'}"
+						>
+							{widgetData.title}
+						</h2>
+					{/if}
+					{#if widgetData.description}
+						<p
+							class="text-sm leading-relaxed {darkMode
+								? 'text-slate-400'
+								: 'text-slate-500'}"
+						>
+							{widgetData.description}
+						</p>
+					{/if}
+					{#if widgetData.content}
+						<p
+							class="text-[0.9375rem] leading-relaxed {darkMode
+								? 'text-slate-200'
+								: 'text-slate-700'}"
+						>
+							{widgetData.content}
+						</p>
+					{/if}
 				</div>
 			{:else}
 				<p class="italic {darkMode ? 'text-slate-500' : 'text-slate-400'}">
@@ -90,18 +112,32 @@
 			{#snippet userFields()}
 				<label class="block">
 					<span class="text-xs font-medium {darkMode ? 'text-slate-400' : 'text-slate-500'}"
+						>Title</span
+					>
+					<input
+						type="text"
+						class="{inputClass} mt-1 block"
+						bind:value={configure.draft.title}
+					/>
+				</label>
+				<label class="block">
+					<span class="text-xs font-medium {darkMode ? 'text-slate-400' : 'text-slate-500'}"
+						>Description</span
+					>
+					<input
+						type="text"
+						class="{inputClass} mt-1 block"
+						bind:value={configure.draft.description}
+					/>
+				</label>
+				<label class="block">
+					<span class="text-xs font-medium {darkMode ? 'text-slate-400' : 'text-slate-500'}"
 						>Content</span
 					>
 					<textarea
 						class="{inputClass} mt-1 block min-h-24 resize-y"
 						bind:value={configure.draft.content}
 					></textarea>
-				</label>
-				<label class="flex items-center gap-2">
-					<input type="checkbox" bind:checked={configure.draft.markdown} />
-					<span class="text-xs font-medium {darkMode ? 'text-slate-400' : 'text-slate-500'}"
-						>Render as Markdown / HTML</span
-					>
 				</label>
 			{/snippet}
 		</WidgetConfigureBack>

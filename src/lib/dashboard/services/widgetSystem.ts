@@ -167,9 +167,9 @@ export type TitleWidgetData = z.infer<typeof TitleWidgetDataSchema>;
  * Paragraph widget data schema
  */
 export const ParagraphWidgetDataSchema = z.object({
-  title: z.string().nullable().optional().describe('Optional paragraph title'),
-  content: z.string().min(1).describe('Paragraph content'),
-  markdown: z.boolean().nullable().default(false).describe('Enable markdown rendering'),
+  title: z.string().describe('Title of the paragraph'),
+  description: z.string().describe('Brief description or subtitle'),
+  content: z.string().describe('The main paragraph content'),
 });
 
 export type ParagraphWidgetData = z.infer<typeof ParagraphWidgetDataSchema>;
@@ -686,9 +686,9 @@ export function getDefaultWidgetData<T extends WidgetType>(type: T): WidgetDataT
       title: 'Widget Title',
     } as TitleWidgetData,
     [WIDGET_TYPES.PARAGRAPH]: {
-      title: null,
+      title: '',
+      description: '',
       content: '',
-      markdown: false,
     } as ParagraphWidgetData,
     [WIDGET_TYPES.IMAGE]: {
       src: 'https://via.placeholder.com/400x300',
