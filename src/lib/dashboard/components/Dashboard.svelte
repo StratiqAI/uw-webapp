@@ -11,7 +11,7 @@
 	import { setDashboardWidgetHost, HostServices, parseJsonSchemaToBuilderState, buildSchemaPreview, getAiStatusTopic } from '@stratiqai/dashboard-widget-sdk';
 	import type { WidgetPromptEditData } from '@stratiqai/dashboard-widget-sdk';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
-	import { getWidgetTopic, getWidgetTopicsByType, getWidgetStructuralHash } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { getWidgetTopic, getWidgetTopicsByType, getWidgetStructuralHash, getTopicsByStructuralHash } from '$lib/dashboard/setup/widgetSchemaRegistration';
 	import { getWidgetPromptConfig } from '$lib/dashboard/setup/widgetRegistry';
 	import { toOntologyInstDataTopic, toOntologyInstMetaTopic, flatToPropertyValues } from '$lib/services/realtime/store/ontologyClientHelpers';
 	import { M_SAVE_ENTITY_INSTANCE } from '@stratiqai/types-simple';
@@ -103,15 +103,47 @@
 			getSchemaById: (id: string) => validatedTopicStore.getSchemaById(id),
 			getJsonSchemaById: (id: string) => validatedTopicStore.getJsonSchemaById(id)
 		},
-		getWidgetTopic,
+		getWidgetTopic(kind: string, widgetId: string, topicOverride?: string): string {
+			if (topicOverride) return topicOverride;
+			const w = dashboard.widgets.find(w => w.id === widgetId);
+			const instanceId = w?.entityInstanceId;
+			const hash = getWidgetStructuralHash(kind);
+			const pid = dashboard.projectId;
+			if (instanceId && hash && pid) {
+				return toOntologyInstDataTopic(pid, hash, instanceId);
+			}
+			if (hash && pid) {
+				const available = getTopicsByStructuralHash(pid, hash);
+				if (available.length > 0) return available[0].topic;
+			}
+			return `widgets/${kind}/${widgetId}`;
+		},
 		services: {
 			get: <T>(name: string) => serviceMap.get(name) as T | undefined,
 			has: (name: string) => serviceMap.has(name)
 		},
 
 		getAvailableTopics(kind: string, widgetId: string) {
-			const defaultTopic = getWidgetTopic(kind as any, widgetId);
 			const w = dashboard.widgets.find((w) => w.id === widgetId);
+			const hash = getWidgetStructuralHash(kind);
+			const pid = dashboard.projectId;
+
+			if (hash && pid) {
+				const ontologyTopics = getTopicsByStructuralHash(pid, hash);
+				const instanceId = w?.entityInstanceId;
+				const currentOwnTopic = (instanceId && hash && pid)
+					? toOntologyInstDataTopic(pid, hash, instanceId)
+					: undefined;
+				const currentTopic = w?.topicOverride ?? currentOwnTopic;
+
+				return ontologyTopics.map((item) => ({
+					topic: item.topic,
+					isCurrent: item.topic === currentTopic,
+					data: item.data
+				}));
+			}
+
+			const defaultTopic = getWidgetTopic(kind as any, widgetId);
 			const currentTopic = w?.topicOverride ?? defaultTopic;
 			const byType = getWidgetTopicsByType(kind as any);
 			return byType.map((item) => ({
@@ -123,10 +155,8 @@
 			}));
 		},
 		setTopicOverride(widgetId: string, topic: string | undefined) {
-			const w = dashboard.widgets.find((w) => w.id === widgetId);
-			const defaultTopic = getWidgetTopic(w?.type as any ?? '', widgetId);
 			dashboard.updateWidget(widgetId, {
-				topicOverride: topic === defaultTopic ? undefined : topic
+				topicOverride: topic || undefined
 			});
 		},
 		getCurrentTopicOverride(widgetId: string) {
@@ -170,7 +200,7 @@
 
 			const qc = new GraphQLQueryClient(token);
 			const w = dashboard.widgets.find((w) => w.id === widgetId);
-			const existingPromptId = (w as any)?.promptId as string | undefined;
+			const existingPromptId = w?.promptId;
 
 			const instance = await ensureWidgetInstancePrompt(
 				kind, widgetId, w?.data?.title ?? undefined, undefined, existingPromptId, qc,
@@ -181,9 +211,9 @@
 				dashboard.updateWidget(widgetId, {
 					promptId: instance.promptId,
 					entityDefinitionId: instance.entityDefinitionId
-				} as any);
-			} else if (instance.entityDefinitionId && !(w as any)?.entityDefinitionId) {
-				dashboard.updateWidget(widgetId, { entityDefinitionId: instance.entityDefinitionId } as any);
+				});
+			} else if (instance.entityDefinitionId && !w?.entityDefinitionId) {
+				dashboard.updateWidget(widgetId, { entityDefinitionId: instance.entityDefinitionId });
 			}
 
 			const editing = await getWidgetInstancePromptForEditing(instance.promptId, qc);
@@ -213,7 +243,7 @@
 
 			const qc = new GraphQLQueryClient(token);
 			const w = dashboard.widgets.find((w) => w.id === widgetId);
-			const promptId = data.promptId ?? (w as any)?.promptId;
+			const promptId = data.promptId ?? w?.promptId;
 			if (!promptId) throw new Error('No prompt ID — load prompt first');
 
 			const editing = await getWidgetInstancePromptForEditing(promptId, qc);
@@ -267,21 +297,31 @@
 
 			log.info(`AI execution submitted for widget ${widgetId}`);
 
-			const legacyTopic = getWidgetTopic(kind as any, widgetId);
-			const statusTopic = getAiStatusTopic(legacyTopic);
-			validatedTopicStore.publish(statusTopic, { generating: true });
-
 			const projectId = dashboard.projectId ?? '';
-			const definitionId = (w as any)?.entityDefinitionId as string | undefined;
+			const definitionId = w?.entityDefinitionId;
+			const existingInstanceId = w?.entityInstanceId;
 			const structuralHash = getWidgetStructuralHash(kind);
+
+
+			const effectiveTopic = (existingInstanceId && structuralHash && projectId)
+				? toOntologyInstDataTopic(projectId, structuralHash, existingInstanceId)
+				: `widgets/${kind}/${widgetId}`;
+			const statusTopic = getAiStatusTopic(effectiveTopic);
+			validatedTopicStore.publish(statusTopic, { generating: true });
 
 			handle.result.then(async (rawOutput) => {
 				if (rawOutput) {
 					try {
-						const parsed = JSON.parse(rawOutput);
-						const output = parsed.output_parsed ?? parsed;
-
-						validatedTopicStore.publish(legacyTopic, output);
+						let output: Record<string, unknown>;
+						try {
+							const parsed = JSON.parse(rawOutput);
+							const resolved = parsed.output_parsed ?? parsed;
+							output = (resolved && typeof resolved === 'object' && !Array.isArray(resolved))
+								? resolved as Record<string, unknown>
+								: { content: typeof resolved === 'string' ? resolved : rawOutput };
+						} catch {
+							output = { content: rawOutput };
+						}
 
 						if (definitionId && structuralHash && projectId) {
 							const instanceId = crypto.randomUUID();
@@ -291,7 +331,7 @@
 								definitionId,
 								senderId: `widget:${widgetId}`,
 								label: `${kind} output`,
-								values: flatToPropertyValues(output as Record<string, unknown>)
+								values: flatToPropertyValues(output)
 							};
 
 							const result = await qc.query<{ saveEntityInstance: EntityInstance }>(
@@ -300,7 +340,7 @@
 							);
 
 							if (result?.saveEntityInstance) {
-								dashboard.updateWidget(widgetId, { entityInstanceId: instanceId } as any);
+								dashboard.updateWidget(widgetId, { entityInstanceId: instanceId });
 
 								const instDataTopic = toOntologyInstDataTopic(projectId, structuralHash, instanceId);
 								validatedTopicStore.publish(instDataTopic, output);
@@ -309,6 +349,10 @@
 									label: instanceInput.label,
 									updatedAt: result.saveEntityInstance.updatedAt ?? new Date().toISOString()
 								});
+
+								const newStatusTopic = getAiStatusTopic(instDataTopic);
+								validatedTopicStore.publish(newStatusTopic, { generating: false });
+
 								log.info(`Persisted EntityInstance ${instanceId} for widget ${widgetId}`);
 							}
 						} else {

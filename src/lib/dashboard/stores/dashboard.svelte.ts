@@ -18,7 +18,8 @@ import {
 	type TabInfo
 } from '$lib/dashboard/types/dashboardTabs';
 import { DASHBOARD_STORAGE_VERSION } from '$lib/dashboard/utils/storage';
-import { getWidgetTopic } from '$lib/dashboard/setup/widgetSchemaRegistration';
+import { getWidgetStructuralHash } from '$lib/dashboard/setup/widgetSchemaRegistration';
+import { toOntologyInstDataTopic } from '$lib/services/realtime/store/ontologyClientHelpers';
 import { isValidPosition, findAvailablePosition, resolveCollisions, repairOverlaps } from '$lib/dashboard/utils/grid';
 import type { WidgetRect } from '$lib/dashboard/utils/grid';
 import { DashboardStorage } from '$lib/dashboard/utils/storage';
@@ -37,10 +38,18 @@ function cloneEmptyMultiTab(): MultiTabDashboardState {
 	return structuredClone(createEmptyMultiTabState());
 }
 
-function clearWidgetTopicsForLayout(widgets: Widget[]): void {
+function resolveWidgetTopic(w: Widget, projectId: string | null): string {
+	if (w.topicOverride) return w.topicOverride;
+	const hash = getWidgetStructuralHash(w.type);
+	if (w.entityInstanceId && hash && projectId) {
+		return toOntologyInstDataTopic(projectId, hash, w.entityInstanceId);
+	}
+	return `widgets/${w.type}/${w.id}`;
+}
+
+function clearWidgetTopicsForLayout(widgets: Widget[], projectId: string | null): void {
 	for (const w of widgets) {
-		const topic = getWidgetTopic(w.type, w.id, w.topicOverride);
-		validatedTopicStore.delete(topic);
+		validatedTopicStore.delete(resolveWidgetTopic(w, projectId));
 	}
 }
 
@@ -455,7 +464,7 @@ class DashboardStore {
 
 		this.#fullscreenWidgetId = null;
 		this.#flushActiveTabIntoSlices();
-		clearWidgetTopicsForLayout($state.snapshot(this.#widgets) as Widget[]);
+		clearWidgetTopicsForLayout($state.snapshot(this.#widgets) as Widget[], this.#projectId);
 
 		this.#activeTabId = tabId;
 		this.#applyTabSlice(this.#tabSlices[tabId]);
@@ -478,10 +487,10 @@ class DashboardStore {
 		if (idx === -1) return false;
 
 		if (tabId === this.#activeTabId) {
-			clearWidgetTopicsForLayout($state.snapshot(this.#widgets) as Widget[]);
+			clearWidgetTopicsForLayout($state.snapshot(this.#widgets) as Widget[], this.#projectId);
 		} else {
 			const slice = this.#tabSlices[tabId];
-			if (slice) clearWidgetTopicsForLayout($state.snapshot(slice.widgets) as Widget[]);
+			if (slice) clearWidgetTopicsForLayout($state.snapshot(slice.widgets) as Widget[], this.#projectId);
 		}
 
 		const newOrder = ($state.snapshot(this.#tabOrder) as TabInfo[]).filter(t => t.id !== tabId);
@@ -636,10 +645,10 @@ class DashboardStore {
 
 		if (!this.addWidget(newWidget)) return null;
 
-		const sourceTopic = getWidgetTopic(widget.type, widget.id, widget.topicOverride);
+		const sourceTopic = resolveWidgetTopic(widget, this.#projectId);
 		const sourceData = validatedTopicStore.at(sourceTopic);
 		if (sourceData != null) {
-			const destTopic = getWidgetTopic(newWidget.type, newId);
+			const destTopic = resolveWidgetTopic(newWidget, this.#projectId);
 			try {
 				validatedTopicStore.publish(destTopic, structuredClone(sourceData));
 			} catch (e) {
@@ -917,7 +926,7 @@ class DashboardStore {
 		this.#suspendAutoSave = true;
 		try {
 			this.#flushActiveTabIntoSlices();
-			clearWidgetTopicsForLayout($state.snapshot(this.#widgets) as Widget[]);
+			clearWidgetTopicsForLayout($state.snapshot(this.#widgets) as Widget[], this.#projectId);
 
 			this.#widgets = [];
 			this.#widgetZIndexMap.clear();
@@ -1097,7 +1106,7 @@ class DashboardStore {
 
 	#applyTabSlice(slice: TabDashboardSlice): void {
 		if (this.#widgets.length > 0) {
-			clearWidgetTopicsForLayout($state.snapshot(this.#widgets) as Widget[]);
+			clearWidgetTopicsForLayout($state.snapshot(this.#widgets) as Widget[], this.#projectId);
 		}
 
 		// #region agent log

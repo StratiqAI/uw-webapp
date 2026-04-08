@@ -43,13 +43,19 @@
 
 	function collectEntities<T extends { id: string }>(prefix: string): T[] {
 		void store.tree;
-		const results = store.getAllAtArray(`documents/${projectId}`) as Array<{ id: string; data: any }>;
+		const projectNode = store.at<Record<string, any>>(`documents/${projectId}`);
+		if (!projectNode || typeof projectNode !== 'object') return [];
+
 		const items: T[] = [];
-		for (const entry of results) {
-			if (typeof entry.data === 'object' && entry.data?.id) {
-				const parts = entry.id.split('/');
-				if (parts.length >= 2 && parts[parts.length - 2] === prefix) {
-					items.push(entry.data as T);
+		for (const docId of Object.keys(projectNode)) {
+			const docNode = projectNode[docId];
+			if (!docNode || typeof docNode !== 'object') continue;
+			const entityGroup = docNode[prefix];
+			if (!entityGroup || typeof entityGroup !== 'object') continue;
+			for (const entityId of Object.keys(entityGroup)) {
+				const entity = entityGroup[entityId];
+				if (entity && typeof entity === 'object' && entity.id) {
+					items.push(entity as T);
 				}
 			}
 		}

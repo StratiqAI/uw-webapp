@@ -4,9 +4,10 @@
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import {
-		getWidgetTopic,
-		getWidgetTopicsByType
+		getWidgetStructuralHash,
+		getTopicsByStructuralHash
 	} from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { toOntologyInstDataTopic } from '$lib/services/realtime/store/ontologyClientHelpers';
 	import { streamCatalog, type DataStream } from '$lib/stores/streamCatalog.svelte';
 	import StreamPicker from '$lib/components/streams/StreamPicker.svelte';
 	import { createLogger } from '$lib/utils/logger';
@@ -67,8 +68,10 @@
 
 	const availableTopics = $derived.by(() => {
 		const _ = validatedTopicStore.tree;
-		const widgetTypeTopics = getWidgetTopicsByType(widget.type as any);
-		return widgetTypeTopics.map((item) => `widgets/${widget.type}/${item.id}`);
+		const hash = getWidgetStructuralHash(widget.type);
+		const pid = dashboard.projectId;
+		if (!hash || !pid) return [];
+		return getTopicsByStructuralHash(pid, hash).map((item) => item.topic);
 	});
 
 	const activeStream = $derived(streamCatalog.getStreamByTopic(currentTopic));
@@ -83,10 +86,15 @@
 	});
 
 	function applyTopicChange() {
-		const defaultTopic = getWidgetTopic(widget.type, widget.id);
-		const newTopicOverride = selectedTopic === defaultTopic ? undefined : selectedTopic;
+		const hash = getWidgetStructuralHash(widget.type);
+		const pid = dashboard.projectId;
+		const instId = widget.entityInstanceId;
+		const ownTopic = (instId && hash && pid)
+			? toOntologyInstDataTopic(pid, hash, instId)
+			: `widgets/${widget.type}/${widget.id}`;
+		const newTopicOverride = selectedTopic === ownTopic ? undefined : selectedTopic;
 		dashboard.updateWidget(widget.id, { topicOverride: newTopicOverride });
-		log.debug(`✅ Changed topic for ${widget.id}: ${currentTopic} → ${selectedTopic}`);
+		log.debug(`Changed topic for ${widget.id}: ${currentTopic} → ${selectedTopic}`);
 		open = false;
 	}
 

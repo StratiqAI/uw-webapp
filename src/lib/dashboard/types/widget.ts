@@ -75,6 +75,8 @@ export interface BaseWidget extends Position, Size, WidgetConstraints {
 	description?: string;
 	topicOverride?: string;
 	promptId?: string;
+	entityDefinitionId?: string;
+	entityInstanceId?: string;
 }
 
 // Widget Action Types

@@ -9,7 +9,8 @@
 	import { createDragHandlers } from '$lib/dashboard/utils/dragDrop';
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
-	import { getWidgetTopic, getWidgetSchemaId } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { getWidgetSchemaId, getWidgetStructuralHash, getTopicsByStructuralHash } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { toOntologyInstDataTopic } from '$lib/services/realtime/store/ontologyClientHelpers';
 	import ResizeHandles from './ResizeHandles.svelte';
 	import WidgetChrome from './WidgetChrome.svelte';
 	import { resolveWidgetComponent } from '$lib/dashboard/setup/widgetTypeMap';
@@ -55,7 +56,21 @@
 		if (isWidgetFullscreen && e.key === 'Escape') dashboard.setFullscreenWidget(null);
 	}
 
-	const currentTopic = $derived(widget.topicOverride || getWidgetTopic(widget.type, widget.id));
+	const currentTopic = $derived.by(() => {
+		if (widget.topicOverride) return widget.topicOverride;
+		const hash = getWidgetStructuralHash(widget.type);
+		const pid = dashboard.projectId;
+		const instId = widget.entityInstanceId;
+		if (instId && hash && pid) return toOntologyInstDataTopic(pid, hash, instId);
+		if (hash && pid) {
+			void validatedTopicStore.tree;
+			const available = getTopicsByStructuralHash(pid, hash);
+			if (available.length > 0) {
+				return available[0].topic;
+			}
+		}
+		return `widgets/${widget.type}/${widget.id}`;
+	});
 	const schemaId = $derived.by(() => {
 		try {
 			return getWidgetSchemaId(widget.type);

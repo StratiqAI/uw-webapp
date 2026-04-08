@@ -40,13 +40,6 @@ import { createLogger } from '$lib/utils/logger';
 
 const log = createLogger('widget-prompt-svc');
 
-/**
- * @deprecated No longer used — widget EntityDefinitions are now scoped
- * to the current project. Kept temporarily for backward compatibility;
- * will be removed in a future cleanup pass.
- */
-export const SYSTEM_PROJECT_ID = '__system__';
-
 // ---------------------------------------------------------------------------
 // Template cache (in-memory, per session)
 // ---------------------------------------------------------------------------

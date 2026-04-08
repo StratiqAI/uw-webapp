@@ -15,7 +15,6 @@
 
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { WidgetDataSchemas } from '$lib/dashboard/types/widgetSchemas';
 import type { WidgetType } from '$lib/dashboard/types/widget';
 import type { JsonSchemaDefinition } from '$lib/types/models';
 import type { RawJsonSchema } from '@stratiqai/types-simple';
@@ -58,8 +57,7 @@ const WIDGET_NAMES: Record<WidgetType, string> = {
 	mapbox3d: 'Mapbox 3D Model'
 };
 
-/** Built-in widget types registered via the old hardcoded loop. Empty now that
- *  all widgets are packaged; kept for backwards compat of the export. */
+/** @deprecated All widgets are now package-based; this array is empty. */
 export const WIDGET_TYPES: WidgetType[] = [];
 
 let schemasRegistered = false;
@@ -86,30 +84,8 @@ function zodToCleanJsonSchema(zodSchema: unknown, name: string): JsonSchemaDefin
 export function initializeWidgetSchemas(): void {
 	if (schemasRegistered) return;
 
-	for (const widgetType of WIDGET_TYPES) {
-		const schemaId = `widget:${widgetType}-v1`;
-		const zodSchema = WidgetDataSchemas[widgetType];
-		const name = WIDGET_NAMES[widgetType];
-		const topicPattern = `widgets/${widgetType}/+`;
-
-		try {
-			validatedTopicStore.registerSchema({
-				id: schemaId,
-				name,
-				description: `Data schema for ${name.toLowerCase()}`,
-				source: 'code',
-				topicPattern,
-				jsonSchema: zodToCleanJsonSchema(zodSchema, `${widgetType}WidgetData`)
-			});
-		} catch (error) {
-			log.error(`Failed to register ${schemaId}:`, error);
-			throw error;
-		}
-	}
-
 	for (const manifest of getRegisteredManifests()) {
 		const schemaId = `widget:${manifest.kind}-${manifest.schemaVersion}`;
-		const topicPattern = `widgets/${manifest.kind}/+`;
 		const topicZod = manifest.inputSchema ?? manifest.zodSchema;
 
 		try {
@@ -118,7 +94,6 @@ export function initializeWidgetSchemas(): void {
 				name: manifest.displayName,
 				description: `Data schema for ${manifest.displayName.toLowerCase()}`,
 				source: 'code',
-				topicPattern,
 				jsonSchema: zodToCleanJsonSchema(topicZod, `${manifest.kind}WidgetData`)
 			});
 		} catch (error) {
@@ -127,14 +102,12 @@ export function initializeWidgetSchemas(): void {
 
 		if (manifest.outputSchema) {
 			const outputSchemaId = `widget:${manifest.kind}-out-${manifest.schemaVersion}`;
-			const outputTopicPattern = `widgets/${manifest.kind}/+/out`;
 			try {
 				validatedTopicStore.registerSchema({
 					id: outputSchemaId,
 					name: `${manifest.displayName} Output`,
 					description: `Output schema for ${manifest.displayName.toLowerCase()}`,
 					source: 'code',
-					topicPattern: outputTopicPattern,
 					jsonSchema: zodToCleanJsonSchema(manifest.outputSchema, `${manifest.kind}WidgetOutput`)
 				});
 			} catch (error) {
@@ -228,6 +201,29 @@ export function getWidgetOutputSchemaId(widgetType: string): string | null {
 	return null;
 }
 
+/**
+ * Return all ontology instance data topics that match a given structuralHash
+ * within a project. Scans the VTS tree under `ontology/p/{projectId}/schema/{hash}/inst`.
+ */
+export function getTopicsByStructuralHash(
+	projectId: string,
+	structuralHash: string
+): Array<{ topic: string; instanceId: string; data: Record<string, unknown> | undefined }> {
+	const instParent = `ontology/p/${projectId}/schema/${structuralHash}/inst`;
+	const instances = validatedTopicStore.getAllAt<Record<string, unknown>>(instParent);
+
+	return instances.map((entry) => {
+		const dataTopic = `${instParent}/${entry.id}/data`;
+		const raw = validatedTopicStore.at<Record<string, unknown>>(dataTopic);
+		return {
+			topic: dataTopic,
+			instanceId: entry.id,
+			data: raw ?? undefined
+		};
+	});
+}
+
+/** @deprecated Use the host's getWidgetTopic or ontology topics instead. */
 export function getWidgetTopic(widgetType: WidgetType | string, widgetId: string, topicOverride?: string): string {
 	if (topicOverride) {
 		return topicOverride;
@@ -235,6 +231,7 @@ export function getWidgetTopic(widgetType: WidgetType | string, widgetId: string
 	return `widgets/${widgetType}/${widgetId}`;
 }
 
+/** @deprecated Use getTopicsByStructuralHash for schema-based discovery. */
 export function getWidgetTopicsByType(widgetType: WidgetType): Array<{ id: string; data: unknown }> {
 	const basePath = `widgets/${widgetType}`;
 	return validatedTopicStore.getAllAt(basePath);
