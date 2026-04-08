@@ -11,8 +11,11 @@
 	import { setDashboardWidgetHost, HostServices, parseJsonSchemaToBuilderState, buildSchemaPreview, getAiStatusTopic } from '@stratiqai/dashboard-widget-sdk';
 	import type { WidgetPromptEditData } from '@stratiqai/dashboard-widget-sdk';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
-	import { getWidgetTopic, getWidgetTopicsByType } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { getWidgetTopic, getWidgetTopicsByType, getWidgetStructuralHash } from '$lib/dashboard/setup/widgetSchemaRegistration';
 	import { getWidgetPromptConfig } from '$lib/dashboard/setup/widgetRegistry';
+	import { toOntologyInstDataTopic, toOntologyInstMetaTopic, flatToPropertyValues } from '$lib/services/realtime/store/ontologyClientHelpers';
+	import { M_SAVE_ENTITY_INSTANCE } from '@stratiqai/types-simple';
+	import type { SaveInstanceInput, EntityInstance } from '@stratiqai/types-simple';
 	import { streamCatalog } from '$lib/stores/streamCatalog.svelte';
 	import { createSupabaseBrowserClient } from '$lib/services/supabase/browser';
 	import { generateWidgetId } from '$lib/dashboard/utils/idGenerator';
@@ -175,7 +178,12 @@
 			);
 
 			if (!existingPromptId && instance.promptId) {
-				dashboard.updateWidget(widgetId, { promptId: instance.promptId } as any);
+				dashboard.updateWidget(widgetId, {
+					promptId: instance.promptId,
+					entityDefinitionId: instance.entityDefinitionId
+				} as any);
+			} else if (instance.entityDefinitionId && !(w as any)?.entityDefinitionId) {
+				dashboard.updateWidget(widgetId, { entityDefinitionId: instance.entityDefinitionId } as any);
 			}
 
 			const editing = await getWidgetInstancePromptForEditing(instance.promptId, qc);
@@ -259,20 +267,55 @@
 
 			log.info(`AI execution submitted for widget ${widgetId}`);
 
-			const topic = getWidgetTopic(kind as any, widgetId);
-			const statusTopic = getAiStatusTopic(topic);
+			const legacyTopic = getWidgetTopic(kind as any, widgetId);
+			const statusTopic = getAiStatusTopic(legacyTopic);
 			validatedTopicStore.publish(statusTopic, { generating: true });
 
-			handle.result.then((rawOutput) => {
+			const projectId = dashboard.projectId ?? '';
+			const definitionId = (w as any)?.entityDefinitionId as string | undefined;
+			const structuralHash = getWidgetStructuralHash(kind);
+
+			handle.result.then(async (rawOutput) => {
 				if (rawOutput) {
 					try {
 						const parsed = JSON.parse(rawOutput);
-						const rawOutput_ = parsed.output_parsed ?? parsed;
-						const promptConfig = getWidgetPromptConfig(kind);
-						const output = promptConfig?.mapAiOutput ? promptConfig.mapAiOutput(rawOutput_) : rawOutput_;
-						validatedTopicStore.publish(topic, output);
+						const output = parsed.output_parsed ?? parsed;
+
+						validatedTopicStore.publish(legacyTopic, output);
+
+						if (definitionId && structuralHash && projectId) {
+							const instanceId = crypto.randomUUID();
+							const instanceInput: SaveInstanceInput = {
+								id: instanceId,
+								projectId,
+								definitionId,
+								senderId: `widget:${widgetId}`,
+								label: `${kind} output`,
+								values: flatToPropertyValues(output as Record<string, unknown>)
+							};
+
+							const result = await qc.query<{ saveEntityInstance: EntityInstance }>(
+								M_SAVE_ENTITY_INSTANCE,
+								{ input: instanceInput }
+							);
+
+							if (result?.saveEntityInstance) {
+								dashboard.updateWidget(widgetId, { entityInstanceId: instanceId } as any);
+
+								const instDataTopic = toOntologyInstDataTopic(projectId, structuralHash, instanceId);
+								validatedTopicStore.publish(instDataTopic, output);
+								const instMetaTopic = toOntologyInstMetaTopic(projectId, structuralHash, instanceId);
+								validatedTopicStore.publish(instMetaTopic, {
+									label: instanceInput.label,
+									updatedAt: result.saveEntityInstance.updatedAt ?? new Date().toISOString()
+								});
+								log.info(`Persisted EntityInstance ${instanceId} for widget ${widgetId}`);
+							}
+						} else {
+							log.warn(`Skipping EntityInstance persistence: missing definitionId or structuralHash for widget ${widgetId}`);
+						}
 					} catch (err) {
-						log.error('Failed to parse AI result:', err);
+						log.error('Failed to parse/persist AI result:', err);
 					}
 				}
 				validatedTopicStore.publish(statusTopic, { generating: false });

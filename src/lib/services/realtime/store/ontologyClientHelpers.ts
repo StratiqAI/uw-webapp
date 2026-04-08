@@ -108,6 +108,25 @@ export function flatMapToEav(
 }
 
 /**
+ * Lightweight reverse of `eavToFlatMap` that infers value slots from JS types.
+ * Useful when property definitions are unavailable (e.g. converting AI output
+ * to `PropertyValueInput[]`).
+ */
+export function flatToPropertyValues(
+	flat: Record<string, unknown>,
+): PropertyValueInput[] {
+	return Object.entries(flat)
+		.filter(([, v]) => v !== undefined && v !== null)
+		.map(([key, value]) => {
+			if (typeof value === 'number')
+				return { propertyName: key, numberValue: value } as PropertyValueInput;
+			if (typeof value === 'boolean')
+				return { propertyName: key, booleanValue: value } as PropertyValueInput;
+			return { propertyName: key, stringValue: String(value) } as PropertyValueInput;
+		});
+}
+
+/**
  * Convenience: extract the flat data map from an EntityInstance.
  * This is what gets published to VTS at the instance data topic.
  */

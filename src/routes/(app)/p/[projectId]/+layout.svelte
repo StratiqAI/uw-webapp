@@ -1,5 +1,5 @@
 <script module lang="ts">
-	let widgetTemplatesSynced = false;
+	let widgetTemplatesSyncedForProject: string | null = null;
 </script>
 
 <script lang="ts">
@@ -113,10 +113,11 @@
 	});
 
 	$effect(() => {
-		if (!browser || !idToken || widgetTemplatesSynced) return;
-		widgetTemplatesSynced = true;
+		if (!browser || !idToken || !routeProjectId) return;
+		if (widgetTemplatesSyncedForProject === routeProjectId) return;
+		widgetTemplatesSyncedForProject = routeProjectId;
 		const qc = new GraphQLQueryClient(idToken);
-		syncWidgetTemplates(qc).catch((err) => {
+		syncWidgetTemplates(qc, routeProjectId).catch((err) => {
 			log.error('Failed to sync widget prompt templates:', err);
 		});
 	});

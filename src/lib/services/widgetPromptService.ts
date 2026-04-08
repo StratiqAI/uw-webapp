@@ -41,9 +41,9 @@ import { createLogger } from '$lib/utils/logger';
 const log = createLogger('widget-prompt-svc');
 
 /**
- * Synthetic project ID used for kind-level widget EntityDefinitions.
- * Stored in the ontology table under `PROJ#__system__` so they are
- * visible to every project via the Ontology Explorer.
+ * @deprecated No longer used — widget EntityDefinitions are now scoped
+ * to the current project. Kept temporarily for backward compatibility;
+ * will be removed in a future cleanup pass.
  */
 export const SYSTEM_PROJECT_ID = '__system__';
 
@@ -107,12 +107,15 @@ function zodToCleanSchemaDef(zodSchema: import('zod').ZodSchema, refName: string
 /**
  * Ensure all registered widget kinds with entityDefinition or promptConfig
  * have their EntityDefinition (and, when applicable, template Prompt)
- * persisted in the cloud. Called once from +layout.svelte onMount.
+ * persisted in the cloud. Called once per project from the project layout.
  *
- * Kind-level EntityDefinitions are stored under SYSTEM_PROJECT_ID so they
- * are visible to every project.
+ * EntityDefinitions are stored under the given projectId so they live in
+ * the same scope as the instances that reference them.
  */
-export async function syncWidgetTemplates(queryClient: IGraphQLQueryClient): Promise<void> {
+export async function syncWidgetTemplates(
+	queryClient: IGraphQLQueryClient,
+	projectId: string
+): Promise<void> {
 	const manifests = getRegisteredManifests();
 	const eligible = manifests.filter((m) => m.entityDefinition || m.promptConfig);
 	if (eligible.length === 0) return;
@@ -125,7 +128,7 @@ export async function syncWidgetTemplates(queryClient: IGraphQLQueryClient): Pro
 
 				const schemaDef = zodToCleanSchemaDef(defConfig.zodSchema, defConfig.name);
 
-				const defResult = await ensureEntityDefinition(queryClient, SYSTEM_PROJECT_ID, {
+				const defResult = await ensureEntityDefinition(queryClient, projectId, {
 					name: defConfig.name,
 					description: defConfig.description,
 					schemaDefinition: schemaDef
@@ -205,12 +208,12 @@ async function ensureWidgetTemplatePrompt(
 /**
  * Internal helper used by ensureWidgetInstancePrompt to get or create the
  * kind-level template (EntityDefinition + Prompt) before cloning.
- * Template EntityDefinitions always go to SYSTEM_PROJECT_ID.
  */
 async function ensureWidgetTemplate(
 	kind: string,
 	promptConfig: WidgetPromptConfig,
-	queryClient: IGraphQLQueryClient
+	queryClient: IGraphQLQueryClient,
+	projectId: string
 ): Promise<TemplateCache> {
 	const cached = templateCache.get(kind);
 	if (cached) return cached;
@@ -220,7 +223,7 @@ async function ensureWidgetTemplate(
 
 	const schemaDef = zodToCleanSchemaDef(defConfig.zodSchema, defConfig.name);
 
-	const defResult = await ensureEntityDefinition(queryClient, SYSTEM_PROJECT_ID, {
+	const defResult = await ensureEntityDefinition(queryClient, projectId, {
 		name: defConfig.name,
 		description: defConfig.description,
 		schemaDefinition: schemaDef
@@ -236,6 +239,7 @@ async function ensureWidgetTemplate(
 export interface WidgetInstancePrompt {
 	promptId: string;
 	jsonSchemaId: string;
+	entityDefinitionId: string;
 }
 
 /**
@@ -259,9 +263,11 @@ export async function ensureWidgetInstancePrompt(
 				{ id: existingPromptId }
 			);
 			if (existing?.getPrompt) {
+				const prompt = existing.getPrompt as unknown as Record<string, string>;
 				return {
 					promptId: existing.getPrompt.id,
-					jsonSchemaId: (existing.getPrompt as unknown as Record<string, string>).jsonSchemaId ?? ''
+					jsonSchemaId: prompt.jsonSchemaId ?? '',
+					entityDefinitionId: prompt.entityDefinitionId ?? ''
 				};
 			}
 		} catch {
@@ -274,7 +280,7 @@ export async function ensureWidgetInstancePrompt(
 		throw new Error(`Widget kind "${kind}" has no promptConfig`);
 	}
 
-	const template = await ensureWidgetTemplate(kind, promptConfig, queryClient);
+	const template = await ensureWidgetTemplate(kind, promptConfig, queryClient, projectId);
 
 	const manifest = getWidgetManifest(kind);
 	const friendlyName = widgetTitle || manifest?.displayName || kind;
@@ -307,6 +313,7 @@ export async function ensureWidgetInstancePrompt(
 		schemaDefinition: templateSchemaDef
 	});
 	const instanceJsonSchemaId = instanceDefResult.jsonSchemaId;
+	const instanceEntityDefinitionId = instanceDefResult.entityDefinitionId;
 
 	// Clone template Prompt for this instance
 	let templatePrompt: Prompt | null = null;
@@ -347,7 +354,8 @@ export async function ensureWidgetInstancePrompt(
 
 	return {
 		promptId: result.createPrompt.id,
-		jsonSchemaId: instanceJsonSchemaId
+		jsonSchemaId: instanceJsonSchemaId,
+		entityDefinitionId: instanceEntityDefinitionId
 	};
 }
 
