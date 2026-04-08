@@ -11,6 +11,7 @@
 	import { themeStore, type AppTheme } from '$lib/stores/themeStore.svelte';
 	import TopBar from '$lib/components/layout/TopBar.svelte';
 	import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
+	import AddWidgetDialog from '$lib/dashboard/components/AddWidgetDialog.svelte';
 	import { toastStore } from '$lib/stores/toastStore.svelte';
 
 	interface Props {
@@ -895,28 +896,9 @@
 {/if}
 
 <!-- Add Widget Dialog -->
-{#if showAddWidgetDialog}
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-		<div class="w-full max-w-3xl rounded-xl {darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border p-6 shadow-2xl">
-			<h3 class="mb-1 text-lg font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">Add Widget</h3>
-			<p class="mb-4 text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'}">Select a widget type to add to the current tab</p>
-			<div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-				{#each widgetTypes as { type, label, icon }}
-					<button
-						onclick={() => handleAddWidget(type)}
-						class="flex flex-col items-center gap-2 rounded-lg border-2 p-4 transition-all hover:shadow-md hover:scale-[1.02]
-							{darkMode
-								? 'border-slate-700 hover:border-indigo-500 hover:bg-indigo-900/20'
-								: 'border-slate-200 hover:border-indigo-500 hover:bg-indigo-50'}"
-					>
-						<span class="text-2xl">{icon}</span>
-						<span class="text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'}">{label}</span>
-					</button>
-				{/each}
-			</div>
-			<div class="mt-6 flex justify-end">
-				<button onclick={() => (showAddWidgetDialog = false)} class="px-4 py-2 text-sm font-medium {darkMode ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'} rounded-md transition-colors">Cancel</button>
-			</div>
-		</div>
-	</div>
-{/if}
+<AddWidgetDialog
+	bind:open={showAddWidgetDialog}
+	{darkMode}
+	{widgetTypes}
+	onAddWidget={handleAddWidget}
+/>
