@@ -23,6 +23,7 @@ export { default as FlipCard } from './FlipCard.svelte';
 export { default as AiStatusOverlay } from './AiStatusOverlay.svelte';
 export { default as WidgetConfigureBack } from './WidgetConfigureBack.svelte';
 export { useWidgetConfigure } from './useWidgetConfigure.svelte.js';
+export { setConfigureTab, consumeConfigureTab, peekConfigureTab } from './configureTabSignal.svelte.js';
 
 export type {
 	NestedSchemaNodeType,

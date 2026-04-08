@@ -91,7 +91,8 @@ export type WidgetAction =
 	| 'refresh'
 	| 'settings'
 	| 'remove'
-	| 'viewFullscreen';
+	| 'viewFullscreen'
+	| 'aiConfiguration';
 
 export interface TableWidget extends BaseWidget {
 	type: 'table';

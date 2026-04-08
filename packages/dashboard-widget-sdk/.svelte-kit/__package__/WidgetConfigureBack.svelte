@@ -2,6 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import type { DashboardAppTheme, StreamEntry, WidgetPromptEditData } from './types.js';
 	import { getDashboardWidgetHost } from './context.svelte.js';
+	import { peekConfigureTab, consumeConfigureTab } from './configureTabSignal.svelte.js';
 	import PromptEditor from './PromptEditor.svelte';
 
 	interface Props {
@@ -40,6 +41,14 @@
 
 	const hasAI = $derived(showAITab && !!host.loadWidgetPrompt);
 	let activeTab = $state<'settings' | 'ai'>('settings');
+
+	$effect(() => {
+		const pending = peekConfigureTab(widgetId);
+		if (pending === 'ai' && hasAI) {
+			consumeConfigureTab(widgetId);
+			activeTab = 'ai';
+		}
+	});
 
 	const panelBg = $derived(
 		darkMode ? 'bg-slate-900 text-slate-100' : theme === 'warm' ? 'bg-[#faf8f4] text-slate-900' : 'bg-slate-50 text-slate-900'

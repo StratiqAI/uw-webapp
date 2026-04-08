@@ -162,4 +162,8 @@ export interface DashboardWidgetHost {
     saveAndRunWidgetPrompt?(kind: string, widgetId: string, data: WidgetPromptEditData): Promise<void>;
     /** Snapshot of which host services are available. */
     getServiceStatus?(): ServiceStatus[];
+    /** Store a tab preference that WidgetConfigureBack will consume on next open. */
+    setRequestedConfigureTab?(widgetId: string, tab: string): void;
+    /** Read and clear the pending tab request for a widget (returns undefined when none). */
+    consumeRequestedConfigureTab?(widgetId: string): string | undefined;
 }

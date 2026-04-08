@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Widget, WidgetAction } from '$lib/dashboard/types/widget';
 	import { themeStore } from '$lib/stores/themeStore.svelte';
+	import { getWidgetPromptConfig } from '$lib/dashboard/setup/widgetRegistry';
 
 	interface MenuRow {
 		action: WidgetAction;
@@ -116,6 +117,8 @@
 			'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4',
 		aiAgent:
 			'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z',
+		aiConfig:
+			'M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714a2.25 2.25 0 00.659 1.591L19 14.5M14.25 3.104c.251.023.501.05.75.082M19 14.5l-1.299 3.896a2.25 2.25 0 01-2.136 1.554H8.435a2.25 2.25 0 01-2.136-1.554L5 14.5m14 0H5',
 		duplicate:
 			'M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z',
 		export:
@@ -167,6 +170,14 @@
 			label: 'Settings',
 			icon: ICONS.settings
 		});
+
+		if (getWidgetPromptConfig(widget.type)) {
+			items.push({
+				action: 'aiConfiguration',
+				label: 'AI Configuration',
+				icon: ICONS.aiConfig
+			});
+		}
 
 		if (hasDataRefresh(widget)) {
 			items.push({

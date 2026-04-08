@@ -83,6 +83,8 @@
 	if (sbClient) serviceMap.set('supabase', sbClient);
 	serviceMap.set('config', { geoapifyApiKey: PUBLIC_GEOAPIFY_API_KEY ?? '' });
 
+	const pendingConfigureTabs: Record<string, string> = {};
+
 	setDashboardWidgetHost({
 		validatedTopicStore: {
 			get tree() { return validatedTopicStore.tree; },
@@ -287,6 +289,15 @@
 				name,
 				available: serviceMap.has(name)
 			}));
+		},
+
+		setRequestedConfigureTab(widgetId: string, tab: string) {
+			pendingConfigureTabs[widgetId] = tab;
+		},
+		consumeRequestedConfigureTab(widgetId: string): string | undefined {
+			const tab = pendingConfigureTabs[widgetId];
+			if (tab !== undefined) delete pendingConfigureTabs[widgetId];
+			return tab;
 		}
 	});
 

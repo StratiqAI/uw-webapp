@@ -16,6 +16,7 @@
 	import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
 	import { themeStore } from '$lib/stores/themeStore.svelte';
 	import WidgetConfigureDialog from './WidgetConfigureDialog.svelte';
+	import { setConfigureTab } from '@stratiqai/dashboard-widget-sdk';
 	import { createLogger } from '$lib/utils/logger';
 
 	const log = createLogger('dashboard');
@@ -82,6 +83,9 @@
 
 	function handleWidgetAction(action: WidgetAction) {
 		switch (action) {
+		case 'aiConfiguration':
+			setConfigureTab(widget.id, 'ai');
+			// fall through to open configure panel
 		case 'configure':
 		case 'edit':
 		case 'settings':
