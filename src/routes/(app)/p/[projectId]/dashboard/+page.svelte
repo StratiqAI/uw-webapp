@@ -4,8 +4,6 @@
 	import DashboardControls from '$lib/dashboard/components/DashboardControls.svelte';
 	import ValidatedTopicStoreSidebar from '$lib/dashboard/components/ValidatedTopicStoreSidebar.svelte';
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
-	import { DashboardStorage } from '$lib/dashboard/utils/storage';
-	import { dashboardWidgets } from './config';
 	import { publishWidgetData } from '$lib/dashboard/setup/widgetDataPublishers';
 
 	import { onMount, setContext } from 'svelte';
@@ -36,6 +34,7 @@
 
 	let { data }: Props = $props();
 	let isLoading = $state(true);
+	let showAddWidgetDialog = $state(false);
 
 	let darkMode = $derived.by(() => themeStore.darkMode);
 	let currentTheme = $derived.by(() => themeStore.theme);
@@ -111,29 +110,12 @@
 				}
 			}
 
-			const hasLoadedDashboard = await dashboard.initialize(projectId);
+			await dashboard.initialize(projectId);
 
-				if (!hasLoadedDashboard) {
-					log.info('No saved dashboard found, loading defaults');
-					try {
-						publishWidgetData(dashboardWidgets);
-					} catch (error) {
-						log.error('Error publishing widget data:', error);
-					}
-					dashboardWidgets.forEach((widget) => {
-						try {
-							dashboard.addWidget(widget);
-						} catch (error) {
-							log.error(`Failed to add widget ${widget.id}:`, error);
-						}
-					});
-				} else {
-					dashboard.mergeMissingWidgetsFromConfig('market', dashboardWidgets);
-					try {
-						publishWidgetData(dashboard.widgets, { onlyIfMissing: true });
-					} catch (error) {
-						log.error('Error publishing widget data:', error);
-					}
+				try {
+					publishWidgetData(dashboard.widgets, { onlyIfMissing: true });
+				} catch (error) {
+					log.error('Error publishing widget data:', error);
 				}
 
 				dashboard.ensureGridCapacity();
@@ -197,8 +179,8 @@
 	<!-- Main Content Area -->
 	<div class="flex-1 flex flex-col overflow-hidden {darkMode ? 'bg-slate-900/80' : 'bg-primary-50/40'}">
 		<DashboardControls
-			defaultWidgets={dashboardWidgets}
 			onProjectChange={handleProjectChange}
+			bind:showAddWidgetDialog
 		/>
 
 
@@ -244,7 +226,7 @@
 					</div>
 				{:else}
 					<div class="min-h-[800px]">
-						<Dashboard />
+						<Dashboard onRequestAddWidget={() => (showAddWidgetDialog = true)} />
 					</div>
 				{/if}
 			</div>

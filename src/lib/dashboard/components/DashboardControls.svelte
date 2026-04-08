@@ -3,6 +3,7 @@
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
 	import type { Widget } from '../types/widget';
 	import { findAvailablePosition } from '../utils/grid';
+
 	import { getRegisteredManifests } from '$lib/dashboard/setup/widgetRegistry';
 	import { getDefaultDataForWidget, getDefaultSizeForWidget } from '$lib/dashboard/setup/defaultDashboardValues';
 	import { generateWidgetId } from '$lib/dashboard/utils/idGenerator';
@@ -13,13 +14,13 @@
 	import { toastStore } from '$lib/stores/toastStore.svelte';
 
 	interface Props {
-		defaultWidgets?: Widget[];
 		onProjectChange?: (projectId: string | null) => void;
+		showAddWidgetDialog?: boolean;
 	}
 
 	let {
-		defaultWidgets,
-		onProjectChange
+		onProjectChange,
+		showAddWidgetDialog = $bindable(false)
 	}: Props = $props();
 
 	const darkMode = $derived(themeStore.darkMode);
@@ -27,14 +28,13 @@
 
 	let showExportDialog = $state(false);
 	let showImportDialog = $state(false);
-	let showAddWidgetDialog = $state(false);
 	let exportedJson = $state('');
 	let importJson = $state('');
 	let importError = $state('');
 	let renamingTabId = $state<DashboardTabId | null>(null);
 	let renameValue = $state('');
 	let showDeleteConfirm = $state<DashboardTabId | null>(null);
-	let showResetConfirm = $state(false);
+	let showClearConfirm = $state(false);
 
 	const widgetCount = $derived(dashboard.widgets.length);
 	const allWidgetsLocked = $derived(dashboard.allWidgetsLocked);
@@ -250,12 +250,12 @@
 		}
 	}
 
-	function handleReset() {
-		showResetConfirm = true;
+	function handleClear() {
+		showClearConfirm = true;
 	}
 
-	function confirmResetLayout() {
-		dashboard.resetToDefault(defaultWidgets);
+	function confirmClearLayout() {
+		dashboard.resetToDefault();
 	}
 
 	function handleExport() {
@@ -747,15 +747,16 @@
 
 		<button
 			type="button"
-			onclick={handleReset}
+			onclick={handleClear}
+			disabled={widgetCount === 0}
 			class="rounded-md p-1.5 transition-colors {darkMode
 				? 'text-slate-400 hover:text-white hover:bg-slate-700'
-				: 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}"
-			title="Reset dashboard to the default layout"
-			aria-label="Reset dashboard to default layout"
+				: 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'} disabled:opacity-30 disabled:pointer-events-none"
+			title="Clear all widgets from the current tab"
+			aria-label="Clear dashboard"
 		>
 			<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+				<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
 			</svg>
 		</button>
 
@@ -827,13 +828,13 @@
 <!-- ═══════════════════ DIALOGS ═══════════════════ -->
 
 <ConfirmModal
-	bind:open={showResetConfirm}
-	title="Reset dashboard layout?"
-	message="This will replace the current layout with the default. Widget positions and tabs may change."
-	confirmLabel="Reset"
+	bind:open={showClearConfirm}
+	title="Clear dashboard?"
+	message="This will remove all widgets from the current tab."
+	confirmLabel="Clear"
 	cancelLabel="Cancel"
 	{darkMode}
-	onConfirm={confirmResetLayout}
+	onConfirm={confirmClearLayout}
 />
 
 <!-- Export Dialog -->

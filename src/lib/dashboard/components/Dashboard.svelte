@@ -39,6 +39,12 @@
 
 	const log = createLogger('dashboard');
 
+	interface Props {
+		onRequestAddWidget?: () => void;
+	}
+
+	let { onRequestAddWidget }: Props = $props();
+
 	function extractDocumentIds(project: Project | null | undefined): string[] {
 		if (!project?.doclinks) return [];
 		const links: Doclink[] = Array.isArray(project.doclinks)
@@ -658,6 +664,31 @@
 	minCellHeight={dashboard.config.minCellHeight}
 	{...dropHandlers}
 >
+	{#if dashboard.widgets.length === 0 && !topicDropGhost}
+		<div class="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+			<div class="pointer-events-auto flex flex-col items-center gap-4 rounded-xl border-2 border-dashed px-10 py-12
+				{darkMode ? 'border-slate-700 bg-slate-800/60 text-slate-300' : 'border-slate-300 bg-white/80 text-slate-600'}">
+				<svg class="w-12 h-12 {darkMode ? 'text-slate-600' : 'text-slate-300'}" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+				</svg>
+				<h2 class="text-lg font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'}">Your dashboard is empty</h2>
+				<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'}">Add your first widget to get started.</p>
+				{#if onRequestAddWidget}
+					<button
+						type="button"
+						onclick={onRequestAddWidget}
+						class="mt-2 inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition-all
+							bg-linear-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400
+							shadow-md shadow-indigo-900/40 hover:shadow-lg hover:shadow-indigo-900/50 hover:-translate-y-px"
+					>
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
+						Add Widget
+					</button>
+				{/if}
+			</div>
+		</div>
+	{/if}
+
 	{#key dashboard.activeTabId}
 		{#each dashboard.widgets as widget (widget.id)}
 			<WidgetWrapper {widget} onDragStart={handleWidgetDragStart} onDragEnd={handleWidgetDragEnd} />
