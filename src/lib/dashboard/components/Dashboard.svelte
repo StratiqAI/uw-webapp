@@ -31,7 +31,7 @@
 	import { aiService } from '$lib/services/ai';
 	import { Q_GET_PROMPT } from '$lib/services/graphql/promptOperations';
 	import { Q_GET_JSON_SCHEMA } from '$lib/services/graphql/jsonSchemaOperations';
-	import { PUBLIC_GEOAPIFY_API_KEY } from '$env/static/public';
+	import { PUBLIC_GEOAPIFY_API_KEY, PUBLIC_MAPBOX_ACCESS_TOKEN } from '$env/static/public';
 	import { createLogger } from '$lib/utils/logger';
 	import { gql } from '$lib/services/realtime/graphql/requestHandler';
 	import { Q_LIST_DOCLINKS } from '@stratiqai/types-simple';
@@ -92,7 +92,10 @@
 	const serviceMap = new Map<string, unknown>();
 	const sbClient = createSupabaseBrowserClient();
 	if (sbClient) serviceMap.set('supabase', sbClient);
-	serviceMap.set('config', { geoapifyApiKey: PUBLIC_GEOAPIFY_API_KEY ?? '' });
+	serviceMap.set('config', {
+		geoapifyApiKey: PUBLIC_GEOAPIFY_API_KEY ?? '',
+		mapboxAccessToken: PUBLIC_MAPBOX_ACCESS_TOKEN ?? ''
+	});
 
 	const pendingConfigureTabs: Record<string, string> = {};
 

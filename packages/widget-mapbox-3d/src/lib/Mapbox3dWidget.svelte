@@ -29,11 +29,15 @@
 	const topicData = useReactiveValidatedTopic<Mapbox3dConfig>(topic);
 	const aiStatus = useAiGenerationStatus(() => topic);
 
+	const envToken = (host.services?.get<{ mapboxAccessToken?: string }>('config'))?.mapboxAccessToken ?? '';
+
+	const isRealToken = (t: string | undefined) => !!t && t !== 'YOUR_MAPBOX_TOKEN' && t.length > 10;
+
 	const cfg = $derived<Mapbox3dConfig>({
 		...DEMO_MAPBOX_3D_CONFIG,
 		...data,
 		...(topicData.current ?? {}),
-		accessToken: data.accessToken || DEMO_MAPBOX_3D_CONFIG.accessToken
+		accessToken: (isRealToken(data.accessToken) ? data.accessToken : undefined) || envToken || DEMO_MAPBOX_3D_CONFIG.accessToken
 	});
 
 	const configure = useWidgetConfigure<Mapbox3dConfig>({
