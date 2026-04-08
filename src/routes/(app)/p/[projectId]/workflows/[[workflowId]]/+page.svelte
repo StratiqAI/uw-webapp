@@ -65,7 +65,7 @@
 	} from '../services/serialization/workflowSerializationService';
 	import { gql } from '$lib/services/realtime/graphql/requestHandler';
 	import { Q_GET_JSON_SCHEMA } from '$lib/services/graphql/jsonSchemaOperations';
-	import { ensureJsonSchemaEntity } from '$lib/services/graphql/jsonSchemaService';
+	import { ensureEntityDefinition } from '$lib/services/graphql/entityDefinitionService';
 	import { GraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
 	import WorkflowSwitcher from '$lib/dashboard/components/WorkflowSwitcher.svelte';
 	import {
@@ -819,25 +819,26 @@
 		try {
 			const queryClient = new GraphQLQueryClient(data.idToken);
 
-			// Persist workflow-level output schema as a JsonSchema entity if needed
+			// Persist workflow-level output schema as an EntityDefinition (pipeline auto-creates JsonSchema)
 			if (outputSchema && Object.keys(outputSchema).length > 0) {
-				workflowJsonSchemaId = await ensureJsonSchemaEntity(
+				const defResult = await ensureEntityDefinition(
 					queryClient,
-					{ name: 'Workflow Output Schema', schemaDefinition: outputSchema },
-					workflowJsonSchemaId ?? undefined
+					selectedProjectId,
+					{ name: 'Workflow Output Schema', schemaDefinition: outputSchema }
 				);
+				workflowJsonSchemaId = defResult.jsonSchemaId;
 			}
 
-			// Persist node-level AI schemas, reusing existing entity IDs
+			// Persist node-level AI schemas as EntityDefinitions
 			const resolvedNodeSchemaIds: Record<string, string> = {};
 			for (const el of gridElements) {
 				if (el.aiQueryData?.responseFormat?.type === 'json_schema' && el.aiQueryData.responseFormat.schema) {
-					const entityId = await ensureJsonSchemaEntity(
+					const defResult = await ensureEntityDefinition(
 						queryClient,
-						{ name: `AI Node Schema (${el.type.label ?? el.id})`, schemaDefinition: el.aiQueryData.responseFormat.schema },
-						nodeJsonSchemaIds[el.id]
+						selectedProjectId,
+						{ name: `AI Node Schema (${el.type.label ?? el.id})`, schemaDefinition: el.aiQueryData.responseFormat.schema }
 					);
-					resolvedNodeSchemaIds[el.id] = entityId;
+					resolvedNodeSchemaIds[el.id] = defResult.jsonSchemaId;
 				}
 			}
 			nodeJsonSchemaIds = { ...nodeJsonSchemaIds, ...resolvedNodeSchemaIds };
@@ -1535,6 +1536,7 @@
 			{darkMode}
 			bind:outputSchema={outputSchema}
 			queryClient={data.idToken ? new GraphQLQueryClient(data.idToken) : undefined}
+			projectId={selectedProjectId ?? ''}
 			selectedJsonSchemaId={workflowJsonSchemaId ?? undefined}
 			onSave={(pickedSchemaId) => {
 				if (pickedSchemaId) workflowJsonSchemaId = pickedSchemaId;

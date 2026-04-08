@@ -1,152 +1,100 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import {
-		Q_LIST_JSON_SCHEMAS,
-		M_CREATE_JSON_SCHEMA,
-		M_UPDATE_JSON_SCHEMA,
-		M_DELETE_JSON_SCHEMA
-	} from '$lib/services/graphql/jsonSchemaOperations';
+	import { Q_LIST_ENTITY_DEFINITIONS, M_SAVE_ENTITY_DEFINITION, M_DELETE_ENTITY_DEFINITION } from '@stratiqai/types-simple';
 	import type { IGraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
+	import { derivePropertiesFromJsonSchema } from '$lib/services/graphql/schemaPropertyDeriver';
 
-	interface JsonSchemaItem {
+	interface EntityDefinitionItem {
 		id: string;
+		projectId: string;
+		jsonSchemaId?: string;
 		name: string;
 		description?: string;
-		schemaDefinition: string;
-		ownerId: string;
-		sharingMode: string;
-		sourceJsonSchemaId?: string;
-		createdAt?: string;
-		updatedAt?: string;
+		jsonSchema: string;
+		structuralHash?: string;
 	}
 
 	interface Props {
 		darkMode?: boolean;
 		queryClient: IGraphQLQueryClient;
+		projectId: string;
 		selectedSchemaId?: string;
-		onselect: (schema: JsonSchemaItem) => void;
+		onselect: (schema: { id: string; jsonSchemaId: string; schemaDefinition: string }) => void;
 		onclose: () => void;
 	}
 
-	let { darkMode = false, queryClient, selectedSchemaId, onselect, onclose }: Props = $props();
+	let { darkMode = false, queryClient, projectId, selectedSchemaId, onselect, onclose }: Props = $props();
 
-	let schemas = $state<JsonSchemaItem[]>([]);
+	let definitions = $state<EntityDefinitionItem[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let searchQuery = $state('');
-	let editingSchema = $state<JsonSchemaItem | null>(null);
+	let editingDef = $state<EntityDefinitionItem | null>(null);
 	let showCreateForm = $state(false);
 
-	// Create/Edit form state
 	let formName = $state('');
 	let formDescription = $state('');
 	let formSchemaText = $state('{\n  "type": "object",\n  "properties": {},\n  "required": []\n}');
 	let formSaving = $state(false);
 
-	const isSystemOwned = (s: JsonSchemaItem) => s.ownerId === 'SYSTEM';
-
-	const filteredSchemas = $derived.by(() => {
-		if (!searchQuery.trim()) return schemas;
+	const filteredDefinitions = $derived.by(() => {
+		if (!searchQuery.trim()) return definitions;
 		const q = searchQuery.toLowerCase();
-		return schemas.filter(
-			(s) =>
-				s.name.toLowerCase().includes(q) ||
-				(s.description?.toLowerCase().includes(q) ?? false)
+		return definitions.filter(
+			(d) =>
+				d.name.toLowerCase().includes(q) ||
+				(d.description?.toLowerCase().includes(q) ?? false)
 		);
 	});
 
 	onMount(() => {
-		loadSchemas();
+		loadDefinitions();
 	});
 
-	async function loadSchemas() {
+	async function loadDefinitions() {
 		loading = true;
 		error = null;
 		try {
 			const result = await queryClient.query<{
-				listJsonSchemas: { items: JsonSchemaItem[]; nextToken?: string };
-			}>(Q_LIST_JSON_SCHEMAS, { scope: 'ALL_TENANT', limit: 200 });
-			schemas = result?.listJsonSchemas?.items ?? [];
+				listEntityDefinitions: EntityDefinitionItem[];
+			}>(Q_LIST_ENTITY_DEFINITIONS, { projectId });
+			definitions = result?.listEntityDefinitions ?? [];
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load schemas';
+			error = e instanceof Error ? e.message : 'Failed to load definitions';
 		} finally {
 			loading = false;
 		}
 	}
 
 	function startCreate() {
-		editingSchema = null;
+		editingDef = null;
 		showCreateForm = true;
 		formName = '';
 		formDescription = '';
 		formSchemaText = '{\n  "type": "object",\n  "properties": {},\n  "required": []\n}';
 	}
 
-	function startEdit(schema: JsonSchemaItem) {
-		if (isSystemOwned(schema)) {
-			startCopyOnWrite(schema);
-			return;
-		}
-		editingSchema = schema;
+	function startEdit(def: EntityDefinitionItem) {
+		editingDef = def;
 		showCreateForm = true;
-		formName = schema.name;
-		formDescription = schema.description ?? '';
+		formName = def.name;
+		formDescription = def.description ?? '';
 		try {
-			const parsed = typeof schema.schemaDefinition === 'string'
-				? JSON.parse(schema.schemaDefinition)
-				: schema.schemaDefinition;
+			const parsed = typeof def.jsonSchema === 'string'
+				? JSON.parse(def.jsonSchema)
+				: def.jsonSchema;
 			formSchemaText = JSON.stringify(parsed, null, 2);
 		} catch {
-			formSchemaText = String(schema.schemaDefinition);
-		}
-	}
-
-	async function startCopyOnWrite(schema: JsonSchemaItem) {
-		formSaving = true;
-		try {
-			const result = await queryClient.query<{ createJsonSchema: JsonSchemaItem }>(
-				M_CREATE_JSON_SCHEMA,
-				{
-					input: {
-						name: `${schema.name} (My Copy)`,
-						description: schema.description || undefined,
-						schemaDefinition:
-							typeof schema.schemaDefinition === 'string'
-								? schema.schemaDefinition
-								: JSON.stringify(schema.schemaDefinition),
-						sharingMode: 'PRIVATE',
-						sourceJsonSchemaId: schema.id
-					}
-				}
-			);
-			if (result?.createJsonSchema) {
-				const copy = result.createJsonSchema;
-				schemas = [copy, ...schemas];
-				editingSchema = copy;
-				showCreateForm = true;
-				formName = copy.name;
-				formDescription = copy.description ?? '';
-				try {
-					const parsed = typeof copy.schemaDefinition === 'string'
-						? JSON.parse(copy.schemaDefinition)
-						: copy.schemaDefinition;
-					formSchemaText = JSON.stringify(parsed, null, 2);
-				} catch {
-					formSchemaText = String(copy.schemaDefinition);
-				}
-			}
-		} catch (e) {
-			error = `Copy failed: ${e instanceof Error ? e.message : String(e)}`;
-		} finally {
-			formSaving = false;
+			formSchemaText = String(def.jsonSchema);
 		}
 	}
 
 	async function handleSaveForm() {
 		if (!formName.trim()) return;
 		formSaving = true;
+		let parsedSchema: unknown;
 		try {
-			JSON.parse(formSchemaText);
+			parsedSchema = JSON.parse(formSchemaText);
 		} catch {
 			error = 'Invalid JSON in schema definition';
 			formSaving = false;
@@ -155,41 +103,36 @@
 		error = null;
 
 		try {
-			if (editingSchema) {
-				const result = await queryClient.query<{ updateJsonSchema: JsonSchemaItem }>(
-					M_UPDATE_JSON_SCHEMA,
-					{
-						id: editingSchema.id,
-						input: {
-							name: formName.trim(),
-							description: formDescription.trim() || undefined,
-							schemaDefinition: formSchemaText
-						}
+			const id = editingDef?.id ?? crypto.randomUUID();
+			const properties = derivePropertiesFromJsonSchema(parsedSchema);
+
+			const result = await queryClient.query<{ saveEntityDefinition: EntityDefinitionItem }>(
+				M_SAVE_ENTITY_DEFINITION,
+				{
+					input: {
+						projectId,
+						id,
+						name: formName.trim(),
+						description: formDescription.trim() || undefined,
+						jsonSchema: formSchemaText,
+						properties
 					}
-				);
-				if (result?.updateJsonSchema) {
-					schemas = schemas.map((s) =>
-						s.id === editingSchema!.id ? result.updateJsonSchema : s
-					);
 				}
-			} else {
-				const result = await queryClient.query<{ createJsonSchema: JsonSchemaItem }>(
-					M_CREATE_JSON_SCHEMA,
-					{
-						input: {
-							name: formName.trim(),
-							description: formDescription.trim() || undefined,
-							schemaDefinition: formSchemaText,
-							sharingMode: 'PRIVATE'
-						}
-					}
-				);
-				if (result?.createJsonSchema) {
-					schemas = [result.createJsonSchema, ...schemas];
+			);
+
+			if (result?.saveEntityDefinition) {
+				const saved = result.saveEntityDefinition;
+				if (editingDef) {
+					definitions = definitions.map((d) =>
+						d.id === editingDef!.id ? saved : d
+					);
+				} else {
+					definitions = [saved, ...definitions];
 				}
 			}
+
 			showCreateForm = false;
-			editingSchema = null;
+			editingDef = null;
 		} catch (e) {
 			error = `Save failed: ${e instanceof Error ? e.message : String(e)}`;
 		} finally {
@@ -197,12 +140,11 @@
 		}
 	}
 
-	async function handleDelete(schema: JsonSchemaItem) {
-		if (isSystemOwned(schema)) return;
-		if (!confirm(`Delete "${schema.name}"?`)) return;
+	async function handleDelete(def: EntityDefinitionItem) {
+		if (!confirm(`Delete "${def.name}"?`)) return;
 		try {
-			await queryClient.query(M_DELETE_JSON_SCHEMA, { id: schema.id });
-			schemas = schemas.filter((s) => s.id !== schema.id);
+			await queryClient.query(M_DELETE_ENTITY_DEFINITION, { projectId, id: def.id });
+			definitions = definitions.filter((d) => d.id !== def.id);
 		} catch (e) {
 			error = `Delete failed: ${e instanceof Error ? e.message : String(e)}`;
 		}
@@ -210,7 +152,12 @@
 
 	function cancelForm() {
 		showCreateForm = false;
-		editingSchema = null;
+		editingDef = null;
+	}
+
+	function handleSelect(def: EntityDefinitionItem) {
+		const schemaDef = typeof def.jsonSchema === 'string' ? def.jsonSchema : JSON.stringify(def.jsonSchema);
+		onselect({ id: def.id, jsonSchemaId: def.jsonSchemaId ?? '', schemaDefinition: schemaDef });
 	}
 
 	const cardCls = $derived(darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200');
@@ -236,7 +183,7 @@
 					</svg>
 				</div>
 				<h2 class="text-sm font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">
-					{showCreateForm ? (editingSchema ? 'Edit Schema' : 'New Schema') : 'Schema Library'}
+					{showCreateForm ? (editingDef ? 'Edit Definition' : 'New Definition') : 'Schema Library'}
 				</h2>
 			</div>
 			<div class="flex items-center gap-2">
@@ -245,7 +192,7 @@
 						type="button"
 						onclick={startCreate}
 						class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all {darkMode ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}"
-					>+ New Schema</button>
+					>+ New Definition</button>
 				{/if}
 				<button
 					type="button"
@@ -271,7 +218,7 @@
 				<div class="space-y-4">
 					<div>
 						<label for="schema-form-name" class={labelCls}>Name <span class="text-red-400">*</span></label>
-						<input id="schema-form-name" type="text" bind:value={formName} placeholder="Schema name" class={inputCls} />
+						<input id="schema-form-name" type="text" bind:value={formName} placeholder="Definition name" class={inputCls} />
 					</div>
 					<div>
 						<label for="schema-form-desc" class={labelCls}>Description</label>
@@ -301,7 +248,7 @@
 					<input
 						type="text"
 						bind:value={searchQuery}
-						placeholder="Search schemas..."
+						placeholder="Search definitions..."
 						class={inputCls}
 					/>
 				</div>
@@ -310,24 +257,23 @@
 					<div class="flex items-center justify-center py-12">
 						<div class="animate-spin h-6 w-6 border-2 border-indigo-500 border-t-transparent rounded-full"></div>
 					</div>
-				{:else if filteredSchemas.length === 0}
+				{:else if filteredDefinitions.length === 0}
 					<div class="py-12 text-center">
 						<p class="text-sm {darkMode ? 'text-slate-500' : 'text-slate-400'}">
-							{searchQuery ? 'No schemas match your search' : 'No schemas yet'}
+							{searchQuery ? 'No definitions match your search' : 'No definitions yet'}
 						</p>
 					</div>
 				{:else}
 					<div class="space-y-2">
-						{#each filteredSchemas as schema (schema.id)}
-							{@const isSelected = schema.id === selectedSchemaId}
-							{@const isSystem = isSystemOwned(schema)}
+						{#each filteredDefinitions as def (def.id)}
+							{@const isSelected = def.jsonSchemaId === selectedSchemaId || def.id === selectedSchemaId}
 							<div
 								class="group rounded-lg border px-4 py-3 transition-all cursor-pointer
 									{isSelected
 										? (darkMode ? 'border-indigo-500 bg-indigo-500/10' : 'border-indigo-400 bg-indigo-50')
 										: (darkMode ? 'border-slate-700 hover:border-slate-600 bg-slate-800/50' : 'border-slate-200 hover:border-slate-300 bg-white')}"
-								onclick={() => onselect(schema)}
-								onkeydown={(e) => { if (e.key === 'Enter') onselect(schema); }}
+								onclick={() => handleSelect(def)}
+								onkeydown={(e) => { if (e.key === 'Enter') handleSelect(def); }}
 								role="button"
 								tabindex="0"
 							>
@@ -335,52 +281,40 @@
 									<div class="min-w-0 flex-1">
 										<div class="flex items-center gap-2">
 											<span class="text-sm font-medium truncate {darkMode ? 'text-white' : 'text-slate-900'}">
-												{schema.name}
+												{def.name}
 											</span>
-											{#if isSystem}
-												<span class="shrink-0 px-1.5 py-0.5 text-[10px] font-bold uppercase rounded {darkMode ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' : 'bg-amber-50 text-amber-600 border border-amber-200'}">
-													System
-												</span>
-											{/if}
-											{#if schema.sourceJsonSchemaId}
-												<span class="shrink-0 px-1.5 py-0.5 text-[10px] font-medium rounded {darkMode ? 'bg-sky-500/15 text-sky-400 border border-sky-500/20' : 'bg-sky-50 text-sky-600 border border-sky-200'}">
-													Copy
-												</span>
-											{/if}
 											{#if isSelected}
 												<svg class="shrink-0 w-4 h-4 text-indigo-500" fill="currentColor" viewBox="0 0 20 20">
 													<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
 												</svg>
 											{/if}
 										</div>
-										{#if schema.description}
-											<p class="mt-0.5 text-xs truncate {darkMode ? 'text-slate-500' : 'text-slate-400'}">{schema.description}</p>
+										{#if def.description}
+											<p class="mt-0.5 text-xs truncate {darkMode ? 'text-slate-500' : 'text-slate-400'}">{def.description}</p>
 										{/if}
 									</div>
 									<!-- svelte-ignore a11y_no_static_element_interactions -->
-								<div class="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+									<div class="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
 										<button
 											type="button"
-											onclick={() => startEdit(schema)}
+											onclick={() => startEdit(def)}
 											class="p-1.5 rounded-md transition-colors {darkMode ? 'text-slate-500 hover:text-white hover:bg-slate-700' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'}"
-											title={isSystem ? 'Customize (creates a copy)' : 'Edit'}
+											title="Edit"
 										>
 											<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
 											</svg>
 										</button>
-										{#if !isSystem}
-											<button
-												type="button"
-												onclick={() => handleDelete(schema)}
-												class="p-1.5 rounded-md transition-colors {darkMode ? 'text-slate-600 hover:text-red-400 hover:bg-red-500/10' : 'text-slate-300 hover:text-red-500 hover:bg-red-50'}"
-												title="Delete"
-											>
-												<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-												</svg>
-											</button>
-										{/if}
+										<button
+											type="button"
+											onclick={() => handleDelete(def)}
+											class="p-1.5 rounded-md transition-colors {darkMode ? 'text-slate-600 hover:text-red-400 hover:bg-red-500/10' : 'text-slate-300 hover:text-red-500 hover:bg-red-50'}"
+											title="Delete"
+										>
+											<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+											</svg>
+										</button>
 									</div>
 								</div>
 							</div>

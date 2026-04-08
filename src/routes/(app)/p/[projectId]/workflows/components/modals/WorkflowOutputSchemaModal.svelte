@@ -14,6 +14,7 @@
 		darkMode = false,
 		outputSchema = $bindable(null),
 		queryClient,
+		projectId = '',
 		selectedJsonSchemaId,
 		onSave,
 		onClose
@@ -21,6 +22,7 @@
 		darkMode?: boolean;
 		outputSchema?: Record<string, unknown> | null;
 		queryClient?: IGraphQLQueryClient;
+		projectId?: string;
 		selectedJsonSchemaId?: string;
 		onSave?: (pickedSchemaId?: string) => void;
 		onClose?: () => void;
@@ -173,9 +175,9 @@
 		return null;
 	}
 
-	function handlePickFromLibrary(schema: { id: string; schemaDefinition: string }) {
+	function handlePickFromLibrary(schema: { id: string; jsonSchemaId: string; schemaDefinition: string }) {
 		showPicker = false;
-		pickedSchemaId = schema.id;
+		pickedSchemaId = schema.jsonSchemaId || schema.id;
 		try {
 			const parsed =
 				typeof schema.schemaDefinition === 'string'
@@ -500,6 +502,7 @@
 	<JsonSchemaPickerModal
 		{darkMode}
 		{queryClient}
+		{projectId}
 		selectedSchemaId={pickedSchemaId ?? selectedJsonSchemaId}
 		onselect={(schema) => handlePickFromLibrary(schema)}
 		onclose={() => (showPicker = false)}

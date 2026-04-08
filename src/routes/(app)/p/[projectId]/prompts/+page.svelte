@@ -212,7 +212,8 @@
 						jsonSchemaId: saveData.jsonSchemaId,
 						schemaData: saveData.schemaData,
 						existingJsonSchemaId: (editingTemplate as { jsonSchemaId?: string }).jsonSchemaId
-					}
+					},
+					selectedProjectId
 				);
 
 				// Update in store
@@ -547,6 +548,7 @@
 	template={editingTemplate}
 	{isCreating}
 	{queryClient}
+	projectId={selectedProjectId ?? ''}
 	onSave={handleSaveTemplate}
 	onCancel={handleCancelEdit}
 />
@@ -556,6 +558,7 @@
 	<JsonSchemaPickerModal
 		{darkMode}
 		{queryClient}
+		projectId={selectedProjectId ?? ''}
 		onselect={() => showSchemaLibrary = false}
 		onclose={() => showSchemaLibrary = false}
 	/>

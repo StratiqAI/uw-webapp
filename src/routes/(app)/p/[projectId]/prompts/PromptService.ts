@@ -14,7 +14,7 @@ import {
 	M_UPDATE_PROMPT,
 	Q_LIST_PROMPTS
 } from '$lib/services/graphql/promptOperations';
-import { ensureJsonSchemaEntity } from '$lib/services/graphql/jsonSchemaService';
+import { ensureEntityDefinition } from '$lib/services/graphql/entityDefinitionService';
 import type { IGraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
 
 /**
@@ -141,11 +141,12 @@ export async function fetchProjectWithPromptTemplates(
 /**
  * Create a new prompt.
  * If jsonSchemaId is provided, it references an existing JsonSchema entity.
- * If schemaData is provided instead, a new JsonSchema entity is created first.
+ * If schemaData is provided instead, an EntityDefinition is saved (which
+ * auto-creates the linked JsonSchema via the backend pipeline).
  */
 export async function createPromptTemplate(
 	queryClient: IGraphQLQueryClient,
-	_parentId: string,
+	projectId: string,
 	name: string,
 	aiQueryData: AIQueryData,
 	description?: string,
@@ -156,11 +157,12 @@ export async function createPromptTemplate(
 
 	let resolvedJsonSchemaId = jsonSchemaId;
 	if (!resolvedJsonSchemaId && schemaData && 'schemaDefinition' in schemaData) {
-		resolvedJsonSchemaId = await ensureJsonSchemaEntity(queryClient, {
+		const defResult = await ensureEntityDefinition(queryClient, projectId, {
 			name: schemaData.name || name,
 			description: schemaData.description,
 			schemaDefinition: schemaData.schemaDefinition
 		});
+		resolvedJsonSchemaId = defResult.jsonSchemaId;
 	}
 
 	const input: Record<string, unknown> = {
@@ -217,9 +219,10 @@ export function extractPromptVariableNames(text: string): string[] {
 }
 
 /**
- * Update an existing prompt (parentId kept for API compatibility but not used).
+ * Update an existing prompt.
  * Uses jsonSchemaId to reference JsonSchema entities.
- * If schemaData is provided and no jsonSchemaId, a JsonSchema entity is created/updated.
+ * If schemaData is provided and no jsonSchemaId, an EntityDefinition is
+ * saved (which auto-creates the linked JsonSchema).
  */
 export async function updatePromptTemplate(
 	queryClient: IGraphQLQueryClient,
@@ -232,7 +235,7 @@ export async function updatePromptTemplate(
 		schemaData?: { name: string; description?: string; schemaDefinition: unknown };
 		existingJsonSchemaId?: string;
 	},
-	_parentId?: string
+	projectId?: string
 ): Promise<Prompt> {
 	const input: Record<string, unknown> = {};
 
@@ -256,17 +259,17 @@ export async function updatePromptTemplate(
 
 	if (updates.jsonSchemaId) {
 		input.jsonSchemaId = updates.jsonSchemaId;
-	} else if (updates.schemaData && 'schemaDefinition' in updates.schemaData) {
-		const resolvedId = await ensureJsonSchemaEntity(
+	} else if (updates.schemaData && 'schemaDefinition' in updates.schemaData && projectId) {
+		const defResult = await ensureEntityDefinition(
 			queryClient,
+			projectId,
 			{
 				name: updates.schemaData.name || (updates.name ?? 'Schema'),
 				description: updates.schemaData.description,
 				schemaDefinition: updates.schemaData.schemaDefinition
-			},
-			updates.existingJsonSchemaId
+			}
 		);
-		input.jsonSchemaId = resolvedId;
+		input.jsonSchemaId = defResult.jsonSchemaId;
 	}
 
 	const response = await queryClient.query<{

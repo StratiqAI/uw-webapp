@@ -14,7 +14,7 @@
 	import PDFViewer from '$lib/documents/viewer/PDFViewer.svelte';
 	import AgentActivityFeed from '$lib/components/ai/AgentActivityFeed.svelte';
 	import { page } from '$app/stores';
-	import { M_DELETE_DOCLINK, S_ON_CREATE_DOCLINK } from '@stratiqai/types-simple';
+	import { M_DELETE_DOCLINK } from '@stratiqai/types-simple';
 	import { addSubscription, removeSubscription } from '$lib/stores/appSyncClientStore';
 	import { print } from 'graphql';
 	import { gql } from '$lib/services/realtime/graphql/requestHandler';
@@ -311,17 +311,26 @@
 
 		if (!browser || !pid || !token) return;
 
-		const spec: SubscriptionSpec<Doclink> = {
-			query: print(S_ON_CREATE_DOCLINK),
-			variables: { parentId: pid },
-			path: 'onCreateDoclink',
-			next: (doclink: Doclink) => mergeDoclink(pid, doclink),
-			error: (err: any) => log.error('Doclink subscription error:', err)
+		let cancelled = false;
+		let activeSpec: SubscriptionSpec<Doclink> | null = null;
+
+		void import('@stratiqai/types-simple').then((mod) => {
+			if (cancelled) return;
+			const spec: SubscriptionSpec<Doclink> = {
+				query: print(mod.S_ON_CREATE_DOCLINK),
+				variables: { parentId: pid },
+				path: 'onCreateDoclink',
+				next: (doclink: Doclink) => mergeDoclink(pid, doclink),
+				error: (err: any) => log.error('Doclink subscription error:', err)
+			};
+			activeSpec = spec;
+			addSubscription(token, spec).catch((err) => log.error('Failed to add doclink subscription:', err));
+		});
+
+		return () => {
+			cancelled = true;
+			if (activeSpec) removeSubscription(activeSpec);
 		};
-
-		addSubscription(token, spec).catch(err => log.error('Failed to add doclink subscription:', err));
-
-		return () => { removeSubscription(spec); };
 	});
 </script>
 

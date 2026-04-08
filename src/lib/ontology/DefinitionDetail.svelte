@@ -100,10 +100,16 @@
 				{definition.description}
 			</p>
 		{/if}
-		<div class="mt-2 flex items-center gap-2">
+		<div class="mt-2 flex flex-wrap items-center gap-2">
 			<span class="rounded px-1.5 py-0.5 font-mono text-[10px] {darkMode ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-500'}">
 				{definition.id}
 			</span>
+			{#if definition.jsonSchemaId}
+				<span class="rounded px-1.5 py-0.5 text-[10px] font-medium {darkMode ? 'bg-indigo-900/30 text-indigo-400' : 'bg-indigo-100 text-indigo-600'}"
+					title="Linked JsonSchema: {definition.jsonSchemaId}">
+					Schema linked
+				</span>
+			{/if}
 		</div>
 	</div>
 

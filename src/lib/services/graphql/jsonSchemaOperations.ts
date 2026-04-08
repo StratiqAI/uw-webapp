@@ -1,6 +1,8 @@
 /**
  * JsonSchema GraphQL operations for the webapp.
- * Matches the deployed AppSync schema (JsonSchema implements Node & Metadata & Shareable).
+ * Note: createJsonSchema mutation has been disabled server-side.
+ * JsonSchemas are now auto-created by the saveEntityDefinition pipeline.
+ * M_CREATE_JSON_SCHEMA is deprecated; use ensureEntityDefinition instead.
  */
 import { gql } from 'graphql-tag';
 

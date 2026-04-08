@@ -207,14 +207,17 @@
 				onkeydown={handleLabelKeydown}
 				onblur={commitLabel}
 			/>
-		{:else}
-			<span
-				class="{darkMode ? 'text-slate-300' : 'text-slate-700'} {isEditable ? 'cursor-pointer rounded px-1 -mx-1 hover:bg-indigo-500/10' : ''} {savingLabel ? 'opacity-50' : ''}"
+		{:else if isEditable}
+			<button
+				type="button"
+				class="text-left {darkMode ? 'text-slate-300' : 'text-slate-700'} cursor-pointer rounded border-0 bg-transparent px-1 py-0 font-inherit -mx-1 hover:bg-indigo-500/10 {savingLabel ? 'opacity-50' : ''}"
 				ondblclick={startLabelEdit}
-				role={isEditable ? 'button' : undefined}
-				tabindex={isEditable ? 0 : -1}
-				onkeydown={(e) => { if ((e.key === 'Enter' || e.key === 'F2') && isEditable) startLabelEdit(); }}
+				onkeydown={(e) => { if (e.key === 'Enter' || e.key === 'F2') startLabelEdit(); }}
 			>
+				{instance.label || '—'}
+			</button>
+		{:else}
+			<span class="{darkMode ? 'text-slate-300' : 'text-slate-700'}">
 				{instance.label || '—'}
 			</span>
 		{/if}
@@ -285,14 +288,17 @@
 						onblur={() => commitField(prop)}
 					/>
 				{/if}
-			{:else}
-				<span
-					class="{darkMode ? 'text-slate-300' : 'text-slate-700'} {isEditable && !isCalc ? 'cursor-pointer rounded px-1 -mx-1 hover:bg-indigo-500/10' : ''} {isSaving ? 'opacity-50' : ''}"
-					ondblclick={() => { if (!isCalc) startFieldEdit(prop.name, val); }}
-					role={isEditable && !isCalc ? 'button' : undefined}
-					tabindex={isEditable && !isCalc ? 0 : -1}
-					onkeydown={(e) => { if ((e.key === 'Enter' || e.key === 'F2') && isEditable && !isCalc) startFieldEdit(prop.name, val); }}
+			{:else if isEditable && !isCalc}
+				<button
+					type="button"
+					class="text-left {darkMode ? 'text-slate-300' : 'text-slate-700'} cursor-pointer rounded border-0 bg-transparent px-1 py-0 font-inherit -mx-1 hover:bg-indigo-500/10 {isSaving ? 'opacity-50' : ''}"
+					ondblclick={() => startFieldEdit(prop.name, val)}
+					onkeydown={(e) => { if (e.key === 'Enter' || e.key === 'F2') startFieldEdit(prop.name, val); }}
 				>
+					{formatValue(val)}
+				</button>
+			{:else}
+				<span class="{darkMode ? 'text-slate-300' : 'text-slate-700'} {isSaving ? 'opacity-50' : ''}">
 					{formatValue(val)}
 				</span>
 			{/if}

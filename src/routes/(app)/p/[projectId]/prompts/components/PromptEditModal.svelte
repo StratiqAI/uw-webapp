@@ -46,6 +46,7 @@
 		template = null,
 		isCreating = false,
 		queryClient = null,
+		projectId = '',
 		onSave,
 		onCancel
 	}: {
@@ -53,6 +54,7 @@
 		template?: Prompt | null;
 		isCreating?: boolean;
 		queryClient?: IGraphQLQueryClient | null;
+		projectId?: string;
 		onSave?: (data: {
 			name: string;
 			description: string;
@@ -202,8 +204,8 @@
 		}
 	}
 
-	function handleSchemaPickerSelect(schema: { id: string; schemaDefinition: string }) {
-		currentJsonSchemaId = schema.id;
+	function handleSchemaPickerSelect(schema: { id: string; jsonSchemaId: string; schemaDefinition: string }) {
+		currentJsonSchemaId = schema.jsonSchemaId || schema.id;
 		applySchemaDefinitionToForm(schema.schemaDefinition);
 		showSchemaPicker = false;
 	}
@@ -457,6 +459,7 @@
 	<JsonSchemaPickerModal
 		{darkMode}
 		{queryClient}
+		{projectId}
 		selectedSchemaId={currentJsonSchemaId}
 		onselect={handleSchemaPickerSelect}
 		onclose={() => showSchemaPicker = false}

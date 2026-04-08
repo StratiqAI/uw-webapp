@@ -168,7 +168,8 @@
 			const existingPromptId = (w as any)?.promptId as string | undefined;
 
 			const instance = await ensureWidgetInstancePrompt(
-				kind, widgetId, w?.data?.title ?? undefined, undefined, existingPromptId, qc
+				kind, widgetId, w?.data?.title ?? undefined, undefined, existingPromptId, qc,
+				dashboard.projectId!
 			);
 
 			if (!existingPromptId && instance.promptId) {
@@ -223,7 +224,8 @@
 					schemaDefinition: schemaDef
 				},
 				jsonSchemaId,
-				qc
+				qc,
+				dashboard.projectId!
 			);
 
 			const documentIds = await getProjectDocumentIds();

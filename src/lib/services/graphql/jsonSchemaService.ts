@@ -1,8 +1,7 @@
 /**
- * Shared JsonSchema entity management utilities.
- *
- * All structured output schemas must be persisted as JsonSchema entities
- * and referenced via jsonSchemaId. Use ensureJsonSchemaEntity for create-or-update.
+ * @deprecated Use entityDefinitionService.ts instead.
+ * JsonSchemas are now auto-created by the saveEntityDefinition pipeline.
+ * This module is retained for backward compatibility (read/update/delete).
  */
 
 import { M_CREATE_JSON_SCHEMA, M_UPDATE_JSON_SCHEMA } from '$lib/services/graphql/jsonSchemaOperations';
@@ -18,6 +17,7 @@ export interface JsonSchemaEntity {
 }
 
 /**
+ * @deprecated Use ensureEntityDefinition from entityDefinitionService.ts instead.
  * Create or update a JsonSchema entity and return its ID.
  * If existingJsonSchemaId is provided, updates that entity; otherwise creates a new one.
  */

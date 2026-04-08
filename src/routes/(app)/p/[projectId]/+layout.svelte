@@ -111,10 +111,10 @@
 	});
 
 	$effect(() => {
-		if (!browser || !idToken || widgetTemplatesSynced) return;
+		if (!browser || !idToken || !routeProjectId || widgetTemplatesSynced) return;
 		widgetTemplatesSynced = true;
 		const qc = new GraphQLQueryClient(idToken);
-		syncWidgetTemplates(qc).catch((err) => {
+		syncWidgetTemplates(qc, routeProjectId).catch((err) => {
 			log.error('Failed to sync widget prompt templates:', err);
 		});
 	});

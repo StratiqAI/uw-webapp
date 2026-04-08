@@ -15,7 +15,7 @@ import {
 	getRegisteredManifests,
 	getWidgetPromptConfig
 } from '$lib/dashboard/setup/widgetRegistry';
-import { ensureJsonSchemaEntity } from '$lib/services/graphql/jsonSchemaService';
+import { ensureEntityDefinition } from '$lib/services/graphql/entityDefinitionService';
 import {
 	Q_GET_PROMPT,
 	Q_LIST_PROMPTS,
@@ -52,7 +52,7 @@ const templateCache = new Map<string, TemplateCache>();
  * template Prompt + JsonSchema entities in the cloud.
  * Called once from +layout.svelte onMount.
  */
-export async function syncWidgetTemplates(queryClient: IGraphQLQueryClient): Promise<void> {
+export async function syncWidgetTemplates(queryClient: IGraphQLQueryClient, projectId: string): Promise<void> {
 	const manifests = getRegisteredManifests();
 	const withPrompt = manifests.filter((m) => m.promptConfig);
 	if (withPrompt.length === 0) return;
@@ -60,7 +60,7 @@ export async function syncWidgetTemplates(queryClient: IGraphQLQueryClient): Pro
 	await Promise.allSettled(
 		withPrompt.map(async (m) => {
 			try {
-				await ensureWidgetTemplate(m.kind, m.promptConfig!, queryClient);
+				await ensureWidgetTemplate(m.kind, m.promptConfig!, queryClient, projectId);
 			} catch (err) {
 				log.error(`Failed to sync template for widget kind "${m.kind}":`, err);
 			}
@@ -71,7 +71,8 @@ export async function syncWidgetTemplates(queryClient: IGraphQLQueryClient): Pro
 async function ensureWidgetTemplate(
 	kind: string,
 	promptConfig: WidgetPromptConfig,
-	queryClient: IGraphQLQueryClient
+	queryClient: IGraphQLQueryClient,
+	projectId: string
 ): Promise<TemplateCache> {
 	const cached = templateCache.get(kind);
 	if (cached) return cached;
@@ -98,12 +99,13 @@ async function ensureWidgetTemplate(
 		return entry;
 	}
 
-	// Create template JsonSchema
-	const templateJsonSchemaId = await ensureJsonSchemaEntity(queryClient, {
+	// Create EntityDefinition (pipeline auto-creates the linked JsonSchema)
+	const defResult = await ensureEntityDefinition(queryClient, projectId, {
 		name: templateSchemaName,
 		description: `Default output schema for ${kind} widgets`,
 		schemaDefinition: schemaDef
 	});
+	const templateJsonSchemaId = defResult.jsonSchemaId;
 
 	// Create template Prompt
 	const variableNames = extractPromptVariables(promptConfig.defaultPrompt).map((v) => v.name);
@@ -156,7 +158,8 @@ export async function ensureWidgetInstancePrompt(
 	widgetTitle: string | undefined,
 	widgetDescription: string | undefined,
 	existingPromptId: string | undefined,
-	queryClient: IGraphQLQueryClient
+	queryClient: IGraphQLQueryClient,
+	projectId: string
 ): Promise<WidgetInstancePrompt> {
 	if (existingPromptId) {
 		try {
@@ -180,7 +183,7 @@ export async function ensureWidgetInstancePrompt(
 		throw new Error(`Widget kind "${kind}" has no promptConfig`);
 	}
 
-	const template = await ensureWidgetTemplate(kind, promptConfig, queryClient);
+	const template = await ensureWidgetTemplate(kind, promptConfig, queryClient, projectId);
 
 	const instanceSchemaName = widgetTitle
 		? `${widgetTitle} Output`
@@ -207,11 +210,12 @@ export async function ensureWidgetInstancePrompt(
 		templateSchemaDef = jsonSchema;
 	}
 
-	const instanceJsonSchemaId = await ensureJsonSchemaEntity(queryClient, {
+	const instanceDefResult = await ensureEntityDefinition(queryClient, projectId, {
 		name: instanceSchemaName,
 		description: widgetDescription || `Output schema for ${kind} widget ${widgetId}`,
 		schemaDefinition: templateSchemaDef
 	});
+	const instanceJsonSchemaId = instanceDefResult.jsonSchemaId;
 
 	// Clone template Prompt for this instance
 	let templatePrompt: Prompt | null = null;
@@ -326,7 +330,8 @@ export async function updateWidgetInstancePrompt(
 		schemaDefinition?: unknown;
 	},
 	jsonSchemaId: string | undefined,
-	queryClient: IGraphQLQueryClient
+	queryClient: IGraphQLQueryClient,
+	projectId: string
 ): Promise<void> {
 	const promptUpdate: Record<string, unknown> = {};
 	if (updates.name !== undefined) promptUpdate.name = updates.name;
@@ -339,19 +344,18 @@ export async function updateWidgetInstancePrompt(
 	if (updates.systemInstruction !== undefined) promptUpdate.systemInstruction = updates.systemInstruction;
 	if (updates.model !== undefined) promptUpdate.model = updates.model;
 
-	if (Object.keys(promptUpdate).length > 0) {
-		await queryClient.query(M_UPDATE_PROMPT, { id: promptId, input: promptUpdate });
+	if (updates.schemaDefinition !== undefined && projectId) {
+		const defResult = await ensureEntityDefinition(queryClient, projectId, {
+			name: updates.name ? `${updates.name} Output` : 'Structured output',
+			schemaDefinition: updates.schemaDefinition
+		});
+		if (defResult.jsonSchemaId !== jsonSchemaId) {
+			promptUpdate.jsonSchemaId = defResult.jsonSchemaId;
+		}
 	}
 
-	if (updates.schemaDefinition !== undefined && jsonSchemaId) {
-		await ensureJsonSchemaEntity(
-			queryClient,
-			{
-				name: updates.name ? `${updates.name} Output` : 'Structured output',
-				schemaDefinition: updates.schemaDefinition
-			},
-			jsonSchemaId
-		);
+	if (Object.keys(promptUpdate).length > 0) {
+		await queryClient.query(M_UPDATE_PROMPT, { id: promptId, input: promptUpdate });
 	}
 }
 
