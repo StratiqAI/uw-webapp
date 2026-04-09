@@ -448,20 +448,6 @@ class DashboardStore {
 		if (tabId === this.#activeTabId) return;
 		if (!this.#tabSlices[tabId]) return;
 
-		// #region agent log
-		const slice = this.#tabSlices[tabId];
-		const widgetTypes = slice?.widgets?.map((w: any) => `${w.type}:${w.id?.slice(0,8)}`) ?? [];
-		const widgetDataKeys = slice?.widgets?.map((w: any) => {
-			if (!w.data || typeof w.data !== 'object') return `${w.type}:no-data`;
-			const nonClone: string[] = [];
-			for (const [k,v] of Object.entries(w.data as Record<string,unknown>)) {
-				try { structuredClone(v); } catch { nonClone.push(`${k}(${typeof v})`); }
-			}
-			return `${w.type}:[${nonClone.join(',')}]`;
-		}) ?? [];
-		fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2eb8ec'},body:JSON.stringify({sessionId:'2eb8ec',location:'dashboard.svelte.ts:switchTab',message:'switchTab called',data:{fromTab:this.#activeTabId,toTab:tabId,widgetCount:slice?.widgets?.length,widgetTypes,widgetDataKeys},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
-		// #endregion
-
 		this.#fullscreenWidgetId = null;
 		this.#flushActiveTabIntoSlices();
 		clearWidgetTopicsForLayout($state.snapshot(this.#widgets) as Widget[], this.#projectId);
@@ -1108,15 +1094,6 @@ class DashboardStore {
 		if (this.#widgets.length > 0) {
 			clearWidgetTopicsForLayout($state.snapshot(this.#widgets) as Widget[], this.#projectId);
 		}
-
-		// #region agent log
-		try {
-			const plain = $state.snapshot(slice) as TabDashboardSlice;
-			fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2eb8ec'},body:JSON.stringify({sessionId:'2eb8ec',location:'dashboard.svelte.ts:applyTabSlice',message:'applyTabSlice snapshot OK',data:{widgetCount:plain.widgets?.length,widgetTypes:plain.widgets?.map((w: any)=>w.type)},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
-		} catch (err) {
-			fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2eb8ec'},body:JSON.stringify({sessionId:'2eb8ec',location:'dashboard.svelte.ts:applyTabSlice',message:'applyTabSlice snapshot FAILED',data:{error:String(err)},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
-		}
-		// #endregion
 
 		const plain = $state.snapshot(slice) as TabDashboardSlice;
 		this.#widgets = plain.widgets;

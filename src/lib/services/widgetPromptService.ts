@@ -1,18 +1,13 @@
 /**
  * Widget Prompt Service
  *
- * Manages the two-tier Prompt/JsonSchema entity lifecycle for AI-enabled widgets:
- *   Tier 1 — Kind-level templates (created once at app startup per widget kind)
- *   Tier 2 — Per-instance entities (cloned from templates when a widget first uses AI)
+ * @deprecated The two-tier Prompt/JsonSchema entity lifecycle is superseded by
+ * the Extraction model. Extraction records embed prompts, schemas, and results
+ * in a single entity. This service is kept for backward compatibility during the
+ * migration. New code should use createExtraction / runExtraction instead.
  *
- * Registration is idempotent: EntityDefinitions are deduplicated by structural
- * hash (via ensureEntityDefinition) and template Prompts by name + jsonSchemaId.
- *
- * Widgets that declare an `entityDefinition` config without a `promptConfig`
- * will still get their EntityDefinition registered (visible in Ontology Explorer)
- * but no Prompt will be created.
- *
- * Also provides prompt discovery (listCompatiblePrompts) for the PromptChooser UI.
+ * Also provides prompt discovery (listCompatiblePrompts) for the PromptChooser UI,
+ * which is still relevant.
  */
 
 import type { Prompt } from '@stratiqai/types-simple';

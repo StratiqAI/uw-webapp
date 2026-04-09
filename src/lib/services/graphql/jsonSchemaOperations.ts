@@ -1,8 +1,8 @@
 /**
- * JsonSchema GraphQL operations for the webapp.
- * Note: createJsonSchema mutation has been disabled server-side.
- * JsonSchemas are now auto-created by the saveEntityDefinition pipeline.
- * M_CREATE_JSON_SCHEMA is deprecated; use ensureEntityDefinition instead.
+ * @deprecated Use Extraction-based data flow instead. The Extraction type
+ * stores schemas inline, eliminating the need for a separate JsonSchema entity.
+ *
+ * JsonSchema GraphQL operations for the webapp — kept for backward compatibility.
  */
 import { gql } from 'graphql-tag';
 

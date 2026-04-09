@@ -110,19 +110,11 @@
 		}
 	});
 
-	// #region agent log
-	const _dbgPage = (location: string, message: string, data: Record<string, unknown> = {}) =>
-		fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bfa702'},body:JSON.stringify({sessionId:'bfa702',location,message,data,timestamp:Date.now()})}).catch(()=>{});
-	// #endregion
-
 	async function createNewProjectHandler(e: Event) {
 		e.preventDefault();
 		errorMsg = null;
 
 		try {
-			// #region agent log
-			_dbgPage('+page.svelte:createNewProjectHandler','creating project',{hypothesisId:'D'});
-			// #endregion
 			const res = await gql<{ createProject: Project }>(
 				print(M_CREATE_PROJECT),
 				{ input: { name: 'New Project', sharingMode: 'PRIVATE' } },
@@ -134,17 +126,8 @@
 				return;
 			}
 
-			// #region agent log
-			_dbgPage('+page.svelte:createNewProjectHandler','project created, navigating',{hypothesisId:'D',newProjectId:res.createProject.id});
-			// #endregion
 			await goto(`/p/${res.createProject.id}/docs`);
-			// #region agent log
-			_dbgPage('+page.svelte:createNewProjectHandler','navigation complete',{hypothesisId:'D'});
-			// #endregion
 		} catch (err) {
-			// #region agent log
-			_dbgPage('+page.svelte:createNewProjectHandler','ERROR',{hypothesisId:'D',error:String(err)});
-			// #endregion
 			log.error('Error creating new project:', err);
 			errorMsg = 'Error creating new project';
 		}

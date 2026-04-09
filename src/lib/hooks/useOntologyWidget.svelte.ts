@@ -1,9 +1,10 @@
 /**
- * Svelte 5 rune hook for ontology-to-widget matchmaking.
+ * @deprecated Use useExtraction hook instead. The extraction-based flow
+ * eliminates the need for structural hash matching. Widgets bind to
+ * Extraction records by extractionId. Kept for backward compatibility
+ * with the Ontology Explorer page.
  *
- * Given a projectId and structuralHash, reactively resolves which registered
- * widget schemas are structurally compatible with the entity definition's
- * normalizedJsonSchema stored in VTS.
+ * Svelte 5 rune hook for ontology-to-widget matchmaking.
  */
 
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';

@@ -8,14 +8,14 @@
 	import { createDropHandlers } from '$lib/dashboard/utils/dragDrop';
 	import { getDefaultDataForWidget, getDefaultSizeForWidget } from '$lib/dashboard/setup/defaultDashboardValues';
 	import type { Widget, WidgetType } from '$lib/dashboard/types/widget';
-	import { setDashboardWidgetHost, HostServices, parseJsonSchemaToBuilderState, buildSchemaPreview, getAiStatusTopic } from '@stratiqai/dashboard-widget-sdk';
+	import { setDashboardWidgetHost, HostServices, parseJsonSchemaToBuilderState, buildSchemaPreview } from '@stratiqai/dashboard-widget-sdk';
 	import type { WidgetPromptEditData, WidgetDebugData } from '@stratiqai/dashboard-widget-sdk';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import { getWidgetTopic, getWidgetTopicsByType, getWidgetStructuralHash, getTopicsByStructuralHash } from '$lib/dashboard/setup/widgetSchemaRegistration';
-	import { getWidgetPromptConfig } from '$lib/dashboard/setup/widgetRegistry';
-	import { toOntologyInstDataTopic, toOntologyInstMetaTopic, flatToPropertyValues } from '$lib/services/realtime/store/ontologyClientHelpers';
-	import { M_SAVE_ENTITY_INSTANCE, Q_GET_ENTITY_DEFINITION, Q_GET_ENTITY_INSTANCE } from '@stratiqai/types-simple';
-	import type { SaveInstanceInput, EntityInstance } from '@stratiqai/types-simple';
+	import { getWidgetPromptConfig, getWidgetManifest } from '$lib/dashboard/setup/widgetRegistry';
+	import { zodToJsonSchema } from 'zod-to-json-schema';
+	import { toOntologyInstDataTopic } from '$lib/services/realtime/store/ontologyClientHelpers';
+	import { Q_GET_ENTITY_DEFINITION, Q_GET_ENTITY_INSTANCE } from '@stratiqai/types-simple';
 	import { streamCatalog } from '$lib/stores/streamCatalog.svelte';
 	import { createSupabaseBrowserClient } from '$lib/services/supabase/browser';
 	import { generateWidgetId } from '$lib/dashboard/utils/idGenerator';
@@ -28,7 +28,7 @@
 		getWidgetInstancePromptForEditing,
 		updateWidgetInstancePrompt
 	} from '$lib/services/widgetPromptService';
-	import { aiService } from '$lib/services/ai';
+	import { createExtraction, runExtraction } from '$lib/hooks/useExtraction.svelte';
 	import { Q_GET_PROMPT } from '$lib/services/graphql/promptOperations';
 	import { Q_GET_JSON_SCHEMA } from '$lib/services/graphql/jsonSchemaOperations';
 	import { PUBLIC_GEOAPIFY_API_KEY, PUBLIC_MAPBOX_ACCESS_TOKEN } from '$env/static/public';
@@ -251,135 +251,67 @@
 
 		async saveAndRunWidgetPrompt(kind: string, widgetId: string, data: WidgetPromptEditData): Promise<void> {
 			const token = getIdToken();
-
 			const qc = new GraphQLQueryClient(token);
 			const w = dashboard.widgets.find((w) => w.id === widgetId);
 			const promptId = data.promptId ?? w?.promptId;
-			if (!promptId) throw new Error('No prompt ID — load prompt first');
+			const projectId = dashboard.projectId ?? '';
 
-			const editing = await getWidgetInstancePromptForEditing(promptId, qc);
-			const jsonSchemaId = editing?.jsonSchemaId;
+			if (promptId) {
+				const editing = await getWidgetInstancePromptForEditing(promptId, qc);
+				const jsonSchemaId = editing?.jsonSchemaId;
 
-			const schemaDef = Object.keys(data.schemaProperties).length > 0
+				const schemaDef = Object.keys(data.schemaProperties).length > 0
+					? buildSchemaPreview(data.schemaProperties, data.schemaRequired)
+					: undefined;
+
+				await updateWidgetInstancePrompt(
+					promptId,
+					{
+						name: data.name,
+						description: data.description,
+						prompt: data.userPrompt,
+						systemInstruction: data.systemInstruction,
+						model: data.model,
+						schemaDefinition: schemaDef
+					},
+					jsonSchemaId,
+					qc,
+					projectId
+				);
+			}
+
+			let schemaDef: unknown = Object.keys(data.schemaProperties).length > 0
 				? buildSchemaPreview(data.schemaProperties, data.schemaRequired)
 				: undefined;
 
-			await updateWidgetInstancePrompt(
-				promptId,
-				{
-					name: data.name,
-					description: data.description,
-					prompt: data.userPrompt,
-					systemInstruction: data.systemInstruction,
-					model: data.model,
-					schemaDefinition: schemaDef
-				},
-				jsonSchemaId,
-				qc,
-				dashboard.projectId!
-			);
-
+			if (!schemaDef) {
+				const manifest = getWidgetManifest(kind);
+				const zodSchema = manifest?.promptConfig?.aiOutputSchema;
+				if (zodSchema) {
+					schemaDef = zodToJsonSchema(zodSchema, { $refStrategy: 'none' });
+				}
+			}
 			const documentIds = await getProjectDocumentIds();
 
-			const inputValues: Record<string, unknown> = {
-				prompt: data.userPrompt,
-				systemInstruction: data.systemInstruction,
-				model: data.model || 'GEMINI_2_5_FLASH',
-				widgetKind: kind,
-				widgetId,
-				...(schemaDef && { responseFormat: { type: 'json_schema', schema: schemaDef } }),
-				...(data.temperature !== undefined && { temperature: data.temperature }),
-				...(data.maxTokens !== undefined && { maxTokens: data.maxTokens }),
-				...(data.topP !== undefined && { topP: data.topP }),
-				...(data.frequencyPenalty !== undefined && { frequencyPenalty: data.frequencyPenalty }),
-				...(documentIds.length > 0 && { documentIds })
-			};
-
-			const handle = await aiService.submitExecution(
+			const extraction = await createExtraction(
 				{
-					projectId: dashboard.projectId ?? '',
-					promptId,
-					inputValues,
-					...(documentIds.length > 0 && { documentIds }),
-					priority: 'MEDIUM'
+					projectId,
+					prompt: data.userPrompt,
+					name: data.name || `${kind} extraction`,
+					systemInstruction: data.systemInstruction,
+					schema: schemaDef ? JSON.stringify(schemaDef) : undefined,
+					model: data.model || 'GEMINI_2_5_FLASH',
+					documentIds: documentIds.length > 0 ? documentIds : undefined,
+					promptId: promptId,
 				},
 				token
 			);
 
-			log.info(`AI execution submitted for widget ${widgetId}`);
+			dashboard.updateWidget(widgetId, { extractionId: extraction.id });
 
-			const projectId = dashboard.projectId ?? '';
-			const definitionId = w?.entityDefinitionId;
-			const existingInstanceId = w?.entityInstanceId;
-			const structuralHash = getWidgetStructuralHash(kind);
+			await runExtraction(extraction.id, token);
 
-
-			const effectiveTopic = (existingInstanceId && structuralHash && projectId)
-				? toOntologyInstDataTopic(projectId, structuralHash, existingInstanceId)
-				: `widgets/${kind}/${widgetId}`;
-			const statusTopic = getAiStatusTopic(effectiveTopic);
-			validatedTopicStore.publish(statusTopic, { generating: true });
-
-			handle.result.then(async (rawOutput) => {
-				if (rawOutput) {
-					try {
-						let output: Record<string, unknown>;
-						try {
-							const parsed = JSON.parse(rawOutput);
-							const resolved = parsed.output_parsed ?? parsed;
-							output = (resolved && typeof resolved === 'object' && !Array.isArray(resolved))
-								? resolved as Record<string, unknown>
-								: { content: typeof resolved === 'string' ? resolved : rawOutput };
-						} catch {
-							output = { content: rawOutput };
-						}
-
-						if (definitionId && structuralHash && projectId) {
-							const instanceId = crypto.randomUUID();
-							const instanceInput: SaveInstanceInput = {
-								id: instanceId,
-								projectId,
-								definitionId,
-								senderId: `widget:${widgetId}`,
-								label: `${kind} output`,
-								values: flatToPropertyValues(output)
-							};
-
-							const result = await qc.query<{ saveEntityInstance: EntityInstance }>(
-								M_SAVE_ENTITY_INSTANCE,
-								{ input: instanceInput }
-							);
-
-							if (result?.saveEntityInstance) {
-								dashboard.updateWidget(widgetId, { entityInstanceId: instanceId });
-
-								const instDataTopic = toOntologyInstDataTopic(projectId, structuralHash, instanceId);
-								validatedTopicStore.publish(instDataTopic, output);
-								const instMetaTopic = toOntologyInstMetaTopic(projectId, structuralHash, instanceId);
-								validatedTopicStore.publish(instMetaTopic, {
-									label: instanceInput.label,
-									updatedAt: result.saveEntityInstance.updatedAt ?? new Date().toISOString()
-								});
-
-								const newStatusTopic = getAiStatusTopic(instDataTopic);
-								validatedTopicStore.publish(newStatusTopic, { generating: false });
-
-								log.info(`Persisted EntityInstance ${instanceId} for widget ${widgetId}`);
-							}
-						} else {
-							log.warn(`Skipping EntityInstance persistence: missing definitionId or structuralHash for widget ${widgetId}`);
-						}
-					} catch (err) {
-						log.error('Failed to parse/persist AI result:', err);
-					}
-				}
-				validatedTopicStore.publish(statusTopic, { generating: false });
-			}).catch((err) => {
-				log.error('AI execution failed:', err);
-				validatedTopicStore.publish(statusTopic, { generating: false, error: err instanceof Error ? err.message : String(err) });
-			}).finally(() => {
-				handle.destroy();
-			});
+			log.info(`Extraction ${extraction.id} created and submitted for widget ${widgetId}`);
 		},
 
 		getServiceStatus() {

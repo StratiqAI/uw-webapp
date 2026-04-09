@@ -202,15 +202,7 @@
 	let peFrequencyPenalty = $state<number | undefined>(undefined);
 	let peStopSequences = $state('');
 
-	// #region agent log
-	let _dbgEffectRunCount = 0;
-	// #endregion
-
 	$effect(() => {
-		// #region agent log
-		const _cnt = ++_dbgEffectRunCount;
-		console.error('[DBG-474345] AI-effect fired', { runCount: _cnt, activeTab, aiPromptLoaded, aiLoading, aiError });
-		// #endregion
 		if (activeTab === 'ai' && !aiPromptLoaded && !aiLoading && !aiError) {
 			loadPrompt();
 		}
@@ -218,16 +210,10 @@
 
 	async function loadPrompt() {
 		if (!host.loadWidgetPrompt) return;
-		// #region agent log
-		console.error('[DBG-474345] loadPrompt called', { aiLoading, aiPromptLoaded, activeTab });
-		// #endregion
 		aiLoading = true;
 		aiError = '';
 		try {
 			const data = await host.loadWidgetPrompt(kind, widgetId);
-			// #region agent log
-			console.error('[DBG-474345] loadWidgetPrompt resolved', { hasData: !!data, promptId: data?.promptId });
-			// #endregion
 			if (data) {
 				aiPromptId = data.promptId;
 				pePromptName = data.name;
@@ -248,14 +234,8 @@
 			aiPromptLoaded = true;
 		} catch (e) {
 			aiError = e instanceof Error ? e.message : 'Failed to load prompt';
-			// #region agent log
-			console.error('[DBG-474345] loadPrompt ERROR — this would have caused an infinite loop before the fix', { error: String(e), aiError });
-			// #endregion
 		} finally {
 			aiLoading = false;
-			// #region agent log
-			console.error('[DBG-474345] loadPrompt finally', { aiLoading: false, aiPromptLoaded });
-			// #endregion
 		}
 	}
 

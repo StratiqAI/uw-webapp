@@ -1,8 +1,10 @@
 /**
- * Pure helper functions for the Ontology-to-Svelte bridge.
+ * @deprecated Use Extraction-based data flow instead. Extraction records store
+ * structured AI output as plain JSON, eliminating the need for EAV translation
+ * and structural-hash-based topic routing. Kept for backward compatibility with
+ * the Ontology Explorer page.
  *
- * Topic path builders, EAV ↔ flat-map translators, and schema compatibility
- * checks. No side effects, no VTS or wsClient imports.
+ * Pure helper functions for the Ontology-to-Svelte bridge.
  */
 
 import type {

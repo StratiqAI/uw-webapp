@@ -16,6 +16,19 @@ export interface WidgetMeta {
 	showDescription?: boolean;
 }
 
+/**
+ * Extraction data passed from the host when a widget is bound to an
+ * Extraction record via `extractionId`. Widgets can read `result` for the
+ * structured AI output without touching VTS or topic routing.
+ */
+export interface ExtractionData {
+	id: string;
+	result: Record<string, unknown> | null;
+	status: string;
+	loading: boolean;
+	error: string | null;
+}
+
 export interface StandardWidgetProps<TData = unknown> {
 	data: TData;
 	widgetId?: string;
@@ -33,6 +46,12 @@ export interface StandardWidgetProps<TData = unknown> {
 	onUpdateConfig?: (data: TData) => void;
 	/** Register a toggle function the host calls when the user clicks Configure/Edit. */
 	onConfigureReady?: (toggleFn: () => void) => void;
+	/**
+	 * When the widget is bound to an Extraction, the host passes the
+	 * extraction data here. Widgets can use `extraction.result` directly
+	 * instead of reading from VTS. Undefined when no extraction is linked.
+	 */
+	extraction?: ExtractionData;
 }
 
 /**
@@ -50,15 +69,13 @@ export interface WidgetPromptConfig {
 }
 
 /**
- * Declares a structured EntityDefinition that the widget produces.
- * During registration the host will create (or reuse) a matching
- * EntityDefinition in the ontology graph so it appears on the
- * Ontology Explorer page.
+ * @deprecated Use Extraction-based flow instead. Widget structured output is
+ * now stored as plain JSON on the Extraction record, not as an
+ * EntityDefinition in the ontology graph.
  */
 export interface WidgetEntityDefinitionConfig {
 	name: string;
 	description?: string;
-	/** Zod schema describing the structured output shape. Converted to JSON Schema at registration time. */
 	outputSchema: z.ZodSchema;
 }
 
@@ -92,9 +109,7 @@ export interface WidgetManifest<TData = unknown> {
 	/** AI prompt configuration — if present, the widget supports AI generation. */
 	promptConfig?: WidgetPromptConfig;
 	/**
-	 * Explicit EntityDefinition for the widget's structured output.
-	 * When omitted but `promptConfig` is present, the EntityDefinition is
-	 * auto-derived from `promptConfig.aiOutputSchema` for backward compatibility.
+	 * @deprecated Use Extraction-based flow instead.
 	 */
 	entityDefinition?: WidgetEntityDefinitionConfig;
 }

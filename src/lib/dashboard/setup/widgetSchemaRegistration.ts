@@ -120,16 +120,18 @@ export function initializeWidgetSchemas(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Structural hash cache (populated by initializeWidgetHashes)
+// Structural hash cache — DEPRECATED
+// The extraction-based data flow replaces structural hash matching.
+// These functions are kept for backward compatibility with the ontology page
+// and widgets that have not yet migrated to extractionId binding.
 // ---------------------------------------------------------------------------
 
 const widgetStructuralHashes = new Map<string, string>();
 let hashesReady: Promise<void> | null = null;
 
 /**
+ * @deprecated Extraction-based flow replaces structural hash matching.
  * Compute and cache the structuralHash for every registered widget manifest.
- * Safe to call multiple times; only the first invocation does work.
- * Must be called after registerWidget() has been called for all manifests.
  */
 export function initializeWidgetHashes(): Promise<void> {
 	if (hashesReady) return hashesReady;
@@ -155,9 +157,8 @@ export function initializeWidgetHashes(): Promise<void> {
 }
 
 /**
+ * @deprecated Use extractionId binding instead.
  * Returns the cached structuralHash for a widget kind.
- * Returns undefined if hashes have not yet been initialized or
- * if the kind is not registered.
  */
 export function getWidgetStructuralHash(kind: string): string | undefined {
 	return widgetStructuralHashes.get(kind);
@@ -202,8 +203,8 @@ export function getWidgetOutputSchemaId(widgetType: string): string | null {
 }
 
 /**
- * Return all ontology instance data topics that match a given structuralHash
- * within a project. Scans the VTS tree under `ontology/p/{projectId}/schema/{hash}/inst`.
+ * @deprecated Use Extraction records with extractionId binding instead.
+ * Return all ontology instance data topics that match a given structuralHash.
  */
 export function getTopicsByStructuralHash(
 	projectId: string,

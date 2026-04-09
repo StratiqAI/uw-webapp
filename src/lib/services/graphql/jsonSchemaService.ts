@@ -1,7 +1,7 @@
 /**
- * @deprecated Use entityDefinitionService.ts instead.
- * JsonSchemas are now auto-created by the saveEntityDefinition pipeline.
- * This module is retained for backward compatibility (read/update/delete).
+ * @deprecated Use Extraction-based data flow instead. Schemas are stored
+ * inline on Extraction records as AWSJSON. Both JsonSchema and
+ * EntityDefinition are superseded by the Extraction model.
  */
 
 import { M_CREATE_JSON_SCHEMA, M_UPDATE_JSON_SCHEMA } from '$lib/services/graphql/jsonSchemaOperations';

@@ -1,13 +1,10 @@
 /**
+ * @deprecated Use Extraction-based data flow instead. The Extraction type
+ * stores schemas inline as AWSJSON, eliminating the need for EntityDefinition
+ * and its linked JsonSchema. Kept for backward compatibility with the Ontology
+ * Explorer page and prompt editing.
+ *
  * EntityDefinition creation/update service.
- *
- * Replaces direct JsonSchema creation — all schema persistence now goes
- * through saveEntityDefinition, which auto-creates a linked JsonSchema
- * via the backend pipeline (computeStructuralHash + ensureJsonSchemaForDef).
- *
- * Uses structural-hash lookups for idempotency: if a definition with the
- * same normalised schema already exists in the project it is returned
- * without a redundant write.
  */
 
 import {

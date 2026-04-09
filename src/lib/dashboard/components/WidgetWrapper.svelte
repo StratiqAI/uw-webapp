@@ -16,7 +16,10 @@
 	import { resolveWidgetComponent } from '$lib/dashboard/setup/widgetTypeMap';
 	import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
 	import { themeStore } from '$lib/stores/themeStore.svelte';
+	import { authStore } from '$lib/stores/auth.svelte';
 	import { setConfigureTab, WidgetConfigureBack } from '@stratiqai/dashboard-widget-sdk';
+	import { useExtraction } from '$lib/hooks/useExtraction.svelte';
+	import { page } from '$app/stores';
 	import { createLogger } from '$lib/utils/logger';
 
 	const log = createLogger('dashboard');
@@ -80,6 +83,32 @@
 			return widget.type === 'schema' ? (widget.data as any).schemaId : null;
 		}
 	});
+
+	const idToken = $derived(
+		($page?.data as Record<string, unknown>)?.idToken as string ?? authStore.idToken ?? ''
+	);
+	const extraction = useExtraction(
+		() => widget.extractionId,
+		() => idToken
+	);
+
+	$effect(() => {
+		if (widget.extractionId && extraction.result) {
+			validatedTopicStore.publish(currentTopic, extraction.result);
+		} else if (widget.extractionId && extraction.data?.rawAnswer && !extraction.result) {
+			validatedTopicStore.publish(currentTopic, { content: extraction.data.rawAnswer });
+		}
+	});
+
+	$effect(() => {
+		if (!widget.extractionId) return;
+		const statusTopic = `${currentTopic}/__ai_status`;
+		validatedTopicStore.publish(statusTopic, {
+			generating: extraction.isRunning,
+			error: extraction.hasError ? (extraction.data?.errorMessage ?? 'Extraction failed') : undefined
+		});
+	});
+
 	const dragHandlers = $derived.by(() =>
 		createDragHandlers(widget, {
 			onDragStart,
@@ -187,7 +216,13 @@
 	 * chrome header label, so lifting it would duplicate the text.
 	 */
 	const liveData = $derived.by(() => {
-		const _ = validatedTopicStore.tree; // reactive dependency
+		if (widget.extractionId && extraction.result) {
+			return extraction.result;
+		}
+		if (widget.extractionId && extraction.data?.rawAnswer && !extraction.result) {
+			return { content: extraction.data.rawAnswer };
+		}
+		const _ = validatedTopicStore.tree;
 		return validatedTopicStore.at(currentTopic);
 	});
 
@@ -214,6 +249,17 @@
 	const displayTitle = $derived(widget.showTitle !== false ? rawTitle : undefined);
 	const displayDescription = $derived(widget.showDescription !== false ? rawDescription : undefined);
 	const showTitleBar = $derived(!!displayTitle || !!displayDescription);
+
+	const extractionProp = $derived.by(() => {
+		if (!widget.extractionId) return undefined;
+		return {
+			id: widget.extractionId,
+			result: extraction.result as Record<string, unknown> | null,
+			status: extraction.status ?? 'DRAFT',
+			loading: extraction.loading || extraction.isRunning,
+			error: extraction.error ?? extraction.data?.errorMessage ?? null,
+		};
+	});
 
 	const widgetBodyPaddingClass = $derived(
 		widget.type === 'brokerCard'
@@ -312,6 +358,7 @@
 					data={widget.data}
 					widgetId={widget.id}
 					topicOverride={widget.topicOverride}
+					extraction={extractionProp}
 					{darkMode}
 					theme={themeStore.theme}
 					refreshSignal={registeredRefreshCounter}

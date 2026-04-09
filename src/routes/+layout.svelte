@@ -54,33 +54,16 @@
 		DashboardStorage.saveWidgetDataNow();
 	}
 
-	// #region agent log
-	let _effectPreRunCount = 0;
-	let _effectRunCount = 0;
-	const _dbgLayout = (location: string, message: string, data: Record<string, unknown> = {}) =>
-		fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bfa702'},body:JSON.stringify({sessionId:'bfa702',location,message,data,timestamp:Date.now()})}).catch(()=>{});
-	// #endregion
-
 	$effect.pre(() => {
 		if (!browser || !data.projects || layoutProjectsInitialized) return;
-		// #region agent log
-		_effectPreRunCount++;
-		_dbgLayout('+layout.svelte:effect.pre','effect.pre running initialize',{hypothesisId:'C',run:_effectPreRunCount,projectCount:data.projects?.length});
-		// #endregion
 		layoutProjectsInitialized = true;
 		globalProjectStore.initialize(data.projects);
 	});
 
 	$effect(() => {
 		if (browser && data.projects) {
-			// #region agent log
-			_effectRunCount++;
-			// #endregion
 			const projects = data.projects;
 			untrack(() => {
-				// #region agent log
-				_dbgLayout('+layout.svelte:effect','setProjects effect firing',{hypothesisId:'A',run:_effectRunCount,projectCount:projects?.length,currentSelectedId:globalProjectStore.selectedProjectId,runId:'post-fix'});
-				// #endregion
 				globalProjectStore.setProjects(projects);
 			});
 		}

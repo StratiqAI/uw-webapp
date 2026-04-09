@@ -1,18 +1,9 @@
 /**
- * OntologySyncManager
+ * @deprecated Use Extraction-based data flow instead. Widgets now bind to
+ * Extraction records by extractionId. This sync manager is kept for
+ * backward compatibility with the Ontology Explorer page.
  *
- * Manages the full lifecycle of ontology data in the browser:
- *   1. Fetches definitions + instances via HTTP (GraphQLQueryClient)
- *   2. Registers definition schemas into VTS (OntologySchemaLoader)
- *   3. Publishes instance data as flat maps into VTS
- *   4. Subscribes to real-time changes (create/update/delete) via wsClient.ts
- *   5. Implements echo cancellation using a per-tab senderId
- *
- * Topic paths use structuralHash (not definitionId):
- *   ontology/p/{projectId}/schema/{hash}/inst/{instanceId}/data
- *
- * Extends BaseSyncManager for unified lifecycle, auto-reconnect refetch,
- * and shared WS client acquisition.
+ * OntologySyncManager — manages the full lifecycle of ontology data in the browser.
  */
 
 import type {

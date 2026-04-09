@@ -1,15 +1,15 @@
 import { defineWidget } from '@stratiqai/dashboard-widget-sdk';
 import { paragraphSchema } from './schema.js';
-import ParagraphWidget from './ParagraphWidget.svelte';
+import SimpleParagraphWidget from './SimpleParagraphWidget.svelte';
 
-export const paragraphWidget = defineWidget({
-	kind: 'paragraph',
-	displayName: 'Paragraph Widget',
+export const simpleParagraphWidget = defineWidget({
+	kind: 'simpleParagraph',
+	displayName: 'Simple Paragraph',
 	zodSchema: paragraphSchema,
-	component: ParagraphWidget,
+	component: SimpleParagraphWidget,
 	defaultData: { title: '', description: '', content: '' },
 	defaultSize: { colSpan: 6, rowSpan: 3 },
-	palette: { icon: '📄', category: 'content' },
+	palette: { icon: '📝', category: 'content' },
 	entityDefinition: {
 		name: 'Paragraph',
 		description: 'A single paragraph with title, subtitle, and prose content',
@@ -26,6 +26,6 @@ export const paragraphWidget = defineWidget({
 	}
 });
 
-export { paragraphSchema, paragraphWidgetDataSchema, paragraphAiOutputSchema } from './schema.js';
-export type { ParagraphData, ParagraphWidgetData, ParagraphAiOutput } from './schema.js';
-export { default as ParagraphWidget } from './ParagraphWidget.svelte';
+export { paragraphSchema } from './schema.js';
+export type { ParagraphData } from './schema.js';
+export { default as SimpleParagraphWidget } from './SimpleParagraphWidget.svelte';

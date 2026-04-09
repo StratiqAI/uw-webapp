@@ -1,5 +1,6 @@
 export type {
 	StandardWidgetProps,
+	ExtractionData,
 	WidgetManifest,
 	WidgetPromptConfig,
 	WidgetEntityDefinitionConfig,

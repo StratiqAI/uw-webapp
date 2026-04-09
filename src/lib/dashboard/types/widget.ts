@@ -73,10 +73,19 @@ export interface BaseWidget extends Position, Size, WidgetConstraints {
 	locked?: boolean;
 	title?: string;
 	description?: string;
+	/** @deprecated Use extractionId instead. Kept for backward compatibility. */
 	topicOverride?: string;
 	promptId?: string;
+	/** @deprecated No longer needed with extraction-based flow. */
 	entityDefinitionId?: string;
+	/** @deprecated No longer needed with extraction-based flow. */
 	entityInstanceId?: string;
+	/**
+	 * Link to an Extraction record. When set, the widget reads extraction.result
+	 * for its data instead of using VTS/topic routing. Multiple widgets can share
+	 * the same extractionId.
+	 */
+	extractionId?: string;
 	/** When true the widget title bar displays the title. Defaults to true when a title exists. */
 	showTitle?: boolean;
 	/** When true the widget title bar displays the description. Defaults to true when a description exists. */

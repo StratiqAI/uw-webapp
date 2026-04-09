@@ -1,14 +1,11 @@
 /**
- * OntologySchemaLoader
+ * @deprecated Use Extraction-based data flow instead. Extraction records store
+ * schemas inline and results as plain JSON, eliminating the need for VTS schema
+ * registration via EntityDefinition structural hashes. Kept for backward
+ * compatibility with the Ontology Explorer page.
  *
- * Fetches entity definitions from AppSync and registers their
- * `normalizedJsonSchema` as VTS schemas so instance data published to
- * `ontology/p/+/schema/{hash}/inst/+/data` is validated at the store boundary.
- *
- * Topic paths are keyed by structuralHash (not definitionId), enabling
- * schema-hash-based discovery across widget types.
- *
- * Also publishes definition metadata to VTS at the definition topic.
+ * OntologySchemaLoader — fetches entity definitions and registers their schemas
+ * into VTS for validation.
  */
 
 import type { EntityDefinition } from '@stratiqai/types-simple';
