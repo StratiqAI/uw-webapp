@@ -575,10 +575,10 @@
 									<span
 										role="button"
 										tabindex="-1"
-										class="ml-0.5 hidden rounded-sm p-0.5 opacity-0 transition-opacity group-hover:inline-flex group-hover:opacity-70 hover:opacity-100!
-											{dashboard.activeTabId === tab.id
-												? 'hover:bg-indigo-700/80'
-												: darkMode ? 'hover:bg-slate-600' : 'hover:bg-slate-200'}"
+									class="ml-0.5 inline-flex rounded-sm p-0.5 opacity-40 transition-opacity hover:opacity-100
+										{dashboard.activeTabId === tab.id
+											? 'hover:bg-indigo-700/80'
+											: darkMode ? 'hover:bg-slate-600' : 'hover:bg-slate-200'}"
 										onclick={(e: MouseEvent) => {
 											e.stopPropagation();
 											handleDeleteTab(tab.id);
