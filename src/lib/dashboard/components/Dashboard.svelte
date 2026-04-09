@@ -464,6 +464,21 @@
 					schema: topicSchemaReg as Record<string, unknown> | undefined,
 				},
 			};
+		},
+
+		getWidgetMeta(widgetId: string) {
+			const w = dashboard.widgets.find((w) => w.id === widgetId);
+			if (!w) return undefined;
+			return {
+				title: w.title,
+				description: w.description,
+				showTitle: w.showTitle,
+				showDescription: w.showDescription
+			};
+		},
+
+		updateWidgetMeta(widgetId: string, meta: { title?: string; description?: string; showTitle?: boolean; showDescription?: boolean }) {
+			dashboard.updateWidget(widgetId, meta);
 		}
 	});
 

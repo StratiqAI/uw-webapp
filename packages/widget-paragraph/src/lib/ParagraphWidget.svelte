@@ -17,8 +17,6 @@
 		topicOverride,
 		darkMode = false,
 		theme,
-		showTitleInBody = false,
-		showDescriptionInBody = false,
 		onUpdateConfig,
 		onConfigureReady
 	}: StandardWidgetProps<ParagraphData> = $props();
@@ -63,36 +61,14 @@
 		<div class="relative h-full overflow-auto px-4 py-4">
 			{#if aiStatus.generating || aiStatus.error}
 				<AiStatusOverlay generating={aiStatus.generating} error={aiStatus.error} {darkMode} />
-			{:else if (showTitleInBody && widgetData.title) || (showDescriptionInBody && widgetData.description) || widgetData.content}
-				<div class="flex flex-col gap-2">
-					{#if showTitleInBody && widgetData.title}
-						<h2
-							class="text-lg font-semibold leading-snug {darkMode
-								? 'text-white'
-								: 'text-slate-900'}"
-						>
-							{widgetData.title}
-						</h2>
-					{/if}
-					{#if showDescriptionInBody && widgetData.description}
-						<p
-							class="text-sm leading-relaxed {darkMode
-								? 'text-slate-400'
-								: 'text-slate-500'}"
-						>
-							{widgetData.description}
-						</p>
-					{/if}
-					{#if widgetData.content}
-						<p
-							class="text-[0.9375rem] leading-relaxed {darkMode
-								? 'text-slate-200'
-								: 'text-slate-700'}"
-						>
-							{widgetData.content}
-						</p>
-					{/if}
-				</div>
+			{:else if widgetData.content}
+				<p
+					class="text-[0.9375rem] leading-relaxed {darkMode
+						? 'text-slate-200'
+						: 'text-slate-700'}"
+				>
+					{widgetData.content}
+				</p>
 			{:else}
 				<p class="italic {darkMode ? 'text-slate-500' : 'text-slate-400'}">
 					No content yet. Open settings to configure the AI prompt.
@@ -112,26 +88,6 @@
 			onCancel={configure.cancelConfig}
 		>
 			{#snippet userFields()}
-				<label class="block">
-					<span class="text-xs font-medium {darkMode ? 'text-slate-400' : 'text-slate-500'}"
-						>Title</span
-					>
-					<input
-						type="text"
-						class="{inputClass} mt-1 block"
-						bind:value={configure.draft.title}
-					/>
-				</label>
-				<label class="block">
-					<span class="text-xs font-medium {darkMode ? 'text-slate-400' : 'text-slate-500'}"
-						>Description</span
-					>
-					<input
-						type="text"
-						class="{inputClass} mt-1 block"
-						bind:value={configure.draft.description}
-					/>
-				</label>
 				<label class="block">
 					<span class="text-xs font-medium {darkMode ? 'text-slate-400' : 'text-slate-500'}"
 						>Content</span

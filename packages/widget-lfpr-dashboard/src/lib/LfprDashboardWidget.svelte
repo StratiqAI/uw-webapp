@@ -18,7 +18,6 @@
 		topicOverride,
 		darkMode = true,
 		theme,
-		showTitleInBody = false,
 		onUpdateConfig,
 		onConfigureReady
 	}: StandardWidgetProps<LfprDashboardConfig> = $props();
@@ -128,11 +127,6 @@
 				<h2 class="text-[10px] font-semibold uppercase tracking-wider {muted}">
 					Economic Data Dashboard
 				</h2>
-				{#if showTitleInBody}
-					<p class="mt-0.5 text-sm font-bold">
-						{cfg.title ?? 'Labor Force Participation Rate (LFPR)'}
-					</p>
-				{/if}
 				<p class="mt-1 text-[11px] italic {muted}">
 					Of all people who could work, what percentage are actually in the labor force?
 				</p>

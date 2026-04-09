@@ -16,8 +16,7 @@
 	import { resolveWidgetComponent } from '$lib/dashboard/setup/widgetTypeMap';
 	import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
 	import { themeStore } from '$lib/stores/themeStore.svelte';
-	import WidgetConfigureDialog from './WidgetConfigureDialog.svelte';
-	import { setConfigureTab } from '@stratiqai/dashboard-widget-sdk';
+	import { setConfigureTab, WidgetConfigureBack } from '@stratiqai/dashboard-widget-sdk';
 	import { createLogger } from '$lib/utils/logger';
 
 	const log = createLogger('dashboard');
@@ -42,7 +41,7 @@
 
 	const darkMode = $derived(themeStore.darkMode);
 
-	let showEditDialog = $state(false);
+	let showHostConfigure = $state(false);
 	let lqMenuSignals = $state<Record<string, { refresh: number; exportRequest: number }>>({});
 	let removeConfirmOpen = $state(false);
 	let lastRefreshedAt = $state<Date | null>(null);
@@ -53,7 +52,10 @@
 	const isWidgetFullscreen = $derived(dashboard.fullscreenWidgetId === widget.id);
 
 	function handleFullscreenEscape(e: KeyboardEvent) {
-		if (isWidgetFullscreen && e.key === 'Escape') dashboard.setFullscreenWidget(null);
+		if (isWidgetFullscreen && e.key === 'Escape') {
+			if (showHostConfigure) showHostConfigure = false;
+			dashboard.setFullscreenWidget(null);
+		}
 	}
 
 	const currentTopic = $derived.by(() => {
@@ -111,7 +113,10 @@
 				}
 				break;
 			}
-			showEditDialog = true;
+			showHostConfigure = true;
+			if (!isWidgetFullscreen) {
+				dashboard.setFullscreenWidget(widget.id);
+			}
 			break;
 
 			case 'duplicate':
@@ -186,7 +191,7 @@
 		return validatedTopicStore.at(currentTopic);
 	});
 
-	const displayTitle = $derived.by(() => {
+	const rawTitle = $derived.by(() => {
 		if (widget.type === 'title') return widget.title;
 		const d = liveData as Record<string, unknown> | undefined | null;
 		if (d && typeof d === 'object') {
@@ -196,7 +201,7 @@
 		return widget.title;
 	});
 
-	const displayDescription = $derived.by(() => {
+	const rawDescription = $derived.by(() => {
 		if (widget.type === 'title') return widget.description;
 		const d = liveData as Record<string, unknown> | undefined | null;
 		if (d && typeof d === 'object') {
@@ -206,10 +211,14 @@
 		return widget.description;
 	});
 
+	const displayTitle = $derived(widget.showTitle !== false ? rawTitle : undefined);
+	const displayDescription = $derived(widget.showDescription !== false ? rawDescription : undefined);
+	const showTitleBar = $derived(!!displayTitle || !!displayDescription);
+
 	const widgetBodyPaddingClass = $derived(
 		widget.type === 'brokerCard'
 			? 'min-h-0 flex-1 overflow-hidden p-0'
-			: displayTitle
+			: showTitleBar
 				? 'p-2'
 				: 'h-full p-2'
 	);
@@ -275,6 +284,7 @@
 			{widget}
 			{displayTitle}
 			{displayDescription}
+			{showTitleBar}
 			{darkMode}
 			{isWidgetFullscreen}
 			{lastRefreshedAt}
@@ -285,7 +295,19 @@
 
 		<!-- Widget Body -->
 		<div class="widget-body {widgetBodyBgClass} {widgetBodyPaddingClass}">
-			{#if ResolvedComp}
+			{#if showHostConfigure}
+				<WidgetConfigureBack
+					kind={widget.type}
+					widgetId={widget.id}
+					{darkMode}
+					theme={themeStore.theme}
+					topicOverride={widget.topicOverride}
+					schemaId={schemaId ?? undefined}
+					showAITab={true}
+					onApply={() => { showHostConfigure = false; dashboard.setFullscreenWidget(null); }}
+					onCancel={() => { showHostConfigure = false; dashboard.setFullscreenWidget(null); }}
+				/>
+			{:else if ResolvedComp}
 				<ResolvedComp
 					data={widget.data}
 					widgetId={widget.id}
@@ -293,9 +315,8 @@
 					{darkMode}
 					theme={themeStore.theme}
 					refreshSignal={registeredRefreshCounter}
-					showTitleInChrome={!!displayTitle}
-					showTitleInBody={!!widget.showTitleInBody}
-					showDescriptionInBody={!!widget.showDescriptionInBody}
+					showTitleInChrome={showTitleBar}
+					showDescriptionInChrome={!!displayDescription}
 					onUpdateConfig={(d: any) => dashboard.updateWidget(widget.id, { data: d })}
 					onConfigureReady={(fn: () => void) => { registeredConfigureFn = fn; }}
 				onUpdateData={(d: any) => dashboard.updateWidget(widget.id, { data: d })}
@@ -321,12 +342,6 @@
 	onConfirm={() => dashboard.removeWidget(widget.id)}
 />
 
-<WidgetConfigureDialog
-	{widget}
-	bind:open={showEditDialog}
-	{currentTopic}
-	{schemaId}
-/>
 
 
 <style>

@@ -77,10 +77,10 @@ export interface BaseWidget extends Position, Size, WidgetConstraints {
 	promptId?: string;
 	entityDefinitionId?: string;
 	entityInstanceId?: string;
-	/** When true, also render the title inside the widget body (chrome title bar always shows it). */
-	showTitleInBody?: boolean;
-	/** When true, also render the description inside the widget body (chrome title bar always shows it). */
-	showDescriptionInBody?: boolean;
+	/** When true the widget title bar displays the title. Defaults to true when a title exists. */
+	showTitle?: boolean;
+	/** When true the widget title bar displays the description. Defaults to true when a description exists. */
+	showDescription?: boolean;
 }
 
 // Widget Action Types

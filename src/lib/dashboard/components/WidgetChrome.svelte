@@ -7,6 +7,7 @@
 		widget: Widget;
 		displayTitle: string | undefined;
 		displayDescription: string | undefined;
+		showTitleBar: boolean;
 		darkMode: boolean;
 		isWidgetFullscreen: boolean;
 		lastRefreshedAt: Date | null;
@@ -19,6 +20,7 @@
 		widget,
 		displayTitle,
 		displayDescription,
+		showTitleBar,
 		darkMode,
 		isWidgetFullscreen,
 		lastRefreshedAt,
@@ -31,17 +33,19 @@
 <!-- Subtle top edge -->
 <div class="pointer-events-none absolute inset-x-0 top-0 z-10 h-px {darkMode ? 'bg-linear-to-r from-transparent via-primary-400/15 to-transparent' : 'bg-linear-to-r from-transparent via-primary-400/18 to-transparent'}"></div>
 
-<!-- Widget Header (if a title is available — static or from live data) -->
-{#if displayTitle}
+<!-- Widget Header -->
+{#if showTitleBar}
 	<div
-		class="widget-header shrink-0 border-b {darkMode ? 'border-slate-700/30 bg-linear-to-r from-slate-800/95 to-slate-800/88' : 'border-slate-200/55 bg-linear-to-r from-slate-50 to-white'} flex items-center gap-2 px-4 py-1"
+		class="widget-header shrink-0 border-b {darkMode ? 'border-slate-700/30 bg-linear-to-r from-slate-800/95 to-slate-800/88' : 'border-slate-200/55 bg-linear-to-r from-slate-50 to-white'} flex items-center gap-2 px-4 {displayDescription ? 'py-2' : 'py-1'}"
 	>
 		<div class="min-w-0 flex-1">
-			<h3 class="text-base font-semibold leading-snug tracking-wide {darkMode ? 'text-slate-100' : 'text-slate-700'}">
-				{displayTitle}
-			</h3>
+			{#if displayTitle}
+				<h3 class="text-base font-semibold leading-snug tracking-wide {darkMode ? 'text-slate-100' : 'text-slate-700'}">
+					{displayTitle}
+				</h3>
+			{/if}
 			{#if displayDescription}
-				<p class="mt-0 text-xs leading-snug {darkMode ? 'text-slate-400' : 'text-slate-500'}">{displayDescription}</p>
+				<p class="{displayTitle ? 'mt-0' : ''} text-xs leading-snug {darkMode ? 'text-slate-400' : 'text-slate-500'}">{displayDescription}</p>
 			{/if}
 		</div>
 		<div class="flex shrink-0 items-center gap-1.5">
@@ -80,7 +84,7 @@
 	</div>
 {/if}
 
-{#if !displayTitle}
+{#if !showTitleBar}
 	<WidgetDropdown
 		{widget}
 		isFullscreen={isWidgetFullscreen}
@@ -90,7 +94,7 @@
 {/if}
 
 <!-- Floating lock indicator (no title bar) -->
-{#if widget.locked && !displayTitle}
+{#if widget.locked && !showTitleBar}
 	<div class="absolute right-12 top-2.5 opacity-0 transition-opacity group-hover:opacity-100">
 		<svg class="h-4 w-4 {darkMode ? 'text-slate-400' : 'text-gray-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 			<path

@@ -81,6 +81,36 @@
 	);
 	const statusDot = (ok: boolean) =>
 		ok ? 'bg-emerald-500' : darkMode ? 'bg-slate-600' : 'bg-slate-300';
+	const inputClass = $derived(
+		darkMode
+			? 'w-full rounded-lg border border-slate-600 bg-slate-800 text-white placeholder-slate-400 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all'
+			: 'w-full rounded-lg border border-slate-300 bg-white text-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all'
+	);
+
+	// --- Widget meta (BaseWidget-level fields) ---
+	const hasMeta = $derived(!!host.getWidgetMeta && !!host.updateWidgetMeta);
+	let metaTitle = $state('');
+	let metaDescription = $state('');
+	let metaShowTitle = $state(true);
+	let metaShowDescription = $state(true);
+
+	function syncMeta() {
+		const m = host.getWidgetMeta?.(widgetId);
+		if (m) {
+			metaTitle = m.title ?? '';
+			metaDescription = m.description ?? '';
+			metaShowTitle = m.showTitle !== false;
+			metaShowDescription = m.showDescription !== false;
+		}
+	}
+
+	$effect(() => {
+		if (hasMeta) syncMeta();
+	});
+
+	function updateMeta(field: string, value: string | boolean) {
+		host.updateWidgetMeta?.(widgetId, { [field]: value });
+	}
 
 	// --- Topic management ---
 	const currentTopic = $derived(host.getWidgetTopic(kind, widgetId, topicOverride));
@@ -316,7 +346,7 @@
 <div class="flex h-full flex-col overflow-auto {panelBg}">
 	<div class="flex-1 space-y-4 px-4 py-4 sm:px-6">
 		<header class="mb-2">
-			<h3 class="text-lg font-bold">Configure</h3>
+			<h3 class="text-lg font-bold">Widget Configuration</h3>
 			<p class={labelClass}>{kind} &bull; {widgetId}</p>
 		</header>
 
@@ -354,6 +384,55 @@
 		{/if}
 
 		{#if activeTab === 'settings'}
+			{#if hasMeta && kind !== 'title'}
+				<section class="space-y-3 border-b pb-4 {sectionBorder}">
+					<h4 class={sectionTitle}>Widget Display</h4>
+					<label class="block">
+						<span class={labelClass}>Title</span>
+						<input
+							type="text"
+							class="{inputClass} mt-1"
+							value={metaTitle}
+							oninput={(e) => { metaTitle = e.currentTarget.value; updateMeta('title', metaTitle); }}
+							placeholder="Widget title..."
+						/>
+					</label>
+					<label class="block">
+						<span class={labelClass}>Description</span>
+						<textarea
+							class="{inputClass} mt-1 resize-none"
+							rows="2"
+							value={metaDescription}
+							oninput={(e) => { metaDescription = e.currentTarget.value; updateMeta('description', metaDescription); }}
+							placeholder="Widget description..."
+						></textarea>
+					</label>
+					<div class="space-y-2 pt-1">
+						<p class="text-xs {darkMode ? 'text-slate-500' : 'text-slate-400'}">
+							Control which fields appear in the widget title bar. When both are off the title bar is hidden.
+						</p>
+						<label class="inline-flex items-center gap-2 cursor-pointer">
+							<input
+								type="checkbox"
+								checked={metaShowTitle}
+								onchange={(e) => { metaShowTitle = e.currentTarget.checked; updateMeta('showTitle', metaShowTitle); }}
+								class="h-4 w-4 rounded border {darkMode ? 'border-slate-600 bg-slate-700 accent-indigo-500' : 'border-slate-300 bg-white accent-indigo-600'}"
+							/>
+							<span class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-700'}">Show title</span>
+						</label>
+						<label class="inline-flex items-center gap-2 cursor-pointer">
+							<input
+								type="checkbox"
+								checked={metaShowDescription}
+								onchange={(e) => { metaShowDescription = e.currentTarget.checked; updateMeta('showDescription', metaShowDescription); }}
+								class="h-4 w-4 rounded border {darkMode ? 'border-slate-600 bg-slate-700 accent-indigo-500' : 'border-slate-300 bg-white accent-indigo-600'}"
+							/>
+							<span class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-700'}">Show description</span>
+						</label>
+					</div>
+				</section>
+			{/if}
+
 			{#if userFields}
 				<section class="space-y-3 border-b pb-4 {sectionBorder}">
 					<h4 class={sectionTitle}>Settings</h4>

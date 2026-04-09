@@ -6,6 +6,13 @@ import type { z } from 'zod';
  */
 /** Host app theme (light / dark / warm “coffee”). Optional; widgets may fall back to darkMode. */
 export type DashboardAppTheme = 'light' | 'dark' | 'warm';
+/** BaseWidget-level metadata editable through the configure panel. */
+export interface WidgetMeta {
+    title?: string;
+    description?: string;
+    showTitle?: boolean;
+    showDescription?: boolean;
+}
 export interface StandardWidgetProps<TData = unknown> {
     data: TData;
     widgetId?: string;
@@ -15,10 +22,10 @@ export interface StandardWidgetProps<TData = unknown> {
     theme?: DashboardAppTheme;
     /** Host-driven refresh counter; incrementing triggers refetch in useExternalData. */
     refreshSignal?: number;
-    /** When true, render the title inside the widget body (in addition to the chrome title bar). */
-    showTitleInBody?: boolean;
-    /** When true, render the description inside the widget body (in addition to the chrome title bar). */
-    showDescriptionInBody?: boolean;
+    /** When true the widget title bar displays the title. Defaults to true when a title exists. */
+    showTitleInChrome?: boolean;
+    /** When true the widget title bar displays the description. Defaults to true when a description exists. */
+    showDescriptionInChrome?: boolean;
     /** Persist config changes back to the dashboard store (widget.data). */
     onUpdateConfig?: (data: TData) => void;
     /** Register a toggle function the host calls when the user clicks Configure/Edit. */
@@ -203,4 +210,8 @@ export interface DashboardWidgetHost {
     consumeRequestedConfigureTab?(widgetId: string): string | undefined;
     /** Fetch raw DB records for the widget's linked entities (debug/inspection). */
     loadWidgetDebugData?(kind: string, widgetId: string): Promise<WidgetDebugData | null>;
+    /** Read current BaseWidget-level meta for display in the configure panel. */
+    getWidgetMeta?(widgetId: string): WidgetMeta | undefined;
+    /** Partial update of BaseWidget-level properties (title, description, display flags). */
+    updateWidgetMeta?(widgetId: string, meta: Partial<WidgetMeta>): void;
 }
