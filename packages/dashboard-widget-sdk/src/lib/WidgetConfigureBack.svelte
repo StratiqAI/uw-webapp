@@ -583,26 +583,27 @@
 					{aiError}
 				</div>
 			{:else}
-			<PromptEditor
-				{darkMode}
-				bind:promptName={pePromptName}
-				bind:promptDescription={pePromptDescription}
-				bind:userPrompt={peUserPrompt}
-				bind:systemInstruction={peSystemInstruction}
-				bind:model={peModel}
-				bind:responseFormatType={peResponseFormatType}
-				bind:schemaProperties={peSchemaProperties}
-				bind:schemaRequired={peSchemaRequired}
-				bind:fieldOrder={peFieldOrder}
-				bind:temperature={peTemperature}
-				bind:maxTokens={peMaxTokens}
-				bind:topP={peTopP}
-				bind:frequencyPenalty={peFrequencyPenalty}
-				bind:stopSequences={peStopSequences}
-				isGenerating={isActivelyGenerating}
-				generateError={combinedError}
-				onGenerate={handleGenerate}
-			/>
+		<PromptEditor
+			{darkMode}
+			bind:promptName={pePromptName}
+			bind:promptDescription={pePromptDescription}
+			bind:userPrompt={peUserPrompt}
+			bind:systemInstruction={peSystemInstruction}
+			bind:model={peModel}
+			bind:responseFormatType={peResponseFormatType}
+			bind:schemaProperties={peSchemaProperties}
+			bind:schemaRequired={peSchemaRequired}
+			bind:fieldOrder={peFieldOrder}
+			bind:temperature={peTemperature}
+			bind:maxTokens={peMaxTokens}
+			bind:topP={peTopP}
+			bind:frequencyPenalty={peFrequencyPenalty}
+			bind:stopSequences={peStopSequences}
+			hideResponseFormat={true}
+			isGenerating={isActivelyGenerating}
+			generateError={combinedError}
+			onGenerate={handleGenerate}
+		/>
 
 			<!-- AI Generation Status -->
 			{#if isActivelyGenerating}

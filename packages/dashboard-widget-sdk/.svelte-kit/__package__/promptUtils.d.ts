@@ -6,6 +6,12 @@
  * All functions are side-effect-free and operate on plain objects.
  */
 import type { NestedItemSchema, NestedSchemaPropertyNode } from './promptSchemaTypes.js';
+export declare const DEFAULT_AI_MODEL = "GEMINI_2_5_FLASH";
+export declare const MODEL_OPTIONS: ReadonlyArray<{
+    value: string;
+    label: string;
+}>;
+export declare function normalizeToAIModel(value: string | undefined): string;
 export declare function newNestedId(): string;
 export declare function extractPromptVariables(text: string): {
     name: string;

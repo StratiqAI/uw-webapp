@@ -38,6 +38,9 @@ export type {
 export type { SchemaBuilderState, RenameResult } from './promptUtils.js';
 
 export {
+	DEFAULT_AI_MODEL,
+	MODEL_OPTIONS,
+	normalizeToAIModel,
 	newNestedId,
 	extractPromptVariables,
 	getOrderedFieldEntries,

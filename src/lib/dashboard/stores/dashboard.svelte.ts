@@ -281,7 +281,6 @@ class DashboardStore {
 						await this.#createCloudLayout(savedState);
 						if (gen !== this.#initGeneration) return false;
 					} else {
-						this.#flushActiveTabIntoSlices();
 						await this.#createCloudLayout(this.#snapshotMultiTabState());
 						if (gen !== this.#initGeneration) return false;
 					}
@@ -313,7 +312,6 @@ class DashboardStore {
 		}
 		
 		try {
-			this.#flushActiveTabIntoSlices();
 			const state = this.#snapshotMultiTabState();
 
 			// Synchronous localStorage write (instant)
@@ -349,7 +347,6 @@ class DashboardStore {
 
 		this.#cloudSyncStatus = 'saving';
 		try {
-			this.#flushActiveTabIntoSlices();
 			const state = this.#snapshotMultiTabState();
 
 			DashboardStorage.saveMultiTabState(state, this.#projectId);
@@ -500,7 +497,6 @@ class DashboardStore {
 		const topicData = validatedTopicStore.at(topic);
 
 		this.removeWidget(widgetId);
-		this.#flushActiveTabIntoSlices();
 
 		const slice = structuredClone($state.snapshot(this.#tabSlices[targetTabId])) as TabDashboardSlice;
 		const { position, config } = this.#findPositionInSlice(slice, widgetSnapshot.colSpan, widgetSnapshot.rowSpan);
@@ -529,8 +525,6 @@ class DashboardStore {
 			return this.addWidget(widget);
 		}
 		if (!this.#tabSlices[targetTabId]) return false;
-
-		this.#flushActiveTabIntoSlices();
 
 		const slice = structuredClone($state.snapshot(this.#tabSlices[targetTabId])) as TabDashboardSlice;
 		const { position, config } = this.#findPositionInSlice(slice, widget.colSpan, widget.rowSpan);
@@ -950,7 +944,6 @@ class DashboardStore {
 
 		this.#suspendAutoSave = true;
 		try {
-			this.#flushActiveTabIntoSlices();
 			clearWidgetTopicsForLayout($state.snapshot(this.#widgets) as Widget[], this.#projectId);
 
 			this.#widgets = [];
@@ -968,7 +961,6 @@ class DashboardStore {
 			this.#emit('dashboard:reset', undefined);
 		} finally {
 			queueMicrotask(() => {
-				this.#flushActiveTabIntoSlices();
 				this.#suspendAutoSave = false;
 				if (this.#autoSaveEnabled) {
 					this.save();
@@ -1105,11 +1097,19 @@ class DashboardStore {
 
 	// Private methods
 	#snapshotMultiTabState(): MultiTabDashboardState {
+		const activeSlice: TabDashboardSlice = {
+			widgets: $state.snapshot(this.#widgets) as Widget[],
+			config: $state.snapshot(this.#config) as DashboardConfig,
+			widgetData: DashboardStorage.collectWidgetDataFromStore()
+		};
 		const state: MultiTabDashboardState = {
 			version: DASHBOARD_STORAGE_VERSION,
 			activeTabId: this.#activeTabId,
 			tabOrder: $state.snapshot(this.#tabOrder) as TabInfo[],
-			tabs: $state.snapshot(this.#tabSlices) as MultiTabDashboardState['tabs']
+			tabs: {
+				...($state.snapshot(this.#tabSlices) as MultiTabDashboardState['tabs']),
+				[this.#activeTabId]: activeSlice
+			}
 		};
 		if (this.#cloudLayoutId) {
 			state.cloudLayoutId = this.#cloudLayoutId;
@@ -1117,6 +1117,12 @@ class DashboardStore {
 		return state;
 	}
 
+	/**
+	 * Persist the live active-tab state (#widgets / #config) back into #tabSlices.
+	 * Only needed before #applyTabSlice() overwrites the live state (i.e. tab switching).
+	 * Serialization paths (save, syncToCloud, etc.) do NOT need this — #snapshotMultiTabState()
+	 * builds the active tab's slice inline.
+	 */
 	#flushActiveTabIntoSlices(): void {
 		this.#tabSlices = {
 			...$state.snapshot(this.#tabSlices),

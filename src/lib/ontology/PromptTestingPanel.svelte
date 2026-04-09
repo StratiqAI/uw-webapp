@@ -5,7 +5,8 @@
 		PromptEditor,
 		buildSchemaPreview,
 		getOrderedFieldEntries,
-		parseJsonSchemaToBuilderState
+		parseJsonSchemaToBuilderState,
+		DEFAULT_AI_MODEL
 	} from '@stratiqai/dashboard-widget-sdk';
 	import type { IGraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
 	import { Q_LIST_PROMPTS, M_CREATE_PROMPT, M_UPDATE_PROMPT } from '$lib/services/graphql/promptOperations';
@@ -46,7 +47,7 @@
 	// PromptEditor bindings
 	let templateName = $state('');
 	let templateDescription = $state('');
-	let aiQueryModel = $state('GEMINI_2_5_FLASH');
+	let aiQueryModel = $state(DEFAULT_AI_MODEL);
 	let aiQuerySystemPrompt = $state(DEFAULT_SYSTEM_PROMPT);
 	let aiQueryPrompt = $state('');
 	let temperature = $state<number | undefined>(undefined);
@@ -135,7 +136,7 @@
 	function populateEditorFromPrompt(prompt: Prompt) {
 		templateName = prompt.name || '';
 		templateDescription = prompt.description || '';
-		aiQueryModel = prompt.model || 'GEMINI_2_5_FLASH';
+		aiQueryModel = prompt.model || DEFAULT_AI_MODEL;
 
 		const templateStr = getTemplateStrForEditor(prompt);
 		const data = parseTemplateToAIQueryData(templateStr);
@@ -168,7 +169,7 @@
 		templateDescription = definition.description || '';
 		aiQueryPrompt = `Analyze the provided documents and extract the following structured data for: ${definition.name}`;
 		aiQuerySystemPrompt = DEFAULT_SYSTEM_PROMPT;
-		aiQueryModel = 'GEMINI_2_5_FLASH';
+		aiQueryModel = DEFAULT_AI_MODEL;
 		applyDefinitionSchema();
 	}
 
@@ -192,7 +193,7 @@
 		templateDescription = '';
 		aiQueryPrompt = '';
 		aiQuerySystemPrompt = DEFAULT_SYSTEM_PROMPT;
-		aiQueryModel = 'GEMINI_2_5_FLASH';
+		aiQueryModel = DEFAULT_AI_MODEL;
 		temperature = undefined;
 		maxTokens = undefined;
 		topP = undefined;

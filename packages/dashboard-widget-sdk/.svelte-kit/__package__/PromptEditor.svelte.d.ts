@@ -9,6 +9,7 @@ interface Props {
     schemaProperties?: Record<string, Record<string, unknown>>;
     schemaRequired?: string[];
     fieldOrder?: string[];
+    hideResponseFormat?: boolean;
     isGenerating?: boolean;
     generateError?: string;
     isSaving?: boolean;

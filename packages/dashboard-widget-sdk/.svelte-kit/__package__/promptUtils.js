@@ -6,6 +6,33 @@
  * All functions are side-effect-free and operate on plain objects.
  */
 // ---------------------------------------------------------------------------
+// Model options
+// ---------------------------------------------------------------------------
+export const DEFAULT_AI_MODEL = 'GEMINI_2_5_FLASH';
+export const MODEL_OPTIONS = [
+    { value: 'GEMINI_3_1_PRO_PREVIEW', label: 'Gemini 3.1 Pro' },
+    { value: 'GEMINI_3_1_FLASH_PREVIEW', label: 'Gemini 3.1 Flash' },
+    { value: 'GEMINI_3_PRO_PREVIEW', label: 'Gemini 3 Pro' },
+    { value: 'GEMINI_3_FLASH_PREVIEW', label: 'Gemini 3 Flash' },
+    { value: 'GEMINI_2_5_PRO', label: 'Gemini 2.5 Pro' },
+    { value: 'GEMINI_2_5_FLASH', label: 'Gemini 2.5 Flash' },
+    { value: 'GEMINI_2_5_FLASH_LITE', label: 'Gemini 2.5 Flash Lite' }
+];
+const VALID_MODEL_VALUES = new Set(MODEL_OPTIONS.map((o) => o.value));
+export function normalizeToAIModel(value) {
+    if (value && VALID_MODEL_VALUES.has(value))
+        return value;
+    if (value === 'gemini-3.1-pro-preview')
+        return 'GEMINI_3_1_PRO_PREVIEW';
+    if (value === 'gemini-3.1-flash-preview')
+        return 'GEMINI_3_1_FLASH_PREVIEW';
+    if (value === 'gemini-3-flash-preview')
+        return 'GEMINI_3_FLASH_PREVIEW';
+    if (value === 'gemini-3-pro-preview')
+        return 'GEMINI_3_PRO_PREVIEW';
+    return DEFAULT_AI_MODEL;
+}
+// ---------------------------------------------------------------------------
 // ID generation
 // ---------------------------------------------------------------------------
 export function newNestedId() {

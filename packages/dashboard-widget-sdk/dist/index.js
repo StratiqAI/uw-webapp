@@ -8,7 +8,7 @@ export { default as AiStatusOverlay } from './AiStatusOverlay.svelte';
 export { default as WidgetConfigureBack } from './WidgetConfigureBack.svelte';
 export { useWidgetConfigure } from './useWidgetConfigure.svelte.js';
 export { setConfigureTab, consumeConfigureTab, peekConfigureTab } from './configureTabSignal.svelte.js';
-export { newNestedId, extractPromptVariables, getOrderedFieldEntries, addSchemaField, removeSchemaField, updateSchemaField, updateSchemaFieldType, toggleSchemaFieldRequired, renameSchemaField, nestedNodeToJsonSchema, nestedItemSchemaToJsonSchema, topLevelFieldToJsonSchema, buildSchemaPreview, jsonSchemaToPropertyNode, jsonSchemaToItemSchema, flatFieldFromJsonSchemaFragment, parseJsonSchemaToBuilderState } from './promptUtils.js';
+export { DEFAULT_AI_MODEL, MODEL_OPTIONS, normalizeToAIModel, newNestedId, extractPromptVariables, getOrderedFieldEntries, addSchemaField, removeSchemaField, updateSchemaField, updateSchemaFieldType, toggleSchemaFieldRequired, renameSchemaField, nestedNodeToJsonSchema, nestedItemSchemaToJsonSchema, topLevelFieldToJsonSchema, buildSchemaPreview, jsonSchemaToPropertyNode, jsonSchemaToItemSchema, flatFieldFromJsonSchemaFragment, parseJsonSchemaToBuilderState } from './promptUtils.js';
 export { default as SchemaNodesEditor } from './SchemaNodesEditor.svelte';
 export { default as PromptEditor } from './PromptEditor.svelte';
 export { default as PromptChooser } from './PromptChooser.svelte';

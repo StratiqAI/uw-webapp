@@ -1,11 +1,12 @@
 <script lang="ts">
 	import type { Prompt } from '@stratiqai/types-simple';
-	import type { AiModel } from '@stratiqai/types-simple';
 	import {
 		PromptEditor,
 		buildSchemaPreview,
 		getOrderedFieldEntries,
-		parseJsonSchemaToBuilderState
+		parseJsonSchemaToBuilderState,
+		normalizeToAIModel,
+		DEFAULT_AI_MODEL
 	} from '@stratiqai/dashboard-widget-sdk';
 	import JsonSchemaPickerModal from '$lib/components/schemas/JsonSchemaPickerModal.svelte';
 	import { Q_GET_JSON_SCHEMA } from '$lib/services/graphql/jsonSchemaOperations';
@@ -17,29 +18,8 @@
 
 	const log = createLogger('prompts');
 
-	const AIMODEL_VALUES: readonly string[] = [
-		'GEMINI_3_1_PRO_PREVIEW',
-		'GEMINI_3_1_FLASH_PREVIEW',
-		'GEMINI_3_PRO_PREVIEW',
-		'GEMINI_3_FLASH_PREVIEW',
-		'GEMINI_2_5_PRO',
-		'GEMINI_2_5_FLASH',
-		'GEMINI_2_5_FLASH_LITE'
-	];
-
-	const VALID_AI_MODELS = new Set<string>(AIMODEL_VALUES);
-	const DEFAULT_AI_MODEL: AiModel = 'GEMINI_3_1_FLASH_PREVIEW' as AiModel;
 	const DEFAULT_SYSTEM_PROMPT =
 		'You are a expert commercial real estate investor and broker that can evaluate documents and extract information';
-
-	function normalizeToAIModel(value: string | undefined): AiModel {
-		if (value && VALID_AI_MODELS.has(value)) return value as AiModel;
-		if (value === 'gemini-3.1-pro-preview') return 'GEMINI_3_1_PRO_PREVIEW' as AiModel;
-		if (value === 'gemini-3.1-flash-preview') return 'GEMINI_3_1_FLASH_PREVIEW' as AiModel;
-		if (value === 'gemini-3-flash-preview') return 'GEMINI_3_FLASH_PREVIEW';
-		if (value === 'gemini-3-pro-preview') return 'GEMINI_3_PRO_PREVIEW';
-		return DEFAULT_AI_MODEL;
-	}
 
 	let {
 		darkMode = false,

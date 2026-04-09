@@ -16,6 +16,7 @@
 		renameSchemaField,
 		buildSchemaPreview,
 		parseJsonSchemaToBuilderState,
+		MODEL_OPTIONS,
 		type SchemaBuilderState
 	} from './promptUtils.js';
 	import SchemaNodesEditor from './SchemaNodesEditor.svelte';
@@ -34,6 +35,8 @@
 		schemaProperties?: Record<string, Record<string, unknown>>;
 		schemaRequired?: string[];
 		fieldOrder?: string[];
+
+		hideResponseFormat?: boolean;
 
 		isGenerating?: boolean;
 		generateError?: string;
@@ -61,6 +64,7 @@
 		schemaProperties = $bindable({}),
 		schemaRequired = $bindable([]),
 		fieldOrder = $bindable([]),
+		hideResponseFormat = false,
 		isGenerating = false,
 		generateError = '',
 		isSaving = false,
@@ -159,7 +163,7 @@
 <div class="space-y-5">
 	<!-- Identity -->
 	<div class="space-y-3">
-		<div class="grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-3">
+		<div class="grid grid-cols-1 sm:grid-cols-[2fr_1fr_auto] gap-3">
 			<div>
 				<label for="pe-name" class={labelCls}>Name <span class="text-red-400">*</span></label>
 				<input id="pe-name" type="text" bind:value={promptName} placeholder="e.g. Property Location Details" class={inputCls} />
@@ -167,6 +171,14 @@
 			<div>
 				<label for="pe-desc" class={labelCls}>Description</label>
 				<input id="pe-desc" type="text" bind:value={promptDescription} placeholder="What this prompt does" class={inputCls} />
+			</div>
+			<div>
+				<label for="pe-model" class={labelCls}>Model</label>
+				<select id="pe-model" bind:value={model} class={inputCls}>
+					{#each MODEL_OPTIONS as opt (opt.value)}
+						<option value={opt.value}>{opt.label}</option>
+					{/each}
+				</select>
 			</div>
 		</div>
 	</div>
@@ -220,6 +232,7 @@
 	</div>
 
 	<!-- Response Format -->
+	{#if !hideResponseFormat}
 	<div>
 		<div class="flex items-center justify-between mb-3">
 			<div class="flex items-center gap-2.5">
@@ -419,6 +432,7 @@
 			{/if}
 		{/if}
 	</div>
+	{/if}
 
 	<!-- Advanced -->
 	<details class="group">
