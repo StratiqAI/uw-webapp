@@ -2,8 +2,10 @@
 	import type { Widget, WidgetAction } from '$lib/dashboard/types/widget';
 	import { themeStore } from '$lib/stores/themeStore.svelte';
 	import { getWidgetPromptConfig } from '$lib/dashboard/setup/widgetRegistry';
+	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
 
 	interface MenuRow {
+		kind: 'action';
 		action: WidgetAction;
 		label: string;
 		icon: string;
@@ -11,11 +13,21 @@
 		danger?: boolean;
 	}
 
+	interface SubMenuRow {
+		kind: 'submenu';
+		id: string;
+		label: string;
+		icon: string;
+	}
+
+	type MenuItem = MenuRow | SubMenuRow | { kind: 'divider' };
+
 	interface Props {
 		widget: Widget;
 		isFullscreen?: boolean;
 		lastRefreshedAt?: Date | null;
 		onAction: (action: WidgetAction) => void;
+		onMoveToDashboard?: (tabId: string) => void;
 		inTitleBar?: boolean;
 	}
 
@@ -24,6 +36,7 @@
 		isFullscreen = false,
 		lastRefreshedAt = null,
 		onAction,
+		onMoveToDashboard,
 		inTitleBar = false
 	}: Props = $props();
 
@@ -33,6 +46,16 @@
 	let dropdownEl = $state<HTMLElement>();
 	let buttonEl = $state<HTMLElement>();
 	let buttonRect = $state<DOMRect | null>(null);
+
+	// Submenu state
+	let submenuOpen = $state(false);
+	let submenuEl = $state<HTMLElement>();
+	let submenuAnchorRect = $state<DOMRect | null>(null);
+	let submenuCloseTimer: ReturnType<typeof setTimeout> | null = null;
+
+	const otherTabs = $derived(
+		dashboard.tabOrder.filter((t) => t.id !== dashboard.activeTabId)
+	);
 
 	const PORTAL_Z = 100070;
 
@@ -65,15 +88,18 @@
 			dropdownEl &&
 			buttonEl &&
 			!dropdownEl.contains(event.target as Node) &&
-			!buttonEl.contains(event.target as Node)
+			!buttonEl.contains(event.target as Node) &&
+			(!submenuEl || !submenuEl.contains(event.target as Node))
 		) {
 			isOpen = false;
+			submenuOpen = false;
 		}
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
 		if (isOpen && event.key === 'Escape') {
 			isOpen = false;
+			submenuOpen = false;
 		}
 	}
 
@@ -83,12 +109,35 @@
 			buttonRect = buttonEl.getBoundingClientRect();
 		}
 		isOpen = !isOpen;
+		if (!isOpen) submenuOpen = false;
 	}
 
 	function handleAction(action: WidgetAction, event: MouseEvent) {
 		event.stopPropagation();
 		onAction(action);
 		isOpen = false;
+		submenuOpen = false;
+	}
+
+	function openSubmenu(rowEl: HTMLElement) {
+		if (submenuCloseTimer) { clearTimeout(submenuCloseTimer); submenuCloseTimer = null; }
+		submenuAnchorRect = rowEl.getBoundingClientRect();
+		submenuOpen = true;
+	}
+
+	function scheduleSubmenuClose() {
+		submenuCloseTimer = setTimeout(() => { submenuOpen = false; submenuCloseTimer = null; }, 120);
+	}
+
+	function cancelSubmenuClose() {
+		if (submenuCloseTimer) { clearTimeout(submenuCloseTimer); submenuCloseTimer = null; }
+	}
+
+	function handleMoveToTab(tabId: string, event: MouseEvent) {
+		event.stopPropagation();
+		onMoveToDashboard?.(tabId);
+		isOpen = false;
+		submenuOpen = false;
 	}
 
 	function formatRefreshSubtext(at: Date | null): string {
@@ -124,7 +173,10 @@
 		export:
 			'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4',
 		delete:
-			'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'
+			'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16',
+		moveToDashboard:
+			'M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9',
+		chevronRight: 'M9 5l7 7-7 7'
 	} as const;
 
 	function hasDataRefresh(widget: Widget): boolean {
@@ -145,12 +197,14 @@
 	function buildMenuItems(
 		widget: Widget,
 		fullscreen: boolean,
-		refreshedAt: Date | null
-	): Array<MenuRow | { divider: true }> {
-		const items: Array<MenuRow | { divider: true }> = [];
+		refreshedAt: Date | null,
+		hasOtherTabs: boolean
+	): MenuItem[] {
+		const items: MenuItem[] = [];
 
 		if (hasDataRefresh(widget)) {
 			items.push({
+				kind: 'action',
 				action: 'refresh',
 				label: 'Refresh',
 				icon: ICONS.refresh,
@@ -159,12 +213,14 @@
 		}
 
 		items.push({
+			kind: 'action',
 			action: 'viewFullscreen',
 			label: fullscreen ? 'Exit full screen' : 'View in full screen',
 			icon: fullscreen ? ICONS.compress : ICONS.expand
 		});
 
 		items.push({
+			kind: 'action',
 			action: 'settings',
 			label: 'Settings',
 			icon: ICONS.settings
@@ -172,6 +228,7 @@
 
 		if (widget.type !== 'title' && getWidgetPromptConfig(widget.type)) {
 			items.push({
+				kind: 'action',
 				action: 'aiConfiguration',
 				label: 'AI Configuration',
 				icon: ICONS.aiConfig
@@ -180,21 +237,33 @@
 
 		if (hasDataRefresh(widget)) {
 			items.push({
+				kind: 'action',
 				action: 'exportData',
 				label: 'Export Data',
 				icon: ICONS.export
 			});
 		}
 
-		items.push({ divider: true });
+		if (hasOtherTabs) {
+			items.push({
+				kind: 'submenu',
+				id: 'moveToDashboard',
+				label: 'Move to Dashboard',
+				icon: ICONS.moveToDashboard
+			});
+		}
+
+		items.push({ kind: 'divider' });
 
 		items.push({
+			kind: 'action',
 			action: 'duplicate',
 			label: 'Duplicate',
 			icon: ICONS.duplicate
 		});
 
 		items.push({
+			kind: 'action',
 			action: 'remove',
 			label: 'Delete card',
 			icon: ICONS.delete,
@@ -204,13 +273,21 @@
 		return items;
 	}
 
-	let menuItems = $derived(buildMenuItems(widget, isFullscreen, lastRefreshedAt));
+	let menuItems = $derived(buildMenuItems(widget, isFullscreen, lastRefreshedAt, otherTabs.length > 0));
 
 	let dropdownStyle = $derived(
 		buttonRect
 			? `position:fixed;top:${buttonRect.top + buttonRect.height + 8}px;left:${Math.min(buttonRect.right - 256, window.innerWidth - 268)}px;z-index:${PORTAL_Z};`
 			: ''
 	);
+
+	let submenuStyle = $derived.by(() => {
+		if (!submenuAnchorRect) return '';
+		const menuRight = submenuAnchorRect.right;
+		const fitsRight = menuRight + 200 < window.innerWidth;
+		const left = fitsRight ? menuRight + 4 : submenuAnchorRect.left - 204;
+		return `position:fixed;top:${submenuAnchorRect.top - 4}px;left:${left}px;z-index:${PORTAL_Z + 1};`;
+	});
 </script>
 
 <svelte:window onkeydown={handleKeydown} onresize={updateButtonPosition} />
@@ -247,15 +324,41 @@
 			: 'border-slate-200 bg-white'}"
 		style={dropdownStyle}
 	>
-		{#each menuItems as item, i (('action' in item) ? item.action : `divider-${i}`)}
-			{#if 'divider' in item && item.divider}
+		{#each menuItems as item, i (item.kind === 'action' ? item.action : item.kind === 'submenu' ? item.id : `divider-${i}`)}
+			{#if item.kind === 'divider'}
 				<div
 					class="mx-2 my-2 border-t {darkMode ? 'border-slate-600/60' : 'border-slate-200'}"
 				></div>
-			{:else if 'action' in item}
+			{:else if item.kind === 'submenu'}
+				<button
+					type="button"
+					onmouseenter={(e) => openSubmenu(e.currentTarget as HTMLElement)}
+					onmouseleave={scheduleSubmenuClose}
+					onclick={(e) => { e.stopPropagation(); openSubmenu(e.currentTarget as HTMLElement); }}
+					class="menu-item mx-1 flex w-[calc(100%-0.5rem)] items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors {darkMode
+						? 'text-slate-100 hover:bg-slate-600/50'
+						: 'text-slate-800 hover:bg-slate-100'}"
+				>
+					<svg
+						class="menu-icon mt-0.5 h-[18px] w-[18px] shrink-0 {darkMode
+							? 'text-slate-400'
+							: 'text-slate-500'}"
+						fill="none"
+						stroke="currentColor"
+						viewBox="0 0 24 24"
+					>
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={item.icon}></path>
+					</svg>
+					<span class="min-w-0 flex-1 font-medium leading-tight">{item.label}</span>
+					<svg class="h-4 w-4 shrink-0 {darkMode ? 'text-slate-500' : 'text-slate-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={ICONS.chevronRight}></path>
+					</svg>
+				</button>
+			{:else if item.kind === 'action'}
 				<button
 					type="button"
 					onclick={(e) => handleAction(item.action, e)}
+					onmouseenter={() => { submenuOpen = false; }}
 					class="menu-item mx-1 flex w-[calc(100%-0.5rem)] items-start gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors {darkMode
 						? item.danger
 							? 'text-red-400 hover:bg-red-950/40 hover:text-red-300'
@@ -265,7 +368,7 @@
 							: 'text-slate-800 hover:bg-slate-100'}"
 				>
 					<svg
-						class="menu-icon mt-0.5 h-[18px] w-[18px] flex-shrink-0 {darkMode
+						class="menu-icon mt-0.5 h-[18px] w-[18px] shrink-0 {darkMode
 							? 'text-slate-400'
 							: 'text-slate-500'}"
 						fill="none"
@@ -293,6 +396,31 @@
 					</span>
 				</button>
 			{/if}
+		{/each}
+	</div>
+{/if}
+
+{#if isOpen && submenuOpen && submenuAnchorRect}
+	<div
+		use:portal
+		bind:this={submenuEl}
+		onmouseenter={cancelSubmenuClose}
+		onmouseleave={scheduleSubmenuClose}
+		class="dropdown-menu animate-in w-48 rounded-xl border py-2 shadow-2xl {darkMode
+			? 'border-slate-700/80 bg-[#2d2d30]'
+			: 'border-slate-200 bg-white'}"
+		style={submenuStyle}
+	>
+		{#each otherTabs as tab (tab.id)}
+			<button
+				type="button"
+				onclick={(e) => handleMoveToTab(tab.id, e)}
+				class="mx-1 flex w-[calc(100%-0.5rem)] items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors {darkMode
+					? 'text-slate-100 hover:bg-slate-600/50'
+					: 'text-slate-800 hover:bg-slate-100'}"
+			>
+				{tab.label}
+			</button>
 		{/each}
 	</div>
 {/if}

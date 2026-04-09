@@ -507,6 +507,67 @@ class DashboardStore {
 	}
 
 	/**
+	 * Move a widget from the active tab to a different tab.
+	 * The target tab's grid auto-expands if there is no free space.
+	 */
+	moveWidgetToTab(widgetId: string, targetTabId: DashboardTabId): boolean {
+		if (targetTabId === this.#activeTabId) return false;
+		if (!this.#tabSlices[targetTabId]) return false;
+
+		const widget = this.#widgets.find((w) => w.id === widgetId);
+		if (!widget) return false;
+
+		const widgetSnapshot = $state.snapshot(widget) as Widget;
+		const topic = resolveWidgetTopic(widgetSnapshot, this.#projectId);
+		const topicData = validatedTopicStore.at(topic);
+
+		this.removeWidget(widgetId);
+		this.#flushActiveTabIntoSlices();
+
+		const slice = structuredClone($state.snapshot(this.#tabSlices[targetTabId])) as TabDashboardSlice;
+		const { position, config } = this.#findPositionInSlice(slice, widgetSnapshot.colSpan, widgetSnapshot.rowSpan);
+
+		const movedWidget: Widget = { ...widgetSnapshot, gridColumn: position.gridColumn, gridRow: position.gridRow };
+		slice.widgets = [...slice.widgets, movedWidget];
+		slice.config = config;
+
+		if (topicData != null) {
+			slice.widgetData = { ...slice.widgetData, [topic]: structuredClone(topicData) };
+		}
+
+		this.#tabSlices = { ...$state.snapshot(this.#tabSlices) as Record<DashboardTabId, TabDashboardSlice>, [targetTabId]: slice };
+		this.#scheduleAutoSave();
+
+		return true;
+	}
+
+	/**
+	 * Add a new widget to a specific tab. If the target is the active tab,
+	 * delegates to `addWidget()`. Otherwise injects directly into the tab slice.
+	 * The target tab's grid auto-expands if there is no free space.
+	 */
+	addWidgetToTab(widget: Widget, targetTabId: DashboardTabId): boolean {
+		if (targetTabId === this.#activeTabId) {
+			return this.addWidget(widget);
+		}
+		if (!this.#tabSlices[targetTabId]) return false;
+
+		this.#flushActiveTabIntoSlices();
+
+		const slice = structuredClone($state.snapshot(this.#tabSlices[targetTabId])) as TabDashboardSlice;
+		const { position, config } = this.#findPositionInSlice(slice, widget.colSpan, widget.rowSpan);
+
+		const placed: Widget = { ...widget, gridColumn: position.gridColumn, gridRow: position.gridRow };
+		slice.widgets = [...slice.widgets, placed];
+		slice.config = config;
+
+		this.#tabSlices = { ...$state.snapshot(this.#tabSlices) as Record<DashboardTabId, TabDashboardSlice>, [targetTabId]: slice };
+		this.#scheduleAutoSave();
+
+		return true;
+	}
+
+	/**
 	 * Ensures widgets from app config exist on a tab (default: Market). Safe when that tab is not active.
 	 */
 	mergeMissingWidgetsFromConfig(tabId: DashboardTabId, configWidgets: Widget[]): void {
@@ -1151,6 +1212,27 @@ class DashboardStore {
 		this.#hasUnsavedChanges = true;
 	}
 	
+	#findPositionInSlice(
+		slice: TabDashboardSlice,
+		colSpan: number,
+		rowSpan: number
+	): { position: Position; config: DashboardConfig } {
+		let position = findAvailablePosition(colSpan, rowSpan, slice.config.gridColumns, slice.config.gridRows, slice.widgets);
+		if (position) return { position, config: slice.config };
+
+		const maxRow = slice.widgets.reduce((m, w) => Math.max(m, w.gridRow + w.rowSpan - 1), 0);
+		const expandedRows = maxRow + rowSpan + GRID_BUFFER_ROWS;
+		const expandedConfig = { ...slice.config, gridRows: expandedRows };
+
+		position = findAvailablePosition(colSpan, rowSpan, expandedConfig.gridColumns, expandedRows, slice.widgets);
+		if (position) return { position, config: expandedConfig };
+
+		return {
+			position: { gridColumn: 1, gridRow: maxRow + 1 },
+			config: { ...expandedConfig, gridRows: maxRow + 1 + rowSpan + GRID_BUFFER_ROWS }
+		};
+	}
+
 	#autoExpandGrid(widget: GridPosition): boolean {
 		const requiredRows = widget.gridRow + widget.rowSpan - 1;
 		const requiredColumns = widget.gridColumn + widget.colSpan - 1;

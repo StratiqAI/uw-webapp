@@ -16,6 +16,7 @@
 	import { resolveWidgetComponent } from '$lib/dashboard/setup/widgetTypeMap';
 	import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
 	import { themeStore } from '$lib/stores/themeStore.svelte';
+	import { toastStore } from '$lib/stores/toastStore.svelte';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { setConfigureTab, WidgetConfigureBack } from '@stratiqai/dashboard-widget-sdk';
 	import { useExtraction } from '$lib/hooks/useExtraction.svelte';
@@ -167,6 +168,14 @@
 			case 'remove':
 				removeConfirmOpen = true;
 				break;
+		}
+	}
+
+	function handleMoveToDashboard(tabId: string) {
+		const targetTab = dashboard.tabOrder.find((t) => t.id === tabId);
+		const ok = dashboard.moveWidgetToTab(widget.id, tabId);
+		if (ok) {
+			toastStore.success(`Moved to ${targetTab?.label ?? 'dashboard'}`);
 		}
 	}
 
@@ -326,6 +335,7 @@
 			{titleBarAiConnection}
 			{aiStatusDotClass}
 			onAction={handleWidgetAction}
+			onMoveToDashboard={handleMoveToDashboard}
 		/>
 
 		<!-- Widget Body -->

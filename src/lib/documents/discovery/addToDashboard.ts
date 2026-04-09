@@ -7,32 +7,17 @@ import { findAvailablePosition } from '$lib/dashboard/utils/grid';
 import { createWidgetPublisher } from '$lib/dashboard/utils/widgetPublisher';
 import { toastStore } from '$lib/stores/toastStore.svelte';
 
-function buildWidget(
+function makeWidget(
 	type: string,
 	data: Record<string, unknown>,
 	size: { colSpan: number; rowSpan: number },
 	title?: string
-): Widget | null {
-	const widgetId = generateWidgetId();
-	const config = dashboard.config;
-
-	const position = findAvailablePosition(
-		size.colSpan,
-		size.rowSpan,
-		config.gridColumns,
-		config.gridRows,
-		dashboard.widgets
-	);
-
-	if (!position) {
-		return null;
-	}
-
+): Widget {
 	return {
-		id: widgetId,
+		id: generateWidgetId(),
 		type,
-		gridColumn: position.gridColumn,
-		gridRow: position.gridRow,
+		gridColumn: 1,
+		gridRow: 1,
 		colSpan: size.colSpan,
 		rowSpan: size.rowSpan,
 		minWidth: 1,
@@ -42,10 +27,25 @@ function buildWidget(
 	} as Widget;
 }
 
-function addAndPublish(widget: Widget | null): boolean {
-	if (!widget) return false;
+function addAndPublish(widget: Widget, targetTabId?: string): boolean {
+	let success: boolean;
 
-	const success = dashboard.addWidget(widget);
+	if (targetTabId && targetTabId !== dashboard.activeTabId) {
+		success = dashboard.addWidgetToTab(widget, targetTabId);
+	} else {
+		const position = findAvailablePosition(
+			widget.colSpan,
+			widget.rowSpan,
+			dashboard.config.gridColumns,
+			dashboard.config.gridRows,
+			dashboard.widgets
+		);
+		if (position) {
+			widget = { ...widget, gridColumn: position.gridColumn, gridRow: position.gridRow };
+		}
+		success = dashboard.addWidget(widget);
+	}
+
 	if (success) {
 		try {
 			const publisher = createWidgetPublisher(widget.type, widget.id, 'entity-to-dashboard');
@@ -57,22 +57,28 @@ function addAndPublish(widget: Widget | null): boolean {
 	return success;
 }
 
-export function addTextToDashboard(text: Text, projectId: string): boolean {
+function tabLabel(tabId?: string): string {
+	if (!tabId || tabId === dashboard.activeTabId) return 'dashboard';
+	const tab = dashboard.tabOrder.find((t) => t.id === tabId);
+	return tab?.label ?? 'dashboard';
+}
+
+export function addTextToDashboard(text: Text, projectId: string, targetTabId?: string): boolean {
 	const pageLabel = text.pageNum ? `Page ${text.pageNum}` : 'Text Block';
-	const widget = buildWidget(
+	const widget = makeWidget(
 		'simpleParagraph',
 		{ title: pageLabel, description: '', content: text.text ?? '' },
 		{ colSpan: 6, rowSpan: 3 },
 		pageLabel
 	);
-	const ok = addAndPublish(widget);
-	if (ok) toastStore.success('Added text block to dashboard');
+	const ok = addAndPublish(widget, targetTabId);
+	if (ok) toastStore.success(`Added text block to ${tabLabel(targetTabId)}`);
 	return ok;
 }
 
-export function addTableToDashboard(table: Table, projectId: string): boolean {
+export function addTableToDashboard(table: Table, projectId: string, targetTabId?: string): boolean {
 	const pageLabel = table.pageNum ? `Table – Page ${table.pageNum}` : 'Table';
-	const widget = buildWidget(
+	const widget = makeWidget(
 		'table',
 		{
 			title: pageLabel,
@@ -86,19 +92,19 @@ export function addTableToDashboard(table: Table, projectId: string): boolean {
 		{ colSpan: 6, rowSpan: 4 },
 		pageLabel
 	);
-	const ok = addAndPublish(widget);
-	if (ok) toastStore.success('Added table to dashboard');
+	const ok = addAndPublish(widget, targetTabId);
+	if (ok) toastStore.success(`Added table to ${tabLabel(targetTabId)}`);
 	return ok;
 }
 
-export function addExtractedTableToDashboard(table: ExtractedTable, projectId: string): boolean {
+export function addExtractedTableToDashboard(table: ExtractedTable, projectId: string, targetTabId?: string): boolean {
 	const pageLabel = table.pageNum ? `Table – Page ${table.pageNum}` : 'Extracted Table';
 	const columns = table.headers.map((h) => ({ key: h, label: h }));
 	const rows = table.rows.map((row) =>
 		Object.fromEntries(table.headers.map((h, i) => [h, row[i] ?? '']))
 	);
 
-	const widget = buildWidget(
+	const widget = makeWidget(
 		'table',
 		{
 			title: pageLabel,
@@ -112,19 +118,19 @@ export function addExtractedTableToDashboard(table: ExtractedTable, projectId: s
 		{ colSpan: 6, rowSpan: 4 },
 		pageLabel
 	);
-	const ok = addAndPublish(widget);
-	if (ok) toastStore.success('Added table to dashboard');
+	const ok = addAndPublish(widget, targetTabId);
+	if (ok) toastStore.success(`Added table to ${tabLabel(targetTabId)}`);
 	return ok;
 }
 
-export function addImageToDashboard(image: Image, projectId: string): boolean {
+export function addImageToDashboard(image: Image, projectId: string, targetTabId?: string): boolean {
 	const pageLabel = image.pageNum ? `Image – Page ${image.pageNum}` : 'Document Image';
 	const src =
 		image.s3Bucket && image.s3Key
 			? `https://${image.s3Bucket}.s3.us-west-2.amazonaws.com/${image.s3Key}`
 			: '';
 
-	const widget = buildWidget(
+	const widget = makeWidget(
 		'image',
 		{
 			src,
@@ -134,8 +140,8 @@ export function addImageToDashboard(image: Image, projectId: string): boolean {
 		{ colSpan: 4, rowSpan: 4 },
 		pageLabel
 	);
-	const ok = addAndPublish(widget);
-	if (ok) toastStore.success('Added image to dashboard');
+	const ok = addAndPublish(widget, targetTabId);
+	if (ok) toastStore.success(`Added image to ${tabLabel(targetTabId)}`);
 	return ok;
 }
 
@@ -146,7 +152,7 @@ export function addAllTextsToDashboard(texts: Text[], projectId: string, exclude
 	let count = 0;
 	for (const text of included) {
 		const pageLabel = text.pageNum ? `Page ${text.pageNum}` : 'Text Block';
-		const widget = buildWidget(
+		const widget = makeWidget(
 			'simpleParagraph',
 			{ title: pageLabel, description: '', content: text.text ?? '' },
 			{ colSpan: 6, rowSpan: 3 },
@@ -169,7 +175,7 @@ export function addAllTablesToDashboard(
 	const includedTables = excludedIds ? tables.filter((t) => !excludedIds.has(t.id)) : tables;
 	for (const table of includedTables) {
 		const pageLabel = table.pageNum ? `Table – Page ${table.pageNum}` : 'Table';
-		const widget = buildWidget(
+		const widget = makeWidget(
 			'table',
 			{
 				title: pageLabel,
@@ -192,7 +198,7 @@ export function addAllTablesToDashboard(
 		const rows = table.rows.map((row) =>
 			Object.fromEntries(table.headers.map((h, i) => [h, row[i] ?? '']))
 		);
-		const widget = buildWidget(
+		const widget = makeWidget(
 			'table',
 			{ title: pageLabel, columns, rows, sortable: true, paginated: true, pageSize: 10, searchable: true },
 			{ colSpan: 6, rowSpan: 4 },
@@ -214,7 +220,7 @@ export function addAllImagesToDashboard(images: Image[], projectId: string, excl
 			image.s3Bucket && image.s3Key
 				? `https://${image.s3Bucket}.s3.us-west-2.amazonaws.com/${image.s3Key}`
 				: '';
-		const widget = buildWidget(
+		const widget = makeWidget(
 			'image',
 			{ src, alt: pageLabel, objectFit: 'contain' },
 			{ colSpan: 4, rowSpan: 4 },

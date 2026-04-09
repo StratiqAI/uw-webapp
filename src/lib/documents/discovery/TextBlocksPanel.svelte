@@ -2,6 +2,7 @@
 	import type { Text } from './types';
 	import { containsMarkdownTable } from './markdownTableParser';
 	import { addTextToDashboard } from './addToDashboard';
+	import SendToDashboardButton from './SendToDashboardButton.svelte';
 
 	const {
 		texts,
@@ -49,15 +50,13 @@
 						<div class="{darkMode ? 'text-slate-300' : 'text-slate-700'} text-sm leading-relaxed {fullscreen ? 'max-h-48 overflow-y-auto' : ''} whitespace-pre-wrap">
 							{text.text || 'No text content'}
 						</div>
-						<button
-							onclick={() => addTextToDashboard(text, projectId)}
-							class="flex items-center gap-1.5 mt-2 text-xs font-medium transition-colors {darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'}"
-						>
-							<span>Send to Dashboard</span>
-							<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-							</svg>
-						</button>
+						<div class="mt-2">
+							<SendToDashboardButton
+								{darkMode}
+								colorClasses={darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'}
+								onSend={(tabId) => addTextToDashboard(text, projectId, tabId)}
+							/>
+						</div>
 					</div>
 				</div>
 			</div>

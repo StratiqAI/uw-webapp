@@ -24,8 +24,7 @@
 		{ label: 'Documents', segment: 'docs' },
 		{ label: 'Dashboard', segment: 'dashboard' },
 		{ label: 'Deal Room', segment: 'dealroom' },
-		{ label: 'Prompts', segment: 'prompts' },
-		{ label: 'Workflows', segment: 'workflows' }
+		{ label: 'Prompts', segment: 'prompts' }
 	];
 
 	const statusColors: Record<string, { bg: string; text: string; darkBg: string; darkText: string }> = {

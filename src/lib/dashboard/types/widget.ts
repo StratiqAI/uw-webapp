@@ -106,7 +106,8 @@ export type WidgetAction =
 	| 'settings'
 	| 'remove'
 	| 'viewFullscreen'
-	| 'aiConfiguration';
+	| 'aiConfiguration'
+	| 'moveToDashboard';
 
 export interface TableWidget extends BaseWidget {
 	type: 'table';

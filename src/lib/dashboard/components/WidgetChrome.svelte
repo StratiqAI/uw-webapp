@@ -14,6 +14,7 @@
 		titleBarAiConnection: AiConnectionState | null;
 		aiStatusDotClass: string;
 		onAction: (action: WidgetAction) => void;
+		onMoveToDashboard?: (tabId: string) => void;
 	}
 
 	let {
@@ -26,7 +27,8 @@
 		lastRefreshedAt,
 		titleBarAiConnection,
 		aiStatusDotClass,
-		onAction
+		onAction,
+		onMoveToDashboard
 	}: Props = $props();
 </script>
 
@@ -79,6 +81,7 @@
 				{lastRefreshedAt}
 				inTitleBar
 				onAction={onAction}
+				{onMoveToDashboard}
 			/>
 		</div>
 	</div>
@@ -90,6 +93,7 @@
 		isFullscreen={isWidgetFullscreen}
 		{lastRefreshedAt}
 		onAction={onAction}
+		{onMoveToDashboard}
 	/>
 {/if}
 
