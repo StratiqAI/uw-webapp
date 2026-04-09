@@ -38,7 +38,17 @@
 		tableAgent: { name: 'Table Agent', color: 'green' as const, initial: 'A' },
 		visionAgent: { name: 'Vision Agent', color: 'purple' as const, initial: 'V' },
 		scannerAgent: { name: 'Scanner Agent', color: 'indigo' as const, initial: 'S' },
-		classifierAgent: { name: 'Classifier Agent', color: 'amber' as const, initial: 'C' }
+		classifierAgent: { name: 'Classifier Agent', color: 'amber' as const, initial: 'C' },
+		documentAgent: { name: 'Document Agent', color: 'blue' as const, initial: 'D' }
+	};
+
+	const AGENT_NAME_MAP: Record<string, keyof typeof AGENTS> = {
+		'Scanner Agent': 'scannerAgent',
+		'Document Agent': 'documentAgent',
+		'Text Agent': 'textAgent',
+		'Table Agent': 'tableAgent',
+		'Vision Agent': 'visionAgent',
+		'Classifier Agent': 'classifierAgent',
 	};
 
 	const TEXT_MESSAGES_SINGLE = [
@@ -139,26 +149,29 @@
 		} catch { return null; }
 	}
 
-	function agentForEventType(eventType: string | null): (typeof AGENTS)[keyof typeof AGENTS] | null {
+	function resolveAgent(notif: Notification): (typeof AGENTS)[keyof typeof AGENTS] {
+		const agentName = (notif as Record<string, unknown>).agent as string | undefined;
+		if (agentName) {
+			const key = AGENT_NAME_MAP[agentName];
+			if (key) return AGENTS[key];
+		}
+		const eventType = parseEventType(notif);
 		if (!eventType) return AGENTS.scannerAgent;
 		switch (eventType) {
 			case 'Complete':
 			case 'Classified':
 				return AGENTS.classifierAgent;
-			case 'AnalysisStarted':
-			case 'PageAnalysisStarted':
-			case 'PageAnalysisComplete':
-				return AGENTS.scannerAgent;
 			default:
 				return AGENTS.scannerAgent;
 		}
 	}
 
 	function notificationToEntry(notif: Notification, isHistorical: boolean): AgentFeedEntry | null {
-		const eventType = parseEventType(notif);
-		const agent = agentForEventType(eventType);
-		if (!agent) return null;
+		const shouldDisplay = (notif as any).displayInAgentActivityFeed;
+		if (shouldDisplay === false) return null;
 
+		const agent = resolveAgent(notif);
+		const eventType = parseEventType(notif);
 		const message = notif.message || defaultMessageForEventType(eventType);
 		if (!message) return null;
 
@@ -452,7 +465,17 @@
 
 	<!-- Feed -->
 	<div class="flex-1 overflow-y-auto">
-		{#if feedEntries.length === 0}
+		{#if notificationStore.loading && feedEntries.length === 0}
+			<div class="flex flex-col items-center justify-center h-full px-4 py-8 text-center">
+				<svg class="animate-spin h-6 w-6 {darkMode ? 'text-indigo-400' : 'text-indigo-500'} mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+					<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+				</svg>
+				<p class="text-xs font-medium {darkMode ? 'text-slate-400' : 'text-slate-500'}">
+					Loading agent activity...
+				</p>
+			</div>
+		{:else if feedEntries.length === 0}
 			<div class="flex flex-col items-center justify-center h-full px-4 py-8 text-center">
 				<div class="relative mb-3">
 					<div class="flex -space-x-2">

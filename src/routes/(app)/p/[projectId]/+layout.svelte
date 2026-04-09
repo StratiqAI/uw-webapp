@@ -7,7 +7,7 @@
 	import type { LayoutProps } from './$types';
 	import { ProjectSyncManager, store } from '$lib/services/realtime/websocket/projectSync';
 	import { addSubscription, removeSubscription } from '$lib/stores/appSyncClientStore';
-	import { notificationStore, S_ON_CREATE_NOTIFICATION, type Notification } from '$lib/stores/notifications.svelte';
+	import { notificationStore, S_ON_CREATE_NOTIFICATION, Q_LIST_NOTIFICATIONS, type Notification } from '$lib/stores/notifications.svelte';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import { ui } from '$lib/stores/ui.svelte';
 	import type { Project } from '@stratiqai/types-simple';
@@ -110,6 +110,24 @@
 		return () => {
 			removeSubscription(spec);
 		};
+	});
+
+	$effect(() => {
+		if (!browser || !idToken || !projectId) return;
+
+		notificationStore.setLoading(true);
+		const qc = new GraphQLQueryClient(idToken);
+		qc.query(Q_LIST_NOTIFICATIONS, { parentId: projectId })
+			.then((result: any) => {
+				const items: Notification[] = result?.listNotifications?.items ?? [];
+				notificationStore.addNotifications(items);
+			})
+			.catch((err: unknown) => {
+				log.error('Failed to load historical notifications', err);
+			})
+			.finally(() => {
+				notificationStore.setLoading(false);
+			});
 	});
 
 	$effect(() => {

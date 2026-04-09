@@ -70,7 +70,7 @@
 		"@flowbite-svelte-plugins/chart": "^0.2.4",
 		"@google/generative-ai": "^0.24.1",
 		"@stratiqai/aws-utils": "^1.0.37",
-		"@stratiqai/types-simple": "^1.0.86",
+		"@stratiqai/types-simple": "^1.0.87",
 		"@supabase/ssr": "^0.9.0",
 		"@supabase/supabase-js": "^2.100.0",
 		"@turf/turf": "^7.2.0",
