@@ -25,8 +25,12 @@ export declare const mapbox3dModelSchema: z.ZodObject<{
     castShadows?: boolean | undefined;
 }>;
 export type Mapbox3dModel = z.infer<typeof mapbox3dModelSchema>;
+export declare const addressModeSchema: z.ZodDefault<z.ZodEnum<["manual", "ai"]>>;
+export type AddressMode = z.infer<typeof addressModeSchema>;
 export declare const mapbox3dConfigSchema: z.ZodObject<{
     accessToken: z.ZodString;
+    addressMode: z.ZodOptional<z.ZodDefault<z.ZodEnum<["manual", "ai"]>>>;
+    address: z.ZodOptional<z.ZodString>;
     center: z.ZodTuple<[z.ZodNumber, z.ZodNumber], null>;
     zoom: z.ZodNumber;
     pitch: z.ZodOptional<z.ZodNumber>;
@@ -65,6 +69,8 @@ export declare const mapbox3dConfigSchema: z.ZodObject<{
     accessToken: string;
     center: [number, number];
     zoom: number;
+    addressMode?: "manual" | "ai" | undefined;
+    address?: string | undefined;
     pitch?: number | undefined;
     bearing?: number | undefined;
     minZoom?: number | undefined;
@@ -85,6 +91,8 @@ export declare const mapbox3dConfigSchema: z.ZodObject<{
     accessToken: string;
     center: [number, number];
     zoom: number;
+    addressMode?: "manual" | "ai" | undefined;
+    address?: string | undefined;
     pitch?: number | undefined;
     bearing?: number | undefined;
     minZoom?: number | undefined;
@@ -104,16 +112,19 @@ export declare const mapbox3dConfigSchema: z.ZodObject<{
 }>;
 export type Mapbox3dConfig = z.infer<typeof mapbox3dConfigSchema>;
 export declare const mapbox3dAiOutputSchema: z.ZodObject<{
+    address: z.ZodString;
     center: z.ZodTuple<[z.ZodNumber, z.ZodNumber], null>;
     zoom: z.ZodNumber;
     pitch: z.ZodOptional<z.ZodNumber>;
     bearing: z.ZodOptional<z.ZodNumber>;
 }, "strip", z.ZodTypeAny, {
+    address: string;
     center: [number, number];
     zoom: number;
     pitch?: number | undefined;
     bearing?: number | undefined;
 }, {
+    address: string;
     center: [number, number];
     zoom: number;
     pitch?: number | undefined;

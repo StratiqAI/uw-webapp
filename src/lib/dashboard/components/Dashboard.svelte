@@ -287,6 +287,9 @@
 					schemaDef = zodToJsonSchema(zodSchema, { $refStrategy: 'none' });
 				}
 			}
+			// #region agent log
+			fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'986080'},body:JSON.stringify({sessionId:'986080',location:'Dashboard.svelte:schemaDef',message:'Schema sent to extraction',data:{kind,schemaDef,schemaStr:schemaDef?JSON.stringify(schemaDef):null},timestamp:Date.now(),hypothesisId:'H-A,H-B,H-C'})}).catch(()=>{});
+			// #endregion
 			const documentIds = await getProjectDocumentIds();
 
 			const extraction = await createExtraction(

@@ -1,9 +1,12 @@
 import { type StandardWidgetProps } from '@stratiqai/dashboard-widget-sdk';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import '@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css';
 declare const Mapbox3dWidget: import("svelte").Component<StandardWidgetProps<{
     accessToken: string;
     center: [number, number];
     zoom: number;
+    addressMode?: "manual" | "ai" | undefined;
+    address?: string | undefined;
     pitch?: number | undefined;
     bearing?: number | undefined;
     minZoom?: number | undefined;
