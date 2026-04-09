@@ -31,7 +31,7 @@
 	let widgetData = $derived<unknown>(dataStream.current || data.data || {});
 
 	const configure = useWidgetConfigure<SchemaWidgetData>({
-		widgetId,
+		widgetId: () => widgetId,
 		data: () => data,
 		get onUpdateConfig() { return onUpdateConfig; },
 		get onConfigureReady() { return onConfigureReady; }

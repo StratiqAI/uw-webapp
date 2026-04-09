@@ -28,7 +28,7 @@
 	let widgetData = $derived<TitleWidgetData>(dataStream.current || data);
 
 	const configure = useWidgetConfigure<TitleWidgetData>({
-		widgetId,
+		widgetId: () => widgetId,
 		data: () => widgetData,
 		get onUpdateConfig() {
 			return onUpdateConfig;

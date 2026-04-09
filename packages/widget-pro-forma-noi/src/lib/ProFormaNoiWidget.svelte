@@ -68,7 +68,7 @@
 	}
 
 	const configure = useWidgetConfigure<ProFormaNoiConfig>({
-		widgetId,
+		widgetId: () => widgetId,
 		data: () => widgetData,
 		onUpdateConfig: (d) => onUpdateConfig?.(d),
 		onConfigureReady: (fn) => onConfigureReady?.(fn)

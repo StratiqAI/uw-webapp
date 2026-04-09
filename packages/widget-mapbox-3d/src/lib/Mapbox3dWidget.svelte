@@ -63,7 +63,7 @@
 	});
 
 	const configure = useWidgetConfigure<Mapbox3dConfig>({
-		widgetId,
+		widgetId: () => widgetId,
 		data: () => cfg,
 		onUpdateConfig: (d) => onUpdateConfig?.(d),
 		onConfigureReady: (fn) => onConfigureReady?.(fn)

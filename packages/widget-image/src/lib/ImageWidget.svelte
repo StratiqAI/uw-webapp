@@ -29,7 +29,7 @@
 	let widgetData = $derived<ImageWidgetData>(dataStream.current || data);
 
 	const configure = useWidgetConfigure<ImageWidgetData>({
-		widgetId,
+		widgetId: () => widgetId,
 		data: () => widgetData,
 		get onUpdateConfig() { return onUpdateConfig; },
 		get onConfigureReady() { return onConfigureReady; }

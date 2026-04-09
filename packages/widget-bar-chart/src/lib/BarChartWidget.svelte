@@ -36,7 +36,7 @@
 	);
 
 	const configure = useWidgetConfigure<BarChartWidgetData>({
-		widgetId,
+		widgetId: () => widgetId,
 		data: () => widgetData,
 		get onUpdateConfig() { return onUpdateConfig; },
 		get onConfigureReady() { return onConfigureReady; }
