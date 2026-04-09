@@ -31,6 +31,7 @@
 	let widgetData = $derived<BrokerCardWidgetData>(dataStream.current || data);
 
 	const configure = useWidgetConfigure<BrokerCardWidgetData>({
+		widgetId,
 		data: () => widgetData,
 		onUpdateConfig: (d) => onUpdateConfig?.(d),
 		onConfigureReady: (fn) => onConfigureReady?.(fn)

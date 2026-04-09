@@ -91,6 +91,7 @@
 	}
 
 	const configure = useWidgetConfigure<ProFormaLeveredReturnsConfig>({
+		widgetId,
 		data: () => widgetData,
 		onUpdateConfig: (d) => onUpdateConfig?.(d),
 		onConfigureReady: (fn) => onConfigureReady?.(fn)

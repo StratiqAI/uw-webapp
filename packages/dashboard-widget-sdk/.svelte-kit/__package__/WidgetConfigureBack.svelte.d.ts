@@ -8,6 +8,8 @@ interface Props {
     topicOverride?: string;
     schemaId?: string;
     showAITab?: boolean;
+    showDataSources?: boolean;
+    showExternalData?: boolean;
     externalData?: {
         isLoading: boolean;
         error: string | null;

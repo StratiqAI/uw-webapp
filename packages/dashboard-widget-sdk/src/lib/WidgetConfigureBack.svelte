@@ -13,6 +13,8 @@
 		topicOverride?: string;
 		schemaId?: string;
 		showAITab?: boolean;
+		showDataSources?: boolean;
+		showExternalData?: boolean;
 		externalData?: { isLoading: boolean; error: string | null; refresh?: () => void };
 		onApply: () => void;
 		onCancel: () => void;
@@ -29,6 +31,8 @@
 		topicOverride,
 		schemaId,
 		showAITab = false,
+		showDataSources = true,
+		showExternalData = true,
 		externalData,
 		onApply,
 		onCancel,
@@ -432,6 +436,7 @@
 				</section>
 			{/if}
 
+			{#if showDataSources}
 			<section class="space-y-3 border-b pb-4 {sectionBorder}">
 				<h4 class={sectionTitle}>Data Sources</h4>
 
@@ -513,8 +518,9 @@
 					</div>
 				{/if}
 			</section>
+			{/if}
 
-			{#if hasServices || externalData}
+			{#if showExternalData && (hasServices || externalData)}
 				<section class="space-y-3 pb-2">
 					<h4 class={sectionTitle}>External Data</h4>
 

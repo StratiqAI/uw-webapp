@@ -34,6 +34,7 @@
 	});
 
 	const configure = useWidgetConfigure({
+		widgetId,
 		data: () => cfg,
 		onUpdateConfig: (d) => onUpdateConfig?.(d),
 		onConfigureReady: (fn) => onConfigureReady?.(fn)

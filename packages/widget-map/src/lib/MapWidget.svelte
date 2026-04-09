@@ -83,6 +83,7 @@
 	let widgetData = $derived<MapWidgetData>(dataStream.current || data);
 
 	const configure = useWidgetConfigure<MapWidgetData>({
+		widgetId,
 		data: () => widgetData,
 		get onUpdateConfig() { return onUpdateConfig; },
 		get onConfigureReady() { return onConfigureReady; }

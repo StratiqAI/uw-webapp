@@ -35,7 +35,6 @@ import { heatmapWidgetDataSchema as HeatmapWidgetDataSchema } from '@stratiqai/w
 import { divergingBarChartWidgetDataSchema as DivergingBarChartWidgetDataSchema } from '@stratiqai/widget-diverging-bar-chart';
 import { mapWidgetDataSchema as MapWidgetDataSchema } from '@stratiqai/widget-map';
 import { schemaWidgetDataSchema as SchemaWidgetDataSchema } from '@stratiqai/widget-schema';
-import { locationQuotientWidgetDataSchema as LocationQuotientWidgetDataSchema } from '@stratiqai/widget-location-quotient';
 import { createLogger } from '$lib/utils/logger';
 
 const log = createLogger('widgets');
@@ -78,8 +77,7 @@ export {
 	JsonViewerWidgetDataSchema,
 	BrokerCardWidgetDataSchema,
 	MapWidgetDataSchema,
-	SchemaWidgetDataSchema,
-	LocationQuotientWidgetDataSchema
+	SchemaWidgetDataSchema
 };
 
 // ===== Schema Registry =====
@@ -100,7 +98,6 @@ export const WidgetDataSchemas = {
 	metric: MetricWidgetDataSchema,
 	map: MapWidgetDataSchema,
 	schema: SchemaWidgetDataSchema,
-	locationQuotient: LocationQuotientWidgetDataSchema,
 	jsonViewer: JsonViewerWidgetDataSchema,
 	brokerCard: BrokerCardWidgetDataSchema,
 	lqAnalysis: LqAnalysisConfigSchema,
@@ -138,7 +135,6 @@ export type { HeatmapWidgetData } from '@stratiqai/widget-heatmap';
 export type { DivergingBarChartWidgetData } from '@stratiqai/widget-diverging-bar-chart';
 export type { MapWidgetData } from '@stratiqai/widget-map';
 export type { SchemaWidgetData } from '@stratiqai/widget-schema';
-export type { LocationQuotientWidgetData } from '@stratiqai/widget-location-quotient';
 export type LqAnalysisWidgetData = z.infer<typeof LqAnalysisConfigSchema>;
 export type EconBaseMultiplierWidgetData = z.infer<typeof EconBaseMultiplierConfigSchema>;
 export type IndustryTrendScorecardWidgetData = z.infer<typeof IndustryTrendScorecardConfigSchema>;
@@ -162,7 +158,6 @@ export type WidgetData =
 	| MetricWidgetData
 	| MapWidgetData
 	| SchemaWidgetData
-	| LocationQuotientWidgetData
 	| JsonViewerWidgetData
 	| BrokerCardWidgetData
 	| LqAnalysisWidgetData
@@ -189,7 +184,6 @@ export interface WidgetDataTypeMap {
 	metric: MetricWidgetData;
 	map: MapWidgetData;
 	schema: SchemaWidgetData;
-	locationQuotient: LocationQuotientWidgetData;
 	jsonViewer: JsonViewerWidgetData;
 	brokerCard: BrokerCardWidgetData;
 	lqAnalysis: LqAnalysisConfig;
@@ -597,13 +591,6 @@ export const WidgetChannels = {
 		widgetType: 'map',
 		schema: MapWidgetDataSchema,
 		description: description || `Map channel: ${channelId}`
-	}),
-
-	locationQuotient: (channelId: string, description?: string): WidgetChannelConfig<'locationQuotient'> => ({
-		channelId,
-		widgetType: 'locationQuotient',
-		schema: LocationQuotientWidgetDataSchema,
-		description: description || `Location quotient channel: ${channelId}`
 	}),
 
 	jsonViewer: (channelId: string, description?: string): WidgetChannelConfig<'jsonViewer'> => ({

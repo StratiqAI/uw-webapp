@@ -24,8 +24,6 @@
 
 	const log = createLogger('dashboard');
 
-	const DEFAULT_LQ_MENU_SIGNALS = { refresh: 0, exportRequest: 0 };
-
 	let titleBarAiConnection = $state<AiConnectionState | null>(null);
 
 	setContext<WidgetTitleBarContext>(WIDGET_TITLE_BAR_CONTEXT, {
@@ -45,7 +43,6 @@
 	const darkMode = $derived(themeStore.darkMode);
 
 	let showHostConfigure = $state(false);
-	let lqMenuSignals = $state<Record<string, { refresh: number; exportRequest: number }>>({});
 	let removeConfirmOpen = $state(false);
 	let lastRefreshedAt = $state<Date | null>(null);
 
@@ -117,16 +114,6 @@
 		})
 	);
 	
-	function bumpLqRefresh(id: string) {
-		const cur = lqMenuSignals[id] ?? { refresh: 0, exportRequest: 0 };
-		lqMenuSignals = { ...lqMenuSignals, [id]: { ...cur, refresh: cur.refresh + 1 } };
-	}
-
-	function bumpLqExport(id: string) {
-		const cur = lqMenuSignals[id] ?? { refresh: 0, exportRequest: 0 };
-		lqMenuSignals = { ...lqMenuSignals, [id]: { ...cur, exportRequest: cur.exportRequest + 1 } };
-	}
-
 	function handleWidgetAction(action: WidgetAction) {
 		switch (action) {
 		case 'aiConfiguration':
@@ -160,9 +147,6 @@
 				if (ResolvedComp) {
 					registeredRefreshCounter++;
 				}
-				if (widget.type === 'locationQuotient') {
-					bumpLqRefresh(widget.id);
-				}
 				refreshWidgetData();
 				lastRefreshedAt = new Date();
 				break;
@@ -180,10 +164,6 @@
 	}
 
 	function exportWidgetData() {
-		if (widget.type === 'locationQuotient') {
-			bumpLqExport(widget.id);
-			return;
-		}
 		const blob = new Blob([JSON.stringify(widget.data, null, 2)], { type: 'application/json' });
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
@@ -367,7 +347,6 @@
 					onUpdateConfig={(d: any) => dashboard.updateWidget(widget.id, { data: d })}
 					onConfigureReady={(fn: () => void) => { registeredConfigureFn = fn; }}
 				onUpdateData={(d: any) => dashboard.updateWidget(widget.id, { data: d })}
-					lqSignals={lqMenuSignals[widget.id] ?? DEFAULT_LQ_MENU_SIGNALS}
 				/>
 			{/if}
 		</div>

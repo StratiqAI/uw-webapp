@@ -29,6 +29,7 @@
 	});
 
 	const configure = useWidgetConfigure<ParagraphData>({
+		widgetId,
 		data: () => widgetData,
 		get onUpdateConfig() {
 			return onUpdateConfig;

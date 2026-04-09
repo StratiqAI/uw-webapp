@@ -1,15 +1,22 @@
+import { getDashboardWidgetHost } from './context.svelte.js';
+
 /**
  * Reactive hook that encapsulates the flip-card configuration boilerplate.
  *
  * Manages `isFlipped` state, registers the toggle function with the host,
  * and provides apply/cancel helpers so each widget only needs to supply
  * its data getter and callbacks.
+ *
+ * Automatically exits fullscreen when the card flips back to front.
  */
 export function useWidgetConfigure<TData>(options: {
+	widgetId?: string;
 	data: () => TData;
 	onUpdateConfig?: (data: TData) => void;
 	onConfigureReady?: (toggleFn: () => void) => void;
 }) {
+	const host = getDashboardWidgetHost();
+
 	let isFlipped = $state(false);
 	let initialDraft: TData;
 	try {
@@ -27,9 +34,19 @@ export function useWidgetConfigure<TData>(options: {
 		}
 	}
 
+	function exitFullscreen() {
+		if (options.widgetId) {
+			host.setWidgetFullscreen?.(options.widgetId, false);
+		}
+	}
+
 	function toggleFlip() {
 		isFlipped = !isFlipped;
-		if (isFlipped) syncDraft();
+		if (isFlipped) {
+			syncDraft();
+		} else {
+			exitFullscreen();
+		}
 	}
 
 	$effect(() => {
@@ -39,10 +56,12 @@ export function useWidgetConfigure<TData>(options: {
 	function applyConfig(draftData?: TData) {
 		options.onUpdateConfig?.(draftData ?? draft);
 		isFlipped = false;
+		exitFullscreen();
 	}
 
 	function cancelConfig() {
 		isFlipped = false;
+		exitFullscreen();
 	}
 
 	return {

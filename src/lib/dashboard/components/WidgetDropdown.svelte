@@ -138,8 +138,7 @@
 			t === 'gauge' ||
 			t === 'sparkline' ||
 			t === 'heatmap' ||
-			t === 'divergingBarChart' ||
-			t === 'locationQuotient'
+			t === 'divergingBarChart'
 		);
 	}
 
@@ -171,7 +170,7 @@
 			icon: ICONS.settings
 		});
 
-		if (getWidgetPromptConfig(widget.type)) {
+		if (widget.type !== 'title' && getWidgetPromptConfig(widget.type)) {
 			items.push({
 				action: 'aiConfiguration',
 				label: 'AI Configuration',

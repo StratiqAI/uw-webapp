@@ -58,6 +58,7 @@
 	const t = $derived(proFormaTheme(darkMode));
 
 	const configure = useWidgetConfigure<ProFormaOpExConfig>({
+		widgetId,
 		data: () => widgetData,
 		onUpdateConfig: (d) => onUpdateConfig?.(d),
 		onConfigureReady: (fn) => onConfigureReady?.(fn)

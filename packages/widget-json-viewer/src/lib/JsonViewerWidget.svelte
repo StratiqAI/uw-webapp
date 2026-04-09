@@ -28,6 +28,7 @@
 	let widgetData = $derived<JsonViewerWidgetData>(dataStream.current || data);
 
 	const configure = useWidgetConfigure<JsonViewerWidgetData>({
+		widgetId,
 		data: () => widgetData,
 		get onUpdateConfig() {
 			return onUpdateConfig;

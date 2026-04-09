@@ -28,6 +28,7 @@
 	let widgetData = $derived<TitleWidgetData>(dataStream.current || data);
 
 	const configure = useWidgetConfigure<TitleWidgetData>({
+		widgetId,
 		data: () => widgetData,
 		get onUpdateConfig() {
 			return onUpdateConfig;
@@ -96,8 +97,13 @@
 			{darkMode}
 			theme={resolvedTheme}
 			{topicOverride}
-			showAITab={true}
-			onApply={() => configure.applyConfig()}
+			showAITab={false}
+			showDataSources={false}
+			showExternalData={false}
+			onApply={() => {
+				host.validatedTopicStore.publish(topic, configure.draft);
+				configure.applyConfig();
+			}}
 			onCancel={configure.cancelConfig}
 		>
 			{#snippet userFields()}

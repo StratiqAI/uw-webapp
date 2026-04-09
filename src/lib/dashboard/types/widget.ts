@@ -31,7 +31,6 @@ export type WidgetType =
 	| 'metric'
 	| 'map'
 	| 'schema'
-	| 'locationQuotient'
 	| 'jsonViewer'
 	| 'brokerCard'
 	| 'lqAnalysis'
@@ -159,8 +158,6 @@ import type { HeatmapWidgetData } from '@stratiqai/widget-heatmap';
 import type { DivergingBarChartWidgetData } from '@stratiqai/widget-diverging-bar-chart';
 import type { MapWidgetData } from '@stratiqai/widget-map';
 import type { SchemaWidgetData } from '@stratiqai/widget-schema';
-import type { LocationQuotientWidgetData } from '@stratiqai/widget-location-quotient';
-
 export interface ImageWidget extends BaseWidget {
 	type: 'image';
 	data: ImageWidgetData;
@@ -229,13 +226,6 @@ export interface JsonViewerWidget extends BaseWidget {
 export interface BrokerCardWidget extends BaseWidget {
 	type: 'brokerCard';
 	data: BrokerCardWidgetData;
-}
-
-export type { LocationQuotientSortOrder } from '@stratiqai/widget-location-quotient';
-
-export interface LocationQuotientWidget extends BaseWidget {
-	type: 'locationQuotient';
-	data: LocationQuotientWidgetData;
 }
 
 export interface LqAnalysisWidgetDef extends BaseWidget {
@@ -319,7 +309,6 @@ export type Widget =
 	| MetricWidget
 	| MapWidget
 	| SchemaWidget
-	| LocationQuotientWidget
 	| JsonViewerWidget
 	| BrokerCardWidget
 	| LqAnalysisWidgetDef

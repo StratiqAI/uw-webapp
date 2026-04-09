@@ -28,6 +28,7 @@
 	let widgetData = $derived<MetricWidgetData>(dataStream.current || data);
 
 	const configure = useWidgetConfigure<MetricWidgetData>({
+		widgetId,
 		data: () => widgetData,
 		get onUpdateConfig() {
 			return onUpdateConfig;
