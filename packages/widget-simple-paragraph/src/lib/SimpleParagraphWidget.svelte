@@ -7,6 +7,9 @@
 		useWidgetConfigure,
 		type StandardWidgetProps
 	} from '@stratiqai/dashboard-widget-sdk';
+	import { marked } from 'marked';
+
+	marked.setOptions({ async: false });
 
 	let {
 		data,
@@ -22,6 +25,11 @@
 	const generating = $derived(extraction?.loading ?? false);
 	const error = $derived(extraction?.error ?? undefined);
 
+	// #region agent log
+	$effect(() => {
+		fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f38342'},body:JSON.stringify({sessionId:'f38342',location:'SimpleParagraphWidget.svelte:widgetData',message:'widget data inputs',data:{widgetId,hasExtraction:!!extraction,extractionResult:extraction?.result ? Object.keys(extraction.result) : null,extractionResultContent: extraction?.result?.content ? String(extraction.result.content).slice(0,80) : null,dataContent: data.content ? String(data.content).slice(0,80) : null,dataTitle: data.title},timestamp:Date.now(),hypothesisId:'H-B,H-C'})}).catch(()=>{});
+	});
+	// #endregion
 	let widgetData = $derived<ParagraphData>({
 		title: (extraction?.result?.title as string) ?? data.title,
 		description: (extraction?.result?.description as string) ?? data.description,
@@ -51,6 +59,9 @@
 			: 'w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500'
 	);
 	const resolvedTheme = $derived(theme ?? (darkMode ? 'dark' : 'light'));
+	const renderedContent = $derived(
+		widgetData.content ? (marked.parse(widgetData.content) as string) : ''
+	);
 </script>
 
 <FlipCard isFlipped={configure.isFlipped} {shellClass} {flipBackClass}>
@@ -59,13 +70,13 @@
 			{#if generating || error}
 				<AiStatusOverlay {generating} {error} {darkMode} />
 			{:else if widgetData.content}
-				<p
-					class="text-[0.9375rem] leading-relaxed {darkMode
-						? 'text-slate-200'
+				<div
+					class="prose prose-sm max-w-none leading-relaxed {darkMode
+						? 'prose-invert text-slate-200'
 						: 'text-slate-700'}"
 				>
-					{widgetData.content}
-				</p>
+					{@html renderedContent}
+				</div>
 			{:else}
 				<p class="italic {darkMode ? 'text-slate-500' : 'text-slate-400'}">
 					No content yet. Open settings to configure the AI prompt.

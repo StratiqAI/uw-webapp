@@ -9,7 +9,7 @@
 	import { createDragHandlers } from '$lib/dashboard/utils/dragDrop';
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
-	import { getWidgetSchemaId, getWidgetStructuralHash, getTopicsByStructuralHash } from '$lib/dashboard/setup/widgetSchemaRegistration';
+	import { getWidgetSchemaId, getWidgetStructuralHash } from '$lib/dashboard/setup/widgetSchemaRegistration';
 	import { toOntologyInstDataTopic } from '$lib/services/realtime/store/ontologyClientHelpers';
 	import ResizeHandles from './ResizeHandles.svelte';
 	import WidgetChrome from './WidgetChrome.svelte';
@@ -64,13 +64,6 @@
 		const pid = dashboard.projectId;
 		const instId = widget.entityInstanceId;
 		if (instId && hash && pid) return toOntologyInstDataTopic(pid, hash, instId);
-		if (hash && pid) {
-			void validatedTopicStore.tree;
-			const available = getTopicsByStructuralHash(pid, hash);
-			if (available.length > 0) {
-				return available[0].topic;
-			}
-		}
 		return `widgets/${widget.type}/${widget.id}`;
 	});
 	const schemaId = $derived.by(() => {
@@ -89,7 +82,16 @@
 		() => idToken
 	);
 
+	// #region agent log
+	let _dbgExtractPubRuns = 0;
+	let _dbgStatusPubRuns = 0;
+	// #endregion
 	$effect(() => {
+		// #region agent log
+		_dbgExtractPubRuns++;
+		fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f38342'},body:JSON.stringify({sessionId:'f38342',location:'WidgetWrapper.svelte:extractionEffect',message:'extraction publish effect',data:{wid:widget.id,wtype:widget.type,run:_dbgExtractPubRuns,hasExtrId:!!widget.extractionId,hasResult:!!extraction.result,topic:currentTopic},timestamp:Date.now(),hypothesisId:'H-D'})}).catch(()=>{});
+		if (_dbgExtractPubRuns > 50) { console.error('[DEBUG] extraction publish loop', widget.id); return; }
+		// #endregion
 		if (widget.extractionId && extraction.result) {
 			validatedTopicStore.publish(currentTopic, extraction.result);
 		} else if (widget.extractionId && extraction.data?.rawAnswer && !extraction.result) {
@@ -98,6 +100,11 @@
 	});
 
 	$effect(() => {
+		// #region agent log
+		_dbgStatusPubRuns++;
+		fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f38342'},body:JSON.stringify({sessionId:'f38342',location:'WidgetWrapper.svelte:statusEffect',message:'status publish effect',data:{wid:widget.id,wtype:widget.type,run:_dbgStatusPubRuns,hasExtrId:!!widget.extractionId,topic:currentTopic},timestamp:Date.now(),hypothesisId:'H-D'})}).catch(()=>{});
+		if (_dbgStatusPubRuns > 50) { console.error('[DEBUG] status publish loop', widget.id); return; }
+		// #endregion
 		if (!widget.extractionId) return;
 		const statusTopic = `${currentTopic}/__ai_status`;
 		validatedTopicStore.publish(statusTopic, {

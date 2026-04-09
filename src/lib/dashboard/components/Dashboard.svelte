@@ -123,10 +123,6 @@
 			if (instanceId && hash && pid) {
 				return toOntologyInstDataTopic(pid, hash, instanceId);
 			}
-			if (hash && pid) {
-				const available = getTopicsByStructuralHash(pid, hash);
-				if (available.length > 0) return available[0].topic;
-			}
 			return `widgets/${kind}/${widgetId}`;
 		},
 		services: {
