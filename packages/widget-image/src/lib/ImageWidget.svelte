@@ -10,6 +10,7 @@
 		getDashboardWidgetHost,
 		type StandardWidgetProps
 	} from '@stratiqai/dashboard-widget-sdk';
+	import ImageSelector from './ImageSelector.svelte';
 
 	let {
 		data,
@@ -34,9 +35,24 @@
 		get onConfigureReady() { return onConfigureReady; }
 	});
 
+	let selectedSrc = $state('');
+	let selectedAlt = $state('');
+
 	const shellClass = $derived(darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white');
 	const flipBackClass = $derived(darkMode ? 'border-slate-600 bg-slate-900' : 'border-slate-200 bg-slate-50');
 	const resolvedTheme = $derived(theme ?? (darkMode ? 'dark' : 'light'));
+
+	function handleApply() {
+		if (selectedSrc) {
+			host.validatedTopicStore.patch(topic, {
+				src: selectedSrc,
+				alt: selectedAlt || widgetData.alt
+			});
+		}
+		configure.applyConfig();
+		selectedSrc = '';
+		selectedAlt = '';
+	}
 </script>
 
 <FlipCard isFlipped={configure.isFlipped} {shellClass} {flipBackClass}>
@@ -63,8 +79,18 @@
 			theme={resolvedTheme}
 			{topicOverride}
 			showAITab={true}
-			onApply={() => configure.applyConfig()}
+			showDataSources={false}
+			showExternalData={false}
+			onApply={handleApply}
 			onCancel={configure.cancelConfig}
-		/>
+		>
+			{#snippet userFields()}
+				<ImageSelector
+					{darkMode}
+					currentSrc={widgetData.src}
+					onSelect={(src, alt) => { selectedSrc = src; selectedAlt = alt; }}
+				/>
+			{/snippet}
+		</WidgetConfigureBack>
 	{/snippet}
 </FlipCard>

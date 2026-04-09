@@ -63,54 +63,65 @@
 		goto(`/p/${projectId}/dashboard`);
 	}
 
-	onMount(() => {
-		log.debug('Dashboard onMount started');
-		let unsubReset: (() => void) | undefined;
+	let currentSyncManager: DashboardSyncManager | null = null;
 
-		function updateGridSize() {
-			try {
-				const width = window.innerWidth;
-				let gridColumns: number;
-				let minRows = 19;
-				
-				if (width < 640) {
-					gridColumns = 4;
-				} else if (width < 1024) {
-					gridColumns = 8;
-				} else {
-					gridColumns = 12;
-				}
-				
-				dashboard.ensureGridCapacity();
-				const requiredRows = Math.max(minRows, dashboard.config.gridRows);
-				dashboard.updateGridConfig({ gridColumns, gridRows: requiredRows });
-			} catch (error) {
-				log.error('Error updating grid size:', error);
-			}
-		}
-
-	async function initDashboard() {
+	function updateGridSize() {
 		try {
-			updateGridSize();
+			const width = window.innerWidth;
+			let gridColumns: number;
+			let minRows = 19;
 
-			const projectId = selectedProjectId;
+			if (width < 640) {
+				gridColumns = 4;
+			} else if (width < 1024) {
+				gridColumns = 8;
+			} else {
+				gridColumns = 12;
+			}
 
-			if (projectId && data.idToken) {
-				try {
-					const syncManager = DashboardSyncManager.createInactive();
-					await withTimeout(
-						syncManager.initialize({ idToken: data.idToken, projectId }),
-						SYNC_INIT_TIMEOUT_MS,
-						'SyncManager init'
-					);
-					dashboard.setSyncManager(syncManager);
-				} catch (e) {
-					log.warn('Cloud sync unavailable for dashboard:', e);
+			dashboard.ensureGridCapacity();
+			const requiredRows = Math.max(minRows, dashboard.config.gridRows);
+			dashboard.updateGridConfig({ gridColumns, gridRows: requiredRows });
+		} catch (error) {
+			log.error('Error updating grid size:', error);
+		}
+	}
+
+	$effect(() => {
+		const projectId = selectedProjectId;
+		const idToken = data.idToken;
+		if (!projectId) return;
+
+		isLoading = true;
+		let cancelled = false;
+
+		(async () => {
+			try {
+				if (currentSyncManager) {
+					currentSyncManager.cleanup();
+					currentSyncManager = null;
 					dashboard.setSyncManager(null);
 				}
-			}
 
-			await dashboard.initialize(projectId);
+				if (idToken) {
+					try {
+						const sm = DashboardSyncManager.createInactive();
+						await withTimeout(
+							sm.initialize({ idToken, projectId }),
+							SYNC_INIT_TIMEOUT_MS,
+							'SyncManager init'
+						);
+						if (cancelled) { sm.cleanup(); return; }
+						currentSyncManager = sm;
+						dashboard.setSyncManager(sm);
+					} catch (e) {
+						log.warn('Cloud sync unavailable for dashboard:', e);
+						dashboard.setSyncManager(null);
+					}
+				}
+
+				if (cancelled) return;
+				await dashboard.initialize(projectId);
 
 				try {
 					publishWidgetData(dashboard.widgets, { onlyIfMissing: true });
@@ -120,19 +131,24 @@
 
 				dashboard.ensureGridCapacity();
 				updateGridSize();
-				log.debug('Dashboard initialization complete');
+				log.debug('Dashboard initialization complete for project:', projectId);
 			} catch (error) {
 				log.error('Error initializing dashboard:', error);
 			} finally {
-				isLoading = false;
+				if (!cancelled) isLoading = false;
 			}
-		}
+		})();
 
-		initDashboard();
+		return () => { cancelled = true; };
+	});
 
+	onMount(() => {
+		log.debug('Dashboard onMount started');
+
+		updateGridSize();
 		window.addEventListener('resize', updateGridSize);
 
-		unsubReset = dashboard.on('dashboard:reset', () => {
+		const unsubReset = dashboard.on('dashboard:reset', () => {
 			try {
 				publishWidgetData(dashboard.widgets);
 			} catch (e) {
@@ -140,7 +156,7 @@
 			}
 		});
 
-		window.addEventListener('beforeunload', () => {
+		const handleBeforeUnload = () => {
 			try {
 				if (dashboard.hasUnsavedChanges && dashboard.autoSaveEnabled) {
 					dashboard.save();
@@ -148,11 +164,17 @@
 			} catch (error) {
 				log.error('Error saving dashboard on beforeunload:', error);
 			}
-		});
+		};
+		window.addEventListener('beforeunload', handleBeforeUnload);
 
 		return () => {
 			unsubReset?.();
 			window.removeEventListener('resize', updateGridSize);
+			window.removeEventListener('beforeunload', handleBeforeUnload);
+			if (currentSyncManager) {
+				currentSyncManager.cleanup();
+				currentSyncManager = null;
+			}
 			try {
 				if (dashboard.hasUnsavedChanges && dashboard.autoSaveEnabled) {
 					dashboard.save();
@@ -163,9 +185,7 @@
 		};
 	});
 
-	// Keyboard shortcuts
 	function handleKeydown(e: KeyboardEvent) {
-		// Ctrl/Cmd + S to save
 		if ((e.ctrlKey || e.metaKey) && e.key === 's') {
 			e.preventDefault();
 			dashboard.save();

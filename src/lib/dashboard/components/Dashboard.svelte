@@ -611,7 +611,7 @@
 	{...dropHandlers}
 >
 	{#if dashboard.widgets.length === 0 && !topicDropGhost}
-		<div class="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+		<div class="absolute inset-0 flex items-start justify-center pt-12 pointer-events-none z-10">
 			<div class="pointer-events-auto flex flex-col items-center gap-4 rounded-xl border-2 border-dashed px-10 py-12
 				{darkMode ? 'border-slate-700 bg-slate-800/60 text-slate-300' : 'border-slate-300 bg-white/80 text-slate-600'}">
 				<svg class="w-12 h-12 {darkMode ? 'text-slate-600' : 'text-slate-300'}" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">

@@ -32,3 +32,4 @@ export const imageWidget = defineWidget({
 export { imageWidgetDataSchema, imageAiOutputSchema } from './schema.js';
 export type { ImageWidgetData, ImageAiOutput } from './schema.js';
 export { default as ImageWidget } from './ImageWidget.svelte';
+export { default as ImageSelector } from './ImageSelector.svelte';
