@@ -187,9 +187,39 @@
 						></textarea>
 					</div>
 
-					<!-- Data Source — tab switcher -->
+				<!-- Body Display Options (not applicable to the title widget) -->
+				{#if widget.type !== 'title'}
 					<div>
-						<p class="mb-2 text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'}">Data Source</p>
+						<p class="mb-2 text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'}">Body Display Options</p>
+						<p class="mb-3 text-xs {darkMode ? 'text-slate-400' : 'text-slate-500'}">
+							Title and description are always shown in the widget header. Use these options to also display them inside the widget body.
+						</p>
+						<div class="flex flex-col gap-2">
+							<label class="inline-flex items-center gap-2 cursor-pointer">
+								<input
+									type="checkbox"
+									checked={!!widget.showTitleInBody}
+									onchange={(e) => dashboard.updateWidget(widget.id, { showTitleInBody: e.currentTarget.checked })}
+									class="h-4 w-4 rounded border {darkMode ? 'border-slate-600 bg-slate-700 accent-indigo-500' : 'border-slate-300 bg-white accent-indigo-600'}"
+								/>
+								<span class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-700'}">Show title in widget body</span>
+							</label>
+							<label class="inline-flex items-center gap-2 cursor-pointer">
+								<input
+									type="checkbox"
+									checked={!!widget.showDescriptionInBody}
+									onchange={(e) => dashboard.updateWidget(widget.id, { showDescriptionInBody: e.currentTarget.checked })}
+									class="h-4 w-4 rounded border {darkMode ? 'border-slate-600 bg-slate-700 accent-indigo-500' : 'border-slate-300 bg-white accent-indigo-600'}"
+								/>
+								<span class="text-sm {darkMode ? 'text-slate-300' : 'text-slate-700'}">Show description in widget body</span>
+							</label>
+						</div>
+					</div>
+				{/if}
+
+				<!-- Data Source — tab switcher -->
+				<div>
+					<p class="mb-2 text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'}">Data Source</p>
 
 						<!-- Active stream badge -->
 						{#if activeStream}

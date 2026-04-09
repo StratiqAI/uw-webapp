@@ -7,6 +7,7 @@
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import { OntologySyncManager } from '$lib/services/realtime/websocket/sync-managers/OntologySyncManager';
+	import { GraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
 	import TopBar from '$lib/components/layout/TopBar.svelte';
 	import DefinitionSidebar from '$lib/ontology/DefinitionSidebar.svelte';
 	import InstanceTable from '$lib/ontology/InstanceTable.svelte';
@@ -14,9 +15,12 @@
 	import DefinitionDetail from '$lib/ontology/DefinitionDetail.svelte';
 	import WidgetGallery from '$lib/ontology/WidgetGallery.svelte';
 	import ActivityIndicator from '$lib/ontology/ActivityIndicator.svelte';
+	import PromptTestingPanel from '$lib/ontology/PromptTestingPanel.svelte';
 	import { createLogger } from '$lib/utils/logger';
 
 	const log = createLogger('ontology-page');
+
+	type CenterTab = 'instances' | 'prompt';
 
 	interface Props {
 		data: PageData;
@@ -29,6 +33,8 @@
 	let syncManager = $state<OntologySyncManager | null>(null);
 	let selectedDefId = $state<string | null>(null);
 	let isLoading = $state(true);
+	let activeTab = $state<CenterTab>('instances');
+	let queryClient = $state<GraphQLQueryClient | null>(null);
 
 	const store = validatedTopicStore;
 
@@ -92,6 +98,7 @@
 	function handleSelectDef(id: string) {
 		selectedDefId = id;
 		selectedInstanceId = null;
+		activeTab = 'instances';
 	}
 
 	function handleProjectChange(newProjectId: string | null) {
@@ -106,6 +113,7 @@
 
 		isLoading = true;
 		selectedDefId = null;
+		queryClient = new GraphQLQueryClient(token);
 
 		let cancelled = false;
 		let mgr: OntologySyncManager | null = null;
@@ -138,6 +146,7 @@
 				syncManager?.cleanup();
 			}
 			syncManager = null;
+			queryClient = null;
 		};
 	});
 
@@ -185,34 +194,81 @@
 				/>
 			</div>
 
-			<!-- Center: Instance Table + Detail Panel -->
+			<!-- Center: Tab Bar + Instance Table / Prompt Testing -->
 			<div class="flex flex-1 flex-col overflow-hidden {darkMode ? 'bg-slate-900' : 'bg-slate-50'}">
 				{#if selectedDefinition}
-					<div class="flex flex-1 flex-col overflow-hidden">
-						<div class="min-h-0 flex-1 overflow-hidden">
-							<InstanceTable
-								definition={selectedDefinition}
-								{instances}
-								{darkMode}
-								{syncManager}
-								projectId={projectId ?? ''}
-								{selectedInstanceId}
-								onselect={(id: string | null) => selectedInstanceId = id}
-							/>
-						</div>
-						{#if selectedInstance && selectedDefinition}
-							<div class="shrink-0 border-t {darkMode ? 'border-slate-700' : 'border-slate-200'}">
-								<InstanceDetailPanel
-									instance={selectedInstance}
+					<!-- Tab Bar -->
+					<div class="flex shrink-0 items-center gap-0 border-b {darkMode ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-white'}">
+						<button
+							type="button"
+							class="relative px-4 py-2 text-xs font-semibold transition-colors
+								{activeTab === 'instances'
+									? (darkMode ? 'text-indigo-400' : 'text-indigo-600')
+									: (darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}"
+							onclick={() => activeTab = 'instances'}
+						>
+							Instances
+							{#if instCount > 0}
+								<span class="ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium {darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'}">
+									{instCount}
+								</span>
+							{/if}
+							{#if activeTab === 'instances'}
+								<span class="absolute bottom-0 left-0 right-0 h-0.5 {darkMode ? 'bg-indigo-400' : 'bg-indigo-600'}"></span>
+							{/if}
+						</button>
+						<button
+							type="button"
+							class="relative px-4 py-2 text-xs font-semibold transition-colors
+								{activeTab === 'prompt'
+									? (darkMode ? 'text-indigo-400' : 'text-indigo-600')
+									: (darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}"
+							onclick={() => activeTab = 'prompt'}
+						>
+							Prompt Testing
+							{#if activeTab === 'prompt'}
+								<span class="absolute bottom-0 left-0 right-0 h-0.5 {darkMode ? 'bg-indigo-400' : 'bg-indigo-600'}"></span>
+							{/if}
+						</button>
+					</div>
+
+					<!-- Tab Content -->
+					{#if activeTab === 'instances'}
+						<div class="flex flex-1 flex-col overflow-hidden">
+							<div class="min-h-0 flex-1 overflow-hidden">
+								<InstanceTable
 									definition={selectedDefinition}
+									{instances}
 									{darkMode}
 									{syncManager}
 									projectId={projectId ?? ''}
-									onclose={() => selectedInstanceId = null}
+									{selectedInstanceId}
+									onselect={(id: string | null) => selectedInstanceId = id}
 								/>
 							</div>
-						{/if}
-					</div>
+							{#if selectedInstance && selectedDefinition}
+								<div class="shrink-0 border-t {darkMode ? 'border-slate-700' : 'border-slate-200'}">
+									<InstanceDetailPanel
+										instance={selectedInstance}
+										definition={selectedDefinition}
+										{darkMode}
+										{syncManager}
+										projectId={projectId ?? ''}
+										onclose={() => selectedInstanceId = null}
+									/>
+								</div>
+							{/if}
+						</div>
+					{:else if activeTab === 'prompt' && queryClient}
+						<PromptTestingPanel
+							definition={selectedDefinition}
+							projectId={projectId ?? ''}
+							idToken={data.idToken}
+							{queryClient}
+							{darkMode}
+							{syncManager}
+						/>
+					{/if}
 				{:else}
 					<div class="flex flex-1 items-center justify-center">
 						<div class="text-center">

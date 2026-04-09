@@ -294,6 +294,8 @@
 					theme={themeStore.theme}
 					refreshSignal={registeredRefreshCounter}
 					showTitleInChrome={!!displayTitle}
+					showTitleInBody={!!widget.showTitleInBody}
+					showDescriptionInBody={!!widget.showDescriptionInBody}
 					onUpdateConfig={(d: any) => dashboard.updateWidget(widget.id, { data: d })}
 					onConfigureReady={(fn: () => void) => { registeredConfigureFn = fn; }}
 				onUpdateData={(d: any) => dashboard.updateWidget(widget.id, { data: d })}

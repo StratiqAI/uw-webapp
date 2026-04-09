@@ -15,6 +15,10 @@ export interface StandardWidgetProps<TData = unknown> {
     theme?: DashboardAppTheme;
     /** Host-driven refresh counter; incrementing triggers refetch in useExternalData. */
     refreshSignal?: number;
+    /** When true, render the title inside the widget body (in addition to the chrome title bar). */
+    showTitleInBody?: boolean;
+    /** When true, render the description inside the widget body (in addition to the chrome title bar). */
+    showDescriptionInBody?: boolean;
     /** Persist config changes back to the dashboard store (widget.data). */
     onUpdateConfig?: (data: TData) => void;
     /** Register a toggle function the host calls when the user clicks Configure/Edit. */

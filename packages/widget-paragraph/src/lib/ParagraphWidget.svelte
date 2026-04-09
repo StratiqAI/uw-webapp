@@ -17,6 +17,8 @@
 		topicOverride,
 		darkMode = false,
 		theme,
+		showTitleInBody = false,
+		showDescriptionInBody = false,
 		onUpdateConfig,
 		onConfigureReady
 	}: StandardWidgetProps<ParagraphData> = $props();
@@ -61,9 +63,9 @@
 		<div class="relative h-full overflow-auto px-4 py-4">
 			{#if aiStatus.generating || aiStatus.error}
 				<AiStatusOverlay generating={aiStatus.generating} error={aiStatus.error} {darkMode} />
-			{:else if widgetData.title || widgetData.description || widgetData.content}
+			{:else if (showTitleInBody && widgetData.title) || (showDescriptionInBody && widgetData.description) || widgetData.content}
 				<div class="flex flex-col gap-2">
-					{#if widgetData.title}
+					{#if showTitleInBody && widgetData.title}
 						<h2
 							class="text-lg font-semibold leading-snug {darkMode
 								? 'text-white'
@@ -72,7 +74,7 @@
 							{widgetData.title}
 						</h2>
 					{/if}
-					{#if widgetData.description}
+					{#if showDescriptionInBody && widgetData.description}
 						<p
 							class="text-sm leading-relaxed {darkMode
 								? 'text-slate-400'
