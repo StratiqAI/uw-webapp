@@ -27,18 +27,9 @@
 {:else}
 	<div class="{fullscreen ? 'grid grid-cols-1 lg:grid-cols-2 gap-4' : 'space-y-3'}">
 		{#each texts as text (text.id)}
-			{@const isExcluded = excludedIds.has(text.id)}
 			{@const hasTable = containsMarkdownTable(text.text || '')}
-			<div class="p-4 {darkMode ? 'bg-blue-900/20 border-blue-500/30 hover:bg-blue-900/30' : 'bg-blue-50 border-blue-200 hover:bg-blue-100'} rounded-lg border transition-colors {isExcluded ? 'opacity-50' : ''}">
+			<div class="p-4 {darkMode ? 'bg-blue-900/20 border-blue-500/30 hover:bg-blue-900/30' : 'bg-blue-50 border-blue-200 hover:bg-blue-100'} rounded-lg border transition-colors">
 				<div class="flex items-start gap-3">
-					<label class="shrink-0 flex items-center justify-center cursor-pointer mt-1">
-						<input
-							type="checkbox"
-							checked={!isExcluded}
-							onchange={() => onToggleExclusion(text.id)}
-							class="w-5 h-5 rounded border-2 {darkMode ? 'bg-slate-700 border-slate-500 checked:bg-blue-500 checked:border-blue-500' : 'bg-white border-slate-300 checked:bg-blue-600 checked:border-blue-600'} cursor-pointer"
-						/>
-					</label>
 					<div class="shrink-0 w-10 h-10 flex items-center justify-center {darkMode ? 'bg-blue-800/50' : 'bg-blue-100'} rounded-lg">
 						<span class="text-lg">📄</span>
 					</div>
@@ -54,24 +45,19 @@
 							{#if hasTable}
 								<span class="text-xs px-1.5 py-0.5 rounded {darkMode ? 'bg-green-900/50 text-green-300' : 'bg-green-100 text-green-700'}">Contains table</span>
 							{/if}
-							{#if isExcluded}
-								<span class="text-xs px-1.5 py-0.5 rounded {darkMode ? 'bg-red-900/50 text-red-300' : 'bg-red-100 text-red-700'}">Excluded</span>
-							{/if}
-							{#if !isExcluded}
-								<button
-									title="Send to Dashboard"
-									onclick={() => addTextToDashboard(text, projectId)}
-									class="ml-auto shrink-0 p-1 rounded {darkMode ? 'text-blue-400 hover:bg-blue-800/50' : 'text-blue-600 hover:bg-blue-100'} transition-colors"
-								>
-									<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-										<path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
-									</svg>
-								</button>
-							{/if}
 						</div>
 						<div class="{darkMode ? 'text-slate-300' : 'text-slate-700'} text-sm leading-relaxed {fullscreen ? 'max-h-48 overflow-y-auto' : ''} whitespace-pre-wrap">
 							{text.text || 'No text content'}
 						</div>
+						<button
+							onclick={() => addTextToDashboard(text, projectId)}
+							class="flex items-center gap-1.5 mt-2 text-xs font-medium transition-colors {darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'}"
+						>
+							<span>Send to Dashboard</span>
+							<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+							</svg>
+						</button>
 					</div>
 				</div>
 			</div>
