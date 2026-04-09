@@ -3,6 +3,7 @@
 	import type { DashboardAppTheme, StreamEntry, WidgetPromptEditData, WidgetDebugData } from './types.js';
 	import { getDashboardWidgetHost } from './context.svelte.js';
 	import { peekConfigureTab, consumeConfigureTab } from './configureTabSignal.svelte.js';
+	import { useAiGenerationStatus } from './hooks.svelte.js';
 	import PromptEditor from './PromptEditor.svelte';
 
 	interface Props {
@@ -275,6 +276,20 @@
 			aiRunning = false;
 		}
 	}
+
+	// --- AI generation status from VTS (tracks async extraction processing) ---
+	const extractionStatus = useAiGenerationStatus(() => currentTopic);
+	const isActivelyGenerating = $derived(aiRunning || extractionStatus.generating);
+	const extractionError = $derived(extractionStatus.error);
+	const combinedError = $derived(aiError || extractionError || '');
+
+	const previewData = $derived.by(() => {
+		const _ = host.validatedTopicStore.tree;
+		return host.validatedTopicStore.at<Record<string, unknown>>(currentTopic);
+	});
+	const hasPreviewData = $derived(
+		previewData != null && typeof previewData === 'object' && Object.keys(previewData as Record<string, unknown>).length > 0
+	);
 
 	// --- Debug tab state ---
 	let debugLoading = $state(false);
@@ -568,27 +583,80 @@
 					{aiError}
 				</div>
 			{:else}
-				<PromptEditor
-					{darkMode}
-					bind:promptName={pePromptName}
-					bind:promptDescription={pePromptDescription}
-					bind:userPrompt={peUserPrompt}
-					bind:systemInstruction={peSystemInstruction}
-					bind:model={peModel}
-					bind:responseFormatType={peResponseFormatType}
-					bind:schemaProperties={peSchemaProperties}
-					bind:schemaRequired={peSchemaRequired}
-					bind:fieldOrder={peFieldOrder}
-					bind:temperature={peTemperature}
-					bind:maxTokens={peMaxTokens}
-					bind:topP={peTopP}
-					bind:frequencyPenalty={peFrequencyPenalty}
-					bind:stopSequences={peStopSequences}
-					isGenerating={aiRunning}
-					generateError={aiError}
-					onGenerate={handleGenerate}
-				/>
+			<PromptEditor
+				{darkMode}
+				bind:promptName={pePromptName}
+				bind:promptDescription={pePromptDescription}
+				bind:userPrompt={peUserPrompt}
+				bind:systemInstruction={peSystemInstruction}
+				bind:model={peModel}
+				bind:responseFormatType={peResponseFormatType}
+				bind:schemaProperties={peSchemaProperties}
+				bind:schemaRequired={peSchemaRequired}
+				bind:fieldOrder={peFieldOrder}
+				bind:temperature={peTemperature}
+				bind:maxTokens={peMaxTokens}
+				bind:topP={peTopP}
+				bind:frequencyPenalty={peFrequencyPenalty}
+				bind:stopSequences={peStopSequences}
+				isGenerating={isActivelyGenerating}
+				generateError={combinedError}
+				onGenerate={handleGenerate}
+			/>
+
+			<!-- AI Generation Status -->
+			{#if isActivelyGenerating}
+				<div class="mt-4 flex items-center gap-3 rounded-lg border px-4 py-3
+					{darkMode ? 'border-indigo-500/30 bg-indigo-500/10' : 'border-indigo-200 bg-indigo-50'}">
+					<svg class="h-4 w-4 shrink-0 animate-spin {darkMode ? 'text-indigo-400' : 'text-indigo-600'}" fill="none" viewBox="0 0 24 24">
+						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+					</svg>
+					<span class="text-sm font-medium {darkMode ? 'text-indigo-300' : 'text-indigo-700'}">
+						Generating&hellip;
+					</span>
+				</div>
+			{:else if extractionError}
+				<div class="mt-4 rounded-lg border px-4 py-3 text-sm
+					{darkMode ? 'border-red-500/30 bg-red-500/10 text-red-400' : 'border-red-200 bg-red-50 text-red-600'}">
+					{extractionError}
+				</div>
+			{:else if hasPreviewData && !aiRunning}
+				<div class="mt-4 flex items-center gap-2 rounded-lg border px-4 py-2
+					{darkMode ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-emerald-200 bg-emerald-50'}">
+					<svg class="h-4 w-4 shrink-0 {darkMode ? 'text-emerald-400' : 'text-emerald-600'}" fill="none" viewBox="0 0 24 24">
+						<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+					</svg>
+					<span class="text-sm font-medium {darkMode ? 'text-emerald-300' : 'text-emerald-700'}">
+						Generation complete
+					</span>
+				</div>
 			{/if}
+
+			<!-- Preview -->
+			{#if hasPreviewData && !isActivelyGenerating}
+				<section class="mt-4 space-y-2 border-t pt-4 {sectionBorder}">
+					<h4 class={sectionTitle}>Preview</h4>
+					<div class="space-y-3 rounded-lg border {darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'} p-3">
+						{#each Object.entries(previewData as Record<string, unknown>) as [key, val] (key)}
+							<div>
+								<span class="text-[11px] font-medium uppercase tracking-wider {darkMode ? 'text-slate-500' : 'text-slate-400'}">{key}</span>
+								{#if typeof val === 'string' && val.length > 120}
+									<div class="mt-1 max-h-40 overflow-auto rounded-md border p-2 text-sm leading-relaxed whitespace-pre-wrap
+										{darkMode ? 'border-slate-600 bg-slate-900/50 text-slate-300' : 'border-slate-200 bg-white text-slate-700'}">
+										{val}
+									</div>
+								{:else}
+									<p class="mt-0.5 text-sm {darkMode ? 'text-slate-300' : 'text-slate-700'}">
+										{val == null ? '\u2014' : typeof val === 'object' ? JSON.stringify(val) : String(val)}
+									</p>
+								{/if}
+							</div>
+						{/each}
+					</div>
+				</section>
+			{/if}
+		{/if}
 		{:else if activeTab === 'debug'}
 			{#if debugLoading}
 				<div class="flex items-center justify-center py-12">

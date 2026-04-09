@@ -1,12 +1,23 @@
 <script lang="ts">
+	const STATUS_MESSAGES: Record<string, string> = {
+		DRAFT: 'Preparing',
+		QUEUED: 'Queued',
+		RUNNING: 'Generating content',
+	};
+
 	interface Props {
 		generating: boolean;
 		error?: string;
 		darkMode?: boolean;
 		message?: string;
+		status?: string;
 	}
 
-	let { generating, error, darkMode = false, message = 'Generating content' }: Props = $props();
+	let { generating, error, darkMode = false, message = 'Generating content', status }: Props = $props();
+
+	const displayMessage = $derived(
+		status && STATUS_MESSAGES[status] ? STATUS_MESSAGES[status] : message
+	);
 </script>
 
 {#if generating}
@@ -24,7 +35,7 @@
 			/>
 		</svg>
 		<span class="text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-600'}">
-			{message}&hellip;
+			{displayMessage}&hellip;
 		</span>
 	</div>
 {:else if error}

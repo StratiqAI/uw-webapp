@@ -3,6 +3,7 @@ interface Props {
     error?: string;
     darkMode?: boolean;
     message?: string;
+    status?: string;
 }
 declare const AiStatusOverlay: import("svelte").Component<Props, {}, "">;
 type AiStatusOverlay = ReturnType<typeof AiStatusOverlay>;
