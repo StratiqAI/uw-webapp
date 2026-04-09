@@ -1,15 +1,18 @@
 <script lang="ts">
 	import type { Image } from './types';
+	import { addImageToDashboard } from './addToDashboard';
 
 	const {
 		images,
 		excludedIds,
+		projectId,
 		fullscreen = false,
 		darkMode = false,
 		onToggleExclusion
 	}: {
 		images: Image[];
 		excludedIds: Set<string>;
+		projectId: string;
 		fullscreen?: boolean;
 		darkMode?: boolean;
 		onToggleExclusion: (id: string) => void;
@@ -38,6 +41,17 @@
 					</label>
 					{#if isExcluded}
 						<span class="text-xs px-1.5 py-0.5 rounded {darkMode ? 'bg-red-900/50 text-red-300' : 'bg-red-100 text-red-700'}">Excluded</span>
+					{/if}
+					{#if !isExcluded}
+						<button
+							title="Send to Dashboard"
+							onclick={() => addImageToDashboard(image, projectId)}
+							class="shrink-0 p-1 rounded {darkMode ? 'text-purple-400 hover:bg-purple-800/50' : 'text-purple-600 hover:bg-purple-100'} transition-colors"
+						>
+							<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+							</svg>
+						</button>
 					{/if}
 				</div>
 				<div class="{fullscreen ? 'aspect-square' : 'aspect-video'} mb-3 {darkMode ? 'bg-slate-800' : 'bg-slate-100'} rounded-lg overflow-hidden flex items-center justify-center">

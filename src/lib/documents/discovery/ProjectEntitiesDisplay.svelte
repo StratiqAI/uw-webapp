@@ -24,6 +24,7 @@
 	import TextBlocksPanel from './TextBlocksPanel.svelte';
 	import TablesPanel from './TablesPanel.svelte';
 	import ImageGrid from './ImageGrid.svelte';
+	import { addAllTextsToDashboard, addAllTablesToDashboard, addAllImagesToDashboard } from './addToDashboard';
 
 	const { projectId, documents = [] } = $props<{
 		projectId: string;
@@ -314,17 +315,59 @@
 			onToggleFullscreen={toggleFullscreen}
 			onClose={closePanel}
 		>
-			{#snippet children({ fullscreen })}
-				{#if selectedCategory === 'documents'}
-					<DocumentsPanel documents={uniqueDocuments} {fullscreen} {darkMode} />
-				{:else if selectedCategory === 'texts'}
-					<TextBlocksPanel texts={uniqueTexts} excludedIds={excludedTexts} {fullscreen} {darkMode} onToggleExclusion={toggleTextExclusion} />
-				{:else if selectedCategory === 'tables'}
-					<TablesPanel tables={uniqueTables} {extractedTables} excludedIds={excludedTables} {fullscreen} {darkMode} onToggleExclusion={toggleTableExclusion} />
-				{:else if selectedCategory === 'images'}
-					<ImageGrid images={uniqueImages} excludedIds={excludedImages} {fullscreen} {darkMode} onToggleExclusion={toggleImageExclusion} />
+		{#snippet children({ fullscreen })}
+			{#if selectedCategory === 'documents'}
+				<DocumentsPanel documents={uniqueDocuments} {fullscreen} {darkMode} />
+			{:else if selectedCategory === 'texts'}
+				{#if includedTextCount > 0}
+					<div class="flex justify-end mb-3">
+						<button
+							type="button"
+							onclick={() => addAllTextsToDashboard(uniqueTexts, projectId, excludedTexts)}
+							class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors {darkMode ? 'bg-blue-600/20 text-blue-300 hover:bg-blue-600/30 border border-blue-500/30' : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'}"
+						>
+							<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+							</svg>
+							Add all {includedTextCount} to Dashboard
+						</button>
+					</div>
 				{/if}
-			{/snippet}
+				<TextBlocksPanel texts={uniqueTexts} excludedIds={excludedTexts} {projectId} {fullscreen} {darkMode} onToggleExclusion={toggleTextExclusion} />
+			{:else if selectedCategory === 'tables'}
+				{#if includedTableCount > 0}
+					<div class="flex justify-end mb-3">
+						<button
+							type="button"
+							onclick={() => addAllTablesToDashboard(uniqueTables, extractedTables, projectId, excludedTables)}
+							class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors {darkMode ? 'bg-green-600/20 text-green-300 hover:bg-green-600/30 border border-green-500/30' : 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'}"
+						>
+							<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+							</svg>
+							Add all {includedTableCount} to Dashboard
+						</button>
+					</div>
+				{/if}
+				<TablesPanel tables={uniqueTables} {extractedTables} excludedIds={excludedTables} {projectId} {fullscreen} {darkMode} onToggleExclusion={toggleTableExclusion} />
+			{:else if selectedCategory === 'images'}
+				{#if includedImageCount > 0}
+					<div class="flex justify-end mb-3">
+						<button
+							type="button"
+							onclick={() => addAllImagesToDashboard(uniqueImages, projectId, excludedImages)}
+							class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors {darkMode ? 'bg-purple-600/20 text-purple-300 hover:bg-purple-600/30 border border-purple-500/30' : 'bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200'}"
+						>
+							<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+							</svg>
+							Add all {includedImageCount} to Dashboard
+						</button>
+					</div>
+				{/if}
+				<ImageGrid images={uniqueImages} excludedIds={excludedImages} {projectId} {fullscreen} {darkMode} onToggleExclusion={toggleImageExclusion} />
+			{/if}
+		{/snippet}
 		</DetailPanel>
 	{:else}
 		<div class="text-center py-6 {darkMode ? 'text-slate-400' : 'text-slate-500'}">

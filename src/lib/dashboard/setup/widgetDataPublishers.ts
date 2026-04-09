@@ -65,8 +65,9 @@ function isEffectivelyEmpty(data: unknown, widgetType: WidgetType): boolean {
 }
 
 /**
- * Publish default data for all widgets into ValidatedTopicStore.
- * Uses manifest defaultData (for package widgets) or DEFAULT_WIDGET_DATA (for built-ins).
+ * Publish data for all widgets into ValidatedTopicStore.
+ * Prefers the widget's own `data` when it contains non-empty values,
+ * falling back to manifest/default data only when `widget.data` is empty.
  */
 export function publishWidgetData(widgets: Widget[], options?: PublishWidgetDataOptions): void {
 	const onlyIfMissing = options?.onlyIfMissing ?? false;
@@ -77,7 +78,10 @@ export function publishWidgetData(widgets: Widget[], options?: PublishWidgetData
 		if (onlyIfMissing && getWidgetData(widget.type, widget.id) !== undefined) {
 			continue;
 		}
-		const data = getDefaultDataForWidget(widget);
+		const widgetData = (widget as Widget & { data?: Record<string, unknown> }).data;
+		const data = (widgetData && !isEffectivelyEmpty(widgetData, widget.type as WidgetType))
+			? { ...widgetData }
+			: getDefaultDataForWidget(widget);
 		try {
 			const publisher = createWidgetPublisher(
 				widget.type,

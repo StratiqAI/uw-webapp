@@ -1,16 +1,19 @@
 <script lang="ts">
 	import type { Text } from './types';
 	import { containsMarkdownTable } from './markdownTableParser';
+	import { addTextToDashboard } from './addToDashboard';
 
 	const {
 		texts,
 		excludedIds,
+		projectId,
 		fullscreen = false,
 		darkMode = false,
 		onToggleExclusion
 	}: {
 		texts: Text[];
 		excludedIds: Set<string>;
+		projectId: string;
 		fullscreen?: boolean;
 		darkMode?: boolean;
 		onToggleExclusion: (id: string) => void;
@@ -53,6 +56,17 @@
 							{/if}
 							{#if isExcluded}
 								<span class="text-xs px-1.5 py-0.5 rounded {darkMode ? 'bg-red-900/50 text-red-300' : 'bg-red-100 text-red-700'}">Excluded</span>
+							{/if}
+							{#if !isExcluded}
+								<button
+									title="Send to Dashboard"
+									onclick={() => addTextToDashboard(text, projectId)}
+									class="ml-auto shrink-0 p-1 rounded {darkMode ? 'text-blue-400 hover:bg-blue-800/50' : 'text-blue-600 hover:bg-blue-100'} transition-colors"
+								>
+									<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+									</svg>
+								</button>
 							{/if}
 						</div>
 						<div class="{darkMode ? 'text-slate-300' : 'text-slate-700'} text-sm leading-relaxed {fullscreen ? 'max-h-48 overflow-y-auto' : ''} whitespace-pre-wrap">
