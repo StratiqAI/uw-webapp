@@ -7,10 +7,13 @@
 	import type { LayoutProps } from './$types';
 	import { ProjectSyncManager, store } from '$lib/services/realtime/websocket/projectSync';
 	import { addSubscription, removeSubscription } from '$lib/stores/appSyncClientStore';
-	import { notificationStore, S_ON_CREATE_NOTIFICATION, Q_LIST_NOTIFICATIONS, type Notification } from '$lib/stores/notifications.svelte';
+	import { notificationStore, S_ON_CREATE_NOTIFICATION, type Notification } from '$lib/stores/notifications.svelte';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 	import { ui } from '$lib/stores/ui.svelte';
-	import type { Project } from '@stratiqai/types-simple';
+	import { Q_LIST_NOTIFICATIONS, type Project } from '@stratiqai/types-simple';
+
+	/** Module-level ref so SSR bundle analysis keeps the query import (used in `$effect` below). */
+	const notificationListQuery = Q_LIST_NOTIFICATIONS;
 	import { print } from 'graphql';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
@@ -117,7 +120,7 @@
 
 		notificationStore.setLoading(true);
 		const qc = new GraphQLQueryClient(idToken);
-		qc.query(Q_LIST_NOTIFICATIONS, { parentId: projectId })
+		qc.query(notificationListQuery, { parentId: projectId })
 			.then((result: any) => {
 				const items: Notification[] = result?.listNotifications?.items ?? [];
 				notificationStore.addNotifications(items);
@@ -179,7 +182,7 @@
 </script>
 
 <div
-	class="flex min-h-[100svh] w-full {darkModeStore.darkMode ? 'bg-slate-900' : 'bg-slate-50'} text-gray-900"
+	class="flex min-h-svh w-full {darkModeStore.darkMode ? 'bg-slate-900' : 'bg-slate-50'} text-gray-900"
 	style={`padding-right:${ui.sidebarOpen ? ui.sidebarWidth : 0}px`}
 >
 	<div class="flex w-full min-w-0 flex-1 flex-col">

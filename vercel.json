@@ -1,0 +1,4 @@
+{
+	"framework": "sveltekit",
+	"installCommand": "NPM_CONFIG_MAXSOCKETS=5 npm install --prefer-offline"
+}

@@ -6,6 +6,9 @@
 	"workspaces": [
 		"packages/*"
 	],
+	"engines": {
+		"node": ">=20"
+	},
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",

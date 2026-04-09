@@ -402,6 +402,8 @@
 
 {#if isOpen && submenuOpen && submenuAnchorRect}
 	<div
+		role="menu"
+		tabindex="-1"
 		use:portal
 		bind:this={submenuEl}
 		onmouseenter={cancelSubmenuClose}
