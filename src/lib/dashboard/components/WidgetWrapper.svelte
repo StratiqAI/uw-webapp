@@ -215,6 +215,7 @@
 
 	const rawTitle = $derived.by(() => {
 		if (widget.type === 'title') return widget.title;
+		if (typeof widget.title === 'string' && widget.title.trim()) return widget.title;
 		const d = liveData as Record<string, unknown> | undefined | null;
 		if (d && typeof d === 'object') {
 			const t = d.title;
@@ -225,6 +226,7 @@
 
 	const rawDescription = $derived.by(() => {
 		if (widget.type === 'title') return widget.description;
+		if (typeof widget.description === 'string' && widget.description.trim()) return widget.description;
 		const d = liveData as Record<string, unknown> | undefined | null;
 		if (d && typeof d === 'object') {
 			const desc = d.description;
