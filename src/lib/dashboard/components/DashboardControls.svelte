@@ -685,22 +685,39 @@
 
 		<div class="h-4 w-px {darkMode ? 'bg-slate-700' : 'bg-slate-200'}"></div>
 
+		<!-- AutoSave toggle -->
+		<label class="flex items-center gap-1 cursor-pointer select-none" title="When on, edits auto-save to the cloud">
+			<span class="text-[10px] font-medium {darkMode ? 'text-slate-400' : 'text-slate-500'}">AutoSave</span>
+			<button
+				type="button"
+				role="switch"
+				aria-checked={dashboard.autoSaveToCloud}
+				aria-label="Toggle auto-save to cloud"
+				onclick={() => dashboard.setAutoSaveToCloud(!dashboard.autoSaveToCloud)}
+				class="relative inline-flex h-4 w-7 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 {dashboard.autoSaveToCloud
+					? 'bg-emerald-500'
+					: darkMode ? 'bg-slate-600' : 'bg-slate-300'}"
+			>
+				<span
+					class="pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform {dashboard.autoSaveToCloud ? 'translate-x-3' : 'translate-x-0'}"
+				></span>
+			</button>
+		</label>
+
 		<button
 			type="button"
 			onclick={handlePushToCloud}
-			disabled={dashboard.cloudSyncStatus === 'unavailable' || isPushingToCloud || isReloadingFromCloud}
+			disabled={!dashboard.projectId || !dashboard.idToken || isPushingToCloud || isReloadingFromCloud}
 			class="relative rounded-md p-1.5 transition-colors {darkMode
 				? 'text-slate-400 hover:text-white hover:bg-slate-700'
 				: 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'} disabled:opacity-30 disabled:pointer-events-none"
-			title={dashboard.cloudSyncStatus === 'unavailable'
-				? 'Push to cloud unavailable (no project or connection)'
-				: isPushingToCloud
-					? 'Saving to cloud…'
-					: dashboard.cloudSyncStatus === 'synced'
-						? 'Push current dashboard to the cloud now'
-						: dashboard.cloudSyncStatus === 'error'
-							? 'Last cloud save failed — click to retry'
-							: 'Push current dashboard to the cloud'}
+			title={isPushingToCloud
+				? 'Saving to cloud…'
+				: dashboard.cloudSyncStatus === 'saved'
+					? 'Push current dashboard to the cloud now'
+					: dashboard.cloudSyncStatus === 'error'
+						? 'Last cloud save failed — click to retry'
+						: 'Push current dashboard to the cloud'}
 			aria-label="Export dashboard layout to cloud"
 		>
 			{#if isPushingToCloud}
@@ -713,7 +730,7 @@
 					<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L9 8m4-4v12"/>
 				</svg>
 			{/if}
-			{#if dashboard.cloudSyncStatus === 'synced' && !isPushingToCloud}
+			{#if dashboard.cloudSyncStatus === 'saved' && !isPushingToCloud}
 				<span class="absolute -top-0.5 -right-0.5 block h-2 w-2 rounded-full bg-emerald-400 ring-1 {darkMode ? 'ring-slate-800' : 'ring-white'}"></span>
 			{:else if dashboard.cloudSyncStatus === 'error' && !isPushingToCloud}
 				<span class="absolute -top-0.5 -right-0.5 block h-2 w-2 rounded-full bg-red-400 ring-1 {darkMode ? 'ring-slate-800' : 'ring-white'}"></span>
@@ -723,15 +740,13 @@
 		<button
 			type="button"
 			onclick={handleReloadFromCloud}
-			disabled={dashboard.cloudSyncStatus === 'unavailable' || isReloadingFromCloud || isPushingToCloud}
+			disabled={!dashboard.projectId || !dashboard.idToken || isReloadingFromCloud || isPushingToCloud}
 			class="rounded-md p-1.5 transition-colors {darkMode
 				? 'text-slate-400 hover:text-white hover:bg-slate-700'
 				: 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'} disabled:opacity-30 disabled:pointer-events-none"
-			title={dashboard.cloudSyncStatus === 'unavailable'
-				? 'Import from cloud unavailable (no project or connection)'
-				: isReloadingFromCloud
-					? 'Importing from cloud…'
-					: 'Clear local cache and import the latest layout from the cloud'}
+			title={isReloadingFromCloud
+				? 'Importing from cloud…'
+				: 'Clear local cache and import the latest layout from the cloud'}
 			aria-label="Import dashboard layout from cloud"
 		>
 			{#if isReloadingFromCloud}

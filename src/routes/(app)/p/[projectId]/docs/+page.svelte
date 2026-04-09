@@ -3,6 +3,7 @@
 	import { browser } from '$app/environment';
 	import { fade } from 'svelte/transition';
 	import { untrack, onDestroy } from 'svelte';
+	import { createAsyncGuard } from '$lib/utils/asyncGuard';
 	import { store } from '$lib/services/realtime/websocket/projectSync';
 	import { DocumentEntitiesSyncManager } from '$lib/services/realtime/websocket/sync-managers/DocumentEntitiesSyncManager';
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
@@ -207,11 +208,13 @@
 	let isLoadingEntities = $state(false);
 	let entitiesError = $state<string | null>(null);
 	let lastFetchedDocIds = $state<string>('');
+	const entitiesGuard = createAsyncGuard();
 
 	const documentIdsKey = $derived(documents.map(doc => doc.id).sort().join(','));
 
 	async function fetchDocumentEntities(documentIds: string[], token: string, pid: string): Promise<void> {
 		if (!browser) return;
+		const gen = entitiesGuard.next();
 		isLoadingEntities = true;
 		entitiesError = null;
 
@@ -222,11 +225,13 @@
 				projectId: pid,
 				documentIds
 			});
+			if (!entitiesGuard.isCurrent(gen)) return;
 		} catch (err) {
+			if (!entitiesGuard.isCurrent(gen)) return;
 			log.error('Failed to fetch document entities:', err);
 			entitiesError = err instanceof Error ? err.message : 'Failed to load document entities';
 		} finally {
-			isLoadingEntities = false;
+			if (entitiesGuard.isCurrent(gen)) isLoadingEntities = false;
 		}
 	}
 

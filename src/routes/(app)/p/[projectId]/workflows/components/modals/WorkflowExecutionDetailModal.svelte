@@ -25,6 +25,7 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	const unsubscribes: Array<() => void> = [];
+	let alive = true;
 
 	function statusColor(status: string) {
 		switch (status) {
@@ -66,25 +67,21 @@
 
 		loading = true;
 		error = null;
-		log.debug('[WorkflowExecutionDetailModal] Fetching execution:', { executionId, workflowId, projectId });
 		try {
 			const result = await fetchWorkflowExecutionDetail(executionId, workflowId, idToken);
-			log.debug('[WorkflowExecutionDetailModal] Fetched execution:', result);
-			if (result) {
-				log.debug('[WorkflowExecutionDetailModal] Node executions count:', result.nodeExecutions?.items?.length ?? 0);
-				log.debug('[WorkflowExecutionDetailModal] Node executions:', result.nodeExecutions?.items);
-			}
+			if (!alive) return;
 			execution = result;
 			if (!result) {
 				error = 'Execution not found';
-				log.warn('[WorkflowExecutionDetailModal] Execution returned null');
 			}
 		} catch (e) {
-			log.error('[WorkflowExecutionDetailModal] Error fetching execution:', e);
+			if (!alive) return;
 			error = e instanceof Error ? e.message : 'Failed to load execution';
 		} finally {
-			loading = false;
+			if (alive) loading = false;
 		}
+
+		if (!alive) return;
 
 		const client = getAppSyncWsClient() ?? initAppSyncWsClient({
 			graphqlHttpUrl: PUBLIC_GRAPHQL_HTTP_ENDPOINT,
@@ -106,7 +103,7 @@
 
 		const h2 = client.subscribe({
 			query: S_ON_WORKFLOW_NODE_EXECUTION_STATUS_CHANGE,
-			variables: { parentId: executionId }, // parentId is the WorkflowExecution ID (WorkflowNodeExecution's parent)
+			variables: { parentId: executionId },
 			next: (payload: any) => {
 				const data = payload?.onWorkflowNodeExecutionStatusChange;
 				if (data && execution?.nodeExecutions?.items) {
@@ -123,6 +120,7 @@
 	});
 
 	onDestroy(() => {
+		alive = false;
 		for (const unsub of unsubscribes) unsub();
 	});
 

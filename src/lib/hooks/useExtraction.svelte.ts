@@ -119,16 +119,18 @@ export function useExtraction(
 				{ id },
 				tok
 			);
+			if (currentId !== id) return;
 			data = resp.getExtraction ?? null;
 
 			if (data && !TERMINAL_STATUSES.has(data.status)) {
 				subscribe(id, tok);
 			}
 		} catch (err) {
+			if (currentId !== id) return;
 			error = err instanceof Error ? err.message : String(err);
 			log.error('Failed to fetch extraction', id, err);
 		} finally {
-			loading = false;
+			if (currentId === id) loading = false;
 		}
 	}
 

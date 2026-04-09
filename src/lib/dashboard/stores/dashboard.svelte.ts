@@ -26,8 +26,13 @@ import { DashboardStorage } from '$lib/dashboard/utils/storage';
 import { generateWidgetId } from '$lib/dashboard/utils/idGenerator';
 import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
-import type { DashboardSyncManager } from '$lib/services/realtime/websocket/sync-managers/DashboardSyncManager';
 import type { DashboardLayout } from '@stratiqai/types-simple';
+import {
+	Q_LIST_DASHBOARD_LAYOUTS,
+	M_CREATE_DASHBOARD_LAYOUT,
+	M_UPDATE_DASHBOARD_LAYOUT
+} from '@stratiqai/types-simple';
+import { gql } from '$lib/services/realtime/graphql/requestHandler';
 import { createLogger } from '$lib/utils/logger';
 
 const log = createLogger('dashboard');
@@ -69,17 +74,8 @@ const DEFAULT_RESIZE_STATE: ResizeState = {
 const GRID_BUFFER_ROWS = 2;
 const AUTO_SAVE_DELAY_MS = 1000;
 const UNDO_STACK_LIMIT = 40;
-const CLOUD_OPERATION_TIMEOUT_MS = 10_000;
-
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-	return new Promise<T>((resolve, reject) => {
-		const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
-		promise.then(
-			(v) => { clearTimeout(timer); resolve(v); },
-			(e) => { clearTimeout(timer); reject(e); }
-		);
-	});
-}
+const CLOUD_SAVE_DEBOUNCE_MS = 1200;
+const AUTOSAVE_CLOUD_KEY = 'dashboard_autosave_cloud';
 
 type LayoutSnapshot = Array<{
 	id: string;
@@ -132,20 +128,21 @@ class DashboardStore {
 	#tabSlices = $state.raw<Record<DashboardTabId, TabDashboardSlice>>(cloneEmptyMultiTab().tabs);
 	
 	// Private state
-	#initialized = false;
+	#initialized = $state(false);
 	#nextZIndex = 1;
 	#autoSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 	#eventListeners = new Map<keyof DashboardEvents, Set<Function>>();
 	#suspendAutoSave = false;
 
-	// Cloud sync state
-	#syncManager: DashboardSyncManager | null = null;
+	// Guards overlapping initialize() calls across project switches
+	#initGeneration = 0;
+
+	// Cloud sync state (direct GraphQL, no sync manager)
+	#idToken: string | null = null;
 	#cloudLayoutId = $state<string | null>(null);
 	#cloudSaveTimeout: ReturnType<typeof setTimeout> | null = null;
-	#isReconciling = false;
-	#cloudSyncStatus: 'idle' | 'syncing' | 'synced' | 'error' | 'unavailable' = $state('unavailable');
-	/** AppSync `updatedAt` from our last successful mutation — skip subscription echo for same timestamp */
-	#lastCloudPushUpdatedAt: string | null = null;
+	#cloudSyncStatus: 'idle' | 'saving' | 'saved' | 'error' = $state('idle');
+	#autoSaveToCloud = $state(true);
 
 	// Undo / redo stacks (layout-only snapshots — lightweight)
 	#undoStack: LayoutSnapshot[] = [];
@@ -168,6 +165,8 @@ class DashboardStore {
 	fullscreenWidgetId = $derived(this.#fullscreenWidgetId);
 	displacementPreview = $derived(this.#displacementPreview);
 	cloudSyncStatus = $derived(this.#cloudSyncStatus);
+	autoSaveToCloud = $derived(this.#autoSaveToCloud);
+	get idToken(): string | null { return this.#idToken; }
 	get tabIds(): DashboardTabId[] { return this.#tabOrder.map(t => t.id); }
 	get isInitialized() { return this.#initialized; }
 	get canUndo(): boolean { return this.#undoStack.length > 0; }
@@ -205,17 +204,24 @@ class DashboardStore {
 	}
 	
 	// Initialization
-	async initialize(projectId: string | null = null): Promise<boolean> {
+	async initialize(projectId: string | null = null, idToken: string | null = null): Promise<boolean> {
 		if (this.#initialized && this.#projectId === projectId) {
+			if (idToken) this.#idToken = idToken;
 			if (projectId) globalProjectStore.setSelectedProjectId(projectId);
 			return true;
 		}
+
+		// Invalidate any in-flight initialize() from a previous call
+		const gen = ++this.#initGeneration;
 		
 		// If switching projects, save current dashboard first
 		if (this.#initialized && this.#projectId !== projectId && this.#hasUnsavedChanges) {
 			this.save();
 		}
 		
+		// Clear all VTS widget topics to prevent stale data from previous project
+		validatedTopicStore.clearAllAt('widgets');
+
 		// Reset state for new project
 		this.#widgets = [];
 		this.#widgetZIndexMap.clear();
@@ -223,6 +229,9 @@ class DashboardStore {
 		this.#nextZIndex = 1;
 		this.#hasUnsavedChanges = false;
 		this.#projectId = projectId;
+		this.#idToken = idToken;
+		this.#cloudLayoutId = null;
+		this.#cloudSyncStatus = 'idle';
 		if (projectId) {
 			globalProjectStore.setSelectedProjectId(projectId);
 		}
@@ -231,6 +240,12 @@ class DashboardStore {
 		const fresh = cloneEmptyMultiTab();
 		this.#tabOrder = fresh.tabOrder;
 		this.#tabSlices = fresh.tabs;
+
+		// Restore autosave preference from localStorage
+		try {
+			const stored = localStorage.getItem(AUTOSAVE_CLOUD_KEY);
+			if (stored !== null) this.#autoSaveToCloud = stored !== 'false';
+		} catch { /* ignore */ }
 		
 		try {
 			DashboardStorage.setAutoSaveWidgetData(this.#autoSaveWidgetData);
@@ -242,6 +257,7 @@ class DashboardStore {
 				return false;
 			}
 			
+			// Load from localStorage first (instant render)
 			const savedState = DashboardStorage.loadDashboard(projectId);
 			if (savedState) {
 				this.#loadFromSavedState(savedState);
@@ -251,18 +267,29 @@ class DashboardStore {
 				this.#initialized = true;
 			}
 
-			if (projectId && this.#syncManager) {
+			// Then fetch from GraphQL and overwrite if cloud has data
+			if (projectId && idToken) {
 				try {
-					await withTimeout(
-						this.#reconcileWithCloud(projectId, savedState),
-						CLOUD_OPERATION_TIMEOUT_MS,
-						'Cloud reconciliation'
-					);
+					const cloudState = await this.#loadFromGraphQL(projectId);
+					if (gen !== this.#initGeneration) return false;
+					if (cloudState) {
+						this.#loadFromSavedState(cloudState);
+						DashboardStorage.saveMultiTabState(cloudState, projectId);
+						this.#emit('dashboard:loaded', undefined);
+						log.info('Loaded dashboard from cloud');
+					} else if (savedState) {
+						await this.#createCloudLayout(savedState);
+						if (gen !== this.#initGeneration) return false;
+					} else {
+						this.#flushActiveTabIntoSlices();
+						await this.#createCloudLayout(this.#snapshotMultiTabState());
+						if (gen !== this.#initGeneration) return false;
+					}
 				} catch (err) {
-					log.error('Cloud reconciliation failed:', err);
+					log.error('Cloud load failed, using local state:', err);
 				}
 			}
-			
+
 			return !!savedState;
 		} catch (error) {
 			log.error('Failed to initialize dashboard:', error);
@@ -271,22 +298,9 @@ class DashboardStore {
 		}
 	}
 
-	/**
-	 * Attach a DashboardSyncManager for cloud persistence.
-	 * Must be called before initialize() for cloud sync to work.
-	 */
-	setSyncManager(manager: DashboardSyncManager | null): void {
-		if (this.#syncManager && this.#syncManager !== manager) {
-			this.#syncManager.cleanup();
-		}
-		this.#lastCloudPushUpdatedAt = null;
-		this.#syncManager = manager;
-		this.#cloudLayoutId = manager?.currentLayoutId ?? null;
-		this.#cloudSyncStatus = manager ? 'idle' : 'unavailable';
-	}
-
-	get syncManager(): DashboardSyncManager | null {
-		return this.#syncManager;
+	setAutoSaveToCloud(enabled: boolean): void {
+		this.#autoSaveToCloud = enabled;
+		try { localStorage.setItem(AUTOSAVE_CLOUD_KEY, String(enabled)); } catch { /* ignore */ }
 	}
 
 	cloudLayoutId = $derived(this.#cloudLayoutId);
@@ -309,8 +323,8 @@ class DashboardStore {
 				this.#emit('dashboard:saved', undefined);
 			}
 
-			// Debounced async cloud save (real-time subscribers receive AppSync subscription events)
-			if (this.#syncManager && this.#projectId) {
+			// Debounced cloud save when autosave is on
+			if (this.#autoSaveToCloud && this.#idToken && this.#projectId) {
 				this.#scheduleCloudSave(state);
 			}
 
@@ -326,18 +340,14 @@ class DashboardStore {
 	 * Also writes to localStorage first.
 	 */
 	async syncToCloud(): Promise<boolean> {
-		if (!this.#syncManager || !this.#projectId) {
-			this.#cloudSyncStatus = 'unavailable';
-			return false;
-		}
+		if (!this.#idToken || !this.#projectId) return false;
 
-		// Cancel any pending debounced cloud save
 		if (this.#cloudSaveTimeout) {
 			clearTimeout(this.#cloudSaveTimeout);
 			this.#cloudSaveTimeout = null;
 		}
 
-		this.#cloudSyncStatus = 'syncing';
+		this.#cloudSyncStatus = 'saving';
 		try {
 			this.#flushActiveTabIntoSlices();
 			const state = this.#snapshotMultiTabState();
@@ -345,13 +355,9 @@ class DashboardStore {
 			DashboardStorage.saveMultiTabState(state, this.#projectId);
 			this.#hasUnsavedChanges = false;
 
-			const layout = await DashboardStorage.saveToCloud(this.#syncManager, state);
+			const layout = await this.#saveToGraphQL(state);
 			if (layout) {
-				this.#cloudLayoutId = layout.id;
-				this.#syncManager!.currentLayoutId = layout.id;
-				if (layout.updatedAt) this.#lastCloudPushUpdatedAt = layout.updatedAt;
-				this.#cloudSyncStatus = 'synced';
-				if (this.#projectId) this.#bindCloudRealtime(this.#projectId);
+				this.#cloudSyncStatus = 'saved';
 				return true;
 			}
 
@@ -365,14 +371,11 @@ class DashboardStore {
 	}
 
 	/**
-	 * Clear this project's dashboard keys in localStorage, then load the latest layout from AppSync.
-	 * Returns true if a cloud layout existed (with or without usable state); false if none.
+	 * Clear this project's dashboard keys in localStorage, then load the latest layout from GraphQL.
+	 * Returns true if a cloud layout existed; false if none.
 	 */
 	async reloadFromCloud(): Promise<boolean> {
-		if (!this.#syncManager || !this.#projectId) {
-			this.#cloudSyncStatus = 'unavailable';
-			return false;
-		}
+		if (!this.#idToken || !this.#projectId) return false;
 
 		const projectId = this.#projectId;
 
@@ -381,17 +384,15 @@ class DashboardStore {
 			this.#cloudSaveTimeout = null;
 		}
 
-		this.#lastCloudPushUpdatedAt = null;
-		this.#cloudSyncStatus = 'syncing';
+		this.#cloudSyncStatus = 'saving';
 
-		this.#isReconciling = true;
 		try {
 			DashboardStorage.clearDashboard(projectId);
 			validatedTopicStore.clearAllAt('widgets');
 
-			const cloudResult = await DashboardStorage.loadFromCloud(this.#syncManager, projectId);
+			const cloudState = await this.#loadFromGraphQL(projectId);
 
-			if (!cloudResult) {
+			if (!cloudState) {
 				const fresh = cloneEmptyMultiTab();
 				this.#tabOrder = fresh.tabOrder;
 				this.#tabSlices = fresh.tabs;
@@ -399,48 +400,25 @@ class DashboardStore {
 				this.#applyTabSlice(fresh.tabs[this.#activeTabId]);
 				this.#initialized = true;
 				this.#cloudLayoutId = null;
-				this.#syncManager.currentLayoutId = null;
 				this.#hasUnsavedChanges = false;
 				this.clearUndoHistory();
 				DashboardStorage.saveMultiTabState(fresh, projectId);
-				this.#wireCloudSubscriptions(projectId);
 				this.#cloudSyncStatus = 'idle';
 				return false;
 			}
 
-			this.#cloudLayoutId = cloudResult.layoutId;
-			this.#syncManager.currentLayoutId = cloudResult.layoutId;
-
-			if (cloudResult.state) {
-				const persisted: MultiTabDashboardState = {
-					...cloudResult.state,
-					cloudLayoutId: cloudResult.layoutId
-				};
-				DashboardStorage.saveMultiTabState(persisted, projectId);
-				this.#loadFromSavedState(persisted);
-				this.#emit('dashboard:loaded', undefined);
-			} else {
-				const fresh = cloneEmptyMultiTab();
-				this.#tabOrder = fresh.tabOrder;
-				this.#tabSlices = fresh.tabs;
-				this.#activeTabId = fresh.activeTabId;
-				this.#applyTabSlice(fresh.tabs[this.#activeTabId]);
-				this.#initialized = true;
-				const statePayload = this.#snapshotMultiTabState();
-				DashboardStorage.saveMultiTabState(statePayload, projectId);
-			}
+			DashboardStorage.saveMultiTabState(cloudState, projectId);
+			this.#loadFromSavedState(cloudState);
+			this.#emit('dashboard:loaded', undefined);
 
 			this.#hasUnsavedChanges = false;
 			this.clearUndoHistory();
-			this.#wireCloudSubscriptions(projectId);
-			this.#cloudSyncStatus = 'synced';
+			this.#cloudSyncStatus = 'saved';
 			return true;
 		} catch (err) {
 			log.error('reloadFromCloud failed:', err);
 			this.#cloudSyncStatus = 'error';
 			return false;
-		} finally {
-			this.#isReconciling = false;
 		}
 	}
 
@@ -1021,7 +999,6 @@ class DashboardStore {
 			this.#config = structuredClone(DEFAULT_CONFIG);
 			this.#hasUnsavedChanges = false;
 			this.#cloudLayoutId = null;
-			this.#lastCloudPushUpdatedAt = null;
 			if (this.#cloudSaveTimeout) {
 				clearTimeout(this.#cloudSaveTimeout);
 				this.#cloudSaveTimeout = null;
@@ -1191,9 +1168,8 @@ class DashboardStore {
 		this.#initialized = true;
 
 		const persistedLayoutId = savedState.cloudLayoutId;
-		if (typeof persistedLayoutId === 'string' && persistedLayoutId.length > 0 && this.#syncManager) {
+		if (typeof persistedLayoutId === 'string' && persistedLayoutId.length > 0) {
 			this.#cloudLayoutId = persistedLayoutId;
-			this.#syncManager.currentLayoutId = persistedLayoutId;
 		}
 	}
 	
@@ -1325,156 +1301,102 @@ class DashboardStore {
 		}
 	}
 
-	// ─── Cloud Sync ──────────────────────────────────────────────────
-
-	static readonly CLOUD_SAVE_DEBOUNCE_MS = 1200;
-
-	#bindCloudRealtime(projectId: string): void {
-		if (!this.#syncManager || !this.#cloudLayoutId) return;
-		this.#syncManager.currentLayoutId = this.#cloudLayoutId;
-		this.#syncManager.setupUpdateSubscription((remoteLayout: DashboardLayout) => {
-			this.#handleRemoteUpdate(remoteLayout, projectId);
-		});
-	}
-
-	#wireCloudSubscriptions(projectId: string): void {
-		if (!this.#syncManager) return;
-		if (this.#cloudLayoutId) {
-			this.#bindCloudRealtime(projectId);
-		} else {
-			this.#syncManager.setupCreateSubscription((newLayout: DashboardLayout) => {
-				this.#cloudLayoutId = newLayout.id;
-				this.#syncManager!.currentLayoutId = newLayout.id;
-				this.#handleRemoteUpdate(newLayout, projectId);
-				this.#bindCloudRealtime(projectId);
-			});
-		}
-	}
+	// ─── Direct GraphQL Cloud Sync ──────────────────────────────────
 
 	#scheduleCloudSave(state: MultiTabDashboardState): void {
 		if (this.#cloudSaveTimeout) clearTimeout(this.#cloudSaveTimeout);
 		this.#cloudSaveTimeout = setTimeout(() => {
 			this.#cloudSaveTimeout = null;
-			if (!this.#syncManager) return;
-			this.#cloudSyncStatus = 'syncing';
-			const pid = this.#projectId;
-			DashboardStorage.saveToCloud(this.#syncManager, state).then((layout) => {
-				if (layout) {
-					this.#cloudLayoutId = layout.id;
-					this.#syncManager!.currentLayoutId = layout.id;
-					if (layout.updatedAt) this.#lastCloudPushUpdatedAt = layout.updatedAt;
-					this.#cloudSyncStatus = 'synced';
-					if (pid) this.#bindCloudRealtime(pid);
-				} else {
-					this.#cloudSyncStatus = 'error';
-				}
+			if (!this.#idToken) return;
+			this.#cloudSyncStatus = 'saving';
+			this.#saveToGraphQL(state).then((layout) => {
+				this.#cloudSyncStatus = layout ? 'saved' : 'error';
 			}).catch(() => {
 				this.#cloudSyncStatus = 'error';
 			});
-		}, DashboardStore.CLOUD_SAVE_DEBOUNCE_MS);
+		}, CLOUD_SAVE_DEBOUNCE_MS);
 	}
 
-	async #reconcileWithCloud(
-		projectId: string,
-		localState: MultiTabDashboardState | null
-	): Promise<void> {
-		if (!this.#syncManager) return;
+	async #loadFromGraphQL(projectId: string): Promise<MultiTabDashboardState | null> {
+		if (!this.#idToken) return null;
 
-		this.#isReconciling = true;
+		const result = await gql<{
+			listDashboardLayouts: { items: DashboardLayout[]; nextToken: string | null };
+		}>(Q_LIST_DASHBOARD_LAYOUTS, { parentId: projectId, limit: 1 }, this.#idToken);
+
+		const items = result?.listDashboardLayouts?.items;
+		if (!items || items.length === 0) return null;
+
+		const layout = items[0];
+		this.#cloudLayoutId = layout.id;
+
+		if (!layout.state) return null;
+
+		let parsed: unknown;
 		try {
-			const cloudResult = await DashboardStorage.loadFromCloud(this.#syncManager, projectId);
+			parsed = typeof layout.state === 'string' ? JSON.parse(layout.state) : layout.state;
+		} catch {
+			log.warn('Cloud layout state is not valid JSON');
+			return null;
+		}
 
-			if (cloudResult) {
-				this.#cloudLayoutId = cloudResult.layoutId;
-				this.#syncManager.currentLayoutId = cloudResult.layoutId;
+		if (!parsed || typeof parsed !== 'object' || (parsed as any).version !== DASHBOARD_STORAGE_VERSION) {
+			log.warn('Cloud state failed validation');
+			return null;
+		}
 
-				if (cloudResult.state) {
-					// Cloud has usable state -- reconcile (cloud wins in v1)
-					const reconciled = DashboardStorage.reconcileWithCloud(
-						localState,
-						{
-							id: cloudResult.layoutId,
-							state: JSON.stringify(cloudResult.state)
-						} as DashboardLayout,
-						projectId
-					);
-					if (reconciled && reconciled !== localState) {
-						this.#loadFromSavedState(reconciled);
-						this.#emit('dashboard:loaded', undefined);
-						log.info('Loaded newer state from cloud');
-					}
-				} else {
-					// Cloud entity exists but state is empty or unusable — keep in-memory dashboard, persist layout id.
-					this.#flushActiveTabIntoSlices();
-					DashboardStorage.saveMultiTabState(this.#snapshotMultiTabState(), projectId);
-				}
-			} else if (localState) {
-				// No cloud data but localStorage has state: migrate to cloud
-				const layout = await DashboardStorage.migrateToCloud(this.#syncManager, localState);
-				if (layout) {
-					this.#cloudLayoutId = layout.id;
-					this.#syncManager.currentLayoutId = layout.id;
-					DashboardStorage.saveMultiTabState(
-						{ ...localState, cloudLayoutId: layout.id },
-						projectId
-					);
-				}
+		const cloudState = parsed as MultiTabDashboardState;
+		cloudState.cloudLayoutId = layout.id;
+		return cloudState;
+	}
+
+	async #saveToGraphQL(state: MultiTabDashboardState): Promise<DashboardLayout | null> {
+		if (!this.#idToken || !this.#projectId) return null;
+
+		const stateJson = JSON.stringify(state);
+
+		try {
+			if (this.#cloudLayoutId) {
+				const result = await gql<{ updateDashboardLayout: DashboardLayout }>(
+					M_UPDATE_DASHBOARD_LAYOUT,
+					{
+						key: { id: this.#cloudLayoutId, parentId: this.#projectId },
+						input: { state: stateJson, version: DASHBOARD_STORAGE_VERSION }
+					},
+					this.#idToken
+				);
+				const layout = result?.updateDashboardLayout;
+				if (layout?.id) this.#cloudLayoutId = layout.id;
+				return layout ?? null;
 			} else {
-				// No cloud row and no saved local snapshot (e.g. first open of this project):
-				// create cloud layout from the current in-memory default so layout id appears immediately.
-				this.#flushActiveTabIntoSlices();
-				const freshState = this.#snapshotMultiTabState();
-				const layout = await DashboardStorage.migrateToCloud(this.#syncManager, freshState);
-				if (layout) {
-					this.#cloudLayoutId = layout.id;
-					this.#syncManager.currentLayoutId = layout.id;
-					DashboardStorage.saveMultiTabState(
-						{ ...freshState, cloudLayoutId: layout.id },
-						projectId
-					);
-				}
+				return this.#createCloudLayout(state);
 			}
-
-			this.#wireCloudSubscriptions(projectId);
-		} finally {
-			this.#isReconciling = false;
+		} catch (err) {
+			log.error('Failed to save to cloud:', err);
+			return null;
 		}
 	}
 
-	#handleRemoteUpdate(remoteLayout: DashboardLayout, projectId: string): void {
-		if (this.#isReconciling) return;
+	async #createCloudLayout(state: MultiTabDashboardState): Promise<DashboardLayout | null> {
+		if (!this.#idToken || !this.#projectId) return null;
 
 		try {
-			if (
-				remoteLayout.updatedAt &&
-				this.#lastCloudPushUpdatedAt &&
-				remoteLayout.updatedAt === this.#lastCloudPushUpdatedAt
-			) {
-				return;
+			const stateJson = JSON.stringify(state);
+			const result = await gql<{ createDashboardLayout: DashboardLayout }>(
+				M_CREATE_DASHBOARD_LAYOUT,
+				{ input: { parentId: this.#projectId, state: stateJson, version: DASHBOARD_STORAGE_VERSION } },
+				this.#idToken
+			);
+			const layout = result?.createDashboardLayout;
+			if (layout?.id) {
+				this.#cloudLayoutId = layout.id;
+				const updated = { ...state, cloudLayoutId: layout.id };
+				DashboardStorage.saveMultiTabState(updated, this.#projectId);
 			}
-
-			if (remoteLayout.id) {
-				this.#cloudLayoutId = remoteLayout.id;
-				if (this.#syncManager) this.#syncManager.currentLayoutId = remoteLayout.id;
-			}
-
-			const mts = DashboardStorage.parseRemoteLayoutState(remoteLayout.state);
-			if (!mts) return;
-
-			const persisted: MultiTabDashboardState = { ...mts };
-			const layoutEntityId = remoteLayout.id ?? this.#cloudLayoutId;
-			if (layoutEntityId) persisted.cloudLayoutId = layoutEntityId;
-
-			DashboardStorage.saveMultiTabState(persisted, projectId);
-
-			this.#isReconciling = true;
-			this.#loadFromSavedState(persisted);
-			this.#emit('dashboard:loaded', undefined);
-			log.info('Applied remote update via AppSync subscription');
+			return layout ?? null;
 		} catch (err) {
-			log.error('Failed to apply remote update:', err);
-		} finally {
-			this.#isReconciling = false;
+			log.error('Failed to create cloud layout:', err);
+			return null;
 		}
 	}
 }

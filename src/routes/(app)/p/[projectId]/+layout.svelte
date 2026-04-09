@@ -118,19 +118,24 @@
 	$effect(() => {
 		if (!browser || !idToken || !projectId) return;
 
+		let cancelled = false;
 		notificationStore.setLoading(true);
 		const qc = new GraphQLQueryClient(idToken);
 		qc.query(notificationListQuery, { parentId: projectId })
 			.then((result: any) => {
+				if (cancelled) return;
 				const items: Notification[] = result?.listNotifications?.items ?? [];
 				notificationStore.addNotifications(items);
 			})
 			.catch((err: unknown) => {
+				if (cancelled) return;
 				log.error('Failed to load historical notifications', err);
 			})
 			.finally(() => {
-				notificationStore.setLoading(false);
+				if (!cancelled) notificationStore.setLoading(false);
 			});
+
+		return () => { cancelled = true; };
 	});
 
 	$effect(() => {

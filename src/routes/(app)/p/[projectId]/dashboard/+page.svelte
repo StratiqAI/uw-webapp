@@ -9,32 +9,23 @@
 	import { onMount, setContext } from 'svelte';
 	import { themeStore } from '$lib/stores/themeStore.svelte';
 	import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
-	import { DashboardSyncManager } from '$lib/services/realtime/websocket/sync-managers/DashboardSyncManager';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { createLogger } from '$lib/utils/logger';
 
 	const log = createLogger('dashboard');
 
-	const SYNC_INIT_TIMEOUT_MS = 8_000;
-
-	function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-		return new Promise<T>((resolve, reject) => {
-			const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
-			promise.then(
-				(v) => { clearTimeout(timer); resolve(v); },
-				(e) => { clearTimeout(timer); reject(e); }
-			);
-		});
-	}
-
 	interface Props {
 		data: PageData;
 	}
 
 	let { data }: Props = $props();
-	let isLoading = $state(true);
 	let showAddWidgetDialog = $state(false);
+	let isLoading = $derived(!dashboard.isInitialized);
+	// #region agent log
+	let _dbgEffectCount = 0;
+	$effect(() => { console.log('[DEBUG-35a5c4] isLoading changed to:', isLoading, 'initialized:', dashboard.isInitialized); });
+	// #endregion
 
 	let darkMode = $derived.by(() => themeStore.darkMode);
 	let currentTheme = $derived.by(() => themeStore.theme);
@@ -63,8 +54,6 @@
 		goto(`/p/${projectId}/dashboard`);
 	}
 
-	let currentSyncManager: DashboardSyncManager | null = null;
-
 	function updateGridSize() {
 		try {
 			const width = window.innerWidth;
@@ -92,54 +81,28 @@
 		const idToken = data.idToken;
 		if (!projectId) return;
 
-		isLoading = true;
-		let cancelled = false;
+		// #region agent log
+		_dbgEffectCount++;
+		console.log('[DEBUG-35a5c4] $effect fired #' + _dbgEffectCount, { projectId, hasIdToken: !!idToken, isInitialized: dashboard.isInitialized });
+		// #endregion
 
-		(async () => {
-			try {
-				if (currentSyncManager) {
-					currentSyncManager.cleanup();
-					currentSyncManager = null;
-					dashboard.setSyncManager(null);
-				}
-
-				if (idToken) {
-					try {
-						const sm = DashboardSyncManager.createInactive();
-						await withTimeout(
-							sm.initialize({ idToken, projectId }),
-							SYNC_INIT_TIMEOUT_MS,
-							'SyncManager init'
-						);
-						if (cancelled) { sm.cleanup(); return; }
-						currentSyncManager = sm;
-						dashboard.setSyncManager(sm);
-					} catch (e) {
-						log.warn('Cloud sync unavailable for dashboard:', e);
-						dashboard.setSyncManager(null);
-					}
-				}
-
-				if (cancelled) return;
-				await dashboard.initialize(projectId);
-
+		dashboard.initialize(projectId, idToken)
+			.then(() => {
 				try {
 					publishWidgetData(dashboard.widgets, { onlyIfMissing: true });
 				} catch (error) {
 					log.error('Error publishing widget data:', error);
 				}
-
 				dashboard.ensureGridCapacity();
 				updateGridSize();
+				// #region agent log
+				console.log('[DEBUG-35a5c4] init .then() complete', { isInitialized: dashboard.isInitialized });
+				// #endregion
 				log.debug('Dashboard initialization complete for project:', projectId);
-			} catch (error) {
+			})
+			.catch((error) => {
 				log.error('Error initializing dashboard:', error);
-			} finally {
-				if (!cancelled) isLoading = false;
-			}
-		})();
-
-		return () => { cancelled = true; };
+			});
 	});
 
 	onMount(() => {
@@ -171,10 +134,6 @@
 			unsubReset?.();
 			window.removeEventListener('resize', updateGridSize);
 			window.removeEventListener('beforeunload', handleBeforeUnload);
-			if (currentSyncManager) {
-				currentSyncManager.cleanup();
-				currentSyncManager = null;
-			}
 			try {
 				if (dashboard.hasUnsavedChanges && dashboard.autoSaveEnabled) {
 					dashboard.save();

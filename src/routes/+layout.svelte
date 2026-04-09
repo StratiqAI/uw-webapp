@@ -9,7 +9,6 @@
 	import { browser } from '$app/environment';
 	import { initTopicStoreSync } from '$lib/stores/topicStoreSync';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
-	import { DashboardStorage } from '$lib/dashboard/utils/storage';
 	import { streamCatalog } from '$lib/stores/streamCatalog.svelte';
 	import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
 	import ToastContainer from '$lib/components/ui/ToastContainer.svelte';
@@ -24,7 +23,6 @@
 	let { children, data } = $props<{ children: any; data: LayoutData }>();
 
 	let destroySync: (() => void) | null = null;
-	let unsubDashboardSync: (() => void) | null = null;
 	let layoutProjectsInitialized = $state(false);
 
 	if (browser) {
@@ -39,19 +37,6 @@
 
 		destroySync = initTopicStoreSync(validatedTopicStore);
 		streamCatalog.init();
-
-		unsubDashboardSync = validatedTopicStore.onChange((event) => {
-			if (
-				(event.type === 'publish' || event.type === 'delete') &&
-				event.topic.startsWith('widgets/')
-			) {
-				DashboardStorage.autoSaveWidgetData();
-			} else if (event.type === 'clear') {
-				DashboardStorage.autoSaveWidgetData();
-			}
-		});
-
-		DashboardStorage.saveWidgetDataNow();
 	}
 
 	$effect.pre(() => {
@@ -75,7 +60,6 @@
 
 	onDestroy(() => {
 		destroySync?.();
-		unsubDashboardSync?.();
 		streamCatalog.destroy();
 	});
 

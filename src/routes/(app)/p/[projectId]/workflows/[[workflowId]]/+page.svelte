@@ -90,10 +90,11 @@
 	import { WorkflowSyncManager } from '$lib/services/realtime/websocket/sync-managers/WorkflowSyncManager';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
 	import { toTopicPath } from '$lib/services/realtime/store/TopicMapper';
-	import { onMount, onDestroy, tick } from 'svelte';
+	import { tick } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
+	import { createAsyncGuard } from '$lib/utils/asyncGuard';
 
 	interface Props {
 		data: PageData;
@@ -173,30 +174,42 @@
 	let executionsLoading = $state(false);
 	let selectedExecutionId = $state<string | null>(null);
 	const executionsSubscriptionSpecRef = { current: null as { query: any; variables: any; next: (p: any) => void } | null };
+	const workflowsGuard = createAsyncGuard();
+	const executionsGuard = createAsyncGuard();
 
 	// ------------------------------------------------------------------------------------------------
 	// Workflow Sync Manager
 	// ------------------------------------------------------------------------------------------------
 	let workflowSyncManager = $state<WorkflowSyncManager | null>(null);
 
-	onMount(async () => {
-		if (data.idToken) {
+	$effect(() => {
+		if (!data.idToken) return;
+		let alive = true;
+		const token = data.idToken;
+
+		(async () => {
 			try {
-				workflowSyncManager = await WorkflowSyncManager.create({
-					idToken: data.idToken,
+				const mgr = await WorkflowSyncManager.create({
+					idToken: token,
 					setupSubscriptions: true
 				});
+				if (!alive) {
+					mgr.cleanup();
+					return;
+				}
+				workflowSyncManager = mgr;
 			} catch (error) {
 				log.error('Failed to initialize WorkflowSyncManager:', error);
 			}
-		}
-	});
+		})();
 
-	onDestroy(() => {
-		if (workflowSyncManager) {
-			workflowSyncManager.cleanup();
-			workflowSyncManager = null;
-		}
+		return () => {
+			alive = false;
+			if (workflowSyncManager) {
+				workflowSyncManager.cleanup();
+				workflowSyncManager = null;
+			}
+		};
 	});
 
 	// Load workflow from URL params on initial load
@@ -224,23 +237,23 @@
 		const wfId = selectedWorkflowId;
 		const projectId = selectedProjectId;
 		const token = data.idToken;
-		log.debug('[loadWorkflowExecutions] Loading executions:', { wfId, projectId, token });
 		if (!wfId || !projectId || !token) {
 			executions = [];
 			return;
 		}
 
+		const gen = executionsGuard.next();
 		executionsLoading = true;
 		try {
-			log.debug('[loadWorkflowExecutions] Loading executions:', { wfId, projectId });
 			const { items } = await fetchWorkflowExecutions(wfId, projectId, token);
-			log.debug('[loadWorkflowExecutions] Loaded executions:', { count: items.length, items });
+			if (!executionsGuard.isCurrent(gen)) return;
 			executions = items;
 		} catch (e) {
+			if (!executionsGuard.isCurrent(gen)) return;
 			log.error('Failed to load workflow executions:', e);
 			executions = [];
 		} finally {
-			executionsLoading = false;
+			if (executionsGuard.isCurrent(gen)) executionsLoading = false;
 		}
 	}
 
@@ -252,9 +265,9 @@
 			return;
 		}
 
+		const gen = workflowsGuard.next();
 		loadingWorkflows = true;
 		try {
-			// Query the project to get its workflows and workflowExecutions
 			const response = await gql<{ 
 				getProject: { 
 					workflows?: { items: Workflow[]; nextToken?: string | null };
@@ -265,34 +278,27 @@
 				{ id: projectId },
 				data.idToken
 			);
+
+			if (!workflowsGuard.isCurrent(gen)) return;
 			
 			const project = response?.getProject;
 			const workflowItems = project?.workflows?.items || [];
 			const executionItems = project?.workflowexecutions?.items || [];
 			
-			log.debug('Loaded workflows for project:', projectId, workflowItems);
-			log.debug('Loaded workflow executions for project:', projectId, executionItems.length, executionItems);
-			
 			workflows = workflowItems;
 
-			// Publish workflow executions to the store (use 'workflowExecutions' camelCase to match sync manager)
 			if (executionItems.length > 0) {
 				for (const execution of executionItems) {
 					const topic = toTopicPath('workflowExecutions', execution.id);
-					const published = validatedTopicStore.publish(topic, execution);
-					log.debug(`[loadWorkflowsForProject] Published execution ${execution.id} to ${topic}:`, published, execution);
+					validatedTopicStore.publish(topic, execution);
 				}
-				log.debug(`[loadWorkflowsForProject] Published ${executionItems.length} workflow executions to store`);
-				
-				// Verify they're in the store
-				const stored = validatedTopicStore.getAllAtArray<WorkflowExecution>('workflowExecutions');
-				log.debug(`[loadWorkflowsForProject] Verified: ${stored.length} executions now in store:`, stored.map(e => ({ id: e.id, parentId: e.parentId })));
 			}
 		} catch (error) {
+			if (!workflowsGuard.isCurrent(gen)) return;
 			log.error('Failed to load workflows:', error);
 			workflows = [];
 		} finally {
-			loadingWorkflows = false;
+			if (workflowsGuard.isCurrent(gen)) loadingWorkflows = false;
 		}
 	}
 
