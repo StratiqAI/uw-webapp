@@ -48,4 +48,14 @@
 	.flip-card-back {
 		transform: rotateY(180deg);
 	}
+
+	:global(.widget-wrapper--dragging) .flip-card-back {
+		opacity: 0;
+	}
+
+	@media print {
+		.flip-card-back {
+			opacity: 0;
+		}
+	}
 </style>
