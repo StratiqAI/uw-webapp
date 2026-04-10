@@ -14,6 +14,7 @@ export interface WidgetMeta {
 	description?: string;
 	showTitle?: boolean;
 	showDescription?: boolean;
+	disableAI?: boolean;
 }
 
 /**

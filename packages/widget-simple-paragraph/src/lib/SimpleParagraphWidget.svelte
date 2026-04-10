@@ -67,8 +67,10 @@
 <FlipCard isFlipped={configure.isFlipped} {shellClass} {flipBackClass}>
 	{#snippet front()}
 		<div class="relative h-full overflow-auto px-4 py-4">
-			{#if generating || error}
-				<AiStatusOverlay {generating} {error} {darkMode} status={extraction?.status} />
+			{#if generating && !data.content}
+				<AiStatusOverlay {generating} error={undefined} {darkMode} status={extraction?.status} />
+			{:else if error && !data.content}
+				<AiStatusOverlay generating={false} {error} {darkMode} status={extraction?.status} />
 			{:else if widgetData.content}
 				<div
 					class="prose prose-sm max-w-none leading-relaxed {darkMode

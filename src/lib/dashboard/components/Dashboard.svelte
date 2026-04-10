@@ -404,11 +404,12 @@
 				title: w.title,
 				description: w.description,
 				showTitle: w.showTitle,
-				showDescription: w.showDescription
+				showDescription: w.showDescription,
+				disableAI: w.disableAI
 			};
 		},
 
-		updateWidgetMeta(widgetId: string, meta: { title?: string; description?: string; showTitle?: boolean; showDescription?: boolean }) {
+		updateWidgetMeta(widgetId: string, meta: { title?: string; description?: string; showTitle?: boolean; showDescription?: boolean; disableAI?: boolean }) {
 			dashboard.updateWidget(widgetId, meta);
 		}
 	});

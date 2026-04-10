@@ -93,6 +93,7 @@
 		fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f38342'},body:JSON.stringify({sessionId:'f38342',location:'WidgetWrapper.svelte:extractionEffect',message:'extraction publish effect',data:{wid:widget.id,wtype:widget.type,run:_dbgExtractPubRuns,hasExtrId:!!widget.extractionId,hasResult:!!extraction.result,topic:currentTopic},timestamp:Date.now(),hypothesisId:'H-D'})}).catch(()=>{});
 		if (_dbgExtractPubRuns > 50) { console.error('[DEBUG] extraction publish loop', widget.id); return; }
 		// #endregion
+		if (widget.disableAI) return;
 		if (widget.extractionId && extraction.result) {
 			validatedTopicStore.publish(currentTopic, extraction.result);
 		} else if (widget.extractionId && extraction.data?.rawAnswer && !extraction.result) {
@@ -106,7 +107,7 @@
 		fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f38342'},body:JSON.stringify({sessionId:'f38342',location:'WidgetWrapper.svelte:statusEffect',message:'status publish effect',data:{wid:widget.id,wtype:widget.type,run:_dbgStatusPubRuns,hasExtrId:!!widget.extractionId,topic:currentTopic},timestamp:Date.now(),hypothesisId:'H-D'})}).catch(()=>{});
 		if (_dbgStatusPubRuns > 50) { console.error('[DEBUG] status publish loop', widget.id); return; }
 		// #endregion
-		if (!widget.extractionId) return;
+		if (!widget.extractionId || widget.disableAI) return;
 		const statusTopic = `${currentTopic}/__ai_status`;
 		validatedTopicStore.publish(statusTopic, {
 			generating: extraction.isRunning,
@@ -212,11 +213,13 @@
 	 * chrome header label, so lifting it would duplicate the text.
 	 */
 	const liveData = $derived.by(() => {
-		if (widget.extractionId && extraction.result) {
-			return extraction.result;
-		}
-		if (widget.extractionId && extraction.data?.rawAnswer && !extraction.result) {
-			return { content: extraction.data.rawAnswer };
+		if (!widget.disableAI) {
+			if (widget.extractionId && extraction.result) {
+				return extraction.result;
+			}
+			if (widget.extractionId && extraction.data?.rawAnswer && !extraction.result) {
+				return { content: extraction.data.rawAnswer };
+			}
 		}
 		const _ = validatedTopicStore.tree;
 		return validatedTopicStore.at(currentTopic);
@@ -249,7 +252,7 @@
 	const showTitleBar = $derived(!!displayTitle || !!displayDescription);
 
 	const extractionProp = $derived.by(() => {
-		if (!widget.extractionId) return undefined;
+		if (!widget.extractionId || widget.disableAI) return undefined;
 		return {
 			id: widget.extractionId,
 			result: extraction.result as Record<string, unknown> | null,

@@ -89,6 +89,8 @@ export interface BaseWidget extends Position, Size, WidgetConstraints {
 	showTitle?: boolean;
 	/** When true the widget title bar displays the description. Defaults to true when a description exists. */
 	showDescription?: boolean;
+	/** When true, AI output and errors are suppressed — manual data takes full precedence. */
+	disableAI?: boolean;
 }
 
 // Widget Action Types
