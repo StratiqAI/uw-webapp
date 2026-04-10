@@ -203,6 +203,7 @@
 	let peSchemaProperties = $state<Record<string, Record<string, unknown>>>({});
 	let peSchemaRequired = $state<string[]>([]);
 	let peFieldOrder = $state<string[]>([]);
+	let peGoogleSearchEnabled = $state(true);
 	let peTemperature = $state<number | undefined>(undefined);
 	let peMaxTokens = $state<number | undefined>(undefined);
 	let peTopP = $state<number | undefined>(undefined);
@@ -232,6 +233,7 @@
 				peSchemaProperties = data.schemaProperties;
 				peSchemaRequired = data.schemaRequired;
 				peFieldOrder = data.fieldOrder;
+				peGoogleSearchEnabled = data.googleSearchEnabled !== false;
 				peTemperature = data.temperature;
 				peMaxTokens = data.maxTokens;
 				peTopP = data.topP;
@@ -258,6 +260,7 @@
 			schemaProperties: peSchemaProperties,
 			schemaRequired: peSchemaRequired,
 			fieldOrder: peFieldOrder,
+			googleSearchEnabled: peGoogleSearchEnabled,
 			temperature: peTemperature,
 			maxTokens: peMaxTokens,
 			topP: peTopP,
@@ -271,6 +274,10 @@
 		aiRunning = true;
 		aiError = '';
 		try {
+			// #region agent log
+			const _dbgData = gatherPromptData();
+			console.warn('[DBG-598495] gatherPromptData', JSON.stringify({googleSearchEnabled:_dbgData.googleSearchEnabled,responseFormatType:_dbgData.responseFormatType,schemaPropsCount:Object.keys(_dbgData.schemaProperties).length,model:_dbgData.model}));
+			// #endregion
 			await host.saveAndRunWidgetPrompt(kind, widgetId, gatherPromptData());
 		} catch (e) {
 			aiError = e instanceof Error ? e.message : 'AI generation failed';
@@ -623,6 +630,7 @@
 			bind:schemaProperties={peSchemaProperties}
 			bind:schemaRequired={peSchemaRequired}
 			bind:fieldOrder={peFieldOrder}
+			bind:googleSearchEnabled={peGoogleSearchEnabled}
 			bind:temperature={peTemperature}
 			bind:maxTokens={peMaxTokens}
 			bind:topP={peTopP}

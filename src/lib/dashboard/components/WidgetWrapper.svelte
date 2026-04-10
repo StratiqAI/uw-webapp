@@ -253,9 +253,16 @@
 
 	const extractionProp = $derived.by(() => {
 		if (!widget.extractionId || widget.disableAI) return undefined;
+		let result = extraction.result as Record<string, unknown> | null;
+		if (!result && extraction.data?.rawAnswer) {
+			result = { content: extraction.data.rawAnswer };
+		}
+		// #region agent log
+		fetch('http://127.0.0.1:7425/ingest/d259fd4d-670c-429d-b4b0-946c068f2de8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'598495'},body:JSON.stringify({sessionId:'598495',location:'WidgetWrapper.svelte:extractionProp',message:'extractionProp derivation',data:{wid:widget.id,hasStructuredResult:!!extraction.result,hasRawAnswer:!!extraction.data?.rawAnswer,rawAnswerSlice:extraction.data?.rawAnswer ? String(extraction.data.rawAnswer).slice(0,80) : null,synthesizedResult:!extraction.result && !!extraction.data?.rawAnswer,resultKeys:result ? Object.keys(result) : null},timestamp:Date.now(),hypothesisId:'H1,H2'})}).catch(()=>{});
+		// #endregion
 		return {
 			id: widget.extractionId,
-			result: extraction.result as Record<string, unknown> | null,
+			result,
 			status: extraction.status ?? 'DRAFT',
 			loading: extraction.loading || extraction.isRunning,
 			error: extraction.error ?? extraction.data?.errorMessage ?? null,

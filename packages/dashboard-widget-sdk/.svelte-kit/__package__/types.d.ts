@@ -12,6 +12,7 @@ export interface WidgetMeta {
     description?: string;
     showTitle?: boolean;
     showDescription?: boolean;
+    disableAI?: boolean;
 }
 /**
  * Extraction data passed from the host when a widget is bound to an
@@ -155,6 +156,7 @@ export interface WidgetPromptEditData {
     schemaProperties: Record<string, Record<string, unknown>>;
     schemaRequired: string[];
     fieldOrder: string[];
+    googleSearchEnabled?: boolean;
     temperature?: number;
     maxTokens?: number;
     topP?: number;

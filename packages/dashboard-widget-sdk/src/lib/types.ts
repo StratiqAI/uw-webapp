@@ -163,6 +163,7 @@ export interface WidgetPromptEditData {
 	schemaProperties: Record<string, Record<string, unknown>>;
 	schemaRequired: string[];
 	fieldOrder: string[];
+	googleSearchEnabled?: boolean;
 	temperature?: number;
 	maxTokens?: number;
 	topP?: number;

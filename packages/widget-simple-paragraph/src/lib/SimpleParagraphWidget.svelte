@@ -27,7 +27,7 @@
 
 	// #region agent log
 	$effect(() => {
-		fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f38342'},body:JSON.stringify({sessionId:'f38342',location:'SimpleParagraphWidget.svelte:widgetData',message:'widget data inputs',data:{widgetId,hasExtraction:!!extraction,extractionResult:extraction?.result ? Object.keys(extraction.result) : null,extractionResultContent: extraction?.result?.content ? String(extraction.result.content).slice(0,80) : null,dataContent: data.content ? String(data.content).slice(0,80) : null,dataTitle: data.title},timestamp:Date.now(),hypothesisId:'H-B,H-C'})}).catch(()=>{});
+		fetch('http://127.0.0.1:7425/ingest/d259fd4d-670c-429d-b4b0-946c068f2de8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'598495'},body:JSON.stringify({sessionId:'598495',location:'SimpleParagraphWidget.svelte:widgetData',message:'widget data inputs',data:{widgetId,hasExtraction:!!extraction,extractionResult:extraction?.result ? Object.keys(extraction.result) : null,extractionResultContent: extraction?.result?.content ? String(extraction.result.content).slice(0,80) : null,dataContent: data.content ? String(data.content).slice(0,80) : null,dataTitle: data.title,widgetDataContent: widgetData.content ? String(widgetData.content).slice(0,80) : null},timestamp:Date.now(),hypothesisId:'H1,H2,H3'})}).catch(()=>{});
 	});
 	// #endregion
 	let widgetData = $derived<ParagraphData>({

@@ -36,6 +36,7 @@ export interface Extraction {
 	documentIds?: string[];
 	topK?: number;
 	topKPerNs?: number;
+	googleSearchEnabled?: boolean;
 	promptId?: string;
 	status: ExtractionStatus;
 	statusMessage?: string;
@@ -197,6 +198,7 @@ export async function createExtraction(
 		documentIds?: string[];
 		topK?: number;
 		topKPerNs?: number;
+		googleSearchEnabled?: boolean;
 		promptId?: string;
 		runImmediately?: boolean;
 	},

@@ -292,23 +292,34 @@
 			// #endregion
 			const documentIds = await getProjectDocumentIds();
 
+			const sendSchema = schemaDef && !data.googleSearchEnabled;
+			// #region agent log
+			console.warn('[DBG-598495] createExtraction input', JSON.stringify({googleSearchEnabled:data.googleSearchEnabled,hasSchema:!!schemaDef,sendSchema:!!sendSchema,schemaKeys:schemaDef?Object.keys(schemaDef as Record<string,unknown>):null,responseFormatType:data.responseFormatType,kind}));
+			// #endregion
 			const extraction = await createExtraction(
 				{
 					projectId,
 					prompt: data.userPrompt,
 					name: data.name || `${kind} extraction`,
 					systemInstruction: data.systemInstruction,
-					schema: schemaDef ? JSON.stringify(schemaDef) : undefined,
+					schema: sendSchema ? JSON.stringify(schemaDef) : undefined,
 					model: data.model || 'GEMINI_2_5_FLASH',
 					documentIds: documentIds.length > 0 ? documentIds : undefined,
 					promptId: promptId,
+					googleSearchEnabled: data.googleSearchEnabled,
 				},
 				token
 			);
+			// #region agent log
+			console.warn('[DBG-598495] createExtraction response', JSON.stringify({extractionId:extraction.id,returnedGoogleSearchEnabled:extraction.googleSearchEnabled,returnedSchema:extraction.schema?String(extraction.schema).slice(0,120):null,returnedStatus:extraction.status}));
+			// #endregion
 
 			dashboard.updateWidget(widgetId, { extractionId: extraction.id });
 
-			await runExtraction(extraction.id, token);
+			const runResult = await runExtraction(extraction.id, token);
+			// #region agent log
+			console.warn('[DBG-598495] runExtraction response', JSON.stringify({extractionId:runResult.id,runGoogleSearchEnabled:runResult.googleSearchEnabled,runSchema:runResult.schema?String(runResult.schema).slice(0,120):null,runStatus:runResult.status,runErrorMessage:runResult.errorMessage?.slice(0,200),runHasResult:!!runResult.result,runHasRawAnswer:!!runResult.rawAnswer}));
+			// #endregion
 
 			log.info(`Extraction ${extraction.id} created and submitted for widget ${widgetId}`);
 		},

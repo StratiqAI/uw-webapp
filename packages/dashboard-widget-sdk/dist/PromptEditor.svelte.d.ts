@@ -9,6 +9,7 @@ interface Props {
     schemaProperties?: Record<string, Record<string, unknown>>;
     schemaRequired?: string[];
     fieldOrder?: string[];
+    googleSearchEnabled?: boolean;
     hideResponseFormat?: boolean;
     isGenerating?: boolean;
     generateError?: string;
@@ -22,6 +23,6 @@ interface Props {
     frequencyPenalty?: number;
     stopSequences?: string;
 }
-declare const PromptEditor: import("svelte").Component<Props, {}, "promptName" | "promptDescription" | "userPrompt" | "systemInstruction" | "model" | "responseFormatType" | "schemaProperties" | "schemaRequired" | "fieldOrder" | "temperature" | "maxTokens" | "topP" | "frequencyPenalty" | "stopSequences">;
+declare const PromptEditor: import("svelte").Component<Props, {}, "promptName" | "promptDescription" | "userPrompt" | "systemInstruction" | "model" | "responseFormatType" | "schemaProperties" | "schemaRequired" | "fieldOrder" | "googleSearchEnabled" | "temperature" | "maxTokens" | "topP" | "frequencyPenalty" | "stopSequences">;
 type PromptEditor = ReturnType<typeof PromptEditor>;
 export default PromptEditor;

@@ -399,21 +399,6 @@
 
 		<div class="space-y-5">
 			<div>
-				<label for="ai-model-select" class="block text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'} mb-2">
-					AI Model
-				</label>
-				<select
-					id="ai-model-select"
-					bind:value={aiQueryModel}
-					class="w-full px-3 py-2.5 {darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'} rounded-md border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-				>
-
-					<option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
-					<option value="gemini-3-pro-preview">Gemini 3 Pro Preview</option>
-				</select>
-			</div>
-
-			<div>
 				<label for="ai-system-prompt" class="block text-sm font-semibold {darkMode ? 'text-slate-200' : 'text-slate-700'} mb-2">
 					Context Instructions <span class="{darkMode ? 'text-slate-500' : 'text-slate-400'} font-normal">(Optional)</span>
 				</label>

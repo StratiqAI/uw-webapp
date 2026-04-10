@@ -98,6 +98,7 @@
 	let metaDescription = $state('');
 	let metaShowTitle = $state(true);
 	let metaShowDescription = $state(true);
+	let metaDisableAI = $state(false);
 
 	function syncMeta() {
 		const m = host.getWidgetMeta?.(widgetId);
@@ -106,6 +107,7 @@
 			metaDescription = m.description ?? '';
 			metaShowTitle = m.showTitle !== false;
 			metaShowDescription = m.showDescription !== false;
+			metaDisableAI = m.disableAI === true;
 		}
 	}
 
@@ -201,6 +203,7 @@
 	let peSchemaProperties = $state<Record<string, Record<string, unknown>>>({});
 	let peSchemaRequired = $state<string[]>([]);
 	let peFieldOrder = $state<string[]>([]);
+	let peGoogleSearchEnabled = $state(true);
 	let peTemperature = $state<number | undefined>(undefined);
 	let peMaxTokens = $state<number | undefined>(undefined);
 	let peTopP = $state<number | undefined>(undefined);
@@ -230,6 +233,7 @@
 				peSchemaProperties = data.schemaProperties;
 				peSchemaRequired = data.schemaRequired;
 				peFieldOrder = data.fieldOrder;
+				peGoogleSearchEnabled = data.googleSearchEnabled !== false;
 				peTemperature = data.temperature;
 				peMaxTokens = data.maxTokens;
 				peTopP = data.topP;
@@ -256,6 +260,7 @@
 			schemaProperties: peSchemaProperties,
 			schemaRequired: peSchemaRequired,
 			fieldOrder: peFieldOrder,
+			googleSearchEnabled: peGoogleSearchEnabled,
 			temperature: peTemperature,
 			maxTokens: peMaxTokens,
 			topP: peTopP,
@@ -269,6 +274,10 @@
 		aiRunning = true;
 		aiError = '';
 		try {
+			// #region agent log
+			const _dbgData = gatherPromptData();
+			console.warn('[DBG-598495] gatherPromptData', JSON.stringify({googleSearchEnabled:_dbgData.googleSearchEnabled,responseFormatType:_dbgData.responseFormatType,schemaPropsCount:Object.keys(_dbgData.schemaProperties).length,model:_dbgData.model}));
+			// #endregion
 			await host.saveAndRunWidgetPrompt(kind, widgetId, gatherPromptData());
 		} catch (e) {
 			aiError = e instanceof Error ? e.message : 'AI generation failed';
@@ -383,6 +392,33 @@
 		{/if}
 
 		{#if activeTab === 'settings'}
+			{#if hasAI && hasMeta}
+				<section class="space-y-3 border-b pb-4 {sectionBorder}">
+					<label class="inline-flex items-center gap-3 cursor-pointer">
+						<span class="text-sm font-medium {darkMode ? 'text-slate-200' : 'text-slate-700'}">Disable AI</span>
+						<button
+							type="button"
+							role="switch"
+							aria-checked={metaDisableAI}
+							aria-label="Disable AI"
+							class="relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2
+								{metaDisableAI
+									? 'bg-indigo-600'
+									: darkMode ? 'bg-slate-600' : 'bg-slate-300'}"
+							onclick={() => { metaDisableAI = !metaDisableAI; updateMeta('disableAI', metaDisableAI); }}
+						>
+							<span
+								class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out
+									{metaDisableAI ? 'translate-x-4' : 'translate-x-0'}"
+							></span>
+						</button>
+					</label>
+					<p class="text-xs {darkMode ? 'text-slate-500' : 'text-slate-400'}">
+						When enabled, AI output and errors are hidden and only manually entered data is shown.
+					</p>
+				</section>
+			{/if}
+
 			{#if hasMeta && kind !== 'title'}
 				<section class="space-y-3 border-b pb-4 {sectionBorder}">
 					<h4 class={sectionTitle}>Widget Display</h4>
@@ -594,6 +630,7 @@
 			bind:schemaProperties={peSchemaProperties}
 			bind:schemaRequired={peSchemaRequired}
 			bind:fieldOrder={peFieldOrder}
+			bind:googleSearchEnabled={peGoogleSearchEnabled}
 			bind:temperature={peTemperature}
 			bind:maxTokens={peMaxTokens}
 			bind:topP={peTopP}
