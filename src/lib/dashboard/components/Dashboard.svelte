@@ -287,22 +287,28 @@
 					schemaDef = zodToJsonSchema(zodSchema, { $refStrategy: 'none' });
 				}
 			}
-			// #region agent log
-			fetch('http://127.0.0.1:7378/ingest/4d5fe42c-52eb-4139-a797-75aa8980d08f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'986080'},body:JSON.stringify({sessionId:'986080',location:'Dashboard.svelte:schemaDef',message:'Schema sent to extraction',data:{kind,schemaDef,schemaStr:schemaDef?JSON.stringify(schemaDef):null},timestamp:Date.now(),hypothesisId:'H-A,H-B,H-C'})}).catch(()=>{});
-			// #endregion
 			const documentIds = await getProjectDocumentIds();
 
-			const sendSchema = schemaDef && !data.googleSearchEnabled;
+			// Until the AppSync schema is deployed with `googleSearchEnabled`,
+			// the backend always defaults to Google Search ON. Sending a schema
+			// as a separate field triggers the "controlled generation + Search
+			// tool" API conflict. Instead, embed the schema in the prompt text
+			// so the model returns JSON without API-level controlled generation.
+			let promptWithSchema = data.userPrompt;
+			if (schemaDef && !data.googleSearchEnabled) {
+				promptWithSchema += `\n\nYou MUST respond with valid JSON matching this schema:\n${JSON.stringify(schemaDef, null, 2)}`;
+			}
+
 			// #region agent log
-			console.warn('[DBG-598495] createExtraction input', JSON.stringify({googleSearchEnabled:data.googleSearchEnabled,hasSchema:!!schemaDef,sendSchema:!!sendSchema,schemaKeys:schemaDef?Object.keys(schemaDef as Record<string,unknown>):null,responseFormatType:data.responseFormatType,kind}));
+			console.warn('[DBG-598495] createExtraction input', JSON.stringify({googleSearchEnabled:data.googleSearchEnabled,hasSchema:!!schemaDef,schemaEmbeddedInPrompt:!!schemaDef && !data.googleSearchEnabled,kind}));
 			// #endregion
 			const extraction = await createExtraction(
 				{
 					projectId,
-					prompt: data.userPrompt,
+					prompt: promptWithSchema,
 					name: data.name || `${kind} extraction`,
 					systemInstruction: data.systemInstruction,
-					schema: sendSchema ? JSON.stringify(schemaDef) : undefined,
+					schema: undefined,
 					model: data.model || 'GEMINI_2_5_FLASH',
 					documentIds: documentIds.length > 0 ? documentIds : undefined,
 					promptId: promptId,
@@ -311,14 +317,14 @@
 				token
 			);
 			// #region agent log
-			console.warn('[DBG-598495] createExtraction response', JSON.stringify({extractionId:extraction.id,returnedGoogleSearchEnabled:extraction.googleSearchEnabled,returnedSchema:extraction.schema?String(extraction.schema).slice(0,120):null,returnedStatus:extraction.status}));
+			console.warn('[DBG-598495] createExtraction response', JSON.stringify({extractionId:extraction.id,returnedGoogleSearchEnabled:extraction.googleSearchEnabled,returnedStatus:extraction.status,promptLength:promptWithSchema.length}));
 			// #endregion
 
 			dashboard.updateWidget(widgetId, { extractionId: extraction.id });
 
 			const runResult = await runExtraction(extraction.id, token);
 			// #region agent log
-			console.warn('[DBG-598495] runExtraction response', JSON.stringify({extractionId:runResult.id,runGoogleSearchEnabled:runResult.googleSearchEnabled,runSchema:runResult.schema?String(runResult.schema).slice(0,120):null,runStatus:runResult.status,runErrorMessage:runResult.errorMessage?.slice(0,200),runHasResult:!!runResult.result,runHasRawAnswer:!!runResult.rawAnswer}));
+			console.warn('[DBG-598495] runExtraction response', JSON.stringify({extractionId:runResult.id,runStatus:runResult.status,runErrorMessage:runResult.errorMessage?.slice(0,200),runHasResult:!!runResult.result,runHasRawAnswer:!!runResult.rawAnswer}));
 			// #endregion
 
 			log.info(`Extraction ${extraction.id} created and submitted for widget ${widgetId}`);
