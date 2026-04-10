@@ -98,7 +98,7 @@
 		"runes-meta-tags": "^0.4.4",
 		"svelte-pdf": "^1.0.28",
 		"topojson-client": "^3.1.0",
-		"uuid": "^13.0.0",
+		"uuid": "^11.0.0",
 		"world-atlas": "^2.0.2",
 		"xlsx": "^0.18.5",
 		"zod": "^3.24.4",
