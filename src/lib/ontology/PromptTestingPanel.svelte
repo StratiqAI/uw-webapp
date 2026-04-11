@@ -68,6 +68,8 @@
 	let executionResult = $state<string | null>(null);
 	let executionError = $state('');
 	let executionMeta = $state<Partial<AiQueryExecution> | null>(null);
+	/** Token stream from /api/ai-stream (cleared when a run completes). */
+	let streamingPreview = $state('');
 
 	// Results state
 	let parsedResult = $state<Record<string, unknown> | null>(null);
@@ -214,6 +216,7 @@
 		executionMeta = null;
 		parsedResult = null;
 		instanceSaved = false;
+		streamingPreview = '';
 	}
 
 	function gatherAIQueryData(): AIQueryData {
@@ -322,14 +325,18 @@
 				...(aiQueryData.frequencyPenalty !== undefined && { frequencyPenalty: aiQueryData.frequencyPenalty })
 			};
 
-			const handle = await aiService.submitExecution(
+			streamingPreview = '';
+			const handle = await aiService.submitStreamingExecution(
 				{
 					projectId,
 					promptId: linkedPrompt.id,
 					inputValues,
 					priority: 'MEDIUM'
 				},
-				idToken
+				idToken,
+				(text) => {
+					streamingPreview += text;
+				}
 			);
 
 			executionHandle = handle;
@@ -352,6 +359,7 @@
 			});
 
 			handle.result.then((rawOutput) => {
+				streamingPreview = '';
 				executionResult = rawOutput;
 				if (rawOutput) {
 					try {
@@ -536,7 +544,7 @@
 			{/if}
 
 			<!-- Execution Status & Results -->
-			{#if executionStatus || executionError}
+			{#if executionStatus || executionError || streamingPreview}
 				<div class="border-b px-4 py-3 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
 					<h4 class="mb-2 text-xs font-semibold uppercase tracking-wider {darkMode ? 'text-slate-400' : 'text-slate-500'}">
 						Execution
@@ -573,6 +581,15 @@
 					{#if executionMeta?.errorMessage}
 						<div class="rounded-md p-2 text-xs {darkMode ? 'bg-red-900/20 text-red-400' : 'bg-red-50 text-red-600'}">
 							{executionMeta.errorMessage}
+						</div>
+					{/if}
+					{#if streamingPreview && (executing || executionStatus === 'PROCESSING' || executionStatus === 'SUBMITTING')}
+						<div class="mt-2">
+							<p class="mb-1 text-[10px] font-semibold uppercase tracking-wider {darkMode ? 'text-slate-500' : 'text-slate-400'}">
+								Live output
+							</p>
+							<pre class="max-h-48 overflow-auto whitespace-pre-wrap rounded-md p-2 text-[11px] leading-relaxed
+								{darkMode ? 'bg-slate-800/80 text-slate-200' : 'bg-slate-100 text-slate-700'}">{streamingPreview}</pre>
 						</div>
 					{/if}
 				</div>

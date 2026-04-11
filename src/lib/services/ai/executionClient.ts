@@ -126,6 +126,243 @@ export async function submitExecution(
 }
 
 // ---------------------------------------------------------------------------
+// Streaming execution (SvelteKit /api/ai-stream SSE) with AppSync fallback
+// ---------------------------------------------------------------------------
+
+/**
+ * Run an AI query with token streaming via same-origin POST /api/ai-stream.
+ * Falls back to {@link submitExecution} when the endpoint is unavailable or returns non-SSE.
+ */
+export async function submitStreamingExecution(
+	input: SubmitExecutionInput,
+	token: string,
+	onChunk: (text: string) => void = () => {}
+): Promise<ExecutionHandle> {
+	if (!token) {
+		throw new AIError('Authentication required', 'AUTH_REQUIRED');
+	}
+
+	const executionId =
+		input.executionId ??
+		(await calculateExecutionId(input.promptId, input.inputValues, input.documentIds));
+
+	const cached = getCachedResult(executionId);
+	if (cached !== undefined) {
+		log.info('Cache hit for execution (streaming path)', executionId);
+		return createCachedHandle(cached);
+	}
+
+	const ac = new AbortController();
+
+	try {
+		const response = await fetch('/api/ai-stream', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				projectId: input.projectId,
+				promptId: input.promptId,
+				executionId,
+				inputValues: input.inputValues,
+				...(input.documentIds?.length ? { documentIds: input.documentIds } : {}),
+				...(input.topK != null ? { topK: input.topK } : {}),
+				...(input.topKPerNs != null ? { topKPerNs: input.topKPerNs } : {}),
+				...(input.priority ? { priority: input.priority } : {}),
+				...(input.googleSearchEnabled != null && { googleSearchEnabled: input.googleSearchEnabled })
+			}),
+			signal: ac.signal
+		});
+
+		const contentType = response.headers.get('Content-Type') ?? '';
+		if (!response.ok || !response.body || !contentType.includes('text/event-stream')) {
+			log.info('Streaming unavailable, using AppSync path', {
+				status: response.status,
+				contentType
+			});
+			return submitExecution(input, token);
+		}
+
+		const executionStore = writable<AiQueryExecution | null>(null);
+		const statusStore = writable<ExecutionStatus | null>('PROCESSING' as ExecutionStatus);
+		const { promise: resultPromise, resolve: resolveResult } = withResolvers<string | null>();
+
+		let timeoutId: ReturnType<typeof setTimeout> | null = null;
+		let destroyed = false;
+		let recordId: string | null = null;
+		let streamSettled = false;
+
+		function finishStreamResult(value: string | null) {
+			if (streamSettled) return;
+			streamSettled = true;
+			resolveResult(value);
+		}
+
+		function resetTimeout() {
+			if (timeoutId) clearTimeout(timeoutId);
+			timeoutId = setTimeout(() => {
+				log.warn('Streaming execution timed out:', executionId);
+				ac.abort();
+				finishStreamResult(null);
+				cleanup();
+			}, DEFAULT_TIMEOUT_MS);
+		}
+
+		function scheduleCleanup() {
+			setTimeout(() => cleanup(), 1000);
+		}
+
+		function cleanup() {
+			if (destroyed) return;
+			destroyed = true;
+			if (timeoutId) clearTimeout(timeoutId);
+			ac.abort();
+		}
+
+		const reader = response.body.getReader();
+		const decoder = new TextDecoder();
+		let buffer = '';
+		let fullText = '';
+
+		resetTimeout();
+
+		void (async () => {
+			try {
+				while (true) {
+					const { done, value } = await reader.read();
+					if (done) break;
+					buffer += decoder.decode(value, { stream: true });
+					const lines = buffer.split('\n');
+					buffer = lines.pop() ?? '';
+					for (const line of lines) {
+						const trimmed = line.trim();
+						if (!trimmed.startsWith('data:')) continue;
+						const payload = trimmed.slice(5).trimStart();
+						let evt: {
+							type?: string;
+							text?: string;
+							id?: string;
+							executionId?: string;
+							promptTokenCount?: number;
+							candidatesTokenCount?: number;
+							totalTokenCount?: number;
+						};
+						try {
+							evt = JSON.parse(payload) as typeof evt;
+						} catch {
+							continue;
+						}
+						const type = evt.type;
+						if (type === 'started' && evt.id) {
+							recordId = evt.id;
+							executionStore.set({
+								id: evt.id,
+								executionId: evt.executionId ?? executionId,
+								status: 'PROCESSING',
+								promptId: input.promptId,
+								projectId: input.projectId
+							} as AiQueryExecution);
+						} else if (type === 'chunk' && typeof evt.text === 'string') {
+							fullText += evt.text;
+							onChunk(evt.text);
+							executionStore.update((cur) => {
+								const base =
+									cur ??
+									({
+										id: recordId ?? '',
+										executionId,
+										promptId: input.promptId,
+										projectId: input.projectId,
+										status: 'PROCESSING'
+									} as AiQueryExecution);
+								return { ...base, rawOutput: fullText, status: 'PROCESSING' as const };
+							});
+							resetTimeout();
+						} else if (type === 'meta') {
+							executionStore.update((cur) =>
+								cur
+									? {
+											...cur,
+											...(evt.promptTokenCount != null && { promptTokenCount: evt.promptTokenCount }),
+											...(evt.candidatesTokenCount != null && {
+												candidatesTokenCount: evt.candidatesTokenCount
+											}),
+											...(evt.totalTokenCount != null && { totalTokenCount: evt.totalTokenCount })
+										}
+									: cur
+							);
+						} else if (type === 'done') {
+							if (evt.id) recordId = evt.id;
+							statusStore.set('SUCCESS' as ExecutionStatus);
+							setCachedResult(executionId, fullText);
+							executionStore.update((cur) => {
+								const base =
+									cur ??
+									({
+										id: recordId ?? evt.id,
+										executionId: evt.executionId ?? executionId,
+										promptId: input.promptId,
+										projectId: input.projectId
+									} as AiQueryExecution);
+								return { ...base, status: 'SUCCESS' as const, rawOutput: fullText };
+							});
+							finishStreamResult(fullText);
+							scheduleCleanup();
+						} else if (type === 'error') {
+							statusStore.set('ERROR' as ExecutionStatus);
+							finishStreamResult(null);
+							scheduleCleanup();
+						}
+					}
+				}
+				if (!streamSettled) {
+					finishStreamResult(fullText.length ? fullText : null);
+				}
+			} catch (err) {
+				if ((err as Error)?.name === 'AbortError') {
+					finishStreamResult(null);
+				} else {
+					log.error('Streaming read error:', err);
+					finishStreamResult(null);
+				}
+			} finally {
+				if (timeoutId) clearTimeout(timeoutId);
+			}
+		})();
+
+		return {
+			execution: executionStore as Readable<AiQueryExecution | null>,
+			status: statusStore as Readable<ExecutionStatus | null>,
+			result: resultPromise,
+			cancel: () => {
+				if (recordId && token) {
+					gql(M_UPDATE_AI_QUERY_EXECUTION, {
+						id: recordId,
+						input: { status: 'CANCELLED', statusMessage: 'Cancelled by user' }
+					}, token).catch((err) => {
+						log.error('Failed to cancel streaming execution:', err);
+					});
+				}
+				ac.abort();
+			},
+			destroy: () => cleanup()
+		};
+	} catch (err) {
+		if ((err as Error)?.name === 'AbortError') {
+			const exStore = writable<AiQueryExecution | null>(null);
+			const stStore = writable<ExecutionStatus | null>(null);
+			return {
+				execution: exStore as Readable<AiQueryExecution | null>,
+				status: stStore as Readable<ExecutionStatus | null>,
+				result: Promise.resolve(null),
+				cancel: () => {},
+				destroy: () => ac.abort()
+			};
+		}
+		log.warn('Streaming request failed, using AppSync path:', err);
+		return submitExecution(input, token);
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Handle factories
 // ---------------------------------------------------------------------------
 

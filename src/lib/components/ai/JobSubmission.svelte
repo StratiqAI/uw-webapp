@@ -46,6 +46,7 @@
 	let currentStatus = $state<ExecutionStatus | null>(null);
 	let rawResult = $state<string | null>(null);
 	let submitted = $state(false);
+	let streamingBuffer = $state('');
 
 	$effect(() => {
 		if (!handle) return;
@@ -97,15 +98,26 @@
 		loading = true;
 		error = null;
 		rawResult = null;
+		streamingBuffer = '';
 		submitted = true;
 
 		try {
-			handle = await aiService.submitExecution(executionInput, idToken);
+			handle = await aiService.submitStreamingExecution(
+				executionInput,
+				idToken,
+				(text) => {
+					streamingBuffer += text;
+				}
+			);
 
-			log.info('AI execution submitted', { projectId: executionInput.projectId, promptId: executionInput.promptId });
+			log.info('AI execution submitted (streaming)', {
+				projectId: executionInput.projectId,
+				promptId: executionInput.promptId
+			});
 
 			handle.result
 				.then((output) => {
+					streamingBuffer = '';
 					rawResult = output;
 					onComplete?.(output);
 				})
@@ -215,6 +227,11 @@
 				<p class="mt-1 text-sm text-gray-500">
 					{execution.statusMessage ?? 'Waiting for result...'}
 				</p>
+				{#if streamingBuffer}
+					<pre
+						class="mt-4 max-h-64 overflow-auto rounded-md bg-gray-900 p-3 text-left text-xs text-gray-100 whitespace-pre-wrap"
+						aria-live="polite">{streamingBuffer}</pre>
+				{/if}
 			</div>
 		{/if}
 

@@ -5,7 +5,7 @@
  * rather than reaching into individual client files.
  */
 
-import { submitExecution, calculateExecutionId } from './executionClient.js';
+import { submitExecution, submitStreamingExecution, calculateExecutionId } from './executionClient.js';
 import { queryAI } from './directAiClient.js';
 import { generatePromptDraft } from './promptAiClient.js';
 import { buildMessages, buildRequestBody } from './messageBuilder.js';
@@ -15,6 +15,7 @@ import { MODELS, getModelMeta, DEFAULT_BACKEND_MODEL, DEFAULT_DIRECT_MODEL } fro
 export const aiService = {
 	// AppSync execution pipeline (widgets, AI studio)
 	submitExecution,
+	submitStreamingExecution,
 	calculateExecutionId,
 
 	// Direct AI calls (chat, future features)

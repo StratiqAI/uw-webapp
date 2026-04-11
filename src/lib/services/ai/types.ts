@@ -145,7 +145,11 @@ export interface SubmitExecutionInput {
 	executionId?: string;
 	documentIds?: string[];
 	topK?: number;
+	/** Per-namespace top-K for vision RAG (streaming + AppSync create). */
+	topKPerNs?: number;
 	priority?: 'HIGH' | 'MEDIUM' | 'LOW';
+	/** Omit or true for default (search on); false disables Google Search grounding. */
+	googleSearchEnabled?: boolean;
 }
 
 // ---------------------------------------------------------------------------

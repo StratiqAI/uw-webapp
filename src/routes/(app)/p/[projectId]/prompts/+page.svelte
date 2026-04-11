@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, untrack } from 'svelte';
 	import type { Prompt, Project } from '@stratiqai/types-simple';
+	import type { Doclink } from '$lib/types/cloud/app';
 	import { PromptSyncManager } from '$lib/services/realtime/websocket/sync-managers/PromptSyncManager';
 	import { ProjectSyncManager } from '$lib/services/realtime/websocket/sync-managers/ProjectSyncManager';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
@@ -9,13 +10,16 @@
 	import { darkModeStore } from '$lib/stores/darkMode.svelte';
 
 	import TopBar from '$lib/components/layout/TopBar.svelte';
-	import { globalProjectStore } from '$lib/stores/globalProjectStore.svelte';
 	import PromptEditModal from './components/PromptEditModal.svelte';
 	import JsonSchemaPickerModal from '$lib/components/schemas/JsonSchemaPickerModal.svelte';
 	import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
+	import PromptWorkspaceToolsSidebar from './components/PromptWorkspaceToolsSidebar.svelte';
+	import PromptWorkspaceCenter from './components/PromptWorkspaceCenter.svelte';
+	import PromptLibrarySidebar from './components/PromptLibrarySidebar.svelte';
 	import { toastStore } from '$lib/stores/toastStore.svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 
 	import {
 		fetchProjectWithPromptTemplates,
@@ -24,11 +28,21 @@
 		deletePromptTemplate,
 		getTemplateStrForEditor,
 		parseTemplateToAIQueryData,
+		extractPromptVariableNames,
 		type AIQueryData
 	} from './PromptService';
+	import { aiService } from '$lib/services/ai';
+	import type { ExecutionHandle } from '$lib/services/ai/types';
 	import { createLogger } from '$lib/utils/logger';
 
 	const log = createLogger('prompts');
+
+	const SIDEBAR_MIN = 200;
+	const SIDEBAR_MAX = 560;
+	const SIDEBAR_DEFAULT_LEFT = 280;
+	const SIDEBAR_DEFAULT_RIGHT = 320;
+
+	const RESERVED_TEMPLATE_VARS = new Set(['question', 'text', 'prompt']);
 
 	let { data } = $props<{ data: { idToken: string; projects: Project[] } }>();
 
@@ -48,29 +62,89 @@
 	let deleteTemplateModalOpen = $state(false);
 	let showSchemaLibrary = $state(false);
 
-	// Get projects from store or page data
-	let projects = $derived.by(() => {
-		const storeProjects = validatedTopicStore.getAllAtArray<Project>('projects');
-		return storeProjects.length > 0 ? storeProjects : data.projects;
-	});
+	let leftSidebarWidth = $state(SIDEBAR_DEFAULT_LEFT);
+	let rightSidebarWidth = $state(SIDEBAR_DEFAULT_RIGHT);
 
-	// Get all templates from store
+	let workspaceTopK = $state(5);
+	let workspaceTopKPerNs = $state(5);
+	let workspacePriority = $state<'HIGH' | 'MEDIUM' | 'LOW'>('MEDIUM');
+	let workspaceGoogleSearch = $state(true);
+	let workspaceDocScopeSelectedOnly = $state(false);
+
+	let selectedWorkspacePrompt = $state<Prompt | null>(null);
+	let workspaceSelectedDocId = $state('');
+	let workspaceQuestion = $state('');
+	let workspaceVarValues = $state<Record<string, string>>({});
+	let streamingBuffer = $state('');
+	let workspaceExecuting = $state(false);
+	let workspaceStreamError = $state('');
+	let executionHandle = $state<ExecutionHandle | null>(null);
+
+	function clampSidebarWidth(w: number): number {
+		if (typeof window === 'undefined') return Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w));
+		const maxByViewport = Math.floor(window.innerWidth * 0.5);
+		return Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w), maxByViewport);
+	}
+
+	function onLeftResizePointerDown(e: PointerEvent) {
+		const target = e.currentTarget as HTMLElement;
+		target.setPointerCapture(e.pointerId);
+		const startX = e.clientX;
+		const startW = leftSidebarWidth;
+
+		function onMove(ev: PointerEvent) {
+			leftSidebarWidth = clampSidebarWidth(startW + (ev.clientX - startX));
+		}
+
+		function onUp(ev: PointerEvent) {
+			target.releasePointerCapture(ev.pointerId);
+			target.removeEventListener('pointermove', onMove);
+			target.removeEventListener('pointerup', onUp);
+			target.removeEventListener('pointercancel', onUp);
+		}
+
+		target.addEventListener('pointermove', onMove);
+		target.addEventListener('pointerup', onUp);
+		target.addEventListener('pointercancel', onUp);
+	}
+
+	function onRightResizePointerDown(e: PointerEvent) {
+		const target = e.currentTarget as HTMLElement;
+		target.setPointerCapture(e.pointerId);
+		const startX = e.clientX;
+		const startW = rightSidebarWidth;
+
+		function onMove(ev: PointerEvent) {
+			rightSidebarWidth = clampSidebarWidth(startW - (ev.clientX - startX));
+		}
+
+		function onUp(ev: PointerEvent) {
+			target.releasePointerCapture(ev.pointerId);
+			target.removeEventListener('pointermove', onMove);
+			target.removeEventListener('pointerup', onUp);
+			target.removeEventListener('pointercancel', onUp);
+		}
+
+		target.addEventListener('pointermove', onMove);
+		target.addEventListener('pointerup', onUp);
+		target.addEventListener('pointercancel', onUp);
+	}
+
 	let allTemplates = $derived.by(() => {
 		return validatedTopicStore.getAllAtArray<Prompt>('prompts');
 	});
 
-	// Filter templates by selected project and search
 	let filteredTemplates = $derived.by(() => {
 		let templates = allTemplates;
 
-		// Filter by project if selected (prompts are no longer project-scoped; show all when parentId is absent)
 		if (selectedProjectId) {
 			templates = templates.filter(
-				(t) => (t as { parentId?: string }).parentId == null || (t as { parentId?: string }).parentId === selectedProjectId
+				(t) =>
+					(t as { parentId?: string }).parentId == null ||
+					(t as { parentId?: string }).parentId === selectedProjectId
 			);
 		}
 
-		// Filter by search
 		if (searchFilter) {
 			const search = searchFilter.toLowerCase();
 			templates = templates.filter(
@@ -83,7 +157,79 @@
 		return templates;
 	});
 
-	// Initialize sync managers and fetch data
+	let projectFromStore = $derived.by(() => {
+		if (!selectedProjectId) return null;
+		return validatedTopicStore.at<Project>(`projects/${selectedProjectId}`) ?? null;
+	});
+
+	type DoclinkWithLinkType = Doclink & { linkType?: string };
+
+	let workspaceDocuments = $derived.by(() => {
+		const p = projectFromStore;
+		if (!p?.doclinks) return [] as { id: string; filename: string }[];
+		const links = Array.isArray(p.doclinks) ? p.doclinks : ((p.doclinks as { items?: Doclink[] }).items ?? []);
+		const byDoc = new Map<string, Doclink>();
+		for (const link of links as DoclinkWithLinkType[]) {
+			if (!link.documentId || link.deletedAt) continue;
+			const existing = byDoc.get(link.documentId);
+			if (!existing || link.linkType === 'NONE') byDoc.set(link.documentId, link);
+		}
+		return Array.from(byDoc.values())
+			.filter((link) => link.documentId && link.filename)
+			.map((link) => ({ id: link.documentId!, filename: link.filename }));
+	});
+
+	let workspaceExtraVarNames = $derived.by(() => {
+		const pr = selectedWorkspacePrompt;
+		if (!pr?.prompt) return [];
+		const fromApi = (pr as { inputVariables?: string[] }).inputVariables ?? [];
+		const fromText = extractPromptVariableNames(pr.prompt);
+		const merged = [...new Set([...fromApi, ...fromText])];
+		return merged.filter((n) => !RESERVED_TEMPLATE_VARS.has(n));
+	});
+
+	function getTemplateDisplayInfo(template: Prompt) {
+		const templateStr = getTemplateStrForEditor(template);
+		const aiData = parseTemplateToAIQueryData(templateStr ?? '');
+		return {
+			prompt: aiData.prompt,
+			model: aiData.model,
+			hasSchema: aiData.responseFormat?.type === 'json_schema'
+		};
+	}
+
+	$effect(() => {
+		const names = workspaceExtraVarNames;
+		untrack(() => {
+			const next: Record<string, string> = {};
+			for (const n of names) {
+				next[n] = workspaceVarValues[n] ?? '';
+			}
+			workspaceVarValues = next;
+		});
+	});
+
+	$effect(() => {
+		const docs = workspaceDocuments;
+		untrack(() => {
+			if (docs.length === 0) {
+				workspaceSelectedDocId = '';
+				return;
+			}
+			if (!workspaceSelectedDocId || !docs.some((d) => d.id === workspaceSelectedDocId)) {
+				workspaceSelectedDocId = docs[0].id;
+			}
+		});
+	});
+
+	$effect(() => {
+		const _ = selectedWorkspacePrompt?.id;
+		untrack(() => {
+			streamingBuffer = '';
+			workspaceStreamError = '';
+		});
+	});
+
 	async function initialize() {
 		if (!data.idToken) {
 			error = 'Not authenticated';
@@ -96,7 +242,6 @@
 		try {
 			queryClient = new GraphQLQueryClient(data.idToken);
 
-			// Initialize project sync manager
 			projectSyncManager = ProjectSyncManager.createInactive();
 			await projectSyncManager.initialize({
 				idToken: data.idToken,
@@ -104,7 +249,6 @@
 				setupSubscriptions: true
 			});
 
-			// Initialize prompt template sync manager
 			promptSyncManager = PromptSyncManager.createInactive();
 			await promptSyncManager.initialize({
 				idToken: data.idToken,
@@ -122,22 +266,15 @@
 		}
 	}
 
-	// Load templates for a specific project by fetching the project with its templates
 	async function loadTemplatesForProject(projectId: string) {
 		if (!queryClient) return;
 
 		isLoading = true;
 		try {
-			// Fetch project with its nested prompt templates
-			const { project, promptTemplates } = await fetchProjectWithPromptTemplates(
-				queryClient,
-				projectId
-			);
+			const { project, promptTemplates } = await fetchProjectWithPromptTemplates(queryClient, projectId);
 
-			// Publish project to store
 			validatedTopicStore.publish(toTopicPath('projects', project.id), project);
 
-			// Publish each template to store
 			for (const template of promptTemplates) {
 				validatedTopicStore.publish(toTopicPath('prompts', template.id), template);
 			}
@@ -151,11 +288,10 @@
 
 	function handleProjectSelect(projectId: string | null) {
 		if (projectId && projectId !== selectedProjectId) {
-			goto(`/p/${projectId}/prompts`);
+			goto(resolve(`/p/${projectId}/prompts`));
 		}
 	}
 
-	// Handle create new template
 	function handleCreateNew() {
 		if (!selectedProjectId) {
 			toastStore.info('Please select a project first.');
@@ -165,13 +301,15 @@
 		editingTemplate = null;
 	}
 
-	// Handle edit template
 	function handleEditTemplate(template: Prompt) {
 		editingTemplate = template;
 		isCreating = false;
 	}
 
-	// Handle save template (create or update)
+	function handleSelectWorkspacePrompt(template: Prompt) {
+		selectedWorkspacePrompt = template;
+	}
+
 	async function handleSaveTemplate(saveData: {
 		name: string;
 		description: string;
@@ -187,7 +325,6 @@
 		isLoading = true;
 		try {
 			if (isCreating && selectedProjectId) {
-				// Create new template
 				const newTemplate = await createPromptTemplate(
 					queryClient,
 					selectedProjectId,
@@ -198,10 +335,8 @@
 					saveData.schemaData
 				);
 
-				// Publish to store
 				validatedTopicStore.publish(toTopicPath('prompts', newTemplate.id), newTemplate);
 			} else if (editingTemplate) {
-				// Update existing template
 				const updatedTemplate = await updatePromptTemplate(
 					queryClient,
 					editingTemplate.id,
@@ -213,35 +348,30 @@
 						schemaData: saveData.schemaData,
 						existingJsonSchemaId: (editingTemplate as { jsonSchemaId?: string }).jsonSchemaId
 					},
-					selectedProjectId
+					selectedProjectId ?? undefined
 				);
 
-				// Update in store
-				validatedTopicStore.publish(
-					toTopicPath('prompts', updatedTemplate.id),
-					updatedTemplate
-				);
+				validatedTopicStore.publish(toTopicPath('prompts', updatedTemplate.id), updatedTemplate);
+				if (selectedWorkspacePrompt?.id === updatedTemplate.id) {
+					selectedWorkspacePrompt = updatedTemplate;
+				}
 			}
 
-			// Close modal
 			editingTemplate = null;
 			isCreating = false;
 		} catch (err) {
 			log.error('Failed to save template:', err);
-			// Rethrow so the modal can show the error and reset saving state
 			throw err;
 		} finally {
 			isLoading = false;
 		}
 	}
 
-	// Handle cancel edit
 	function handleCancelEdit() {
 		editingTemplate = null;
 		isCreating = false;
 	}
 
-	// Handle delete template
 	function requestDeleteTemplate(template: Prompt) {
 		deleteTemplateConfirm = template;
 		deleteTemplateModalOpen = true;
@@ -256,6 +386,9 @@
 			await deletePromptTemplate(queryClient, template.id, undefined);
 
 			validatedTopicStore.delete(toTopicPath('prompts', template.id));
+			if (selectedWorkspacePrompt?.id === template.id) {
+				selectedWorkspacePrompt = null;
+			}
 		} catch (err) {
 			log.error('Failed to delete template:', err);
 			toastStore.error(err instanceof Error ? err.message : 'Failed to delete template');
@@ -268,57 +401,148 @@
 		if (!deleteTemplateModalOpen) deleteTemplateConfirm = null;
 	});
 
-	// Get display info for a template
-	function getTemplateDisplayInfo(template: Prompt) {
-		const templateStr = getTemplateStrForEditor(template);
-		const aiData = parseTemplateToAIQueryData(templateStr ?? '');
-		return {
-			prompt: aiData.prompt,
-			model: aiData.model,
-			hasSchema: aiData.responseFormat?.type === 'json_schema'
+	function cancelWorkspaceStream() {
+		executionHandle?.cancel();
+	}
+
+	async function runWorkspaceStream() {
+		if (!data.idToken || !selectedProjectId || !selectedWorkspacePrompt || workspaceExecuting) return;
+		const q = workspaceQuestion.trim();
+		if (!q) {
+			toastStore.info('Enter a message or question to run.');
+			return;
+		}
+
+		workspaceExecuting = true;
+		workspaceStreamError = '';
+		streamingBuffer = '';
+		executionHandle?.destroy();
+		executionHandle = null;
+
+		const inputValues: Record<string, unknown> = {
+			...workspaceVarValues,
+			question: q
 		};
+
+		const hasDocs = workspaceDocuments.length > 0;
+		const documentIds =
+			!hasDocs
+				? undefined
+				: workspaceDocScopeSelectedOnly && workspaceSelectedDocId
+					? [workspaceSelectedDocId]
+					: undefined;
+
+		let unsubStatus: (() => void) | undefined;
+		let unsubExec: (() => void) | undefined;
+
+		try {
+			const handle = await aiService.submitStreamingExecution(
+				{
+					projectId: selectedProjectId,
+					promptId: selectedWorkspacePrompt.id,
+					inputValues,
+					documentIds,
+					topK: workspaceTopK,
+					topKPerNs: workspaceTopKPerNs,
+					priority: workspacePriority,
+					googleSearchEnabled: workspaceGoogleSearch ? undefined : false
+				},
+				data.idToken,
+				(text) => {
+					streamingBuffer += text;
+				}
+			);
+
+			executionHandle = handle;
+
+			unsubStatus = handle.status.subscribe((s) => {
+				if (s === 'ERROR') {
+					workspaceStreamError = 'Execution failed.';
+				}
+			});
+			unsubExec = handle.execution.subscribe((ex) => {
+				if (ex?.status === 'ERROR' && ex.errorMessage) {
+					workspaceStreamError = ex.errorMessage;
+				}
+			});
+
+			handle.result
+				.then((raw) => {
+					if (raw != null) streamingBuffer = raw;
+					workspaceExecuting = false;
+					unsubStatus?.();
+					unsubExec?.();
+				})
+				.catch((err) => {
+					log.error('Workspace stream failed:', err);
+					workspaceStreamError = err instanceof Error ? err.message : 'Run failed';
+					workspaceExecuting = false;
+					unsubStatus?.();
+					unsubExec?.();
+				});
+		} catch (err) {
+			log.error('Workspace submit failed:', err);
+			workspaceStreamError = err instanceof Error ? err.message : 'Run failed';
+			workspaceExecuting = false;
+		}
 	}
 
 	onMount(() => {
 		initialize();
+		function onResize() {
+			leftSidebarWidth = clampSidebarWidth(leftSidebarWidth);
+			rightSidebarWidth = clampSidebarWidth(rightSidebarWidth);
+		}
+		window.addEventListener('resize', onResize);
+		return () => window.removeEventListener('resize', onResize);
 	});
 
 	onDestroy(() => {
 		promptSyncManager?.cleanup();
 		projectSyncManager?.cleanup();
+		executionHandle?.destroy();
 	});
 </script>
 
-<div class="min-h-screen {darkMode ? 'bg-slate-900' : 'bg-slate-50'} transition-colors">
-	<TopBar
-		pageTitle="Prompt Library"
-		onProjectChange={handleProjectSelect}
-	>
+<div
+	class="flex h-screen w-full flex-col overflow-hidden transition-colors {darkMode ? 'bg-slate-900' : 'bg-slate-50'}"
+>
+	<TopBar pageTitle="Prompt Library" onProjectChange={handleProjectSelect}>
 		{#snippet tabs()}
-			<div class="relative flex-1 min-w-[120px] max-w-sm">
+			<div class="relative min-w-[120px] max-w-sm flex-1">
 				<input
 					type="text"
 					bind:value={searchFilter}
 					placeholder="Search queries..."
-					class="w-full h-7 px-3 pl-8 text-xs rounded-md border transition-colors focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500
+					class="h-7 w-full rounded-md border px-3 pl-8 text-xs transition-colors focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none
 						{darkMode
-						? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400'
-						: 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'}"
+						? 'border-slate-600 bg-slate-700 text-white placeholder-slate-400'
+						: 'border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400'}"
 				/>
 				<svg
-					class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 {darkMode ? 'text-slate-400' : 'text-slate-400'}"
-					fill="none" stroke="currentColor" viewBox="0 0 24 24"
+					class="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+					fill="none"
+					stroke="currentColor"
+					viewBox="0 0 24 24"
 				>
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+					></path>
 				</svg>
 				{#if searchFilter}
 					<button
 						onclick={() => (searchFilter = '')}
-						class="absolute right-2 top-1/2 -translate-y-1/2 {darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-400 hover:text-slate-600'} transition-colors"
+						class="absolute top-1/2 right-2 -translate-y-1/2 transition-colors {darkMode
+							? 'text-slate-400 hover:text-slate-200'
+							: 'text-slate-400 hover:text-slate-600'}"
 						aria-label="Clear filter"
 					>
-						<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+						<svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"
+							></path>
 						</svg>
 					</button>
 				{/if}
@@ -326,25 +550,30 @@
 		{/snippet}
 		{#snippet actions()}
 			<button
-				onclick={() => showSchemaLibrary = true}
+				onclick={() => (showSchemaLibrary = true)}
 				disabled={!queryClient}
-				class="px-3 py-1.5 text-xs font-medium {darkMode
-					? 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-900/20'
-					: 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50'} rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+				class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 {darkMode
+					? 'text-emerald-400 hover:bg-emerald-900/20 hover:text-emerald-300'
+					: 'text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700'}"
 			>
-				<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+				<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"
+					/>
 				</svg>
 				Schemas
 			</button>
 			<button
 				onclick={handleCreateNew}
 				disabled={!selectedProjectId || isLoading}
-				class="px-3 py-1.5 text-xs font-medium {darkMode
-					? 'text-indigo-400 hover:text-indigo-300 hover:bg-indigo-900/20'
-					: 'text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50'} rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+				class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 {darkMode
+					? 'text-indigo-400 hover:bg-indigo-900/20 hover:text-indigo-300'
+					: 'text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700'}"
 			>
-				<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
 				</svg>
 				Create New
@@ -352,179 +581,148 @@
 		{/snippet}
 	</TopBar>
 
-	<!-- Main Content -->
-	<div class="max-w-7xl mx-auto px-6 py-8">
-		<!-- Error Message -->
-		{#if error}
-			<div
-				class="mb-6 p-4 rounded-lg {darkMode
-					? 'bg-red-900/20 border-red-800 text-red-300'
-					: 'bg-red-50 border-red-200 text-red-700'} border"
-			>
-				<p class="text-sm">{error}</p>
-			</div>
-		{/if}
+	{#if error}
+		<div
+			class="shrink-0 border-b px-4 py-2 text-sm {darkMode
+				? 'border-red-800 bg-red-900/20 text-red-300'
+				: 'border-red-200 bg-red-50 text-red-700'}"
+		>
+			{error}
+		</div>
+	{/if}
 
-		<!-- Loading State -->
-		{#if isLoading && filteredTemplates.length === 0}
-			<div class="text-center py-12">
+	<div class="flex min-h-0 flex-1 overflow-hidden">
+		{#if !selectedProjectId}
+			<div class="flex flex-1 flex-col items-center justify-center p-8 text-center">
+				<p class="text-sm font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'}">Select a Project</p>
+				<p class="mt-1 text-xs {darkMode ? 'text-slate-500' : 'text-slate-500'}">
+					Choose a project from the dropdown to use the prompt workspace.
+				</p>
+			</div>
+		{:else if isLoading && filteredTemplates.length === 0}
+			<div class="flex flex-1 flex-col items-center justify-center gap-3">
 				<div
-					class="w-12 h-12 mx-auto mb-4 border-4 {darkMode
+					class="h-10 w-10 animate-spin rounded-full border-4 {darkMode
 						? 'border-slate-600 border-t-indigo-500'
-						: 'border-slate-200 border-t-indigo-600'} rounded-full animate-spin"
+						: 'border-slate-200 border-t-indigo-600'}"
 				></div>
-				<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'}">Loading templates...</p>
-			</div>
-		{:else if !selectedProjectId}
-			<!-- No Project Selected -->
-			<div class="text-center py-12">
-				<svg
-					class="w-16 h-16 mx-auto {darkMode ? 'text-slate-600' : 'text-slate-300'} mb-4"
-					fill="none"
-					stroke="currentColor"
-					viewBox="0 0 24 24"
-				>
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="1.5"
-						d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-					></path>
-				</svg>
-				<p class="text-base font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
-					Select a Project
-				</p>
-				<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'}">
-					Choose a project from the dropdown to view and manage its query templates
-				</p>
-			</div>
-		{:else if filteredTemplates.length === 0}
-			<!-- No Templates -->
-			<div class="text-center py-12">
-				<svg
-					class="w-16 h-16 mx-auto {darkMode ? 'text-slate-600' : 'text-slate-300'} mb-4"
-					fill="none"
-					stroke="currentColor"
-					viewBox="0 0 24 24"
-				>
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="1.5"
-						d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-					></path>
-				</svg>
-				<p class="text-base font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'} mb-2">
-					{searchFilter ? 'No queries found' : 'No query templates yet'}
-				</p>
-				<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'} mb-4">
-					{searchFilter
-						? 'Try adjusting your search terms'
-						: 'Create your first AI query template to get started'}
-				</p>
-				{#if !searchFilter}
-					<button
-						onclick={handleCreateNew}
-						class="px-4 py-2 text-sm font-medium {darkMode
-							? 'bg-indigo-600 hover:bg-indigo-700'
-							: 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-lg transition-colors"
-					>
-						Create Your First Query
-					</button>
-				{/if}
+				<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'}">Loading templates…</p>
 			</div>
 		{:else}
-			<!-- Template Grid -->
-			<div>
-				<h2
-					class="text-sm font-semibold {darkMode
-						? 'text-slate-300'
-						: 'text-slate-700'} mb-4 flex items-center gap-2"
-				>
-					<span class="w-1 h-4 {darkMode ? 'bg-emerald-500' : 'bg-emerald-600'} rounded"></span>
-					Query Templates ({filteredTemplates.length})
-				</h2>
-				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-					{#each filteredTemplates as template (template.id)}
-						{@const displayInfo = getTemplateDisplayInfo(template)}
-						<div
-							class="{darkMode
-								? 'bg-slate-800 border-slate-700 hover:border-emerald-500'
-								: 'bg-white border-slate-200 hover:border-emerald-300'} border rounded-lg p-4 transition-all hover:shadow-lg group relative cursor-pointer"
-							onclick={() => handleEditTemplate(template)}
-							onkeydown={(e) => e.key === 'Enter' && handleEditTemplate(template)}
-							role="button"
-							tabindex="0"
-						>
-							<!-- Delete Button -->
-							<button
-								onclick={(e) => {
-									e.stopPropagation();
-									requestDeleteTemplate(template);
-								}}
-								class="absolute top-2 right-2 p-1 {darkMode
-									? 'text-slate-500 hover:text-red-400 hover:bg-red-900/20'
-									: 'text-slate-400 hover:text-red-600 hover:bg-red-50'} rounded transition-colors opacity-0 group-hover:opacity-100"
-								title="Delete query"
-								aria-label="Delete query"
-							>
-								<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2"
-										d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-									></path>
-								</svg>
-							</button>
+			<!-- Left: tools -->
+			<div
+				class="flex min-h-0 shrink-0 flex-col overflow-hidden"
+				style="width: {leftSidebarWidth}px"
+			>
+				<PromptWorkspaceToolsSidebar
+					{darkMode}
+					bind:topK={workspaceTopK}
+					bind:topKPerNs={workspaceTopKPerNs}
+					bind:priority={workspacePriority}
+					bind:googleSearchEnabled={workspaceGoogleSearch}
+					bind:documentScopeSelectedOnly={workspaceDocScopeSelectedOnly}
+					hasDocuments={workspaceDocuments.length > 0}
+				/>
+			</div>
 
-							<div class="flex items-start gap-3 pr-6">
-								<div
-									class="w-10 h-10 shrink-0 {darkMode
-										? 'bg-emerald-900'
-										: 'bg-emerald-100'} rounded-lg flex items-center justify-center"
-								>
-									<span class="text-xs font-bold {darkMode ? 'text-emerald-300' : 'text-emerald-600'}"
-										>AI</span
-									>
-								</div>
-								<div class="flex-1 min-w-0">
-									<h3
-										class="text-sm font-semibold {darkMode
-											? 'text-white'
-											: 'text-slate-900'} mb-1 group-hover:text-emerald-400 transition-colors"
-									>
-										{template.name}
-									</h3>
-									<p
-										class="text-xs {darkMode ? 'text-slate-400' : 'text-slate-600'} line-clamp-2 mb-2"
-									>
-										{template.description || displayInfo.prompt.slice(0, 100)}
-										{displayInfo.prompt.length > 100 ? '...' : ''}
-									</p>
-									<div class="flex items-center gap-2 flex-wrap">
-										<span
-											class="text-[10px] px-1.5 py-0.5 {darkMode
-												? 'bg-slate-700 text-slate-300'
-												: 'bg-slate-200 text-slate-600'} rounded font-medium"
-										>
-											{displayInfo.model}
-										</span>
-										{#if displayInfo.hasSchema}
-											<span
-												class="text-[10px] px-1.5 py-0.5 {darkMode
-													? 'bg-teal-900/50 text-teal-300'
-													: 'bg-teal-100 text-teal-700'} rounded font-medium"
-											>
-												Structured Output
-											</span>
-										{/if}
-									</div>
-								</div>
-							</div>
-						</div>
-					{/each}
-				</div>
+			<div
+				role="slider"
+				tabindex="0"
+				aria-label="Tools panel width"
+				aria-valuenow={leftSidebarWidth}
+				aria-valuemin={SIDEBAR_MIN}
+				aria-valuemax={SIDEBAR_MAX}
+				aria-orientation="horizontal"
+				class="w-1.5 shrink-0 cursor-col-resize touch-none select-none focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-indigo-500 {darkMode
+					? 'bg-slate-700 hover:bg-slate-600'
+					: 'bg-slate-200 hover:bg-slate-300'}"
+				onpointerdown={onLeftResizePointerDown}
+				onkeydown={(e) => {
+					const step = e.shiftKey ? 40 : 12;
+					if (e.key === 'ArrowLeft') {
+						e.preventDefault();
+						leftSidebarWidth = clampSidebarWidth(leftSidebarWidth - step);
+					} else if (e.key === 'ArrowRight') {
+						e.preventDefault();
+						leftSidebarWidth = clampSidebarWidth(leftSidebarWidth + step);
+					}
+				}}
+			></div>
+
+			<!-- Center -->
+			<PromptWorkspaceCenter
+				{darkMode}
+				documents={workspaceDocuments}
+				selectedPrompt={selectedWorkspacePrompt}
+				bind:selectedDocumentId={workspaceSelectedDocId}
+				bind:question={workspaceQuestion}
+				extraVarNames={workspaceExtraVarNames}
+				bind:extraVarValues={workspaceVarValues}
+				streamingText={streamingBuffer}
+				executing={workspaceExecuting}
+				streamError={workspaceStreamError}
+				onRun={runWorkspaceStream}
+				onCancel={cancelWorkspaceStream}
+			/>
+
+			<div
+				role="slider"
+				tabindex="0"
+				aria-label="Prompt library panel width"
+				aria-valuenow={rightSidebarWidth}
+				aria-valuemin={SIDEBAR_MIN}
+				aria-valuemax={SIDEBAR_MAX}
+				aria-orientation="horizontal"
+				class="w-1.5 shrink-0 cursor-col-resize touch-none select-none focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-indigo-500 {darkMode
+					? 'bg-slate-700 hover:bg-slate-600'
+					: 'bg-slate-200 hover:bg-slate-300'}"
+				onpointerdown={onRightResizePointerDown}
+				onkeydown={(e) => {
+					const step = e.shiftKey ? 40 : 12;
+					if (e.key === 'ArrowLeft') {
+						e.preventDefault();
+						rightSidebarWidth = clampSidebarWidth(rightSidebarWidth + step);
+					} else if (e.key === 'ArrowRight') {
+						e.preventDefault();
+						rightSidebarWidth = clampSidebarWidth(rightSidebarWidth - step);
+					}
+				}}
+			></div>
+
+			<!-- Right: library -->
+			<div
+				class="flex min-h-0 shrink-0 flex-col overflow-hidden"
+				style="width: {rightSidebarWidth}px"
+			>
+				{#if filteredTemplates.length === 0}
+					<div
+						class="flex h-full flex-col items-center justify-center gap-2 border-l p-4 text-center {darkMode
+							? 'border-slate-700 bg-slate-800/50'
+							: 'border-slate-200 bg-white'}"
+					>
+						<p class="text-xs font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'}">
+							{searchFilter ? 'No queries found' : 'No query templates yet'}
+						</p>
+						{#if !searchFilter}
+							<button
+								onclick={handleCreateNew}
+								class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
+							>
+								Create your first query
+							</button>
+						{/if}
+					</div>
+				{:else}
+					<PromptLibrarySidebar
+						{darkMode}
+						templates={filteredTemplates}
+						selectedId={selectedWorkspacePrompt?.id ?? null}
+						onSelect={handleSelectWorkspacePrompt}
+						onEdit={handleEditTemplate}
+						onDelete={requestDeleteTemplate}
+						{getTemplateDisplayInfo}
+					/>
+				{/if}
 			</div>
 		{/if}
 	</div>
@@ -542,7 +740,6 @@
 	onConfirm={confirmDeleteTemplate}
 />
 
-<!-- Edit/Create Modal -->
 <PromptEditModal
 	{darkMode}
 	template={editingTemplate}
@@ -553,13 +750,12 @@
 	onCancel={handleCancelEdit}
 />
 
-<!-- Schema Library Modal -->
 {#if showSchemaLibrary && queryClient}
 	<JsonSchemaPickerModal
 		{darkMode}
 		{queryClient}
 		projectId={selectedProjectId ?? ''}
-		onselect={() => showSchemaLibrary = false}
-		onclose={() => showSchemaLibrary = false}
+		onselect={() => (showSchemaLibrary = false)}
+		onclose={() => (showSchemaLibrary = false)}
 	/>
 {/if}

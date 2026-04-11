@@ -7,7 +7,7 @@
  */
 
 import type { Prompt, Project } from '@stratiqai/types-simple';
-import { Q_GET_PROJECT_WITH_PROMPTS } from '@stratiqai/types-simple';
+import { Q_GET_PROJECT } from '$lib/services/realtime/graphql/queries/Project';
 import {
 	M_CREATE_PROMPT,
 	M_DELETE_PROMPT,
@@ -37,7 +37,7 @@ export async function fetchProjectWithPromptTemplates(
 	projectId: string
 ): Promise<{ project: Project; promptTemplates: Prompt[] }> {
 	const [projectResponse, promptsResponse] = await Promise.all([
-		queryClient.query<{ getProject: Project | null }>(Q_GET_PROJECT_WITH_PROMPTS, {
+		queryClient.query<{ getProject: Project | null }>(Q_GET_PROJECT, {
 			id: projectId
 		}),
 		queryClient.query<{ listPrompts: { items: Prompt[] } }>(Q_LIST_PROMPTS, {
