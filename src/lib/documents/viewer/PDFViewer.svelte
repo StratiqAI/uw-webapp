@@ -24,6 +24,7 @@
 		showTopButton = true,
 		embed = false,
 		hideDocumentFilename = false,
+		fitWidthOnLoad = true,
 		onProgress,
 		externalLinksTarget
 	}: PDFViewerProps = $props();
@@ -315,7 +316,12 @@
 			isLoading = false;
 
 			await tick();
-			fitToWidth();
+			if (fitWidthOnLoad) {
+				fitToWidth();
+			} else {
+				scale = 1;
+				queueRenderPage(currentPage);
+			}
 		} catch (error: any) {
 			const isPasswordError =
 				error?.name === 'PasswordException' ||

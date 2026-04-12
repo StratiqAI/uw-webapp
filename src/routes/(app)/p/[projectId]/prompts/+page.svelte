@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, onDestroy, untrack } from 'svelte';
+	import { onMount, onDestroy, setContext, untrack } from 'svelte';
 	import type { Prompt, Project } from '@stratiqai/types-simple';
 	import type { Doclink } from '$lib/types/cloud/app';
 	import { PromptSyncManager } from '$lib/services/realtime/websocket/sync-managers/PromptSyncManager';
@@ -17,6 +17,12 @@
 	import PromptChatSidebar from './components/PromptChatSidebar.svelte';
 	import PromptLibrarySidebar from './components/PromptLibrarySidebar.svelte';
 	import { toastStore } from '$lib/stores/toastStore.svelte';
+	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
+	import { addPlainParagraphToDashboard } from '$lib/documents/discovery/addToDashboard';
+	import {
+		PROMPTS_ADD_CHAT_TO_DASHBOARD,
+		type PromptsAddChatToDashboardContext
+	} from './promptsDashboardContext';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -37,6 +43,7 @@
 
 	const LIBRARY_SIDEBAR_MIN = 200;
 	const LIBRARY_SIDEBAR_MAX = 520;
+	/** SSR / first paint before `onMount` applies viewport fractions. */
 	const LIBRARY_SIDEBAR_DEFAULT = 320;
 
 	const CHAT_SIDEBAR_MIN = 280;
@@ -44,6 +51,11 @@
 	const CHAT_SIDEBAR_MAX = 560;
 	const CHAT_SIDEBAR_DEFAULT = 360;
 	const CHAT_SIDEBAR_MAX_VIEWPORT_FRACTION = 0.5;
+
+	/** Initial library column width as a fraction of viewport (reference layout ~22%). */
+	const LIBRARY_SIDEBAR_VIEWPORT_FRACTION = 0.22;
+	/** Initial chat column width as a fraction of viewport (reference layout ~48%, nearly half). */
+	const CHAT_SIDEBAR_VIEWPORT_FRACTION = 0.48;
 
 	const RESERVED_TEMPLATE_VARS = new Set(['question', 'text', 'prompt']);
 
@@ -265,12 +277,36 @@
 		});
 	});
 
+	/** Load dashboard layout for this project so “Add to Dashboard” uses project-scoped storage (same as /dashboard). */
+	$effect(() => {
+		const pid = selectedProjectId;
+		const token = data.idToken;
+		if (!pid || !token) return;
+		void dashboard.initialize(pid, token);
+	});
+
 	function nextChatTurnId(): string {
 		if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
 			return crypto.randomUUID();
 		}
 		return `chat-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 	}
+
+	async function handleAddChatResponseToDashboard(text: string, tabId?: string): Promise<void> {
+		const pid = selectedProjectId;
+		const tok = data.idToken;
+		if (!pid || !tok || !text.trim()) return;
+		await dashboard.initialize(pid, tok);
+		const title = selectedWorkspacePrompt?.name?.trim() || 'Prompt response';
+		addPlainParagraphToDashboard(text, pid, title, tabId);
+	}
+
+	const promptsAddChatToDashboard: PromptsAddChatToDashboardContext = {
+		add: (text, tabId) => {
+			void handleAddChatResponseToDashboard(text, tabId);
+		}
+	};
+	setContext(PROMPTS_ADD_CHAT_TO_DASHBOARD, promptsAddChatToDashboard);
 
 	async function initialize() {
 		if (!data.idToken) {
@@ -576,7 +612,10 @@
 	}
 
 	onMount(() => {
-		viewportInnerWidth = window.innerWidth;
+		const vw = window.innerWidth;
+		viewportInnerWidth = vw;
+		leftSidebarWidth = clampLibrarySidebarWidth(Math.round(vw * LIBRARY_SIDEBAR_VIEWPORT_FRACTION));
+		rightSidebarWidth = clampChatSidebarWidth(Math.round(vw * CHAT_SIDEBAR_VIEWPORT_FRACTION));
 		initialize();
 		function onResize() {
 			viewportInnerWidth = window.innerWidth;
@@ -774,6 +813,7 @@
 			>
 				<PromptChatSidebar
 					{darkMode}
+					projectId={selectedProjectId ?? ''}
 					selectedPrompt={selectedWorkspacePrompt}
 					bind:question={workspaceQuestion}
 					chatHistory={workspaceChatHistory}

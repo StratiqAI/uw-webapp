@@ -1,8 +1,13 @@
 <script lang="ts">
-	import { onMount, tick, untrack } from 'svelte';
+	import { getContext, onMount, tick, untrack } from 'svelte';
 	import { marked } from 'marked';
 	import type { Prompt } from '@stratiqai/types-simple';
 	import PromptToolsPopover from './PromptToolsPopover.svelte';
+	import SendToDashboardButton from '$lib/documents/discovery/SendToDashboardButton.svelte';
+	import {
+		PROMPTS_ADD_CHAT_TO_DASHBOARD,
+		type PromptsAddChatToDashboardContext
+	} from '../promptsDashboardContext';
 
 	marked.setOptions({ async: false, gfm: true, breaks: true });
 
@@ -22,6 +27,7 @@
 
 	let {
 		darkMode,
+		projectId = '',
 		selectedPrompt,
 		question = $bindable(''),
 		chatHistory = [],
@@ -34,6 +40,8 @@
 		onCancel: _onCancel
 	} = $props<{
 		darkMode: boolean;
+		/** Current project; enables “Add to Dashboard” for each assistant message. */
+		projectId?: string;
 		selectedPrompt: Prompt | null;
 		/** Run / template body message (shared with Edit prompt save state). */
 		question?: string;
@@ -48,6 +56,10 @@
 		onCancel: () => void;
 	}>();
 
+	const promptsAddToDashboard = getContext<PromptsAddChatToDashboardContext | undefined>(
+		PROMPTS_ADD_CHAT_TO_DASHBOARD
+	);
+
 	function setExtra(name: string, value: string) {
 		extraVarValues = { ...extraVarValues, [name]: value };
 	}
@@ -61,6 +73,11 @@
 		darkMode
 			? 'border-slate-600/80 bg-slate-950/80 text-slate-200'
 			: 'border-slate-200 bg-slate-50 text-slate-800'
+	);
+
+	const showDashboardActions = $derived(Boolean(projectId?.trim() && promptsAddToDashboard));
+	const dashboardBtnColors = $derived(
+		darkMode ? 'text-indigo-300 hover:text-indigo-200' : 'text-indigo-600 hover:text-indigo-800'
 	);
 
 	let scrollRoot = $state<HTMLDivElement | undefined>();
@@ -159,17 +176,53 @@
 			{/if}
 			<div class="flex min-h-full flex-col justify-end gap-2">
 				{#each chatHistory as turn (turn.id)}
-					<div class="rounded-lg border px-3 py-2 text-sm leading-relaxed {bubble} {mdProseClass}">
-						{@html renderMarkdown(turn.text)}
+					<div class="overflow-hidden rounded-lg border {bubble}">
+						{#if showDashboardActions}
+							<div
+								class="flex justify-end border-b px-2 py-1 {darkMode
+									? 'border-slate-600/60 bg-slate-900/60'
+									: 'border-slate-200 bg-slate-100/90'}"
+							>
+								<SendToDashboardButton
+									{darkMode}
+									buttonLabel="Add to Dashboard"
+									colorClasses={dashboardBtnColors}
+									onSend={(tabId) => {
+										void promptsAddToDashboard?.add(turn.text, tabId);
+									}}
+								/>
+							</div>
+						{/if}
+						<div class="px-3 py-2 text-sm leading-relaxed {mdProseClass}">
+							{@html renderMarkdown(turn.text)}
+						</div>
 					</div>
 				{/each}
 				{#if executing || streamingText}
-					<div class="rounded-lg border px-3 py-2 text-sm leading-relaxed {bubble} {mdProseClass}">
-						{#if streamingText}
-							{@html renderMarkdown(streamingText)}
-						{:else}
-							<span class="font-mono text-slate-500">…</span>
+					<div class="overflow-hidden rounded-lg border {bubble}">
+						{#if showDashboardActions && streamingText.trim()}
+							<div
+								class="flex justify-end border-b px-2 py-1 {darkMode
+									? 'border-slate-600/60 bg-slate-900/60'
+									: 'border-slate-200 bg-slate-100/90'}"
+							>
+								<SendToDashboardButton
+									{darkMode}
+									buttonLabel="Add to Dashboard"
+									colorClasses={dashboardBtnColors}
+									onSend={(tabId) => {
+										void promptsAddToDashboard?.add(streamingText, tabId);
+									}}
+								/>
+							</div>
 						{/if}
+						<div class="px-3 py-2 text-sm leading-relaxed {mdProseClass}">
+							{#if streamingText}
+								{@html renderMarkdown(streamingText)}
+							{:else}
+								<span class="font-mono text-slate-500">…</span>
+							{/if}
+						</div>
 					</div>
 				{:else if chatHistory.length === 0 && !streamError}
 					<div

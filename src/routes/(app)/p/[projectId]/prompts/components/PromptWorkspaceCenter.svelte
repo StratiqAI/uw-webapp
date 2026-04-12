@@ -9,6 +9,8 @@
 	const BOTTOM_PANEL_MIN = 200;
 	const PDF_AREA_MIN = 120;
 	const PDF_BOTTOM_RESIZER_H = 6;
+	/** Initial split: bottom (edit/tools) panel height as a fraction of the center column (reference layout ~50/50). */
+	const INITIAL_BOTTOM_PANEL_FRACTION = 0.5;
 
 	let {
 		darkMode,
@@ -36,6 +38,7 @@
 	let centerColumnEl = $state<HTMLDivElement | undefined>();
 	let bottomPanelHeightPx = $state(300);
 	let workspaceTab = $state<'edit' | 'tools'>('edit');
+	let didApplyInitialVerticalSplit = $state(false);
 
 	const centerBg = $derived(darkMode ? 'bg-slate-900' : 'bg-slate-50');
 	const card = $derived(darkMode ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-white');
@@ -94,12 +97,28 @@
 		target.addEventListener('pointercancel', onUp);
 	}
 
+	function tryApplyInitialVerticalSplit(): void {
+		if (didApplyInitialVerticalSplit || !centerColumnEl) return;
+		const h = centerColumnEl.getBoundingClientRect().height;
+		if (h <= PDF_BOTTOM_RESIZER_H + PDF_AREA_MIN + BOTTOM_PANEL_MIN) return;
+		const target = (h - PDF_BOTTOM_RESIZER_H) * INITIAL_BOTTOM_PANEL_FRACTION;
+		bottomPanelHeightPx = clampBottomPanelHeight(target, h);
+		didApplyInitialVerticalSplit = true;
+	}
+
 	onMount(() => {
 		function onWinResize() {
 			reclampBottomPanel();
 		}
 		window.addEventListener('resize', onWinResize);
-		queueMicrotask(() => reclampBottomPanel());
+		queueMicrotask(() => {
+			tryApplyInitialVerticalSplit();
+			reclampBottomPanel();
+			requestAnimationFrame(() => {
+				tryApplyInitialVerticalSplit();
+				reclampBottomPanel();
+			});
+		});
 		return () => window.removeEventListener('resize', onWinResize);
 	});
 </script>
@@ -123,6 +142,7 @@
 				bind:currentPage={currentPage}
 				embed
 				hideDocumentFilename
+				fitWidthOnLoad={false}
 				showButtons={['navigation', 'zoom', 'rotate', 'download', 'refresh']}
 			/>
 		{/if}

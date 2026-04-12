@@ -53,6 +53,9 @@ function addAndPublish(widget: Widget, targetTabId?: string): boolean {
 		} catch {
 			// Non-fatal: widget is added but topic publish failed; dashboard init will republish
 		}
+		// Flush layout immediately so navigation to /dashboard (full re-init) does not drop the widget
+		// before the debounced autosave (see dashboard store #scheduleAutoSave).
+		dashboard.save();
 	}
 	return success;
 }
@@ -63,17 +66,32 @@ function tabLabel(tabId?: string): string {
 	return tab?.label ?? 'dashboard';
 }
 
-export function addTextToDashboard(text: Text, projectId: string, targetTabId?: string): boolean {
-	const pageLabel = text.pageNum ? `Page ${text.pageNum}` : 'Text Block';
+/**
+ * Add arbitrary text as a `simpleParagraph` widget (same shape as discovery text blocks).
+ * @param title — widget title / label in the dashboard chrome
+ */
+export function addPlainParagraphToDashboard(
+	content: string,
+	_projectId: string,
+	title?: string,
+	targetTabId?: string
+): boolean {
+	const label = title?.trim() || 'AI response';
 	const widget = makeWidget(
 		'simpleParagraph',
-		{ title: pageLabel, description: '', content: text.text ?? '' },
+		{ title: label, description: '', content: content ?? '' },
 		{ colSpan: 6, rowSpan: 3 },
-		pageLabel
+		label
 	);
 	const ok = addAndPublish(widget, targetTabId);
 	if (ok) toastStore.success(`Added text block to ${tabLabel(targetTabId)}`);
+	else toastStore.info('No space on dashboard for this widget');
 	return ok;
+}
+
+export function addTextToDashboard(text: Text, projectId: string, targetTabId?: string): boolean {
+	const pageLabel = text.pageNum ? `Page ${text.pageNum}` : 'Text Block';
+	return addPlainParagraphToDashboard(text.text ?? '', projectId, pageLabel, targetTabId);
 }
 
 export function addTableToDashboard(table: Table, projectId: string, targetTabId?: string): boolean {
