@@ -66,13 +66,19 @@ function missingVisionRagVars(): string[] {
 	].filter((v): v is string => v != null);
 }
 
+export interface ResolveStreamOptions {
+	/** When true, never enable vision RAG (AI Studio text-only path). */
+	disableVisionRag?: boolean;
+}
+
 /**
  * Resolve all inputs needed to run streaming generation.
  */
 export async function resolveStreamInputs(
 	body: StreamRequestBody,
 	documentIdsFromRequest: string[],
-	idToken: string
+	idToken: string,
+	options?: ResolveStreamOptions
 ): Promise<ResolveStreamResult> {
 	const getPromptResult = await gql<{ getPrompt: Prompt | null }>(
 		Q_GET_PROMPT,
@@ -130,7 +136,8 @@ export async function resolveStreamInputs(
 			? bodyDocIds
 			: ((variables.documentIds as string[] | undefined) ?? []).filter(Boolean);
 
-	const useVisionRag = Boolean(question?.trim() && documentIds.length > 0);
+	const useVisionRag =
+		!options?.disableVisionRag && Boolean(question?.trim() && documentIds.length > 0);
 
 	let visionRag: VisionRagBlock | null = null;
 	if (useVisionRag) {
