@@ -14,6 +14,10 @@ export interface PDFViewerProps {
 	currentDocHash?: string;
 	downloadFileName?: string;
 	showTopButton?: boolean;
+	/** Omit outer border/radius; parent controls chrome and height. */
+	embed?: boolean;
+	/** Hide filename in toolbar; single-doc hides picker. Multi-doc keeps icon-only switcher. */
+	hideDocumentFilename?: boolean;
 	onProgress?: (progress: { loaded: number; total: number }) => void;
 	externalLinksTarget?: string;
 }

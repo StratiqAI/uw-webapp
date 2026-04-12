@@ -17,6 +17,12 @@ export interface StreamRequestBody {
 	priority?: string;
 	/** When false, disables Gemini Google Search grounding (default true). */
 	googleSearchEnabled?: boolean;
+	/**
+	 * Prompt workspace: document id for the PDF in the viewer. Server resolves the S3 URL,
+	 * injects `currentPdfUrl` for `{{ currentPdfUrl }}`, prefixes the URL in the prompt text,
+	 * and attaches the PDF as inline `application/pdf` when fetch succeeds.
+	 */
+	workspacePdfDocumentId?: string;
 }
 
 export interface VisionRagConfig {

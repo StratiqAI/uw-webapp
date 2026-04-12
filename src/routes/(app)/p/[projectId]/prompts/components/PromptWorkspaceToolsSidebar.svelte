@@ -1,6 +1,8 @@
 <script lang="ts">
 	let {
 		darkMode,
+		embedded = false,
+		hideIntroHeader = false,
 		topK = $bindable(5),
 		topKPerNs = $bindable(5),
 		priority = $bindable<'HIGH' | 'MEDIUM' | 'LOW'>('MEDIUM'),
@@ -9,6 +11,10 @@
 		hasDocuments = false
 	} = $props<{
 		darkMode: boolean;
+		/** When true, omit outer column chrome; parent provides scroll and panel background. */
+		embedded?: boolean;
+		/** Hide the “AI tools” title block (e.g. when the parent tab already labels this view). */
+		hideIntroHeader?: boolean;
 		topK?: number;
 		topKPerNs?: number;
 		priority?: 'HIGH' | 'MEDIUM' | 'LOW';
@@ -26,15 +32,23 @@
 			? 'border-slate-600 bg-slate-900 text-slate-100'
 			: 'border-slate-200 bg-white text-slate-900'
 	);
+
+	const outerShell = $derived(
+		embedded
+			? 'flex h-full min-h-0 flex-1 flex-col overflow-hidden'
+			: `flex h-full min-h-0 flex-col overflow-hidden border-r ${panel}`
+	);
 </script>
 
-<div class="flex h-full min-h-0 flex-col overflow-hidden border-r {panel}">
-	<div class="border-b px-3 py-2.5 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
-		<h2 class="text-xs font-semibold uppercase tracking-wider {label}">AI tools</h2>
-		<p class="mt-1 text-[10px] leading-snug {darkMode ? 'text-slate-500' : 'text-slate-500'}">
-			Google Search affects both vision-RAG and text runs. Structured JSON output is disabled while search is on.
-		</p>
-	</div>
+<div class={outerShell}>
+	{#if !hideIntroHeader}
+		<div class="shrink-0 border-b px-3 py-2.5 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
+			<h2 class="text-xs font-semibold uppercase tracking-wider {label}">AI tools</h2>
+			<p class="mt-1 text-[10px] leading-snug {darkMode ? 'text-slate-500' : 'text-slate-500'}">
+				Google Search affects both vision-RAG and text runs. Structured JSON output is disabled while search is on.
+			</p>
+		</div>
+	{/if}
 
 	<div class="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
 		<label class="flex cursor-pointer items-start gap-2">

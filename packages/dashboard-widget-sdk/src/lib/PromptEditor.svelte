@@ -37,6 +37,13 @@
 
 		googleSearchEnabled?: boolean;
 
+		/** Label above the user prompt field (default “Prompt”). */
+		userPromptLabel?: string;
+		userPromptPlaceholder?: string;
+		userPromptRows?: number;
+		/** Hide the user prompt card (e.g. when the host renders prompt elsewhere). */
+		hideUserPrompt?: boolean;
+
 		hideResponseFormat?: boolean;
 
 		isGenerating?: boolean;
@@ -66,6 +73,10 @@
 		schemaRequired = $bindable([]),
 		fieldOrder = $bindable([]),
 		googleSearchEnabled = $bindable(true),
+		userPromptLabel = 'Prompt',
+		userPromptPlaceholder = 'e.g. Extract the property location details such as address, city, state, zip code...',
+		userPromptRows = 4,
+		hideUserPrompt = false,
 		hideResponseFormat = false,
 		isGenerating = false,
 		generateError = '',
@@ -214,30 +225,32 @@
 	</div>
 
 	<!-- Prompt -->
-	<div class="rounded-xl border {darkMode ? 'border-slate-700/50 bg-slate-800/30' : 'border-slate-200/80 bg-slate-50/50'} overflow-hidden">
-		<div class="px-4 pt-3 pb-1">
-			<label for="pe-prompt" class="text-[11px] font-semibold uppercase tracking-wider {darkMode ? 'text-slate-400' : 'text-slate-500'}">
-				Prompt
-			</label>
+	{#if !hideUserPrompt}
+		<div class="rounded-xl border {darkMode ? 'border-slate-700/50 bg-slate-800/30' : 'border-slate-200/80 bg-slate-50/50'} overflow-hidden">
+			<div class="px-4 pt-3 pb-1">
+				<label for="pe-prompt" class="text-[11px] font-semibold uppercase tracking-wider {darkMode ? 'text-slate-400' : 'text-slate-500'}">
+					{userPromptLabel}
+				</label>
+			</div>
+			<div class="px-4 pb-4">
+				<textarea
+					id="pe-prompt"
+					bind:value={userPrompt}
+					placeholder={userPromptPlaceholder}
+					class="w-full px-0 py-2 text-sm border-0 resize-none focus:outline-none focus:ring-0 {darkMode ? 'bg-transparent text-white placeholder-slate-600' : 'bg-transparent text-slate-900 placeholder-slate-400'}"
+					rows={userPromptRows}
+				></textarea>
+				{#if promptInputVariables.length > 0}
+					<div class="flex items-center gap-1.5 flex-wrap pt-2 border-t {darkMode ? 'border-slate-700/40' : 'border-slate-200/60'}">
+						<span class="text-[10px] uppercase tracking-wider font-semibold {darkMode ? 'text-slate-600' : 'text-slate-400'}">Variables</span>
+						{#each promptInputVariables as { syntax }}
+							<span class="px-1.5 py-0.5 rounded text-[10px] font-mono {darkMode ? 'bg-amber-500/10 text-amber-400/90 border border-amber-500/20' : 'bg-amber-50 text-amber-600 border border-amber-200/80'}">{syntax}</span>
+						{/each}
+					</div>
+				{/if}
+			</div>
 		</div>
-		<div class="px-4 pb-4">
-			<textarea
-				id="pe-prompt"
-				bind:value={userPrompt}
-				placeholder="e.g. Extract the property location details such as address, city, state, zip code..."
-				class="w-full px-0 py-2 text-sm border-0 resize-none focus:outline-none focus:ring-0 {darkMode ? 'bg-transparent text-white placeholder-slate-600' : 'bg-transparent text-slate-900 placeholder-slate-400'}"
-				rows="4"
-			></textarea>
-			{#if promptInputVariables.length > 0}
-				<div class="flex items-center gap-1.5 flex-wrap pt-2 border-t {darkMode ? 'border-slate-700/40' : 'border-slate-200/60'}">
-					<span class="text-[10px] uppercase tracking-wider font-semibold {darkMode ? 'text-slate-600' : 'text-slate-400'}">Variables</span>
-					{#each promptInputVariables as { syntax }}
-						<span class="px-1.5 py-0.5 rounded text-[10px] font-mono {darkMode ? 'bg-amber-500/10 text-amber-400/90 border border-amber-500/20' : 'bg-amber-50 text-amber-600 border border-amber-200/80'}">{syntax}</span>
-					{/each}
-				</div>
-			{/if}
-		</div>
-	</div>
+	{/if}
 
 	<!-- System instruction (collapsible) -->
 	<div>

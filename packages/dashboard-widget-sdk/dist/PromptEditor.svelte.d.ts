@@ -10,6 +10,12 @@ interface Props {
     schemaRequired?: string[];
     fieldOrder?: string[];
     googleSearchEnabled?: boolean;
+    /** Label above the user prompt field (default “Prompt”). */
+    userPromptLabel?: string;
+    userPromptPlaceholder?: string;
+    userPromptRows?: number;
+    /** Hide the user prompt card (e.g. when the host renders prompt elsewhere). */
+    hideUserPrompt?: boolean;
     hideResponseFormat?: boolean;
     isGenerating?: boolean;
     generateError?: string;

@@ -35,21 +35,36 @@ export interface TextStreamMeta {
 /**
  * Stream Gemini text for a compiled prompt; retries only the stream setup on 429/5xx.
  */
+export type StreamTextTemplateOptions = {
+	/** Base64 PDF body for Gemini multimodal (same pattern as document-processing examples). */
+	pdfInlineBase64?: string | null;
+};
+
 export async function streamTextTemplate(
 	compiledPrompt: string,
 	responseSchema: Record<string, unknown> | null | undefined,
 	client: GoogleGenAI,
 	modelId: string,
 	googleSearchEnabled: boolean,
-	onChunk: (text: string) => void
+	onChunk: (text: string) => void,
+	options?: StreamTextTemplateOptions
 ): Promise<TextStreamMeta> {
 	const hasSchema = hasSchemaKeys(responseSchema);
 	const useStructured = hasSchema && !googleSearchEnabled;
 
+	const pdfB64 = options?.pdfInlineBase64;
+	const contents =
+		pdfB64 && pdfB64.length > 0
+			? [
+					{ text: compiledPrompt },
+					{ inlineData: { mimeType: 'application/pdf', data: pdfB64 } }
+				]
+			: compiledPrompt;
+
 	const { result: stream, retryCount } = await withRetry(async () => {
 		return await client.models.generateContentStream({
 			model: modelId,
-			contents: compiledPrompt,
+			contents,
 			config: {
 				...(googleSearchEnabled && { tools: [{ googleSearch: {} }] }),
 				...(useStructured && {

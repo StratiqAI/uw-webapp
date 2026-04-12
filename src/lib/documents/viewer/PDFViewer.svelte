@@ -22,6 +22,8 @@
 		totalPage = 0,
 		downloadFileName = '',
 		showTopButton = true,
+		embed = false,
+		hideDocumentFilename = false,
 		onProgress,
 		externalLinksTarget
 	}: PDFViewerProps = $props();
@@ -43,6 +45,21 @@
 	let reloadNonce = $state(0);
 	let documentLoadUrl = $derived(
 		url && reloadNonce > 0 ? `${url}${url.includes('?') ? '&' : '?'}r=${reloadNonce}` : url
+	);
+	/** Shown on the toolbar info icon hover (native tooltip). */
+	let documentSourceTooltip = $derived(
+		currentDocHash ? documentLoadUrl : data ? 'PDF loaded from in-memory data' : 'No document loaded'
+	);
+	/** Stable S3 URL (no cache-bust query) for sharing / clipboard. */
+	let copyablePdfUrl = $derived(currentDocHash ? url : '');
+	let copyUrlFeedback = $state(false);
+	let copyUrlFeedbackTimer: ReturnType<typeof setTimeout> | undefined;
+	let infoIconTitle = $derived(
+		copyUrlFeedback
+			? 'Copied to clipboard'
+			: copyablePdfUrl
+				? `${documentLoadUrl} — Click to copy`
+				: documentSourceTooltip
 	);
 	let currentDocFilename = $derived(docs.find((doc) => doc.id === currentDocHash)?.filename ?? '');
 	let hasDocuments: boolean = $derived((documents?.length ?? 0) > 0);
@@ -410,39 +427,61 @@
 		if (!target.closest('.page-selector')) pageSelectorOpen = false;
 	}
 
+	async function copyPdfUrlToClipboard(): Promise<void> {
+		const text = copyablePdfUrl;
+		if (!text) return;
+		try {
+			await navigator.clipboard.writeText(text);
+			copyUrlFeedback = true;
+			if (copyUrlFeedbackTimer) clearTimeout(copyUrlFeedbackTimer);
+			copyUrlFeedbackTimer = setTimeout(() => {
+				copyUrlFeedback = false;
+			}, 2000);
+		} catch (err) {
+			log.warn('Failed to copy PDF URL', err);
+		}
+	}
+
 	onDestroy(() => {
 		clearInterval(interval);
 		clearInterval(secondInterval);
 		clearTimeout(retryTimer);
+		clearTimeout(copyUrlFeedbackTimer);
 	});
 </script>
 
 <svelte:window onkeydown={handleKeyDown} onclick={handleClickOutside} />
 
 <div
-	class="flex flex-col rounded-lg overflow-hidden border
-		{darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}"
+	class="flex min-h-0 flex-1 flex-col {embed
+		? ''
+		: `rounded-lg border overflow-hidden ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}"
 >
 	<!-- Toolbar -->
 	<div
-		class="flex items-center gap-1 px-3 py-2 border-b flex-wrap
-			{darkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-slate-50 border-slate-200'}"
+		class="flex shrink-0 flex-wrap items-center gap-1 border-b px-3 py-2
+			{darkMode ? 'border-slate-700 bg-slate-800/80' : 'border-slate-200 bg-slate-50'}"
 	>
-		<!-- Document Selector -->
-		{#if docs.length > 0}
+		<!-- Document selector (full, icon-only when multi-doc + hideDocumentFilename, or hidden when single-doc + hideDocumentFilename) -->
+		{#if docs.length > 0 && !(hideDocumentFilename && docs.length === 1)}
 			<div class="doc-selector relative">
 				<button
 					type="button"
 					onclick={() => (docSelectorOpen = !docSelectorOpen)}
-					class="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors max-w-[400px]
+					title={hideDocumentFilename ? 'Switch document' : currentDocFilename || 'Select document'}
+					aria-label={hideDocumentFilename ? 'Switch document' : undefined}
+					class="flex max-w-[400px] items-center gap-2 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors
 						{darkMode
 							? 'text-slate-200 hover:bg-slate-700'
-							: 'text-slate-700 hover:bg-slate-200'}"
+							: 'text-slate-700 hover:bg-slate-200'}
+						{hideDocumentFilename ? 'px-2' : ''}"
 				>
 					<svg class="h-4 w-4 shrink-0 {darkMode ? 'text-indigo-400' : 'text-indigo-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
 					</svg>
-					<span class="truncate">{currentDocFilename || 'Select document'}</span>
+					{#if !hideDocumentFilename}
+						<span class="truncate">{currentDocFilename || 'Select document'}</span>
+					{/if}
 					{#if docs.length > 1}
 						<svg class="h-3.5 w-3.5 shrink-0 transition-transform {docSelectorOpen ? 'rotate-180' : ''} {darkMode ? 'text-slate-400' : 'text-slate-500'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
@@ -451,17 +490,21 @@
 				</button>
 				{#if docSelectorOpen && docs.length > 1}
 					<div
-						class="absolute left-0 top-full z-30 mt-1 min-w-[240px] max-w-[360px] rounded-lg border shadow-lg py-1
-							{darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}"
+						class="absolute left-0 top-full z-30 mt-1 min-w-[240px] max-w-[360px] rounded-lg border py-1 shadow-lg
+							{darkMode ? 'border-slate-600 bg-slate-800' : 'border-slate-200 bg-white'}"
 					>
 						{#each docs as document}
 							<button
 								type="button"
 								onclick={() => onDocumentChange(document.id)}
-								class="flex w-full items-center gap-2 px-3 py-2 text-sm text-left transition-colors
+								class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors
 									{document.id === currentDocHash
-										? (darkMode ? 'bg-indigo-600/20 text-indigo-300' : 'bg-indigo-50 text-indigo-700')
-										: (darkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-700 hover:bg-slate-50')}"
+										? darkMode
+											? 'bg-indigo-600/20 text-indigo-300'
+											: 'bg-indigo-50 text-indigo-700'
+										: darkMode
+											? 'text-slate-300 hover:bg-slate-700'
+											: 'text-slate-700 hover:bg-slate-50'}"
 							>
 								{#if document.id === currentDocHash}
 									<svg class="h-3.5 w-3.5 shrink-0 {darkMode ? 'text-indigo-400' : 'text-indigo-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -476,10 +519,10 @@
 					</div>
 				{/if}
 			</div>
-		{/if}
 
-		<!-- Divider -->
-		<div class="h-5 w-px mx-1 {darkMode ? 'bg-slate-600' : 'bg-slate-300'}"></div>
+			<!-- Divider -->
+			<div class="mx-1 h-5 w-px {darkMode ? 'bg-slate-600' : 'bg-slate-300'}"></div>
+		{/if}
 
 		<!-- Page Navigation -->
 		<div class="flex items-center gap-0.5">
@@ -665,6 +708,27 @@
 		<!-- Spacer -->
 		<div class="flex-1"></div>
 
+		{#if hasDocuments || data}
+			<button
+				type="button"
+				onclick={copyPdfUrlToClipboard}
+				class="rounded-md p-1.5 transition-colors
+					{darkMode ? 'text-slate-300 hover:bg-slate-700 hover:text-white' : 'text-slate-600 hover:bg-slate-200 hover:text-slate-900'}
+					{!copyablePdfUrl ? 'opacity-50' : ''}"
+				title={infoIconTitle}
+				aria-label={copyablePdfUrl ? 'Copy PDF URL to clipboard' : 'Document source (no URL to copy)'}
+			>
+				<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+					/>
+				</svg>
+			</button>
+		{/if}
+
 		<!-- Download -->
 		{#if showButtons.includes('download')}
 			<button
@@ -684,8 +748,8 @@
 	<!-- PDF Canvas Area -->
 	<div
 		bind:this={viewerContainer}
-		class="relative flex-1 overflow-auto"
-		style="min-height: 500px; max-height: calc(100vh - 280px);"
+		class="relative min-h-0 flex-1 overflow-auto"
+		style={embed ? undefined : 'min-height: 500px; max-height: calc(100vh - 280px);'}
 	>
 		{#if isLoading}
 			<div class="absolute inset-0 flex flex-col items-center justify-center gap-3 z-20

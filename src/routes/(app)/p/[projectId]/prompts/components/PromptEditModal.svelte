@@ -23,18 +23,24 @@
 
 	let {
 		darkMode = false,
+		variant = 'modal',
 		template = null,
 		isCreating = false,
 		queryClient = null,
 		projectId = '',
+		workspaceQuestion = $bindable(''),
 		onSave,
 		onCancel
 	}: {
 		darkMode?: boolean;
+		/** `inline`: embedded panel (e.g. sidebar). `modal`: overlay dialog. */
+		variant?: 'modal' | 'inline';
 		template?: Prompt | null;
 		isCreating?: boolean;
 		queryClient?: IGraphQLQueryClient | null;
 		projectId?: string;
+		/** User prompt / run message; bound from the prompts workspace so Edit and Run share one field. */
+		workspaceQuestion?: string;
 		onSave?: (data: {
 			name: string;
 			description: string;
@@ -53,7 +59,6 @@
 	let templateDescription = $state('');
 	let aiQueryModel = $state<string>(DEFAULT_AI_MODEL);
 	let aiQuerySystemPrompt = $state(DEFAULT_SYSTEM_PROMPT);
-	let aiQueryPrompt = $state('');
 
 	let temperature = $state<number | undefined>(undefined);
 	let maxTokens = $state<number | undefined>(undefined);
@@ -79,6 +84,8 @@
 
 	let orderedFieldEntries = $derived(getOrderedFieldEntries(schemaProperties, fieldOrder));
 	let schemaPreview = $derived(buildSchemaPreview(schemaProperties, schemaRequired));
+	/** Match PromptWorkspaceToolsSidebar section titles. */
+	const toolsStyleTitle = $derived(darkMode ? 'text-slate-400' : 'text-slate-600');
 
 	function applySchemaDefinitionToForm(schemaDefRaw: unknown) {
 		const schema = typeof schemaDefRaw === 'string'
@@ -103,7 +110,7 @@
 			const templateStr = getTemplateStrForEditor(template);
 			const data = parseTemplateToAIQueryData(templateStr);
 
-			aiQueryPrompt = data.prompt || '';
+			workspaceQuestion = data.prompt || '';
 			aiQueryModel = normalizeToAIModel((template as { model?: string }).model ?? data.model);
 			aiQuerySystemPrompt = data.systemPrompt || DEFAULT_SYSTEM_PROMPT;
 
@@ -144,11 +151,33 @@
 			seed = data.seed;
 			logitBiasText = data.logitBias ? JSON.stringify(data.logitBias, null, 2) : '';
 			metadataText = data.metadata ? JSON.stringify(data.metadata, null, 2) : '';
+		} else if (variant === 'inline' && !isCreating) {
+			templateName = '';
+			templateDescription = '';
+			currentJsonSchemaId = undefined;
+			workspaceQuestion = '';
+			aiQueryModel = DEFAULT_AI_MODEL;
+			aiQuerySystemPrompt = DEFAULT_SYSTEM_PROMPT;
+			temperature = undefined;
+			maxTokens = undefined;
+			topP = undefined;
+			frequencyPenalty = undefined;
+			presencePenalty = undefined;
+			stopSequences = '';
+			responseFormatType = 'json_schema';
+			schemaProperties = {};
+			schemaRequired = [];
+			fieldOrder = [];
+			stream = false;
+			user = '';
+			seed = undefined;
+			logitBiasText = '';
+			metadataText = '';
 		} else if (isCreating) {
 			templateName = '';
 			templateDescription = '';
 			currentJsonSchemaId = undefined;
-			aiQueryPrompt = 'Analyze the following data and provide insights: {input}';
+			workspaceQuestion = 'Analyze the following data and provide insights: {input}';
 			aiQueryModel = DEFAULT_AI_MODEL;
 			aiQuerySystemPrompt = DEFAULT_SYSTEM_PROMPT;
 			temperature = undefined;
@@ -207,7 +236,7 @@
 			);
 
 			if (draft.suggestedName) templateName = draft.suggestedName;
-			aiQueryPrompt = draft.prompt;
+			workspaceQuestion = draft.prompt;
 			if (draft.systemInstruction) aiQuerySystemPrompt = draft.systemInstruction;
 
 			if (draft.jsonSchema) {
@@ -246,7 +275,7 @@
 		const modelValue = typeof aiQueryModel === 'string' ? aiQueryModel : String(aiQueryModel);
 		const aiQueryData: AIQueryData = {
 			model: modelValue,
-			prompt: aiQueryPrompt
+			prompt: workspaceQuestion
 		};
 
 		aiQueryData.systemPrompt = aiQuerySystemPrompt || DEFAULT_SYSTEM_PROMPT;
@@ -315,13 +344,133 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
+		if (variant !== 'modal') return;
 		if (e.key === 'Escape') {
 			handleCancel();
 		}
 	}
 </script>
 
-{#if template || isCreating}
+{#snippet promptEditorSection()}
+	{#if isCreating && queryClient && (variant === 'modal' || variant === 'inline')}
+		<div class="rounded-xl border {darkMode ? 'border-violet-500/20 bg-violet-500/5' : 'border-violet-200/80 bg-violet-50/40'} overflow-hidden">
+			<div class="px-4 pt-3 pb-1 flex items-center gap-2">
+				<svg class="w-3.5 h-3.5 {darkMode ? 'text-violet-400' : 'text-violet-500'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+				</svg>
+				<span class="text-[11px] font-semibold uppercase tracking-wider {darkMode ? 'text-violet-400' : 'text-violet-500'}">
+					Generate with AI
+				</span>
+			</div>
+			<div class="px-4 pb-4 pt-1 space-y-2">
+				<textarea
+					bind:value={aiGenerateDescription}
+					placeholder="Describe what you want to extract, e.g. 'Get property address, square footage, lease terms, and tenant info from offering memorandums'"
+					class="w-full px-3 py-2 text-sm rounded-lg border resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500 {darkMode ? 'bg-slate-800/80 text-white border-slate-600/80 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-200 placeholder-slate-400'}"
+					rows="2"
+					disabled={aiGenerating}
+				></textarea>
+				<div class="flex items-center gap-2">
+					<button
+						type="button"
+						onclick={handleAiGenerate}
+						disabled={aiGenerating || !aiGenerateDescription.trim()}
+						class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed
+							{darkMode ? 'bg-violet-600 hover:bg-violet-500 text-white' : 'bg-violet-600 hover:bg-violet-700 text-white'}"
+					>
+						{#if aiGenerating}
+							<span class="inline-flex items-center gap-1.5">
+								<svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+								Generating...
+							</span>
+						{:else}
+							Generate
+						{/if}
+					</button>
+					{#if aiGenerateError}
+						<span class="text-xs {darkMode ? 'text-red-400' : 'text-red-500'}">{aiGenerateError}</span>
+					{/if}
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	<PromptEditor
+		{darkMode}
+		bind:promptName={templateName}
+		bind:promptDescription={templateDescription}
+		bind:userPrompt={workspaceQuestion}
+		hideUserPrompt={variant === 'inline'}
+		bind:systemInstruction={aiQuerySystemPrompt}
+		bind:model={aiQueryModel}
+		bind:responseFormatType
+		bind:schemaProperties
+		bind:schemaRequired
+		bind:fieldOrder
+		bind:temperature
+		bind:maxTokens
+		bind:topP
+		bind:frequencyPenalty
+		bind:stopSequences
+		onLoadSchemaFromLibrary={queryClient ? () => { showSchemaPicker = true; } : undefined}
+	/>
+{/snippet}
+
+{#if variant === 'inline'}
+	<div class="flex h-full min-h-0 flex-col overflow-hidden">
+		{#if !template && !isCreating}
+			<div
+				class="flex flex-1 flex-col items-center justify-center px-4 py-8 text-center text-[10px] leading-relaxed {darkMode ? 'text-slate-500' : 'text-slate-500'}"
+			>
+				Select a prompt in the library to edit it here, or use Create New.
+			</div>
+		{:else}
+			<div class="shrink-0 border-b px-3 py-2.5 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
+				<div class="flex items-start justify-between gap-2">
+					<div class="min-w-0 flex-1">
+						<h2
+							id="prompt-edit-panel-title"
+							class="text-xs font-semibold uppercase tracking-wider {toolsStyleTitle}"
+						>
+							{isCreating ? 'New prompt' : 'Edit prompt'}
+						</h2>
+						<p class="mt-1 text-[10px] leading-snug {darkMode ? 'text-slate-500' : 'text-slate-500'}">
+							{isCreating
+								? 'Define the template, then save to add it to this project.'
+								: 'Name, prompt text, response format, and advanced settings for the selected prompt.'}
+						</p>
+					</div>
+					<div class="mt-0.5 flex shrink-0 items-center gap-1.5">
+						{#if isCreating}
+							<button
+								type="button"
+								onclick={handleCancel}
+								class="rounded-lg px-2 py-1 text-xs font-medium transition-colors {darkMode
+									? 'text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+									: 'text-slate-600 hover:bg-slate-100'}"
+							>
+								Cancel
+							</button>
+						{/if}
+						<button
+							type="button"
+							onclick={handleSave}
+							disabled={saving || !templateName.trim()}
+							class="rounded-lg px-2.5 py-1 text-xs font-semibold shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-40 {darkMode
+								? 'bg-indigo-600 text-white hover:bg-indigo-500'
+								: 'bg-indigo-600 text-white hover:bg-indigo-700'}"
+						>
+							{saving ? 'Saving…' : 'Save'}
+						</button>
+					</div>
+				</div>
+			</div>
+			<div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-3">
+				{@render promptEditorSection()}
+			</div>
+		{/if}
+	</div>
+{:else if template || isCreating}
 <div
 	class="fixed inset-0 bg-black/50 backdrop-blur-[2px] flex items-start justify-center z-50 pt-[3vh] pb-[3vh] overflow-y-auto"
 	onclick={handleCancel}
@@ -370,70 +519,11 @@
 		</div>
 
 		<div class="flex-1 overflow-y-auto px-6 py-5 space-y-6">
-			{#if isCreating && queryClient}
-				<div class="rounded-xl border {darkMode ? 'border-violet-500/20 bg-violet-500/5' : 'border-violet-200/80 bg-violet-50/40'} overflow-hidden">
-					<div class="px-4 pt-3 pb-1 flex items-center gap-2">
-						<svg class="w-3.5 h-3.5 {darkMode ? 'text-violet-400' : 'text-violet-500'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-						</svg>
-						<span class="text-[11px] font-semibold uppercase tracking-wider {darkMode ? 'text-violet-400' : 'text-violet-500'}">
-							Generate with AI
-						</span>
-					</div>
-					<div class="px-4 pb-4 pt-1 space-y-2">
-						<textarea
-							bind:value={aiGenerateDescription}
-							placeholder="Describe what you want to extract, e.g. 'Get property address, square footage, lease terms, and tenant info from offering memorandums'"
-							class="w-full px-3 py-2 text-sm rounded-lg border resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500 {darkMode ? 'bg-slate-800/80 text-white border-slate-600/80 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-200 placeholder-slate-400'}"
-							rows="2"
-							disabled={aiGenerating}
-						></textarea>
-						<div class="flex items-center gap-2">
-							<button
-								type="button"
-								onclick={handleAiGenerate}
-								disabled={aiGenerating || !aiGenerateDescription.trim()}
-								class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed
-									{darkMode ? 'bg-violet-600 hover:bg-violet-500 text-white' : 'bg-violet-600 hover:bg-violet-700 text-white'}"
-							>
-								{#if aiGenerating}
-									<span class="inline-flex items-center gap-1.5">
-										<svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-										Generating...
-									</span>
-								{:else}
-									Generate
-								{/if}
-							</button>
-							{#if aiGenerateError}
-								<span class="text-xs {darkMode ? 'text-red-400' : 'text-red-500'}">{aiGenerateError}</span>
-							{/if}
-						</div>
-					</div>
-				</div>
-			{/if}
-
-			<PromptEditor
-				{darkMode}
-				bind:promptName={templateName}
-				bind:promptDescription={templateDescription}
-				bind:userPrompt={aiQueryPrompt}
-				bind:systemInstruction={aiQuerySystemPrompt}
-				bind:model={aiQueryModel}
-				bind:responseFormatType
-				bind:schemaProperties
-				bind:schemaRequired
-				bind:fieldOrder
-				bind:temperature
-				bind:maxTokens
-				bind:topP
-				bind:frequencyPenalty
-				bind:stopSequences
-				onLoadSchemaFromLibrary={queryClient ? () => { showSchemaPicker = true; } : undefined}
-			/>
+			{@render promptEditorSection()}
 		</div>
 	</div>
 </div>
+{/if}
 
 {#if showSchemaPicker && queryClient}
 	<JsonSchemaPickerModal
@@ -444,5 +534,4 @@
 		onselect={handleSchemaPickerSelect}
 		onclose={() => showSchemaPicker = false}
 	/>
-{/if}
 {/if}

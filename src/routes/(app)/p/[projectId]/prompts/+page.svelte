@@ -13,8 +13,8 @@
 	import PromptEditModal from './components/PromptEditModal.svelte';
 	import JsonSchemaPickerModal from '$lib/components/schemas/JsonSchemaPickerModal.svelte';
 	import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
-	import PromptWorkspaceToolsSidebar from './components/PromptWorkspaceToolsSidebar.svelte';
 	import PromptWorkspaceCenter from './components/PromptWorkspaceCenter.svelte';
+	import PromptChatSidebar from './components/PromptChatSidebar.svelte';
 	import PromptLibrarySidebar from './components/PromptLibrarySidebar.svelte';
 	import { toastStore } from '$lib/stores/toastStore.svelte';
 	import { page } from '$app/stores';
@@ -31,16 +31,19 @@
 		extractPromptVariableNames,
 		type AIQueryData
 	} from './PromptService';
-	import { aiService } from '$lib/services/ai';
-	import type { ExecutionHandle } from '$lib/services/ai/types';
 	import { createLogger } from '$lib/utils/logger';
 
 	const log = createLogger('prompts');
 
-	const SIDEBAR_MIN = 200;
-	const SIDEBAR_MAX = 560;
-	const SIDEBAR_DEFAULT_LEFT = 280;
-	const SIDEBAR_DEFAULT_RIGHT = 320;
+	const LIBRARY_SIDEBAR_MIN = 200;
+	const LIBRARY_SIDEBAR_MAX = 520;
+	const LIBRARY_SIDEBAR_DEFAULT = 320;
+
+	const CHAT_SIDEBAR_MIN = 280;
+	/** Upper bound when `window` is unavailable (SSR). In the browser, max is 50% of viewport width. */
+	const CHAT_SIDEBAR_MAX = 560;
+	const CHAT_SIDEBAR_DEFAULT = 360;
+	const CHAT_SIDEBAR_MAX_VIEWPORT_FRACTION = 0.5;
 
 	const RESERVED_TEMPLATE_VARS = new Set(['question', 'text', 'prompt']);
 
@@ -62,8 +65,19 @@
 	let deleteTemplateModalOpen = $state(false);
 	let showSchemaLibrary = $state(false);
 
-	let leftSidebarWidth = $state(SIDEBAR_DEFAULT_LEFT);
-	let rightSidebarWidth = $state(SIDEBAR_DEFAULT_RIGHT);
+	let leftSidebarWidth = $state(LIBRARY_SIDEBAR_DEFAULT);
+	let rightSidebarWidth = $state(CHAT_SIDEBAR_DEFAULT);
+	/** Keeps chat slider `aria-valuemax` in sync after window resize. */
+	let viewportInnerWidth = $state(0);
+
+	let chatSidebarMaxPx = $derived(
+		viewportInnerWidth <= 0
+			? CHAT_SIDEBAR_MAX
+			: Math.max(
+					CHAT_SIDEBAR_MIN,
+					Math.floor(viewportInnerWidth * CHAT_SIDEBAR_MAX_VIEWPORT_FRACTION)
+				)
+	);
 
 	let workspaceTopK = $state(5);
 	let workspaceTopKPerNs = $state(5);
@@ -76,14 +90,20 @@
 	let workspaceQuestion = $state('');
 	let workspaceVarValues = $state<Record<string, string>>({});
 	let streamingBuffer = $state('');
+	/** Prior assistant replies (oldest first); current stream is in `streamingBuffer`. */
+	let workspaceChatHistory = $state<{ id: string; text: string }[]>([]);
 	let workspaceExecuting = $state(false);
 	let workspaceStreamError = $state('');
-	let executionHandle = $state<ExecutionHandle | null>(null);
+	/** Aborts in-flight `POST /api/ai-studio` (no AppSync submitAIQuery). */
+	let workspaceRunAbort = $state<AbortController | null>(null);
 
-	function clampSidebarWidth(w: number): number {
-		if (typeof window === 'undefined') return Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w));
+	function clampLibrarySidebarWidth(w: number): number {
+		if (typeof window === 'undefined') {
+			return Math.min(LIBRARY_SIDEBAR_MAX, Math.max(LIBRARY_SIDEBAR_MIN, w));
+		}
 		const maxByViewport = Math.floor(window.innerWidth * 0.5);
-		return Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w), maxByViewport);
+		const cap = Math.min(LIBRARY_SIDEBAR_MAX, Math.max(LIBRARY_SIDEBAR_MIN, maxByViewport));
+		return Math.min(cap, Math.max(LIBRARY_SIDEBAR_MIN, w));
 	}
 
 	function onLeftResizePointerDown(e: PointerEvent) {
@@ -93,7 +113,7 @@
 		const startW = leftSidebarWidth;
 
 		function onMove(ev: PointerEvent) {
-			leftSidebarWidth = clampSidebarWidth(startW + (ev.clientX - startX));
+			leftSidebarWidth = clampLibrarySidebarWidth(startW + (ev.clientX - startX));
 		}
 
 		function onUp(ev: PointerEvent) {
@@ -108,6 +128,17 @@
 		target.addEventListener('pointercancel', onUp);
 	}
 
+	function clampChatSidebarWidth(w: number): number {
+		if (typeof window === 'undefined') {
+			return Math.min(CHAT_SIDEBAR_MAX, Math.max(CHAT_SIDEBAR_MIN, w));
+		}
+		const cap = Math.max(
+			CHAT_SIDEBAR_MIN,
+			Math.floor(window.innerWidth * CHAT_SIDEBAR_MAX_VIEWPORT_FRACTION)
+		);
+		return Math.min(cap, Math.max(CHAT_SIDEBAR_MIN, w));
+	}
+
 	function onRightResizePointerDown(e: PointerEvent) {
 		const target = e.currentTarget as HTMLElement;
 		target.setPointerCapture(e.pointerId);
@@ -115,7 +146,8 @@
 		const startW = rightSidebarWidth;
 
 		function onMove(ev: PointerEvent) {
-			rightSidebarWidth = clampSidebarWidth(startW - (ev.clientX - startX));
+			// Handle is the chat panel’s left edge: moving the pointer right moves the edge right → center grows, chat narrows.
+			rightSidebarWidth = clampChatSidebarWidth(startW - (ev.clientX - startX));
 		}
 
 		function onUp(ev: PointerEvent) {
@@ -134,9 +166,17 @@
 		return validatedTopicStore.getAllAtArray<Prompt>('prompts');
 	});
 
-	let filteredTemplates = $derived.by(() => {
-		let templates = allTemplates;
+	function getTemplateDisplayInfo(template: Prompt) {
+		const templateStr = getTemplateStrForEditor(template);
+		const aiData = parseTemplateToAIQueryData(templateStr ?? '');
+		return {
+			prompt: aiData.prompt,
+			hasSchema: aiData.responseFormat?.type === 'json_schema'
+		};
+	}
 
+	let projectScopedTemplates = $derived.by(() => {
+		let templates = allTemplates;
 		if (selectedProjectId) {
 			templates = templates.filter(
 				(t) =>
@@ -144,16 +184,20 @@
 					(t as { parentId?: string }).parentId === selectedProjectId
 			);
 		}
+		return templates;
+	});
 
+	let filteredTemplates = $derived.by(() => {
+		let templates = projectScopedTemplates;
 		if (searchFilter) {
 			const search = searchFilter.toLowerCase();
-			templates = templates.filter(
-				(t) =>
-					t.name.toLowerCase().includes(search) ||
-					(t.description && t.description.toLowerCase().includes(search))
-			);
+			templates = templates.filter((t) => {
+				if (t.name.toLowerCase().includes(search)) return true;
+				if (t.description?.toLowerCase().includes(search)) return true;
+				const { prompt } = getTemplateDisplayInfo(t);
+				return prompt.toLowerCase().includes(search);
+			});
 		}
-
 		return templates;
 	});
 
@@ -188,16 +232,6 @@
 		return merged.filter((n) => !RESERVED_TEMPLATE_VARS.has(n));
 	});
 
-	function getTemplateDisplayInfo(template: Prompt) {
-		const templateStr = getTemplateStrForEditor(template);
-		const aiData = parseTemplateToAIQueryData(templateStr ?? '');
-		return {
-			prompt: aiData.prompt,
-			model: aiData.model,
-			hasSchema: aiData.responseFormat?.type === 'json_schema'
-		};
-	}
-
 	$effect(() => {
 		const names = workspaceExtraVarNames;
 		untrack(() => {
@@ -227,8 +261,16 @@
 		untrack(() => {
 			streamingBuffer = '';
 			workspaceStreamError = '';
+			workspaceChatHistory = [];
 		});
 	});
+
+	function nextChatTurnId(): string {
+		if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+			return crypto.randomUUID();
+		}
+		return `chat-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+	}
 
 	async function initialize() {
 		if (!data.idToken) {
@@ -304,10 +346,18 @@
 	function handleEditTemplate(template: Prompt) {
 		editingTemplate = template;
 		isCreating = false;
+		selectedWorkspacePrompt = template;
+		const templateStr = getTemplateStrForEditor(template);
+		const data = parseTemplateToAIQueryData(templateStr ?? '');
+		workspaceQuestion = (data.prompt ?? '').trim();
 	}
 
 	function handleSelectWorkspacePrompt(template: Prompt) {
+		editingTemplate = null;
 		selectedWorkspacePrompt = template;
+		const templateStr = getTemplateStrForEditor(template);
+		const data = parseTemplateToAIQueryData(templateStr ?? '');
+		workspaceQuestion = (data.prompt ?? '').trim();
 	}
 
 	async function handleSaveTemplate(saveData: {
@@ -336,17 +386,22 @@
 				);
 
 				validatedTopicStore.publish(toTopicPath('prompts', newTemplate.id), newTemplate);
-			} else if (editingTemplate) {
+			} else {
+				const updateTarget = editingTemplate ?? selectedWorkspacePrompt;
+				if (!updateTarget) {
+					toastStore.error('No prompt selected to update.');
+					return;
+				}
 				const updatedTemplate = await updatePromptTemplate(
 					queryClient,
-					editingTemplate.id,
+					updateTarget.id,
 					{
 						name: saveData.name,
 						aiQueryData: saveData.aiQueryData,
 						description: saveData.description || undefined,
 						jsonSchemaId: saveData.jsonSchemaId,
 						schemaData: saveData.schemaData,
-						existingJsonSchemaId: (editingTemplate as { jsonSchemaId?: string }).jsonSchemaId
+						existingJsonSchemaId: (updateTarget as { jsonSchemaId?: string }).jsonSchemaId
 					},
 					selectedProjectId ?? undefined
 				);
@@ -402,7 +457,7 @@
 	});
 
 	function cancelWorkspaceStream() {
-		executionHandle?.cancel();
+		workspaceRunAbort?.abort();
 	}
 
 	async function runWorkspaceStream() {
@@ -415,9 +470,14 @@
 
 		workspaceExecuting = true;
 		workspaceStreamError = '';
+		const prior = streamingBuffer.trim();
+		if (prior.length > 0) {
+			workspaceChatHistory = [...workspaceChatHistory, { id: nextChatTurnId(), text: streamingBuffer }];
+		}
 		streamingBuffer = '';
-		executionHandle?.destroy();
-		executionHandle = null;
+		workspaceRunAbort?.abort();
+		const ac = new AbortController();
+		workspaceRunAbort = ac;
 
 		const inputValues: Record<string, unknown> = {
 			...workspaceVarValues,
@@ -432,66 +492,96 @@
 					? [workspaceSelectedDocId]
 					: undefined;
 
-		let unsubStatus: (() => void) | undefined;
-		let unsubExec: (() => void) | undefined;
-
 		try {
-			const handle = await aiService.submitStreamingExecution(
-				{
+			const res = await fetch('/api/ai-studio', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				credentials: 'include',
+				signal: ac.signal,
+				body: JSON.stringify({
 					projectId: selectedProjectId,
 					promptId: selectedWorkspacePrompt.id,
 					inputValues,
-					documentIds,
+					...(documentIds?.length ? { documentIds } : {}),
+					...(workspaceSelectedDocId.trim()
+						? { workspacePdfDocumentId: workspaceSelectedDocId.trim() }
+						: {}),
 					topK: workspaceTopK,
 					topKPerNs: workspaceTopKPerNs,
 					priority: workspacePriority,
 					googleSearchEnabled: workspaceGoogleSearch ? undefined : false
-				},
-				data.idToken,
-				(text) => {
-					streamingBuffer += text;
-				}
-			);
-
-			executionHandle = handle;
-
-			unsubStatus = handle.status.subscribe((s) => {
-				if (s === 'ERROR') {
-					workspaceStreamError = 'Execution failed.';
-				}
-			});
-			unsubExec = handle.execution.subscribe((ex) => {
-				if (ex?.status === 'ERROR' && ex.errorMessage) {
-					workspaceStreamError = ex.errorMessage;
-				}
-			});
-
-			handle.result
-				.then((raw) => {
-					if (raw != null) streamingBuffer = raw;
-					workspaceExecuting = false;
-					unsubStatus?.();
-					unsubExec?.();
 				})
-				.catch((err) => {
-					log.error('Workspace stream failed:', err);
-					workspaceStreamError = err instanceof Error ? err.message : 'Run failed';
-					workspaceExecuting = false;
-					unsubStatus?.();
-					unsubExec?.();
-				});
+			});
+
+			const contentType = res.headers.get('Content-Type') ?? '';
+
+			if (!res.ok) {
+				const payload = (await res.json().catch(() => ({}))) as { error?: string };
+				workspaceStreamError =
+					typeof payload.error === 'string' && payload.error.length > 0
+						? payload.error
+						: `Run failed (${res.status})`;
+				return;
+			}
+
+			if (!res.body || !contentType.includes('text/event-stream')) {
+				workspaceStreamError = 'Unexpected response from AI Studio.';
+				return;
+			}
+
+			const reader = res.body.getReader();
+			const decoder = new TextDecoder();
+			let lineBuffer = '';
+			let accumulated = '';
+
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				lineBuffer += decoder.decode(value, { stream: true });
+				const lines = lineBuffer.split('\n');
+				lineBuffer = lines.pop() ?? '';
+				for (const line of lines) {
+					const trimmed = line.trim();
+					if (!trimmed.startsWith('data:')) continue;
+					const jsonStr = trimmed.slice(5).trimStart();
+					let evt: { type?: string; text?: string; message?: string };
+					try {
+						evt = JSON.parse(jsonStr) as typeof evt;
+					} catch {
+						continue;
+					}
+					if (evt.type === 'chunk' && typeof evt.text === 'string') {
+						accumulated += evt.text;
+						streamingBuffer = accumulated;
+					} else if (evt.type === 'error') {
+						workspaceStreamError =
+							typeof evt.message === 'string' && evt.message.length > 0
+								? evt.message
+								: 'Generation failed';
+					} else if (evt.type === 'done' && typeof evt.text === 'string') {
+						streamingBuffer = evt.text;
+					}
+				}
+			}
 		} catch (err) {
-			log.error('Workspace submit failed:', err);
+			if (err instanceof Error && err.name === 'AbortError') {
+				return;
+			}
+			log.error('Workspace AI Studio run failed:', err);
 			workspaceStreamError = err instanceof Error ? err.message : 'Run failed';
+		} finally {
 			workspaceExecuting = false;
+			workspaceRunAbort = null;
 		}
 	}
 
 	onMount(() => {
+		viewportInnerWidth = window.innerWidth;
 		initialize();
 		function onResize() {
-			leftSidebarWidth = clampSidebarWidth(leftSidebarWidth);
-			rightSidebarWidth = clampSidebarWidth(rightSidebarWidth);
+			viewportInnerWidth = window.innerWidth;
+			leftSidebarWidth = clampLibrarySidebarWidth(leftSidebarWidth);
+			rightSidebarWidth = clampChatSidebarWidth(rightSidebarWidth);
 		}
 		window.addEventListener('resize', onResize);
 		return () => window.removeEventListener('resize', onResize);
@@ -500,7 +590,7 @@
 	onDestroy(() => {
 		promptSyncManager?.cleanup();
 		projectSyncManager?.cleanup();
-		executionHandle?.destroy();
+		workspaceRunAbort?.abort();
 	});
 </script>
 
@@ -508,46 +598,6 @@
 	class="flex h-screen w-full flex-col overflow-hidden transition-colors {darkMode ? 'bg-slate-900' : 'bg-slate-50'}"
 >
 	<TopBar pageTitle="Prompt Library" onProjectChange={handleProjectSelect}>
-		{#snippet tabs()}
-			<div class="relative min-w-[120px] max-w-sm flex-1">
-				<input
-					type="text"
-					bind:value={searchFilter}
-					placeholder="Search queries..."
-					class="h-7 w-full rounded-md border px-3 pl-8 text-xs transition-colors focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none
-						{darkMode
-						? 'border-slate-600 bg-slate-700 text-white placeholder-slate-400'
-						: 'border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400'}"
-				/>
-				<svg
-					class="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
-					fill="none"
-					stroke="currentColor"
-					viewBox="0 0 24 24"
-				>
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-					></path>
-				</svg>
-				{#if searchFilter}
-					<button
-						onclick={() => (searchFilter = '')}
-						class="absolute top-1/2 right-2 -translate-y-1/2 transition-colors {darkMode
-							? 'text-slate-400 hover:text-slate-200'
-							: 'text-slate-400 hover:text-slate-600'}"
-						aria-label="Clear filter"
-					>
-						<svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"
-							></path>
-						</svg>
-					</button>
-				{/if}
-			</div>
-		{/snippet}
 		{#snippet actions()}
 			<button
 				onclick={() => (showSchemaLibrary = true)}
@@ -599,7 +649,7 @@
 					Choose a project from the dropdown to use the prompt workspace.
 				</p>
 			</div>
-		{:else if isLoading && filteredTemplates.length === 0}
+		{:else if isLoading && projectScopedTemplates.length === 0}
 			<div class="flex flex-1 flex-col items-center justify-center gap-3">
 				<div
 					class="h-10 w-10 animate-spin rounded-full border-4 {darkMode
@@ -609,29 +659,47 @@
 				<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'}">Loading templates…</p>
 			</div>
 		{:else}
-			<!-- Left: tools -->
+			<!-- Left: Prompt library only -->
 			<div
-				class="flex min-h-0 shrink-0 flex-col overflow-hidden"
+				class="flex min-h-0 shrink-0 flex-col overflow-hidden border-r {darkMode
+					? 'border-slate-700 bg-slate-800/50'
+					: 'border-slate-200 bg-white'}"
 				style="width: {leftSidebarWidth}px"
 			>
-				<PromptWorkspaceToolsSidebar
-					{darkMode}
-					bind:topK={workspaceTopK}
-					bind:topKPerNs={workspaceTopKPerNs}
-					bind:priority={workspacePriority}
-					bind:googleSearchEnabled={workspaceGoogleSearch}
-					bind:documentScopeSelectedOnly={workspaceDocScopeSelectedOnly}
-					hasDocuments={workspaceDocuments.length > 0}
-				/>
+				{#if projectScopedTemplates.length === 0}
+					<div class="flex h-full flex-col items-center justify-center gap-2 p-4 text-center">
+						<p class="text-xs font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'}">
+							No query templates yet
+						</p>
+						<button
+							onclick={handleCreateNew}
+							class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
+						>
+							Create your first query
+						</button>
+					</div>
+				{:else}
+					<PromptLibrarySidebar
+						{darkMode}
+						bind:searchFilter
+						libraryTotalCount={projectScopedTemplates.length}
+						templates={filteredTemplates}
+						selectedId={selectedWorkspacePrompt?.id ?? null}
+						onSelect={handleSelectWorkspacePrompt}
+						onEdit={handleEditTemplate}
+						onDelete={requestDeleteTemplate}
+						{getTemplateDisplayInfo}
+					/>
+				{/if}
 			</div>
 
 			<div
 				role="slider"
 				tabindex="0"
-				aria-label="Tools panel width"
+				aria-label="Prompt library width"
 				aria-valuenow={leftSidebarWidth}
-				aria-valuemin={SIDEBAR_MIN}
-				aria-valuemax={SIDEBAR_MAX}
+				aria-valuemin={LIBRARY_SIDEBAR_MIN}
+				aria-valuemax={LIBRARY_SIDEBAR_MAX}
 				aria-orientation="horizontal"
 				class="w-1.5 shrink-0 cursor-col-resize touch-none select-none focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-indigo-500 {darkMode
 					? 'bg-slate-700 hover:bg-slate-600'
@@ -641,37 +709,47 @@
 					const step = e.shiftKey ? 40 : 12;
 					if (e.key === 'ArrowLeft') {
 						e.preventDefault();
-						leftSidebarWidth = clampSidebarWidth(leftSidebarWidth - step);
+						leftSidebarWidth = clampLibrarySidebarWidth(leftSidebarWidth - step);
 					} else if (e.key === 'ArrowRight') {
 						e.preventDefault();
-						leftSidebarWidth = clampSidebarWidth(leftSidebarWidth + step);
+						leftSidebarWidth = clampLibrarySidebarWidth(leftSidebarWidth + step);
 					}
 				}}
 			></div>
 
-			<!-- Center -->
+			<!-- Center: PDF + edit prompt + AI tools -->
 			<PromptWorkspaceCenter
 				{darkMode}
 				documents={workspaceDocuments}
-				selectedPrompt={selectedWorkspacePrompt}
 				bind:selectedDocumentId={workspaceSelectedDocId}
-				bind:question={workspaceQuestion}
-				extraVarNames={workspaceExtraVarNames}
-				bind:extraVarValues={workspaceVarValues}
-				streamingText={streamingBuffer}
-				executing={workspaceExecuting}
-				streamError={workspaceStreamError}
-				onRun={runWorkspaceStream}
-				onCancel={cancelWorkspaceStream}
-			/>
+				bind:topK={workspaceTopK}
+				bind:topKPerNs={workspaceTopKPerNs}
+				bind:priority={workspacePriority}
+				bind:googleSearchEnabled={workspaceGoogleSearch}
+				bind:documentScopeSelectedOnly={workspaceDocScopeSelectedOnly}
+			>
+				{#snippet workspaceEdit()}
+					<PromptEditModal
+						variant="inline"
+						{darkMode}
+						template={isCreating ? null : (editingTemplate ?? selectedWorkspacePrompt)}
+						{isCreating}
+						{queryClient}
+						projectId={selectedProjectId ?? ''}
+						bind:workspaceQuestion
+						onSave={handleSaveTemplate}
+						onCancel={handleCancelEdit}
+					/>
+				{/snippet}
+			</PromptWorkspaceCenter>
 
 			<div
 				role="slider"
 				tabindex="0"
-				aria-label="Prompt library panel width"
+				aria-label="Chat panel width"
 				aria-valuenow={rightSidebarWidth}
-				aria-valuemin={SIDEBAR_MIN}
-				aria-valuemax={SIDEBAR_MAX}
+				aria-valuemin={CHAT_SIDEBAR_MIN}
+				aria-valuemax={chatSidebarMaxPx}
 				aria-orientation="horizontal"
 				class="w-1.5 shrink-0 cursor-col-resize touch-none select-none focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-indigo-500 {darkMode
 					? 'bg-slate-700 hover:bg-slate-600'
@@ -681,48 +759,32 @@
 					const step = e.shiftKey ? 40 : 12;
 					if (e.key === 'ArrowLeft') {
 						e.preventDefault();
-						rightSidebarWidth = clampSidebarWidth(rightSidebarWidth + step);
+						rightSidebarWidth = clampChatSidebarWidth(rightSidebarWidth + step);
 					} else if (e.key === 'ArrowRight') {
 						e.preventDefault();
-						rightSidebarWidth = clampSidebarWidth(rightSidebarWidth - step);
+						rightSidebarWidth = clampChatSidebarWidth(rightSidebarWidth - step);
 					}
 				}}
 			></div>
 
-			<!-- Right: library -->
+			<!-- Right: chat + composer -->
 			<div
 				class="flex min-h-0 shrink-0 flex-col overflow-hidden"
 				style="width: {rightSidebarWidth}px"
 			>
-				{#if filteredTemplates.length === 0}
-					<div
-						class="flex h-full flex-col items-center justify-center gap-2 border-l p-4 text-center {darkMode
-							? 'border-slate-700 bg-slate-800/50'
-							: 'border-slate-200 bg-white'}"
-					>
-						<p class="text-xs font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'}">
-							{searchFilter ? 'No queries found' : 'No query templates yet'}
-						</p>
-						{#if !searchFilter}
-							<button
-								onclick={handleCreateNew}
-								class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
-							>
-								Create your first query
-							</button>
-						{/if}
-					</div>
-				{:else}
-					<PromptLibrarySidebar
-						{darkMode}
-						templates={filteredTemplates}
-						selectedId={selectedWorkspacePrompt?.id ?? null}
-						onSelect={handleSelectWorkspacePrompt}
-						onEdit={handleEditTemplate}
-						onDelete={requestDeleteTemplate}
-						{getTemplateDisplayInfo}
-					/>
-				{/if}
+				<PromptChatSidebar
+					{darkMode}
+					selectedPrompt={selectedWorkspacePrompt}
+					bind:question={workspaceQuestion}
+					chatHistory={workspaceChatHistory}
+					extraVarNames={workspaceExtraVarNames}
+					bind:extraVarValues={workspaceVarValues}
+					streamingText={streamingBuffer}
+					executing={workspaceExecuting}
+					streamError={workspaceStreamError}
+					onRun={runWorkspaceStream}
+					onCancel={cancelWorkspaceStream}
+				/>
 			</div>
 		{/if}
 	</div>
@@ -738,16 +800,6 @@
 	cancelLabel="Cancel"
 	darkMode={darkMode}
 	onConfirm={confirmDeleteTemplate}
-/>
-
-<PromptEditModal
-	{darkMode}
-	template={editingTemplate}
-	{isCreating}
-	{queryClient}
-	projectId={selectedProjectId ?? ''}
-	onSave={handleSaveTemplate}
-	onCancel={handleCancelEdit}
 />
 
 {#if showSchemaLibrary && queryClient}
