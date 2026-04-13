@@ -45,6 +45,8 @@
 		hideUserPrompt?: boolean;
 
 		hideResponseFormat?: boolean;
+		/** Hide system instruction (e.g. when the host renders it in a tools panel). */
+		hideSystemInstruction?: boolean;
 
 		isGenerating?: boolean;
 		generateError?: string;
@@ -78,6 +80,7 @@
 		userPromptRows = 4,
 		hideUserPrompt = false,
 		hideResponseFormat = false,
+		hideSystemInstruction = false,
 		isGenerating = false,
 		generateError = '',
 		isSaving = false,
@@ -253,26 +256,28 @@
 	{/if}
 
 	<!-- System instruction (collapsible) -->
-	<div>
-		<button
-			type="button"
-			onclick={() => showSystemInstruction = !showSystemInstruction}
-			class="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider transition-colors {darkMode ? 'text-slate-600 hover:text-slate-400' : 'text-slate-400 hover:text-slate-500'}"
-		>
-			<svg class="w-3 h-3 transition-transform {showSystemInstruction ? 'rotate-90' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
-			System Instruction
-		</button>
-		{#if showSystemInstruction}
-			<div class="mt-2">
-				<textarea
-					bind:value={systemInstruction}
-					placeholder="System instruction for the AI model..."
-					class="w-full px-3 py-2 text-sm rounded-lg border resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 {darkMode ? 'bg-slate-800/80 text-white border-slate-600/80 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-200 placeholder-slate-400'}"
-					rows="3"
-				></textarea>
-			</div>
-		{/if}
-	</div>
+	{#if !hideSystemInstruction}
+		<div>
+			<button
+				type="button"
+				onclick={() => (showSystemInstruction = !showSystemInstruction)}
+				class="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider transition-colors {darkMode ? 'text-slate-600 hover:text-slate-400' : 'text-slate-400 hover:text-slate-500'}"
+			>
+				<svg class="w-3 h-3 transition-transform {showSystemInstruction ? 'rotate-90' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+				System Instruction
+			</button>
+			{#if showSystemInstruction}
+				<div class="mt-2">
+					<textarea
+						bind:value={systemInstruction}
+						placeholder="System instruction for the AI model..."
+						class="w-full px-3 py-2 text-sm rounded-lg border resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 {darkMode ? 'bg-slate-800/80 text-white border-slate-600/80 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-200 placeholder-slate-400'}"
+						rows="3"
+					></textarea>
+				</div>
+			{/if}
+		</div>
+	{/if}
 
 	<!-- Response Format -->
 	{#if !hideResponseFormat}
@@ -290,7 +295,7 @@
 					<option value="json_object">JSON object</option>
 				</select>
 				{#if googleSearchEnabled}
-					<span class="text-[10px] {darkMode ? 'text-amber-400/80' : 'text-amber-600'}">Locked to plain text while Google Search is on</span>
+					<span class="text-[10px] {darkMode ? 'text-amber-400/80' : 'text-amber-600'}">Locked to plain text while Grounding is on</span>
 				{/if}
 			</div>
 			{#if responseFormatType === 'json_schema'}

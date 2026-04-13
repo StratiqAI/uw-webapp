@@ -2,7 +2,8 @@
  * Text-template Gemini streaming via @google/genai (Vertex).
  */
 
-import type { GoogleGenAI } from '@google/genai';
+import type { GoogleGenAI, Tool } from '@google/genai';
+import type { AiStudioToolsConfig } from '$lib/types/ai-studio.js';
 import { withRetry } from './utils.js';
 
 function hasSchemaKeys(schema: Record<string, unknown> | null | undefined): schema is Record<string, unknown> {
@@ -26,33 +27,62 @@ function sanitizeSchema(schema: Record<string, unknown>): Record<string, unknown
 	return cleaned;
 }
 
+/**
+ * Build the `Tool[]` array for `@google/genai` from our high-level config.
+ */
+function buildToolsList(cfg: AiStudioToolsConfig): Tool[] {
+	const tools: Tool[] = [];
+
+	if (cfg.googleSearch) tools.push({ googleSearch: {} });
+	if (cfg.googleMaps) tools.push({ googleMaps: {} });
+	if (cfg.urlContext) tools.push({ urlContext: {} });
+	if (cfg.codeExecution) tools.push({ codeExecution: {} });
+
+	if (cfg.functionCalling) {
+		if (typeof cfg.functionCalling === 'object' && cfg.functionCalling.declarations?.length) {
+			tools.push({
+				functionDeclarations: cfg.functionCalling.declarations.map((d) => ({
+					name: d.name,
+					description: d.description,
+					...(d.parameters ? { parametersJsonSchema: d.parameters } : {})
+				}))
+			});
+		}
+	}
+
+	return tools;
+}
+
 export interface TextStreamMeta {
 	promptTokenCount: number;
 	candidatesTokenCount: number;
 	retryCount: number;
 }
 
-/**
- * Stream Gemini text for a compiled prompt; retries only the stream setup on 429/5xx.
- */
 export type StreamTextTemplateOptions = {
-	/** Base64 PDF body for Gemini multimodal (same pattern as document-processing examples). */
+	/** Base64 PDF body for Gemini multimodal. */
 	pdfInlineBase64?: string | null;
 };
 
+/**
+ * Stream Gemini text for a compiled prompt; retries only the stream setup on 429/5xx.
+ */
 export async function streamTextTemplate(
 	compiledPrompt: string,
 	responseSchema: Record<string, unknown> | null | undefined,
 	client: GoogleGenAI,
 	modelId: string,
-	googleSearchEnabled: boolean,
+	toolsConfig: AiStudioToolsConfig,
 	onChunk: (text: string) => void,
 	options?: StreamTextTemplateOptions
 ): Promise<TextStreamMeta> {
 	const hasSchema = hasSchemaKeys(responseSchema);
-	const useStructured = hasSchema && !googleSearchEnabled;
+	const googleSearchActive = toolsConfig.googleSearch === true || toolsConfig.googleMaps === true;
+	const useStructured = hasSchema && !googleSearchActive;
 
-	const pdfB64 = options?.pdfInlineBase64;
+	const tools = buildToolsList(toolsConfig);
+
+	const pdfB64 = !googleSearchActive ? options?.pdfInlineBase64 : null;
 	const contents =
 		pdfB64 && pdfB64.length > 0
 			? [
@@ -66,7 +96,7 @@ export async function streamTextTemplate(
 			model: modelId,
 			contents,
 			config: {
-				...(googleSearchEnabled && { tools: [{ googleSearch: {} }] }),
+				...(tools.length > 0 && { tools }),
 				...(useStructured && {
 					responseMimeType: 'application/json',
 					responseSchema: sanitizeSchema(responseSchema!)

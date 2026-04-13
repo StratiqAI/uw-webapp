@@ -12,14 +12,14 @@
 	import { Q_GET_JSON_SCHEMA } from '$lib/services/graphql/jsonSchemaOperations';
 	import type { IGraphQLQueryClient } from '$lib/services/realtime/store/GraphQLQueryClient';
 	import { getTemplateStrForEditor, parseTemplateToAIQueryData, type AIQueryData } from '../PromptService';
+	import { WORKSPACE_DEFAULT_SYSTEM_INSTRUCTION } from '../workspacePromptDefaults';
 	import { aiService } from '$lib/services/ai';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { createLogger } from '$lib/utils/logger';
 
 	const log = createLogger('prompts');
 
-	const DEFAULT_SYSTEM_PROMPT =
-		'You are a expert commercial real estate investor and broker that can evaluate documents and extract information';
+	const DEFAULT_SYSTEM_PROMPT = WORKSPACE_DEFAULT_SYSTEM_INSTRUCTION;
 
 	let {
 		darkMode = false,
@@ -29,6 +29,7 @@
 		queryClient = null,
 		projectId = '',
 		workspaceQuestion = $bindable(''),
+		systemInstruction = $bindable(DEFAULT_SYSTEM_PROMPT),
 		onSave,
 		onCancel
 	}: {
@@ -41,6 +42,8 @@
 		projectId?: string;
 		/** User prompt / run message; bound from the prompts workspace so Edit and Run share one field. */
 		workspaceQuestion?: string;
+		/** System instruction; shared with chat tools panel when editing inline. */
+		systemInstruction?: string;
 		onSave?: (data: {
 			name: string;
 			description: string;
@@ -58,7 +61,6 @@
 	let templateName = $state('');
 	let templateDescription = $state('');
 	let aiQueryModel = $state<string>(DEFAULT_AI_MODEL);
-	let aiQuerySystemPrompt = $state(DEFAULT_SYSTEM_PROMPT);
 
 	let temperature = $state<number | undefined>(undefined);
 	let maxTokens = $state<number | undefined>(undefined);
@@ -112,7 +114,7 @@
 
 			workspaceQuestion = data.prompt || '';
 			aiQueryModel = normalizeToAIModel((template as { model?: string }).model ?? data.model);
-			aiQuerySystemPrompt = data.systemPrompt || DEFAULT_SYSTEM_PROMPT;
+			systemInstruction = data.systemPrompt || DEFAULT_SYSTEM_PROMPT;
 
 			temperature = data.temperature;
 			maxTokens = data.maxTokens;
@@ -157,7 +159,7 @@
 			currentJsonSchemaId = undefined;
 			workspaceQuestion = '';
 			aiQueryModel = DEFAULT_AI_MODEL;
-			aiQuerySystemPrompt = DEFAULT_SYSTEM_PROMPT;
+			systemInstruction = DEFAULT_SYSTEM_PROMPT;
 			temperature = undefined;
 			maxTokens = undefined;
 			topP = undefined;
@@ -179,7 +181,7 @@
 			currentJsonSchemaId = undefined;
 			workspaceQuestion = 'Analyze the following data and provide insights: {input}';
 			aiQueryModel = DEFAULT_AI_MODEL;
-			aiQuerySystemPrompt = DEFAULT_SYSTEM_PROMPT;
+			systemInstruction = DEFAULT_SYSTEM_PROMPT;
 			temperature = undefined;
 			maxTokens = undefined;
 			topP = undefined;
@@ -237,7 +239,7 @@
 
 			if (draft.suggestedName) templateName = draft.suggestedName;
 			workspaceQuestion = draft.prompt;
-			if (draft.systemInstruction) aiQuerySystemPrompt = draft.systemInstruction;
+			if (draft.systemInstruction) systemInstruction = draft.systemInstruction;
 
 			if (draft.jsonSchema) {
 				applySchemaDefinitionToForm(draft.jsonSchema);
@@ -278,7 +280,7 @@
 			prompt: workspaceQuestion
 		};
 
-		aiQueryData.systemPrompt = aiQuerySystemPrompt || DEFAULT_SYSTEM_PROMPT;
+		aiQueryData.systemPrompt = systemInstruction || DEFAULT_SYSTEM_PROMPT;
 		if (temperature !== undefined) aiQueryData.temperature = temperature;
 		if (maxTokens !== undefined) aiQueryData.maxTokens = maxTokens;
 		if (topP !== undefined) aiQueryData.topP = topP;
@@ -401,7 +403,9 @@
 		bind:promptDescription={templateDescription}
 		bind:userPrompt={workspaceQuestion}
 		hideUserPrompt={variant === 'inline'}
-		bind:systemInstruction={aiQuerySystemPrompt}
+		hideResponseFormat={variant === 'inline'}
+		bind:systemInstruction
+		hideSystemInstruction={variant === 'inline'}
 		bind:model={aiQueryModel}
 		bind:responseFormatType
 		bind:schemaProperties

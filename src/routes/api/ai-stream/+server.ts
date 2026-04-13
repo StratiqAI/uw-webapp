@@ -276,19 +276,18 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 						totalTokenCount: meta.promptTokenCount + meta.candidatesTokenCount
 					});
 				} else {
-					const compiled = compileTemplate(r.promptText, r.variables);
-					const googleOn = body.googleSearchEnabled !== false;
-					const meta = await streamTextTemplate(
-						compiled,
-						r.schemaDefinition,
-						r.client,
-						r.modelId,
-						googleOn,
-						(t) => {
-							fullText += t;
-							send({ type: 'chunk', text: t });
-						}
-					);
+				const compiled = compileTemplate(r.promptText, r.variables);
+				const meta = await streamTextTemplate(
+					compiled,
+					r.schemaDefinition,
+					r.client,
+					r.modelId,
+					{ googleSearch: body.googleSearchEnabled !== false },
+					(t) => {
+						fullText += t;
+						send({ type: 'chunk', text: t });
+					}
+				);
 					send({
 						type: 'meta',
 						promptTokenCount: meta.promptTokenCount,

@@ -2,6 +2,7 @@
 	import { onMount, onDestroy, setContext, untrack } from 'svelte';
 	import type { Prompt, Project } from '@stratiqai/types-simple';
 	import type { Doclink } from '$lib/types/cloud/app';
+	import type { AiStudioToolsConfig } from '$lib/types/ai-studio.js';
 	import { PromptSyncManager } from '$lib/services/realtime/websocket/sync-managers/PromptSyncManager';
 	import { ProjectSyncManager } from '$lib/services/realtime/websocket/sync-managers/ProjectSyncManager';
 	import { validatedTopicStore } from '$lib/stores/validatedTopicStore';
@@ -37,6 +38,12 @@
 		extractPromptVariableNames,
 		type AIQueryData
 	} from './PromptService';
+	import { WORKSPACE_DEFAULT_SYSTEM_INSTRUCTION } from './workspacePromptDefaults';
+	import {
+		buildSchemaPreview,
+		parseJsonSchemaToBuilderState
+	} from '@stratiqai/dashboard-widget-sdk';
+	import { Q_GET_JSON_SCHEMA } from '$lib/services/graphql/jsonSchemaOperations';
 	import { createLogger } from '$lib/utils/logger';
 
 	const log = createLogger('prompts');
@@ -94,12 +101,19 @@
 	let workspaceTopK = $state(5);
 	let workspaceTopKPerNs = $state(5);
 	let workspacePriority = $state<'HIGH' | 'MEDIUM' | 'LOW'>('MEDIUM');
-	let workspaceGoogleSearch = $state(true);
+	let workspaceToolsConfig = $state<AiStudioToolsConfig>({ googleSearch: true });
+	let workspaceGoogleSearchProxy = $state(true);
 	let workspaceDocScopeSelectedOnly = $state(false);
+
+	let workspaceResponseFormatType = $state<'text' | 'json_object' | 'json_schema'>('json_schema');
+	let workspaceSchemaProperties = $state<Record<string, Record<string, unknown>>>({});
+	let workspaceSchemaRequired = $state<string[]>([]);
+	let workspaceFieldOrder = $state<string[]>([]);
 
 	let selectedWorkspacePrompt = $state<Prompt | null>(null);
 	let workspaceSelectedDocId = $state('');
 	let workspaceQuestion = $state('');
+	let workspaceSystemInstruction = $state(WORKSPACE_DEFAULT_SYSTEM_INSTRUCTION);
 	let workspaceVarValues = $state<Record<string, string>>({});
 	let streamingBuffer = $state('');
 	/** Prior assistant replies (oldest first); current stream is in `streamingBuffer`. */
@@ -277,6 +291,65 @@
 		});
 	});
 
+	$effect(() => {
+		const prompt = selectedWorkspacePrompt;
+		untrack(() => {
+			if (!prompt) {
+				workspaceSchemaProperties = {};
+				workspaceSchemaRequired = [];
+				workspaceFieldOrder = [];
+				workspaceResponseFormatType = 'json_schema';
+				return;
+			}
+
+			const jsonSchemaId = (prompt as { jsonSchemaId?: string }).jsonSchemaId;
+			if (jsonSchemaId && queryClient) {
+				loadWorkspaceSchemaById(jsonSchemaId);
+				return;
+			}
+
+			const templateStr = getTemplateStrForEditor(prompt);
+			const aiData = parseTemplateToAIQueryData(templateStr ?? '');
+			if (aiData.responseFormat) {
+				const rf = aiData.responseFormat;
+				const rfType = (rf as { type: string }).type;
+				workspaceResponseFormatType = (rfType === 'json_schema_nested' ? 'json_schema' : rfType) as
+					| 'text' | 'json_object' | 'json_schema';
+				if ((rfType === 'json_schema' || rfType === 'json_schema_nested') && (rf as { schema?: unknown }).schema) {
+					const state = parseJsonSchemaToBuilderState((rf as { schema: unknown }).schema);
+					workspaceSchemaProperties = state.properties;
+					workspaceSchemaRequired = state.required;
+					workspaceFieldOrder = state.fieldOrder;
+				} else {
+					workspaceSchemaProperties = {};
+					workspaceSchemaRequired = [];
+					workspaceFieldOrder = [];
+				}
+			} else {
+				workspaceResponseFormatType = 'json_schema';
+				workspaceSchemaProperties = {};
+				workspaceSchemaRequired = [];
+				workspaceFieldOrder = [];
+			}
+		});
+	});
+
+	$effect(() => {
+		const gsFromTools = workspaceToolsConfig.googleSearch ?? true;
+		untrack(() => {
+			workspaceGoogleSearchProxy = gsFromTools;
+		});
+	});
+
+	$effect(() => {
+		const gsFromProxy = workspaceGoogleSearchProxy;
+		untrack(() => {
+			if ((workspaceToolsConfig.googleSearch ?? true) !== gsFromProxy) {
+				workspaceToolsConfig = { ...workspaceToolsConfig, googleSearch: gsFromProxy };
+			}
+		});
+	});
+
 	/** Load dashboard layout for this project so “Add to Dashboard” uses project-scoped storage (same as /dashboard). */
 	$effect(() => {
 		const pid = selectedProjectId;
@@ -284,6 +357,27 @@
 		if (!pid || !token) return;
 		void dashboard.initialize(pid, token);
 	});
+
+	async function loadWorkspaceSchemaById(id: string) {
+		if (!queryClient) return;
+		try {
+			const result = await queryClient.query<{ getJsonSchema: { id: string; schemaDefinition: string } | null }>(
+				Q_GET_JSON_SCHEMA,
+				{ id }
+			);
+			if (result?.getJsonSchema?.schemaDefinition) {
+				const raw = result.getJsonSchema.schemaDefinition;
+				const schema = typeof raw === 'string' ? JSON.parse(raw) : raw;
+				const state = parseJsonSchemaToBuilderState(schema);
+				workspaceSchemaProperties = state.properties;
+				workspaceSchemaRequired = state.required;
+				workspaceFieldOrder = state.fieldOrder;
+				workspaceResponseFormatType = 'json_schema';
+			}
+		} catch (e) {
+			log.error('Failed to load workspace schema:', e);
+		}
+	}
 
 	function nextChatTurnId(): string {
 		if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -386,6 +480,8 @@
 		const templateStr = getTemplateStrForEditor(template);
 		const data = parseTemplateToAIQueryData(templateStr ?? '');
 		workspaceQuestion = (data.prompt ?? '').trim();
+		workspaceSystemInstruction =
+			(data.systemPrompt ?? '').trim() || WORKSPACE_DEFAULT_SYSTEM_INSTRUCTION;
 	}
 
 	function handleSelectWorkspacePrompt(template: Prompt) {
@@ -394,6 +490,8 @@
 		const templateStr = getTemplateStrForEditor(template);
 		const data = parseTemplateToAIQueryData(templateStr ?? '');
 		workspaceQuestion = (data.prompt ?? '').trim();
+		workspaceSystemInstruction =
+			(data.systemPrompt ?? '').trim() || WORKSPACE_DEFAULT_SYSTEM_INSTRUCTION;
 	}
 
 	async function handleSaveTemplate(saveData: {
@@ -528,6 +626,8 @@
 					? [workspaceSelectedDocId]
 					: undefined;
 
+		const googleGroundingActive = workspaceToolsConfig.googleSearch === true || workspaceToolsConfig.googleMaps === true;
+
 		try {
 			const res = await fetch('/api/ai-studio', {
 				method: 'POST',
@@ -539,14 +639,21 @@
 					promptId: selectedWorkspacePrompt.id,
 					inputValues,
 					...(documentIds?.length ? { documentIds } : {}),
-					...(workspaceSelectedDocId.trim()
+					...(!googleGroundingActive && workspaceSelectedDocId.trim()
 						? { workspacePdfDocumentId: workspaceSelectedDocId.trim() }
 						: {}),
-					topK: workspaceTopK,
-					topKPerNs: workspaceTopKPerNs,
-					priority: workspacePriority,
-					googleSearchEnabled: workspaceGoogleSearch ? undefined : false
-				})
+			topK: workspaceTopK,
+			topKPerNs: workspaceTopKPerNs,
+			priority: workspacePriority,
+			tools: workspaceToolsConfig,
+			...(workspaceToolsConfig.structuredOutputs &&
+			workspaceToolsConfig.applyStructuredResponse !== false &&
+			workspaceToolsConfig.googleSearch !== true &&
+			workspaceToolsConfig.googleMaps !== true &&
+			Object.keys(workspaceSchemaProperties).length > 0
+				? { structuredOutput: { responseJsonSchema: buildSchemaPreview(workspaceSchemaProperties, workspaceSchemaRequired) } }
+				: {})
+			})
 			});
 
 			const contentType = res.headers.get('Content-Type') ?? '';
@@ -764,7 +871,7 @@
 				bind:topK={workspaceTopK}
 				bind:topKPerNs={workspaceTopKPerNs}
 				bind:priority={workspacePriority}
-				bind:googleSearchEnabled={workspaceGoogleSearch}
+				bind:googleSearchEnabled={workspaceGoogleSearchProxy}
 				bind:documentScopeSelectedOnly={workspaceDocScopeSelectedOnly}
 			>
 				{#snippet workspaceEdit()}
@@ -776,6 +883,7 @@
 						{queryClient}
 						projectId={selectedProjectId ?? ''}
 						bind:workspaceQuestion
+						bind:systemInstruction={workspaceSystemInstruction}
 						onSave={handleSaveTemplate}
 						onCancel={handleCancelEdit}
 					/>
@@ -811,20 +919,27 @@
 				class="flex min-h-0 shrink-0 flex-col overflow-hidden"
 				style="width: {rightSidebarWidth}px"
 			>
-				<PromptChatSidebar
-					{darkMode}
-					projectId={selectedProjectId ?? ''}
-					selectedPrompt={selectedWorkspacePrompt}
-					bind:question={workspaceQuestion}
-					chatHistory={workspaceChatHistory}
-					extraVarNames={workspaceExtraVarNames}
-					bind:extraVarValues={workspaceVarValues}
-					streamingText={streamingBuffer}
-					executing={workspaceExecuting}
-					streamError={workspaceStreamError}
-					onRun={runWorkspaceStream}
-					onCancel={cancelWorkspaceStream}
-				/>
+			<PromptChatSidebar
+				{darkMode}
+				projectId={selectedProjectId ?? ''}
+				selectedPrompt={selectedWorkspacePrompt}
+				bind:question={workspaceQuestion}
+				bind:systemInstruction={workspaceSystemInstruction}
+				chatHistory={workspaceChatHistory}
+				extraVarNames={workspaceExtraVarNames}
+				bind:extraVarValues={workspaceVarValues}
+				bind:toolsConfig={workspaceToolsConfig}
+				bind:responseFormatType={workspaceResponseFormatType}
+				bind:schemaProperties={workspaceSchemaProperties}
+				bind:schemaRequired={workspaceSchemaRequired}
+				bind:fieldOrder={workspaceFieldOrder}
+				onLoadSchemaFromLibrary={() => (showSchemaLibrary = true)}
+				streamingText={streamingBuffer}
+				executing={workspaceExecuting}
+				streamError={workspaceStreamError}
+				onRun={runWorkspaceStream}
+				onCancel={cancelWorkspaceStream}
+			/>
 			</div>
 		{/if}
 	</div>

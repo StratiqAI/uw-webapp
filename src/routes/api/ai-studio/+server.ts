@@ -11,6 +11,7 @@ import { resolveStreamInputs } from '$lib/server/ai/resolve-inputs.js';
 import { streamTextTemplate } from '$lib/server/ai/generate-stream.js';
 import { compileTemplate, classifyErrorCode } from '$lib/server/ai/utils.js';
 import type { StreamRequestBody } from '$lib/server/ai/types.js';
+import type { AiStudioToolsConfig } from '$lib/types/ai-studio.js';
 
 const log = createLogger('api.ai-studio');
 
@@ -73,6 +74,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	let body: StreamRequestBody;
 	try {
 		body = (await request.json()) as StreamRequestBody;
+		console.log('body', body);
 	} catch {
 		return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
 			status: 400,
@@ -110,10 +112,24 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	}
 
 	const { client, modelId, schemaDefinition, variables, promptText } = resolved.data;
-	const googleSearchEnabled = body.googleSearchEnabled !== false;
+
+	const toolsConfig: AiStudioToolsConfig = body.tools ?? {
+		googleSearch: body.googleSearchEnabled !== false
+	};
+
+	const applyStructured = body.tools?.applyStructuredResponse !== false;
+
+	let effectiveSchema: Record<string, unknown> | null | undefined =
+		body.structuredOutput?.responseJsonSchema ?? schemaDefinition;
+
+	if (!applyStructured) {
+		effectiveSchema = undefined;
+	}
+
+	const googleGroundingActive = toolsConfig.googleSearch === true || toolsConfig.googleMaps === true;
 
 	const rawWorkspaceDocId =
-		typeof body.workspacePdfDocumentId === 'string' ? body.workspacePdfDocumentId.trim() : '';
+		typeof body.workspacePdfDocumentId === 'string' && !googleGroundingActive ? body.workspacePdfDocumentId.trim() : '';
 	const workspacePdfUrl =
 		rawWorkspaceDocId && isSafeWorkspaceDocumentId(rawWorkspaceDocId)
 			? workspacePdfObjectUrl(rawWorkspaceDocId)
@@ -148,6 +164,9 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			compiled +=
 				'\n\n[Note: The PDF could not be loaded on the server for inline attachment; use the URL above if you can access it.]\n';
 		}
+	} else if (typeof body.workspacePdfDocumentId === 'string' && body.workspacePdfDocumentId.trim() && googleGroundingActive) {
+		compiled +=
+			'\n\n[Note: The PDF attachment was omitted because Grounding with Google Search or Maps is enabled (they do not support PDF inlineData).]\n';
 	}
 
 	const encoder = new TextEncoder();
@@ -161,10 +180,10 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 				let fullText = '';
 				const meta = await streamTextTemplate(
 					compiled,
-					schemaDefinition,
+					effectiveSchema,
 					client,
 					modelId,
-					googleSearchEnabled,
+					toolsConfig,
 					(t) => {
 						fullText += t;
 						send({ type: 'chunk', text: t });

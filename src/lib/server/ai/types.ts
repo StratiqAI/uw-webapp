@@ -4,8 +4,14 @@
 
 import type { GoogleGenAI } from '@google/genai';
 import type { Prompt } from '@stratiqai/types-simple';
+import type {
+	AiStudioToolsConfig,
+	AiStudioStructuredOutputConfig
+} from '$lib/types/ai-studio.js';
 
-/** HTTP POST body for /api/ai-stream */
+export type { AiStudioToolsConfig, AiStudioStructuredOutputConfig };
+
+/** HTTP POST body for /api/ai-stream and /api/ai-studio */
 export interface StreamRequestBody {
 	projectId: string;
 	promptId: string;
@@ -15,8 +21,16 @@ export interface StreamRequestBody {
 	topK?: number;
 	topKPerNs?: number;
 	priority?: string;
-	/** When false, disables Gemini Google Search grounding (default true). */
+
+	/** Tool toggles — replaces the legacy `googleSearchEnabled` boolean. */
+	tools?: AiStudioToolsConfig;
+
+	/** Override or supply a JSON Schema for structured output. */
+	structuredOutput?: AiStudioStructuredOutputConfig;
+
+	/** @deprecated Use `tools.googleSearch` instead. */
 	googleSearchEnabled?: boolean;
+
 	/**
 	 * Prompt workspace: document id for the PDF in the viewer. Server resolves the S3 URL,
 	 * injects `currentPdfUrl` for `{{ currentPdfUrl }}`, prefixes the URL in the prompt text,

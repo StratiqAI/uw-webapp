@@ -17,6 +17,8 @@ interface Props {
     /** Hide the user prompt card (e.g. when the host renders prompt elsewhere). */
     hideUserPrompt?: boolean;
     hideResponseFormat?: boolean;
+    /** Hide system instruction (e.g. when the host renders it in a tools panel). */
+    hideSystemInstruction?: boolean;
     isGenerating?: boolean;
     generateError?: string;
     isSaving?: boolean;
