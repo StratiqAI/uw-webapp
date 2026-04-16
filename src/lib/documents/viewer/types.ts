@@ -19,8 +19,8 @@ export interface PDFViewerProps {
 	/** Hide filename in toolbar; single-doc hides picker. Multi-doc keeps icon-only switcher. */
 	hideDocumentFilename?: boolean;
 	/**
-	 * After the PDF loads, zoom to fit the viewer width (default). When false, keeps `scale`
-	 * (e.g. 1.0 = 100%) and only renders at the current zoom.
+	 * After the PDF loads, zoom to fit the viewer width (default true). When false, does not
+	 * change `scale` — use bindable `scale` (e.g. 0.6 for 60%) and it persists after load.
 	 */
 	fitWidthOnLoad?: boolean;
 	onProgress?: (progress: { loaded: number; total: number }) => void;

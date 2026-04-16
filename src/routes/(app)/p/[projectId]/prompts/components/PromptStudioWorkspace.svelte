@@ -60,6 +60,22 @@
 	const LIBRARY_SIDEBAR_VIEWPORT_FRACTION = 0.22;
 	const CHAT_SIDEBAR_VIEWPORT_FRACTION = 0.48;
 
+	/** Build-widget dialog: resizable chat column (px). */
+	const EMBEDDED_CHAT_PANEL_MIN = 320;
+	const EMBEDDED_CHAT_PANEL_MAX = 1600;
+	/** Upper bound from viewport (lets the splitter move farther left / chat wider). */
+	const EMBEDDED_CHAT_VIEWPORT_MAX_FRAC = 0.88;
+	const EMBEDDED_CHAT_INITIAL_VW_FRAC = 0.56;
+	/** Keep at least this much width for PDF + prompts (approx., vs viewport). */
+	const EMBEDDED_LEFT_COLUMN_MIN = 220;
+	const EMBEDDED_DIALOG_SIDE_CHROME = 100;
+	/** Prompt grid: use 2 columns when the prompts pane is narrower than this (px). */
+	const EMBEDDED_PROMPTS_TWO_COL_MAX_PX = 620;
+	/** Build-widget: vertical split PDF vs prompt library (px height of PDF stack). */
+	const EMBEDDED_PDF_PANE_MIN = 140;
+	const EMBEDDED_PROMPTS_PANE_MIN = 140;
+	const EMBEDDED_PDF_PROMPTS_RESIZER_H = 6;
+
 	const RESERVED_TEMPLATE_VARS = new Set(['question', 'text', 'prompt']);
 
 	interface Props {
@@ -97,6 +113,16 @@
 
 	let leftSidebarWidth = $state(LIBRARY_SIDEBAR_DEFAULT);
 	let rightSidebarWidth = $state(CHAT_SIDEBAR_DEFAULT);
+	/** AI Studio dialog: width of the chat column (drag handle between PDF/prompts and chat). */
+	let embeddedChatWidth = $state(520);
+	/** Measured prompts stack (under PDF); drives 2 vs 3 column prompt cards when embedded. */
+	let embeddedPromptsAreaEl = $state<HTMLDivElement | undefined>();
+	let embeddedPromptsGridCols = $state<2 | 3>(3);
+	/** Left column (PDF + prompts): measured height for clamping PDF pane. */
+	let embeddedLeftStackEl = $state<HTMLDivElement | undefined>();
+	let embeddedLeftStackHeightPx = $state(0);
+	/** Height of the PDF block only (splitter and prompt grid sit below). */
+	let embeddedPdfPaneHeightPx = $state(300);
 	let viewportInnerWidth = $state(0);
 
 	let chatSidebarMaxPx = $derived(
@@ -194,6 +220,116 @@
 		target.addEventListener('pointerup', onUp);
 		target.addEventListener('pointercancel', onUp);
 	}
+
+	function embeddedChatClampMax(): number {
+		if (typeof window === 'undefined') {
+			return EMBEDDED_CHAT_PANEL_MAX;
+		}
+		const vw = window.innerWidth;
+		const byFraction = Math.floor(vw * EMBEDDED_CHAT_VIEWPORT_MAX_FRAC);
+		const byLeftReserve = Math.max(
+			EMBEDDED_CHAT_PANEL_MIN,
+			vw - EMBEDDED_LEFT_COLUMN_MIN - EMBEDDED_DIALOG_SIDE_CHROME
+		);
+		return Math.min(EMBEDDED_CHAT_PANEL_MAX, byFraction, byLeftReserve);
+	}
+
+	function clampEmbeddedChatWidth(w: number): number {
+		const cap = embeddedChatClampMax();
+		return Math.min(cap, Math.max(EMBEDDED_CHAT_PANEL_MIN, w));
+	}
+
+	function onEmbeddedChatResizePointerDown(e: PointerEvent) {
+		const target = e.currentTarget as HTMLElement;
+		target.setPointerCapture(e.pointerId);
+		const startX = e.clientX;
+		const startW = embeddedChatWidth;
+
+		function onMove(ev: PointerEvent) {
+			embeddedChatWidth = clampEmbeddedChatWidth(startW - (ev.clientX - startX));
+		}
+
+		function onUp(ev: PointerEvent) {
+			target.releasePointerCapture(ev.pointerId);
+			target.removeEventListener('pointermove', onMove);
+			target.removeEventListener('pointerup', onUp);
+			target.removeEventListener('pointercancel', onUp);
+		}
+
+		target.addEventListener('pointermove', onMove);
+		target.addEventListener('pointerup', onUp);
+		target.addEventListener('pointercancel', onUp);
+	}
+
+	function clampEmbeddedPdfPaneHeight(h: number): number {
+		const colH = embeddedLeftStackHeightPx;
+		const fallbackMax = 560;
+		const maxPdf =
+			colH > EMBEDDED_PROMPTS_PANE_MIN + EMBEDDED_PDF_PROMPTS_RESIZER_H + EMBEDDED_PDF_PANE_MIN
+				? colH - EMBEDDED_PROMPTS_PANE_MIN - EMBEDDED_PDF_PROMPTS_RESIZER_H
+				: fallbackMax;
+		return Math.min(Math.max(EMBEDDED_PDF_PANE_MIN, h), Math.max(EMBEDDED_PDF_PANE_MIN, maxPdf));
+	}
+
+	function onEmbeddedPdfPromptsResizePointerDown(e: PointerEvent) {
+		const target = e.currentTarget as HTMLElement;
+		target.setPointerCapture(e.pointerId);
+		const startY = e.clientY;
+		const startH = embeddedPdfPaneHeightPx;
+
+		function onMove(ev: PointerEvent) {
+			embeddedPdfPaneHeightPx = clampEmbeddedPdfPaneHeight(startH + (startY - ev.clientY));
+		}
+
+		function onUp(ev: PointerEvent) {
+			target.releasePointerCapture(ev.pointerId);
+			target.removeEventListener('pointermove', onMove);
+			target.removeEventListener('pointerup', onUp);
+			target.removeEventListener('pointercancel', onUp);
+		}
+
+		target.addEventListener('pointermove', onMove);
+		target.addEventListener('pointerup', onUp);
+		target.addEventListener('pointercancel', onUp);
+	}
+
+	$effect(() => {
+		if (!embedded) {
+			embeddedPromptsGridCols = 3;
+			return;
+		}
+		const el = embeddedPromptsAreaEl;
+		if (typeof ResizeObserver === 'undefined' || !el) return;
+
+		function applyWidth(w: number) {
+			embeddedPromptsGridCols =
+				w > 0 && w < EMBEDDED_PROMPTS_TWO_COL_MAX_PX ? 2 : 3;
+		}
+
+		applyWidth(el.getBoundingClientRect().width);
+		const ro = new ResizeObserver((entries) => {
+			const w = entries[0]?.contentRect.width ?? 0;
+			applyWidth(w);
+		});
+		ro.observe(el);
+		return () => ro.disconnect();
+	});
+
+	$effect(() => {
+		if (!embedded || typeof ResizeObserver === 'undefined') return;
+		const stackEl = embeddedLeftStackEl;
+		if (!stackEl) return;
+		function measureAndClamp() {
+			const node = embeddedLeftStackEl;
+			if (!node) return;
+			embeddedLeftStackHeightPx = node.getBoundingClientRect().height;
+			embeddedPdfPaneHeightPx = clampEmbeddedPdfPaneHeight(embeddedPdfPaneHeightPx);
+		}
+		measureAndClamp();
+		const ro = new ResizeObserver(() => measureAndClamp());
+		ro.observe(stackEl);
+		return () => ro.disconnect();
+	});
 
 	let allTemplates = $derived.by(() => {
 		return validatedTopicStore.getAllAtArray<Prompt>('prompts');
@@ -605,7 +741,11 @@
 	}
 
 	async function runWorkspaceStream() {
-		if (!data.idToken || !selectedProjectId || !selectedWorkspacePrompt || workspaceExecuting) return;
+		if (!data.idToken || !selectedProjectId || workspaceExecuting) return;
+		if (!selectedWorkspacePrompt) {
+			toastStore.info('Choose a prompt in the library first.');
+			return;
+		}
 		const q = workspaceQuestion.trim();
 		if (!q) {
 			toastStore.info('Enter a message or question to run.');
@@ -737,18 +877,36 @@
 	}
 
 	onMount(() => {
-		const vw = window.innerWidth;
-		viewportInnerWidth = vw;
-		leftSidebarWidth = clampLibrarySidebarWidth(Math.round(vw * LIBRARY_SIDEBAR_VIEWPORT_FRACTION));
-		rightSidebarWidth = clampChatSidebarWidth(Math.round(vw * CHAT_SIDEBAR_VIEWPORT_FRACTION));
-		initialize();
-		function onResize() {
-			viewportInnerWidth = window.innerWidth;
-			leftSidebarWidth = clampLibrarySidebarWidth(leftSidebarWidth);
-			rightSidebarWidth = clampChatSidebarWidth(rightSidebarWidth);
+		if (!embedded) {
+			const vw = window.innerWidth;
+			viewportInnerWidth = vw;
+			leftSidebarWidth = clampLibrarySidebarWidth(Math.round(vw * LIBRARY_SIDEBAR_VIEWPORT_FRACTION));
+			rightSidebarWidth = clampChatSidebarWidth(Math.round(vw * CHAT_SIDEBAR_VIEWPORT_FRACTION));
+			function onResize() {
+				viewportInnerWidth = window.innerWidth;
+				leftSidebarWidth = clampLibrarySidebarWidth(leftSidebarWidth);
+				rightSidebarWidth = clampChatSidebarWidth(rightSidebarWidth);
+			}
+			window.addEventListener('resize', onResize);
+			void initialize();
+			return () => window.removeEventListener('resize', onResize);
 		}
-		window.addEventListener('resize', onResize);
-		return () => window.removeEventListener('resize', onResize);
+		if (typeof window !== 'undefined') {
+			embeddedChatWidth = clampEmbeddedChatWidth(
+				Math.round(window.innerWidth * EMBEDDED_CHAT_INITIAL_VW_FRAC)
+			);
+			embeddedPdfPaneHeightPx = Math.round(
+				Math.min(560, Math.max(EMBEDDED_PDF_PANE_MIN, window.innerHeight * 0.34))
+			);
+			function onEmbeddedResize() {
+				embeddedChatWidth = clampEmbeddedChatWidth(embeddedChatWidth);
+				embeddedPdfPaneHeightPx = clampEmbeddedPdfPaneHeight(embeddedPdfPaneHeightPx);
+			}
+			window.addEventListener('resize', onEmbeddedResize);
+			void initialize();
+			return () => window.removeEventListener('resize', onEmbeddedResize);
+		}
+		void initialize();
 	});
 
 	onDestroy(() => {
@@ -825,6 +983,154 @@
 						: 'border-slate-200 border-t-indigo-600'}"
 				></div>
 				<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'}">Loading templates…</p>
+			</div>
+		{:else if embedded}
+			<div class="flex min-h-0 w-full min-w-0 flex-1 overflow-hidden">
+				<div
+					bind:this={embeddedLeftStackEl}
+					class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-r {darkMode
+						? 'border-slate-700 bg-slate-800/50'
+						: 'border-slate-200 bg-white'}"
+				>
+					<div
+						class="flex min-h-0 w-full shrink-0 flex-col overflow-hidden border-b {darkMode
+							? 'border-slate-700'
+							: 'border-slate-200'}"
+						style="height: {embeddedPdfPaneHeightPx}px"
+					>
+						<PromptWorkspaceCenter
+							embedded
+							{darkMode}
+							documents={workspaceDocuments}
+							bind:selectedDocumentId={workspaceSelectedDocId}
+							bind:topK={workspaceTopK}
+							bind:topKPerNs={workspaceTopKPerNs}
+							bind:priority={workspacePriority}
+							bind:googleSearchEnabled={workspaceGoogleSearchProxy}
+							bind:documentScopeSelectedOnly={workspaceDocScopeSelectedOnly}
+						>
+							{#snippet workspaceEdit()}
+								<PromptEditModal
+									variant="inline"
+									{darkMode}
+									template={isCreating ? null : (editingTemplate ?? selectedWorkspacePrompt)}
+									{isCreating}
+									{queryClient}
+									projectId={selectedProjectId ?? ''}
+									bind:workspaceQuestion
+									bind:systemInstruction={workspaceSystemInstruction}
+									onSave={handleSaveTemplate}
+									onCancel={handleCancelEdit}
+								/>
+							{/snippet}
+						</PromptWorkspaceCenter>
+					</div>
+
+					<button
+						type="button"
+						aria-label="Resize PDF height vs prompt library"
+						class="h-1.5 w-full shrink-0 cursor-row-resize touch-none border-0 p-0 select-none focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-indigo-500 {darkMode
+							? 'bg-slate-600 hover:bg-slate-500'
+							: 'bg-slate-300 hover:bg-slate-400'}"
+						onpointerdown={onEmbeddedPdfPromptsResizePointerDown}
+						onkeydown={(e) => {
+							const step = e.shiftKey ? 32 : 10;
+							if (e.key === 'ArrowUp') {
+								e.preventDefault();
+								embeddedPdfPaneHeightPx = clampEmbeddedPdfPaneHeight(embeddedPdfPaneHeightPx + step);
+							} else if (e.key === 'ArrowDown') {
+								e.preventDefault();
+								embeddedPdfPaneHeightPx = clampEmbeddedPdfPaneHeight(embeddedPdfPaneHeightPx - step);
+							}
+						}}
+					></button>
+
+					<div
+						bind:this={embeddedPromptsAreaEl}
+						class="flex min-h-0 flex-1 flex-col overflow-hidden"
+					>
+						{#if projectScopedTemplates.length === 0}
+							<div class="flex h-full flex-col items-center justify-center gap-2 p-4 text-center">
+								<p class="text-xs font-medium {darkMode ? 'text-slate-300' : 'text-slate-700'}">
+									No query templates yet
+								</p>
+								<button
+									onclick={handleCreateNew}
+									class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
+								>
+									Create your first query
+								</button>
+							</div>
+						{:else}
+							<PromptLibrarySidebar
+								layout="grid"
+								promptGridColumns={embeddedPromptsGridCols}
+								{darkMode}
+								bind:searchFilter
+								libraryTotalCount={projectScopedTemplates.length}
+								templates={filteredTemplates}
+								selectedId={selectedWorkspacePrompt?.id ?? null}
+								onSelect={handleSelectWorkspacePrompt}
+								onEdit={handleEditTemplate}
+								onDelete={requestDeleteTemplate}
+								{getTemplateDisplayInfo}
+							/>
+						{/if}
+					</div>
+				</div>
+
+				<div
+					role="slider"
+					tabindex="0"
+					aria-label="Resize document and prompts vs chat"
+					aria-valuenow={embeddedChatWidth}
+					aria-valuemin={EMBEDDED_CHAT_PANEL_MIN}
+					aria-valuemax={embeddedChatClampMax()}
+					aria-orientation="horizontal"
+					class="w-1.5 shrink-0 cursor-col-resize touch-none select-none focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-indigo-500 {darkMode
+						? 'bg-slate-700 hover:bg-slate-600'
+						: 'bg-slate-200 hover:bg-slate-300'}"
+					onpointerdown={onEmbeddedChatResizePointerDown}
+					onkeydown={(e) => {
+						const step = e.shiftKey ? 40 : 12;
+						if (e.key === 'ArrowLeft') {
+							e.preventDefault();
+							embeddedChatWidth = clampEmbeddedChatWidth(embeddedChatWidth + step);
+						} else if (e.key === 'ArrowRight') {
+							e.preventDefault();
+							embeddedChatWidth = clampEmbeddedChatWidth(embeddedChatWidth - step);
+						}
+					}}
+				></div>
+
+				<div
+					class="flex min-h-0 shrink-0 flex-col overflow-hidden"
+					style="width: {embeddedChatWidth}px"
+				>
+					<PromptChatSidebar
+						embedded
+						{darkMode}
+						projectId={selectedProjectId ?? ''}
+						selectedPrompt={selectedWorkspacePrompt}
+						bind:question={workspaceQuestion}
+						bind:systemInstruction={workspaceSystemInstruction}
+						chatHistory={workspaceChatHistory}
+						extraVarNames={workspaceExtraVarNames}
+						bind:extraVarValues={workspaceVarValues}
+						bind:toolsConfig={workspaceToolsConfig}
+						bind:responseFormatType={workspaceResponseFormatType}
+						bind:schemaProperties={workspaceSchemaProperties}
+						bind:schemaRequired={workspaceSchemaRequired}
+						bind:fieldOrder={workspaceFieldOrder}
+						onLoadSchemaFromLibrary={() => (showSchemaLibrary = true)}
+						streamingText={streamingBuffer}
+						executing={workspaceExecuting}
+						streamError={workspaceStreamError}
+						onRun={runWorkspaceStream}
+						onCancel={cancelWorkspaceStream}
+						addToDashboardButtonLabel={addToDashboardButtonLabel}
+					/>
+				</div>
 			</div>
 		{:else}
 			<div

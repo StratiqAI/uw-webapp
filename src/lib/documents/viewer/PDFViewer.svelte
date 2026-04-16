@@ -319,7 +319,6 @@
 			if (fitWidthOnLoad) {
 				fitToWidth();
 			} else {
-				scale = 1;
 				queueRenderPage(currentPage);
 			}
 		} catch (error: any) {

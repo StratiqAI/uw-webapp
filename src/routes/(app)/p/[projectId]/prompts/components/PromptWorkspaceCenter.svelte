@@ -21,7 +21,8 @@
 		priority = $bindable<'HIGH' | 'MEDIUM' | 'LOW'>('MEDIUM'),
 		googleSearchEnabled = $bindable(true),
 		documentScopeSelectedOnly = $bindable(false),
-		workspaceEdit
+		workspaceEdit,
+		embedded = false
 	} = $props<{
 		darkMode: boolean;
 		documents: DocItem[];
@@ -32,9 +33,14 @@
 		googleSearchEnabled: boolean;
 		documentScopeSelectedOnly: boolean;
 		workspaceEdit: Snippet;
+		/** Modal/dialog: compact PDF only, no bottom edit/tools panel or vertical resizer. */
+		embedded?: boolean;
 	}>();
 
 	let currentPage = $state(1);
+	/** Full-page: 100%. Build-widget dialog embedded: 50% on first paint (before PDF load). */
+	// svelte-ignore state_referenced_locally
+	let pdfScale = $state(embedded ? 0.5 : 1.0);
 	let centerColumnEl = $state<HTMLDivElement | undefined>();
 	let bottomPanelHeightPx = $state(300);
 	let workspaceTab = $state<'edit' | 'tools'>('edit');
@@ -107,6 +113,7 @@
 	}
 
 	onMount(() => {
+		if (embedded) return;
 		function onWinResize() {
 			reclampBottomPanel();
 		}
@@ -127,8 +134,10 @@
 	bind:this={centerColumnEl}
 	class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden {centerBg}"
 >
-	<!-- PDF (fills space above the tabbed panel) -->
-	<div class="flex min-h-0 flex-1 flex-col overflow-hidden">
+	<!-- PDF: full height in page mode; embedded height is set by dialog parent -->
+	<div
+		class="flex min-h-0 flex-col overflow-hidden {embedded ? 'h-full min-h-0 shrink-0' : 'flex-1'}"
+	>
 		{#if documents.length === 0}
 			<div
 				class="flex flex-1 items-center justify-center p-4 text-center text-xs {darkMode ? 'text-slate-500' : 'text-slate-500'}"
@@ -140,6 +149,7 @@
 				{documents}
 				bind:currentDocHash={selectedDocumentId}
 				bind:currentPage={currentPage}
+				bind:scale={pdfScale}
 				embed
 				hideDocumentFilename
 				fitWidthOnLoad={false}
@@ -148,6 +158,7 @@
 		{/if}
 	</div>
 
+	{#if !embedded}
 	<!-- Resize PDF vs. tabbed panel (top of the edit / tools panel) -->
 	<button
 		type="button"
@@ -239,4 +250,5 @@
 			</div>
 		{/if}
 	</div>
+	{/if}
 </div>

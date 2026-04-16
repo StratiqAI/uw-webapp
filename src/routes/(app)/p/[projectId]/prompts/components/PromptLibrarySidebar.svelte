@@ -10,7 +10,9 @@
 		onSelect,
 		onEdit,
 		onDelete,
-		getTemplateDisplayInfo
+		getTemplateDisplayInfo,
+		layout = 'list',
+		promptGridColumns = undefined
 	} = $props<{
 		darkMode: boolean;
 		searchFilter?: string;
@@ -22,14 +24,30 @@
 		onEdit: (t: Prompt) => void;
 		onDelete: (t: Prompt) => void;
 		getTemplateDisplayInfo: (t: Prompt) => { prompt: string; hasSchema: boolean };
+		/** `grid`: AI Studio dialog — cards in a responsive grid under the PDF. */
+		layout?: 'list' | 'grid';
+		/** When set with `layout="grid"`, fixed column count (e.g. 2 when prompts pane is narrow). */
+		promptGridColumns?: 2 | 3;
 	}>();
 
 	const panel = $derived(
 		darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-white'
 	);
+	const listChrome = $derived(layout === 'list' ? 'border-r' : '');
+	const cardPadding = $derived(layout === 'grid' ? 'p-2' : 'p-3');
+	const titleClamp = $derived(layout === 'grid' ? 'line-clamp-2' : '');
+	const gridBodyClass = $derived(
+		layout === 'grid'
+			? promptGridColumns === 2
+				? 'grid grid-cols-2 gap-2'
+				: promptGridColumns === 3
+					? 'grid grid-cols-3 gap-2'
+					: 'grid grid-cols-2 gap-2 xl:grid-cols-3'
+			: 'flex flex-col gap-2'
+	);
 </script>
 
-<div class="flex h-full min-h-0 flex-col overflow-hidden border-r {panel}">
+<div class="flex h-full min-h-0 flex-col overflow-hidden {listChrome} {panel}">
 	<div class="border-b px-3 py-2.5 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
 		<h2 class="text-xs font-semibold uppercase tracking-wider {darkMode ? 'text-slate-400' : 'text-slate-500'}">
 			Prompt library ({libraryTotalCount})
@@ -82,10 +100,12 @@
 	</div>
 
 	<div class="min-h-0 flex-1 overflow-y-auto p-2">
-		<div class="flex flex-col gap-2">
+		<div class={gridBodyClass}>
 			{#if templates.length === 0}
 				<p
-					class="px-1 py-10 text-center text-[11px] {darkMode ? 'text-slate-500' : 'text-slate-500'}"
+					class="px-1 py-10 text-center text-[11px] {layout === 'grid' ? 'col-span-full' : ''} {darkMode
+						? 'text-slate-500'
+						: 'text-slate-500'}"
 				>
 					{searchFilter.trim()
 						? 'No prompts match your search.'
@@ -96,7 +116,7 @@
 					{@const displayInfo = getTemplateDisplayInfo(template)}
 					{@const isSelected = selectedId === template.id}
 					<div
-						class="group relative rounded-lg border p-3 transition-all {isSelected
+						class="group relative rounded-lg border {cardPadding} transition-all {isSelected
 							? darkMode
 								? 'border-emerald-500 bg-emerald-950/30 ring-1 ring-emerald-500/40'
 								: 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-200'
@@ -109,8 +129,10 @@
 							class="w-full text-left"
 							onclick={() => onSelect(template)}
 						>
-							<div class="min-w-0 pr-14">
-								<h3 class="text-xs font-semibold {darkMode ? 'text-white' : 'text-slate-900'}">
+							<div class="min-w-0 {layout === 'grid' ? 'pr-11' : 'pr-14'}">
+								<h3
+									class="text-xs font-semibold {darkMode ? 'text-white' : 'text-slate-900'} {titleClamp}"
+								>
 									{template.name}
 								</h3>
 								<p class="mt-0.5 line-clamp-2 text-[11px] {darkMode ? 'text-slate-400' : 'text-slate-600'}">

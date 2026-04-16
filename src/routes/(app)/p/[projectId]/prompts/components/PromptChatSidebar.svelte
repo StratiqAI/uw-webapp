@@ -54,7 +54,8 @@
 		streamError,
 		onRun,
 		onCancel: _onCancel,
-		addToDashboardButtonLabel = 'Add to Dashboard'
+		addToDashboardButtonLabel = 'Add to Dashboard',
+		embedded = false
 	} = $props<{
 		darkMode: boolean;
 		/** Current project; enables “Add to Dashboard” for each assistant message. */
@@ -80,6 +81,8 @@
 		onRun: () => void;
 		onCancel: () => void;
 		addToDashboardButtonLabel?: string;
+		/** Dialog layout: no drag resize; flex-based message/composer split. */
+		embedded?: boolean;
 	}>();
 
 	const promptsAddToDashboard = getContext<PromptsAddChatToDashboardContext | undefined>(
@@ -287,12 +290,14 @@
 	});
 
 	$effect(() => {
+		if (embedded) return;
 		if (toolsPanelExpanded) {
 			queueMicrotask(() => reclampComposerToolsPane());
 		}
 	});
 
 	onMount(() => {
+		if (embedded) return;
 		function onWinResize() {
 			reclampStreamPane();
 			reclampComposerToolsPane();
@@ -326,8 +331,10 @@
 		<!-- Messages: oldest at top, newest / streaming at bottom -->
 		<div
 			bind:this={scrollRoot}
-			style="height: {streamPaneHeightPx}px"
-			class="shrink-0 overflow-y-auto overflow-x-hidden px-3 py-2"
+			style={embedded ? undefined : `height: ${streamPaneHeightPx}px`}
+			class="overflow-x-hidden px-3 py-2 {embedded
+				? 'min-h-0 flex-1 overflow-y-auto'
+				: 'shrink-0 overflow-y-auto'}"
 		>
 			{#if streamError}
 				<p class="mb-2 rounded border border-red-500/40 bg-red-500/10 px-2 py-1.5 text-xs text-red-400">{streamError}</p>
@@ -394,35 +401,36 @@
 			</div>
 		</div>
 
-		<button
-			type="button"
-			aria-label="Resize responses area and prompt composer"
-			class="h-1.5 w-full shrink-0 cursor-row-resize touch-none border-0 p-0 select-none focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-indigo-500 {darkMode
-				? 'bg-slate-600 hover:bg-slate-500'
-				: 'bg-slate-300 hover:bg-slate-400'}"
-			onpointerdown={onStreamComposerResizePointerDown}
-			onkeydown={(e) => {
-				if (!streamComposerBodyEl) return;
-				const h = streamComposerBodyEl.getBoundingClientRect().height;
-				if (h <= STREAM_COMPOSER_RESIZER_H + STREAM_PANE_MIN + COMPOSER_PANE_MIN) return;
-				const step = e.shiftKey ? 24 : 10;
-				if (e.key === 'ArrowUp') {
-					e.preventDefault();
-					streamPaneHeightPx = clampStreamPaneHeight(streamPaneHeightPx - step, h);
-				} else if (e.key === 'ArrowDown') {
-					e.preventDefault();
-					streamPaneHeightPx = clampStreamPaneHeight(streamPaneHeightPx + step, h);
-				}
-			}}
-		></button>
+		{#if !embedded}
+			<button
+				type="button"
+				aria-label="Resize responses area and prompt composer"
+				class="h-1.5 w-full shrink-0 cursor-row-resize touch-none border-0 p-0 select-none focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-indigo-500 {darkMode
+					? 'bg-slate-600 hover:bg-slate-500'
+					: 'bg-slate-300 hover:bg-slate-400'}"
+				onpointerdown={onStreamComposerResizePointerDown}
+				onkeydown={(e) => {
+					if (!streamComposerBodyEl) return;
+					const h = streamComposerBodyEl.getBoundingClientRect().height;
+					if (h <= STREAM_COMPOSER_RESIZER_H + STREAM_PANE_MIN + COMPOSER_PANE_MIN) return;
+					const step = e.shiftKey ? 24 : 10;
+					if (e.key === 'ArrowUp') {
+						e.preventDefault();
+						streamPaneHeightPx = clampStreamPaneHeight(streamPaneHeightPx - step, h);
+					} else if (e.key === 'ArrowDown') {
+						e.preventDefault();
+						streamPaneHeightPx = clampStreamPaneHeight(streamPaneHeightPx + step, h);
+					}
+				}}
+			></button>
+		{/if}
 
 		<!-- Composer: prompt area grows to fill space above Run/Cancel -->
 		<div
-			class="flex min-h-0 flex-1 flex-col overflow-hidden border-t px-3 py-2.5 {darkMode
-				? 'border-slate-700 bg-slate-900/40'
-				: 'border-slate-200 bg-slate-50/90'}"
+			class="flex min-h-0 flex-col overflow-hidden border-t px-3 py-2.5 {embedded
+				? 'max-h-[46vh] min-h-[140px] shrink-0 overflow-y-auto'
+				: 'flex-1'} {darkMode ? 'border-slate-700 bg-slate-900/40' : 'border-slate-200 bg-slate-50/90'}"
 		>
-			{#if selectedPrompt}
 				<div
 					bind:this={composerSplitRowEl}
 					class="flex min-h-0 flex-1 {composerTwoColumn ? 'min-h-0 flex-row gap-0' : 'flex-col gap-2'}"
@@ -467,7 +475,9 @@
 								<textarea
 									id="prompt-chat-message"
 									bind:value={question}
-									placeholder="Template loads when you select a prompt; edit here for runs…"
+									placeholder={selectedPrompt
+										? 'Template loaded from the selected prompt — edit here for runs…'
+										: 'Choose a prompt in the library to load its text here, then run or edit…'}
 									disabled={executing}
 									class="box-border h-full min-h-0 w-full flex-1 resize-none overflow-y-auto border-0 bg-transparent px-2 py-2 text-sm leading-snug outline-none focus:ring-0 {darkMode
 										? 'text-slate-100 placeholder:text-slate-500'
@@ -480,7 +490,7 @@
 							<button
 								type="button"
 								onclick={onRun}
-								disabled={executing || !question.trim()}
+								disabled={executing || !question.trim() || !selectedPrompt}
 								class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
 							>
 								{executing ? 'Running…' : 'Run'}
@@ -513,7 +523,7 @@
 						</div>
 					</div>
 
-					{#if toolsPanelExpanded}
+					{#if toolsPanelExpanded && !embedded}
 						<button
 							type="button"
 							aria-label="Resize prompt and tools panel"
@@ -586,8 +596,10 @@
 						{:else}
 							<div
 								id="prompt-chat-composer-side-panel"
-								style:width="{composerToolsPaneWidthPx}px"
-								class="flex min-h-0 min-w-0 shrink-0 flex-col overflow-hidden border-l pl-2 {darkMode ? 'border-slate-700' : 'border-slate-200'}"
+								style:width={embedded ? undefined : `${composerToolsPaneWidthPx}px`}
+								class="flex min-h-0 shrink-0 flex-col overflow-hidden border-l pl-2 {darkMode
+									? 'border-slate-700'
+									: 'border-slate-200'} {embedded ? 'w-64 min-w-[16rem] max-w-[16rem]' : 'min-w-0'}"
 							>
 								<div
 									class="mb-2 flex shrink-0 items-center justify-end border-b {darkMode ? 'border-slate-700' : 'border-slate-200'}"
@@ -779,11 +791,6 @@
 						{/if}
 					{/if}
 				</div>
-			{:else}
-				<p class="py-4 text-center text-[11px] {darkMode ? 'text-slate-500' : 'text-slate-500'}">
-					Choose a prompt in the library to run it from here.
-				</p>
-			{/if}
 		</div>
 	</div>
 </div>

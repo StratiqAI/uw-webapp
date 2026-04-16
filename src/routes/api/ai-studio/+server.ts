@@ -74,7 +74,6 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	let body: StreamRequestBody;
 	try {
 		body = (await request.json()) as StreamRequestBody;
-		console.log('body', body);
 	} catch {
 		return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
 			status: 400,
@@ -139,9 +138,16 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		? { ...variables, currentPdfUrl: workspacePdfUrl }
 		: variables;
 
+	/** Chat / Run box sends `inputValues.question`; only merges via `{{ question }}` unless we use it as the template body. */
+	const userQuestion =
+		typeof variables.question === 'string' ? variables.question.trim() : '';
+	const promptHasQuestionSlot = /\{\{\s*question\s*\}\}/.test(promptText);
+	const basePromptForCompile =
+		promptHasQuestionSlot || !userQuestion ? promptText : userQuestion;
+
 	let compiled: string;
 	try {
-		compiled = compileTemplate(promptText, variablesWithPdfUrl);
+		compiled = compileTemplate(basePromptForCompile, variablesWithPdfUrl);
 	} catch (err) {
 		log.error('ai-studio.template_failed', err);
 		return new Response(JSON.stringify({ error: 'Failed to compile prompt template' }), {
