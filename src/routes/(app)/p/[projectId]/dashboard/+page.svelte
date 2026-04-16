@@ -2,6 +2,7 @@
 	import type { PageData } from './$types';
 	import Dashboard from '$lib/dashboard/components/Dashboard.svelte';
 	import DashboardControls from '$lib/dashboard/components/DashboardControls.svelte';
+	import AiStudioDialog from '$lib/dashboard/components/AiStudioDialog.svelte';
 	import ValidatedTopicStoreSidebar from '$lib/dashboard/components/ValidatedTopicStoreSidebar.svelte';
 	import { dashboard } from '$lib/dashboard/stores/dashboard.svelte';
 	import { publishWidgetData } from '$lib/dashboard/setup/widgetDataPublishers';
@@ -21,11 +22,14 @@
 
 	let { data }: Props = $props();
 	let showAddWidgetDialog = $state(false);
+	let showBuildWidgetDialog = $state(false);
 	let isLoading = $derived(!dashboard.isInitialized);
-	// #region agent log
-	let _dbgEffectCount = 0;
-	$effect(() => { console.log('[DEBUG-35a5c4] isLoading changed to:', isLoading, 'initialized:', dashboard.isInitialized); });
-	// #endregion
+
+	const aiStudioWorkspaceData = $derived({
+		idToken: data.idToken ?? '',
+		projects: data.projects ?? [],
+		currentUser: data.currentUser
+	});
 
 	let darkMode = $derived.by(() => themeStore.darkMode);
 	let currentTheme = $derived.by(() => themeStore.theme);
@@ -81,11 +85,6 @@
 		const idToken = data.idToken;
 		if (!projectId) return;
 
-		// #region agent log
-		_dbgEffectCount++;
-		console.log('[DEBUG-35a5c4] $effect fired #' + _dbgEffectCount, { projectId, hasIdToken: !!idToken, isInitialized: dashboard.isInitialized });
-		// #endregion
-
 		dashboard.initialize(projectId, idToken)
 			.then(() => {
 				try {
@@ -95,9 +94,6 @@
 				}
 				dashboard.ensureGridCapacity();
 				updateGridSize();
-				// #region agent log
-				console.log('[DEBUG-35a5c4] init .then() complete', { isInitialized: dashboard.isInitialized });
-				// #endregion
 				log.debug('Dashboard initialization complete for project:', projectId);
 			})
 			.catch((error) => {
@@ -160,7 +156,10 @@
 		<DashboardControls
 			onProjectChange={handleProjectChange}
 			bind:showAddWidgetDialog
+			bind:showBuildWidgetDialog
 		/>
+
+		<AiStudioDialog bind:open={showBuildWidgetDialog} data={aiStudioWorkspaceData} />
 
 
 	<!-- AI Job → Paragraph Widget Example -->

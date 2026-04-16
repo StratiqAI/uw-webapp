@@ -53,7 +53,8 @@
 		executing,
 		streamError,
 		onRun,
-		onCancel: _onCancel
+		onCancel: _onCancel,
+		addToDashboardButtonLabel = 'Add to Dashboard'
 	} = $props<{
 		darkMode: boolean;
 		/** Current project; enables “Add to Dashboard” for each assistant message. */
@@ -78,11 +79,18 @@
 		streamError: string;
 		onRun: () => void;
 		onCancel: () => void;
+		addToDashboardButtonLabel?: string;
 	}>();
 
 	const promptsAddToDashboard = getContext<PromptsAddChatToDashboardContext | undefined>(
 		PROMPTS_ADD_CHAT_TO_DASHBOARD
 	);
+
+	async function sendChatToDashboard(text: string, tabId?: string) {
+		const add = promptsAddToDashboard?.add;
+		if (!add) return;
+		await Promise.resolve(add(text, tabId));
+	}
 
 	let showSystemInstructionPanel = $state(false);
 	$effect(() => {
@@ -335,10 +343,10 @@
 							>
 								<SendToDashboardButton
 									{darkMode}
-									buttonLabel="Add to Dashboard"
+									buttonLabel={addToDashboardButtonLabel}
 									colorClasses={dashboardBtnColors}
 									onSend={(tabId) => {
-										void promptsAddToDashboard?.add(turn.text, tabId);
+										void sendChatToDashboard(turn.text, tabId);
 									}}
 								/>
 							</div>
@@ -358,10 +366,10 @@
 							>
 								<SendToDashboardButton
 									{darkMode}
-									buttonLabel="Add to Dashboard"
+									buttonLabel={addToDashboardButtonLabel}
 									colorClasses={dashboardBtnColors}
 									onSend={(tabId) => {
-										void promptsAddToDashboard?.add(streamingText, tabId);
+										void sendChatToDashboard(streamingText, tabId);
 									}}
 								/>
 							</div>
