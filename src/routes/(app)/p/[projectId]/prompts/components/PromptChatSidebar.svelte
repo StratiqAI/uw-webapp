@@ -1,8 +1,19 @@
 <script lang="ts">
+	import { Chat } from '@ai-sdk/svelte';
 	import { getContext, onMount, tick, untrack } from 'svelte';
-	import { marked } from 'marked';
+	import type { UIMessage } from 'ai';
 	import type { Prompt } from '@stratiqai/types-simple';
 	import type { AiStudioToolsConfig } from '$lib/types/ai-studio.js';
+	import {
+		collectAssistantVisibleText,
+		extractTaggedThinking,
+		getToolRender,
+		parseAssistantTextWithSources,
+		proseWithoutThinkingTags,
+		toolResultEmbeddedError,
+		type ParsedSource
+	} from '$lib/ai/agent-chat-parts.js';
+	import { renderAssistantMarkdown } from '$lib/ai/safe-marked.js';
 	import PromptStudioToolsToggleList from './PromptStudioToolsToggleList.svelte';
 	import ResponseFormatPanel from './ResponseFormatPanel.svelte';
 	import SendToDashboardButton from '$lib/documents/discovery/SendToDashboardButton.svelte';
@@ -12,11 +23,50 @@
 	} from '../promptsDashboardContext';
 	import { WORKSPACE_DEFAULT_SYSTEM_INSTRUCTION } from '../workspacePromptDefaults';
 
-	marked.setOptions({ async: false, gfm: true, breaks: true });
+	function pageImageUrl(pageLabel: string, pageImageMap: Map<number, string>): string | null {
+		const nums = [...pageLabel.matchAll(/\d+/g)].map((m) => Number(m[0]));
+		if (nums.length === 0) return null;
+		const n = nums[nums.length - 1];
+		return pageImageMap.get(n) ?? null;
+	}
 
-	function renderMarkdown(content: string): string {
-		if (!content.trim()) return '';
-		return marked.parse(content) as string;
+	function assistantBodyHtml(text: string): { html: string; sources: ParsedSource[] } {
+		const think = extractTaggedThinking(text);
+		const visible = proseWithoutThinkingTags(think.prose);
+		const parsed = parseAssistantTextWithSources(visible);
+		const bodyMd = parsed.sources.length > 0 ? parsed.bodyText : visible;
+		return { html: renderAssistantMarkdown(bodyMd), sources: parsed.sources };
+	}
+
+	type AnswerToolMinimal = {
+		pageImageMap: Map<number, string>;
+		defaultImageUrl: string | null;
+	};
+
+	function getMinimalAnswerToolMeta(parts: Array<Record<string, unknown>>): AnswerToolMinimal {
+		let pageImageMap = new Map<number, string>();
+		let defaultImageUrl: string | null = null;
+
+		for (const part of parts) {
+			const toolUi = getToolRender(part);
+			if (!toolUi?.isSuccess || toolUi.result == null || typeof toolUi.result !== 'object')
+				continue;
+			const out = toolUi.result as Record<string, unknown>;
+			const urls = (out.usedImageUrls as string[] | undefined) ?? [];
+			if (urls.length) defaultImageUrl = urls[0] ?? null;
+			const sources = (out.sources ?? []) as Array<{ pageNumber?: unknown; imageUrl?: string | null }>;
+			for (const s of sources) {
+				const pn =
+					typeof s.pageNumber === 'number'
+						? Math.trunc(s.pageNumber)
+						: typeof s.pageNumber === 'string'
+							? Number(s.pageNumber.trim())
+							: NaN;
+				if (Number.isFinite(pn) && s.imageUrl) pageImageMap.set(pn, s.imageUrl);
+			}
+		}
+
+		return { pageImageMap, defaultImageUrl };
 	}
 
 	/** Tailwind typography for AI replies (matches ChatDrawer pattern). */
@@ -40,7 +90,7 @@
 		selectedPrompt,
 		question = $bindable(''),
 		systemInstruction = $bindable(WORKSPACE_DEFAULT_SYSTEM_INSTRUCTION),
-		chatHistory = [],
+		chat,
 		extraVarNames,
 		extraVarValues = $bindable<Record<string, string>>({}),
 		toolsConfig = $bindable<AiStudioToolsConfig>({}),
@@ -49,11 +99,8 @@
 		schemaRequired = $bindable<string[]>([]),
 		fieldOrder = $bindable<string[]>([]),
 		onLoadSchemaFromLibrary,
-		streamingText,
-		executing,
-		streamError,
 		onRun,
-		onCancel: _onCancel,
+		onCancel,
 		addToDashboardButtonLabel = 'Add to Dashboard',
 		embedded = false
 	} = $props<{
@@ -65,8 +112,7 @@
 		question?: string;
 		/** System instruction (shared with inline prompt editor). */
 		systemInstruction?: string;
-		/** Completed assistant turns, oldest first. */
-		chatHistory?: { id: string; text: string }[];
+		chat: Chat<UIMessage>;
 		extraVarNames: string[];
 		extraVarValues?: Record<string, string>;
 		toolsConfig?: AiStudioToolsConfig;
@@ -75,15 +121,17 @@
 		schemaRequired?: string[];
 		fieldOrder?: string[];
 		onLoadSchemaFromLibrary?: () => void;
-		streamingText: string;
-		executing: boolean;
-		streamError: string;
 		onRun: () => void;
 		onCancel: () => void;
 		addToDashboardButtonLabel?: string;
 		/** Dialog layout: no drag resize; flex-based message/composer split. */
 		embedded?: boolean;
 	}>();
+
+	const executing = $derived(chat.status === 'streaming' || chat.status === 'submitted');
+	const streamError = $derived(
+		chat.status === 'error' && chat.error ? chat.error.message : ''
+	);
 
 	const promptsAddToDashboard = getContext<PromptsAddChatToDashboardContext | undefined>(
 		PROMPTS_ADD_CHAT_TO_DASHBOARD
@@ -274,11 +322,9 @@
 	}
 
 	$effect(() => {
-		const _h = chatHistory.length;
-		const _t = streamingText;
+		const _m = chat.messages;
 		const _e = executing;
-		void _h;
-		void _t;
+		void _m;
 		void _e;
 		untrack(async () => {
 			await tick();
@@ -340,9 +386,10 @@
 				<p class="mb-2 rounded border border-red-500/40 bg-red-500/10 px-2 py-1.5 text-xs text-red-400">{streamError}</p>
 			{/if}
 			<div class="flex min-h-full flex-col justify-end gap-2">
-				{#each chatHistory as turn (turn.id)}
+				{#each chat.messages as message (message.id)}
+					{@const answerMeta = getMinimalAnswerToolMeta(message.parts as Array<Record<string, unknown>>)}
 					<div class="overflow-hidden rounded-lg border {bubble}">
-						{#if showDashboardActions}
+						{#if message.role === 'assistant' && showDashboardActions && collectAssistantVisibleText(message).trim()}
 							<div
 								class="flex justify-end border-b px-2 py-1 {darkMode
 									? 'border-slate-600/60 bg-slate-900/60'
@@ -353,43 +400,136 @@
 									buttonLabel={addToDashboardButtonLabel}
 									colorClasses={dashboardBtnColors}
 									onSend={(tabId) => {
-										void sendChatToDashboard(turn.text, tabId);
+										void sendChatToDashboard(collectAssistantVisibleText(message), tabId);
 									}}
 								/>
 							</div>
 						{/if}
-						<div class="px-3 py-2 text-sm leading-relaxed {mdProseClass}">
-							{@html renderMarkdown(turn.text)}
+						<div class="px-3 py-2 text-xs leading-relaxed">
+							<span class="mb-1 block font-semibold uppercase tracking-wide opacity-70 {darkMode ? 'text-slate-400' : 'text-slate-500'}">
+								{message.role === 'user' ? 'You' : 'Agent'}
+							</span>
+							{#each message.parts as part, pi (pi)}
+								{@const toolUi = getToolRender(part)}
+								{#if part.type === 'text'}
+									{#if message.role === 'assistant'}
+										{@const rawText = part.text ?? ''}
+										{@const think = extractTaggedThinking(rawText)}
+										{#if think.blocks.length}
+											<div class="mb-2 rounded-md border {darkMode ? 'border-slate-600 bg-slate-950/80' : 'border-slate-200 bg-slate-100'} px-2 py-1.5">
+												<details class="text-[11px]">
+													<summary class="cursor-pointer opacity-80">View agent thinking ({think.blocks.length})</summary>
+													{#each think.blocks as block, bi (`${bi}-${block.slice(0, 40)}`)}
+														<pre class="mt-1 whitespace-pre-wrap break-words rounded border px-2 py-1 font-mono text-[10px] opacity-90 {darkMode ? 'border-slate-700 bg-slate-900 text-slate-400' : 'border-slate-200 bg-white text-slate-600'}">{block}</pre>
+													{/each}
+												</details>
+											</div>
+										{/if}
+										{@const body = assistantBodyHtml(rawText)}
+										{#if body.sources.length > 0}
+											{#if body.html.trim()}
+												<div class="{mdProseClass} prose-headings:!text-[0.95rem]">{@html body.html}</div>
+											{/if}
+											<section class="mt-2 rounded-lg border px-2 py-2 text-[11px] {darkMode ? 'border-indigo-900/50 bg-indigo-950/30' : 'border-indigo-100 bg-indigo-50/80'}">
+												<p class="mb-1 font-semibold uppercase tracking-wide opacity-90">Sources</p>
+												<ul class="space-y-1">
+													{#each body.sources as source (`${source.raw}-${source.displayText}`)}
+														{@const imgUrl =
+															source.pageLabel &&
+															pageImageUrl(source.pageLabel, answerMeta.pageImageMap)}
+														{@const sourceHref =
+															source.url ??
+															imgUrl ??
+															(source.raw.toLowerCase().includes('bounding box')
+																? answerMeta.defaultImageUrl
+																: null)}
+														<li class="flex flex-wrap items-center gap-1">
+															{#if source.pageLabel}
+																{#if imgUrl}
+																	<a
+																		class="rounded px-1.5 py-0.5 font-semibold underline-offset-2 hover:underline {darkMode ? 'bg-slate-800 text-indigo-300' : 'bg-white text-indigo-700'}"
+																		href={imgUrl}
+																		target="_blank"
+																		rel="noopener noreferrer">{source.pageLabel}</a>
+																{:else}
+																	<span class="rounded px-1.5 py-0.5 font-semibold {darkMode ? 'bg-slate-800' : 'bg-white'}">{source.pageLabel}</span>
+																{/if}
+															{/if}
+															{#if sourceHref}
+																<a
+																	class="break-all text-indigo-500 underline-offset-2 hover:underline dark:text-indigo-300"
+																	href={sourceHref}
+																	target="_blank"
+																	rel="noopener noreferrer">{source.displayText.trim() ? source.displayText : sourceHref}</a>
+															{:else}
+																<span class="opacity-90">{source.raw}</span>
+															{/if}
+														</li>
+													{/each}
+												</ul>
+											</section>
+										{:else}
+											<div class="{mdProseClass} prose-headings:!text-[0.95rem]">{@html body.html}</div>
+										{/if}
+									{:else}
+										<p class="whitespace-pre-wrap text-sm {darkMode ? 'text-slate-200' : 'text-slate-800'}">{part.text}</p>
+									{/if}
+								{:else if part.type === 'reasoning' && message.role !== 'user'}
+									<details class="mb-2 rounded-md border px-2 py-1 text-[11px] {darkMode ? 'border-slate-600 bg-slate-950/60' : 'border-slate-200 bg-slate-50'}">
+										<summary class="cursor-pointer opacity-80">Model reasoning</summary>
+										<pre class="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-[10px] opacity-95">{part.text}</pre>
+									</details>
+								{:else if toolUi}
+									{@const embeddedErr = toolResultEmbeddedError(toolUi.result)}
+									<div
+										class="mb-2 border-l-2 pl-2 text-[11px] {toolUi.isPending
+											? 'border-blue-400'
+											: toolUi.isError
+												? 'border-red-400'
+												: embeddedErr
+													? 'border-amber-400'
+													: 'border-emerald-500'}"
+									>
+										<div class="flex flex-wrap items-center gap-2 opacity-95">
+											{#if toolUi.isPending}
+												<span class="inline-block size-3.5 animate-spin rounded-full border-2 border-slate-500 border-t-indigo-500" aria-hidden="true"></span>
+												<span>Running <code class="rounded bg-black/10 px-1">{toolUi.name}</code>…</span>
+												<span class="rounded bg-amber-500/15 px-1.5 py-px text-[9px] uppercase">{toolUi.state}</span>
+											{:else if toolUi.isError}
+												<span class="font-medium text-red-500">Tool failed: <code>{toolUi.name}</code></span>
+											{:else if embeddedErr}
+												<span class="font-medium text-amber-600 dark:text-amber-400">Completed with error</span>
+											{:else}
+												<span class="font-medium text-emerald-600 dark:text-emerald-400"><code>{toolUi.name}</code> finished</span>
+											{/if}
+										</div>
+										<details class="mt-1">
+											<summary class="cursor-pointer opacity-75">Arguments</summary>
+											<pre class="mt-1 max-h-32 overflow-auto rounded border px-2 py-1 font-mono text-[10px] {darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}">{JSON.stringify(toolUi.args ?? {}, null, 2)}</pre>
+										</details>
+										{#if toolUi.isSuccess || toolUi.isError}
+											<details class="mt-1" open={toolUi.isError || !!embeddedErr}>
+												<summary>{toolUi.isError ? 'Error detail' : 'Result'}</summary>
+												{#if toolUi.isError && toolUi.errorText}
+													<pre class="mt-1 whitespace-pre-wrap text-[10px] text-red-500">{toolUi.errorText}</pre>
+												{:else if embeddedErr}
+													<pre class="mt-1 whitespace-pre-wrap text-[10px] text-amber-600">{embeddedErr}</pre>
+													<pre class="mt-1 max-h-40 overflow-auto rounded border px-2 py-1 font-mono text-[10px]">{JSON.stringify(toolUi.result, null, 2)}</pre>
+												{:else}
+													<pre class="mt-1 max-h-40 overflow-auto rounded border px-2 py-1 font-mono text-[10px]">{JSON.stringify(toolUi.result, null, 2)}</pre>
+												{/if}
+											</details>
+										{/if}
+									</div>
+								{/if}
+							{/each}
 						</div>
 					</div>
 				{/each}
-				{#if executing || streamingText}
-					<div class="overflow-hidden rounded-lg border {bubble}">
-						{#if showDashboardActions && streamingText.trim()}
-							<div
-								class="flex justify-end border-b px-2 py-1 {darkMode
-									? 'border-slate-600/60 bg-slate-900/60'
-									: 'border-slate-200 bg-slate-100/90'}"
-							>
-								<SendToDashboardButton
-									{darkMode}
-									buttonLabel={addToDashboardButtonLabel}
-									colorClasses={dashboardBtnColors}
-									onSend={(tabId) => {
-										void sendChatToDashboard(streamingText, tabId);
-									}}
-								/>
-							</div>
-						{/if}
-						<div class="px-3 py-2 text-sm leading-relaxed {mdProseClass}">
-							{#if streamingText}
-								{@html renderMarkdown(streamingText)}
-							{:else}
-								<span class="font-mono text-slate-500">…</span>
-							{/if}
-						</div>
-					</div>
-				{:else if chatHistory.length === 0 && !streamError}
+				{#if executing}
+					<p class="animate-pulse px-1 text-[11px] opacity-70 {darkMode ? 'text-slate-400' : 'text-slate-500'}">Agent is thinking…</p>
+				{/if}
+				{#if chat.messages.length === 0 && !streamError}
 					<div
 						class="rounded-lg border border-dashed px-3 py-2 text-center font-mono text-xs leading-relaxed {darkMode
 							? 'border-slate-600/60 bg-slate-900/40 text-slate-500'
@@ -495,6 +635,17 @@
 							>
 								{executing ? 'Running…' : 'Run'}
 							</button>
+							{#if executing}
+								<button
+									type="button"
+									onclick={() => onCancel()}
+									class="rounded-lg border px-3 py-1.5 text-xs font-medium {darkMode
+										? 'border-slate-500 text-slate-200 hover:bg-slate-700'
+										: 'border-slate-300 text-slate-700 hover:bg-slate-100'}"
+								>
+									Cancel
+								</button>
+							{/if}
 
 							<button
 								type="button"

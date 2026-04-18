@@ -2,6 +2,7 @@
  * Types for SvelteKit server-side AI streaming (vision RAG + text template).
  */
 
+import type { UIMessage } from 'ai';
 import type { GoogleGenAI } from '@google/genai';
 import type { Prompt } from '@stratiqai/types-simple';
 import type {
@@ -27,6 +28,16 @@ export interface StreamRequestBody {
 
 	/** Override or supply a JSON Schema for structured output. */
 	structuredOutput?: AiStudioStructuredOutputConfig;
+
+	/**
+	 * Vercel AI UI message history from `@ai-sdk/svelte` Chat (POST /api/ai-studio).
+	 */
+	messages?: UIMessage[];
+
+	/**
+	 * Workspace system instruction (optional); passed as the model `system` message for Vertex.
+	 */
+	systemInstruction?: string;
 
 	/** @deprecated Use `tools.googleSearch` instead. */
 	googleSearchEnabled?: boolean;

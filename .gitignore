@@ -6,6 +6,7 @@ node_modules
 .netlify
 .wrangler
 /.svelte-kit
+packages/**/.svelte-kit
 /build
 
 # OS
@@ -30,4 +31,5 @@ svelte-flowbite-awssdk-starter-template.code-workspace
 # VSCode
 .vscode
 PRIVATE-README.md
+packages/**/service-account.json
 svelte-flowbite-awssdk-starter-template.code-workspace

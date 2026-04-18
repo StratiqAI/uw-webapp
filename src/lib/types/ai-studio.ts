@@ -3,6 +3,8 @@
  * Client-safe — no server-only imports.
  */
 
+import type { UIMessage } from 'ai';
+
 // ---------------------------------------------------------------------------
 // Tool-level configuration
 // ---------------------------------------------------------------------------
@@ -54,6 +56,12 @@ export interface AiStudioRequest {
 	projectId: string;
 	promptId: string;
 	inputValues: Record<string, unknown>;
+	/**
+	 * When using POST /api/ai-studio with `@ai-sdk/svelte` Chat, the client sends
+	 * Vercel AI `UIMessage[]` for multi-turn context.
+	 */
+	messages?: UIMessage[];
+	systemInstruction?: string;
 	documentIds?: string[];
 	workspacePdfDocumentId?: string;
 	topK?: number;

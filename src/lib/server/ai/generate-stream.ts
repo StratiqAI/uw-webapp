@@ -10,7 +10,8 @@ function hasSchemaKeys(schema: Record<string, unknown> | null | undefined): sche
 	return schema != null && typeof schema === 'object' && Object.keys(schema).length > 0;
 }
 
-function sanitizeSchema(schema: Record<string, unknown>): Record<string, unknown> {
+/** Exported for AI SDK structured output (ai-studio Vertex stream). */
+export function sanitizeSchema(schema: Record<string, unknown>): Record<string, unknown> {
 	const { $schema, additionalProperties, ...rest } = schema;
 	const cleaned: Record<string, unknown> = { ...rest };
 	if (cleaned.properties && typeof cleaned.properties === 'object') {

@@ -1,17 +1,18 @@
 /**
- * AI Studio — streaming Vertex Gemini (SSE) for text templates.
- * No AppSync submitAIQuery / no SQS. Auth: id_token cookie.
+ * AI Studio — streaming Vertex Gemini via Vercel AI SDK UI message stream.
+ * Auth: id_token cookie.
  */
 
 import { Buffer } from 'node:buffer';
+import type { UIMessage } from 'ai';
 import { PUBLIC_DOCUMENTS_BUCKET, PUBLIC_REGION } from '$env/static/public';
 import type { RequestHandler } from './$types';
 import { createLogger } from '$lib/utils/logger';
 import { resolveStreamInputs } from '$lib/server/ai/resolve-inputs.js';
-import { streamTextTemplate } from '$lib/server/ai/generate-stream.js';
-import { compileTemplate, classifyErrorCode } from '$lib/server/ai/utils.js';
+import { compileTemplate } from '$lib/server/ai/utils.js';
 import type { StreamRequestBody } from '$lib/server/ai/types.js';
 import type { AiStudioToolsConfig } from '$lib/types/ai-studio.js';
+import { createAiStudioVertexStreamResponse } from '$lib/server/ai/ai-studio-vertex-stream.js';
 
 const log = createLogger('api.ai-studio');
 
@@ -46,12 +47,18 @@ async function fetchPdfAsBase64(url: string): Promise<string | null> {
 		}
 		const buf = new Uint8Array(await res.arrayBuffer());
 		if (buf.byteLength > MAX_INLINE_PDF_BYTES) {
-			log.warn('ai-studio.workspace_pdf_too_large', { bytes: buf.byteLength, max: MAX_INLINE_PDF_BYTES });
+			log.warn('ai-studio.workspace_pdf_too_large', {
+				bytes: buf.byteLength,
+				max: MAX_INLINE_PDF_BYTES
+			});
 			return null;
 		}
 		return Buffer.from(buf).toString('base64');
 	} catch (err) {
-		log.warn('ai-studio.workspace_pdf_fetch_error', { url, error: err instanceof Error ? err.message : String(err) });
+		log.warn('ai-studio.workspace_pdf_fetch_error', {
+			url,
+			error: err instanceof Error ? err.message : String(err)
+		});
 		return null;
 	} finally {
 		clearTimeout(timer);
@@ -88,6 +95,15 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		});
 	}
 
+	if (!Array.isArray(body.messages)) {
+		return new Response(JSON.stringify({ error: 'messages array is required' }), {
+			status: 400,
+			headers: { 'Content-Type': 'application/json' }
+		});
+	}
+
+	const uiMessages = body.messages as UIMessage[];
+
 	const documentIdsFromRequest = await resolveDocumentIdsForCompat(body);
 
 	const resolved = await resolveStreamInputs(body, documentIdsFromRequest, idToken, {
@@ -110,7 +126,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		);
 	}
 
-	const { client, modelId, schemaDefinition, variables, promptText } = resolved.data;
+	const { modelId, schemaDefinition, variables, promptText } = resolved.data;
 
 	const toolsConfig: AiStudioToolsConfig = body.tools ?? {
 		googleSearch: body.googleSearchEnabled !== false
@@ -128,7 +144,9 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	const googleGroundingActive = toolsConfig.googleSearch === true || toolsConfig.googleMaps === true;
 
 	const rawWorkspaceDocId =
-		typeof body.workspacePdfDocumentId === 'string' && !googleGroundingActive ? body.workspacePdfDocumentId.trim() : '';
+		typeof body.workspacePdfDocumentId === 'string' && !googleGroundingActive
+			? body.workspacePdfDocumentId.trim()
+			: '';
 	const workspacePdfUrl =
 		rawWorkspaceDocId && isSafeWorkspaceDocumentId(rawWorkspaceDocId)
 			? workspacePdfObjectUrl(rawWorkspaceDocId)
@@ -170,59 +188,39 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			compiled +=
 				'\n\n[Note: The PDF could not be loaded on the server for inline attachment; use the URL above if you can access it.]\n';
 		}
-	} else if (typeof body.workspacePdfDocumentId === 'string' && body.workspacePdfDocumentId.trim() && googleGroundingActive) {
+	} else if (
+		typeof body.workspacePdfDocumentId === 'string' &&
+		body.workspacePdfDocumentId.trim() &&
+		googleGroundingActive
+	) {
 		compiled +=
 			'\n\n[Note: The PDF attachment was omitted because Grounding with Google Search or Maps is enabled (they do not support PDF inlineData).]\n';
 	}
 
-	const encoder = new TextEncoder();
-	const stream = new ReadableStream({
-		async start(controller) {
-			const send = (data: object) => {
-				controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
-			};
-
-			try {
-				let fullText = '';
-				const meta = await streamTextTemplate(
-					compiled,
-					effectiveSchema,
-					client,
-					modelId,
-					toolsConfig,
-					(t) => {
-						fullText += t;
-						send({ type: 'chunk', text: t });
-					},
-					{ pdfInlineBase64 }
-				);
-
-				send({
-					type: 'meta',
-					promptTokenCount: meta.promptTokenCount,
-					candidatesTokenCount: meta.candidatesTokenCount,
-					totalTokenCount: meta.promptTokenCount + meta.candidatesTokenCount
-				});
-				send({ type: 'done', text: fullText });
-			} catch (err) {
-				const message = err instanceof Error ? err.message : 'Generation failed';
-				log.error('ai-studio.stream_failed', err);
-				send({
-					type: 'error',
-					message,
-					errorCode: classifyErrorCode(message)
-				});
-			} finally {
-				controller.close();
-			}
-		}
+	const abortController = new AbortController();
+	request.signal.addEventListener('abort', () => {
+		abortController.abort();
 	});
 
-	return new Response(stream, {
-		headers: {
-			'Content-Type': 'text/event-stream',
-			'Cache-Control': 'no-cache',
-			Connection: 'keep-alive'
-		}
-	});
+	try {
+		return await createAiStudioVertexStreamResponse({
+			uiMessages,
+			compiledPrompt: compiled,
+			pdfInlineBase64,
+			toolsConfig,
+			effectiveSchema,
+			applyStructured,
+			googleGroundingActive,
+			modelId,
+			systemInstruction: typeof body.systemInstruction === 'string' ? body.systemInstruction : undefined,
+			abortSignal: abortController.signal
+		});
+	} catch (err) {
+		log.error('ai-studio.stream_failed', err);
+		const message = err instanceof Error ? err.message : 'Generation failed';
+		return new Response(JSON.stringify({ error: message }), {
+			status: 500,
+			headers: { 'Content-Type': 'application/json' }
+		});
+	}
 };

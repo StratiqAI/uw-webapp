@@ -45,6 +45,9 @@
 	} from '@stratiqai/dashboard-widget-sdk';
 	import { Q_GET_JSON_SCHEMA } from '$lib/services/graphql/jsonSchemaOperations';
 	import { createLogger } from '$lib/utils/logger';
+	import { Chat } from '@ai-sdk/svelte';
+	import { DefaultChatTransport } from 'ai';
+	import type { UIMessage } from 'ai';
 
 	const log = createLogger('prompts');
 
@@ -151,11 +154,65 @@
 	let workspaceQuestion = $state('');
 	let workspaceSystemInstruction = $state(WORKSPACE_DEFAULT_SYSTEM_INSTRUCTION);
 	let workspaceVarValues = $state<Record<string, string>>({});
-	let streamingBuffer = $state('');
-	let workspaceChatHistory = $state<{ id: string; text: string }[]>([]);
-	let workspaceExecuting = $state(false);
-	let workspaceStreamError = $state('');
-	let workspaceRunAbort = $state<AbortController | null>(null);
+
+	const workspaceChat = new Chat<UIMessage>({
+		transport: new DefaultChatTransport<UIMessage>({
+			api: '/api/ai-studio',
+			credentials: 'include',
+			prepareSendMessagesRequest: ({ messages }) => {
+				const pid = selectedProjectId ?? '';
+				const prompt = selectedWorkspacePrompt;
+				const q = workspaceQuestion.trim();
+				const inputValues: Record<string, unknown> = {
+					...workspaceVarValues,
+					question: q
+				};
+				const hasDocs = workspaceDocuments.length > 0;
+				const documentIds =
+					!hasDocs
+						? undefined
+						: workspaceDocScopeSelectedOnly && workspaceSelectedDocId
+							? [workspaceSelectedDocId]
+							: undefined;
+				const googleGroundingActive =
+					workspaceToolsConfig.googleSearch === true || workspaceToolsConfig.googleMaps === true;
+
+				const body: Record<string, unknown> = {
+					projectId: pid,
+					promptId: prompt?.id ?? '',
+					inputValues,
+					systemInstruction: workspaceSystemInstruction,
+					...(documentIds?.length ? { documentIds } : {}),
+					...(!googleGroundingActive && workspaceSelectedDocId.trim()
+						? { workspacePdfDocumentId: workspaceSelectedDocId.trim() }
+						: {}),
+					topK: workspaceTopK,
+					topKPerNs: workspaceTopKPerNs,
+					priority: workspacePriority,
+					tools: workspaceToolsConfig,
+					messages,
+					...(workspaceToolsConfig.structuredOutputs &&
+					workspaceToolsConfig.applyStructuredResponse !== false &&
+					workspaceToolsConfig.googleSearch !== true &&
+					workspaceToolsConfig.googleMaps !== true &&
+					Object.keys(workspaceSchemaProperties).length > 0
+						? {
+								structuredOutput: {
+									responseJsonSchema: buildSchemaPreview(
+										workspaceSchemaProperties,
+										workspaceSchemaRequired
+									)
+								}
+							}
+						: {})
+				};
+				return {
+					credentials: 'include',
+					body
+				};
+			}
+		})
+	});
 
 	function clampLibrarySidebarWidth(w: number): number {
 		if (typeof window === 'undefined') {
@@ -428,9 +485,8 @@
 	$effect(() => {
 		const _ = selectedWorkspacePrompt?.id;
 		untrack(() => {
-			streamingBuffer = '';
-			workspaceStreamError = '';
-			workspaceChatHistory = [];
+			workspaceChat.messages = [];
+			workspaceChat.clearError();
 		});
 	});
 
@@ -521,13 +577,6 @@
 		} catch (e) {
 			log.error('Failed to load workspace schema:', e);
 		}
-	}
-
-	function nextChatTurnId(): string {
-		if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-			return crypto.randomUUID();
-		}
-		return `chat-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 	}
 
 	async function handleAddChatResponseToDashboard(text: string, tabId?: string): Promise<boolean> {
@@ -737,11 +786,17 @@
 	});
 
 	function cancelWorkspaceStream() {
-		workspaceRunAbort?.abort();
+		void workspaceChat.stop();
 	}
 
 	async function runWorkspaceStream() {
-		if (!data.idToken || !selectedProjectId || workspaceExecuting) return;
+		if (!data.idToken || !selectedProjectId) return;
+		if (
+			workspaceChat.status === 'streaming' ||
+			workspaceChat.status === 'submitted'
+		) {
+			return;
+		}
 		if (!selectedWorkspacePrompt) {
 			toastStore.info('Choose a prompt in the library first.');
 			return;
@@ -752,127 +807,11 @@
 			return;
 		}
 
-		workspaceExecuting = true;
-		workspaceStreamError = '';
-		const prior = streamingBuffer.trim();
-		if (prior.length > 0) {
-			workspaceChatHistory = [...workspaceChatHistory, { id: nextChatTurnId(), text: streamingBuffer }];
-		}
-		streamingBuffer = '';
-		workspaceRunAbort?.abort();
-		const ac = new AbortController();
-		workspaceRunAbort = ac;
-
-		const inputValues: Record<string, unknown> = {
-			...workspaceVarValues,
-			question: q
-		};
-
-		const hasDocs = workspaceDocuments.length > 0;
-		const documentIds =
-			!hasDocs
-				? undefined
-				: workspaceDocScopeSelectedOnly && workspaceSelectedDocId
-					? [workspaceSelectedDocId]
-					: undefined;
-
-		const googleGroundingActive =
-			workspaceToolsConfig.googleSearch === true || workspaceToolsConfig.googleMaps === true;
-
+		workspaceChat.clearError();
 		try {
-			const res = await fetch('/api/ai-studio', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				credentials: 'include',
-				signal: ac.signal,
-				body: JSON.stringify({
-					projectId: selectedProjectId,
-					promptId: selectedWorkspacePrompt.id,
-					inputValues,
-					...(documentIds?.length ? { documentIds } : {}),
-					...(!googleGroundingActive && workspaceSelectedDocId.trim()
-						? { workspacePdfDocumentId: workspaceSelectedDocId.trim() }
-						: {}),
-					topK: workspaceTopK,
-					topKPerNs: workspaceTopKPerNs,
-					priority: workspacePriority,
-					tools: workspaceToolsConfig,
-					...(workspaceToolsConfig.structuredOutputs &&
-					workspaceToolsConfig.applyStructuredResponse !== false &&
-					workspaceToolsConfig.googleSearch !== true &&
-					workspaceToolsConfig.googleMaps !== true &&
-					Object.keys(workspaceSchemaProperties).length > 0
-						? {
-								structuredOutput: {
-									responseJsonSchema: buildSchemaPreview(
-										workspaceSchemaProperties,
-										workspaceSchemaRequired
-									)
-								}
-							}
-						: {})
-				})
-			});
-
-			const contentType = res.headers.get('Content-Type') ?? '';
-
-			if (!res.ok) {
-				const payload = (await res.json().catch(() => ({}))) as { error?: string };
-				workspaceStreamError =
-					typeof payload.error === 'string' && payload.error.length > 0
-						? payload.error
-						: `Run failed (${res.status})`;
-				return;
-			}
-
-			if (!res.body || !contentType.includes('text/event-stream')) {
-				workspaceStreamError = 'Unexpected response from AI Studio.';
-				return;
-			}
-
-			const reader = res.body.getReader();
-			const decoder = new TextDecoder();
-			let lineBuffer = '';
-			let accumulated = '';
-
-			while (true) {
-				const { done, value } = await reader.read();
-				if (done) break;
-				lineBuffer += decoder.decode(value, { stream: true });
-				const lines = lineBuffer.split('\n');
-				lineBuffer = lines.pop() ?? '';
-				for (const line of lines) {
-					const trimmed = line.trim();
-					if (!trimmed.startsWith('data:')) continue;
-					const jsonStr = trimmed.slice(5).trimStart();
-					let evt: { type?: string; text?: string; message?: string };
-					try {
-						evt = JSON.parse(jsonStr) as typeof evt;
-					} catch {
-						continue;
-					}
-					if (evt.type === 'chunk' && typeof evt.text === 'string') {
-						accumulated += evt.text;
-						streamingBuffer = accumulated;
-					} else if (evt.type === 'error') {
-						workspaceStreamError =
-							typeof evt.message === 'string' && evt.message.length > 0
-								? evt.message
-								: 'Generation failed';
-					} else if (evt.type === 'done' && typeof evt.text === 'string') {
-						streamingBuffer = evt.text;
-					}
-				}
-			}
+			await workspaceChat.sendMessage({ text: q });
 		} catch (err) {
-			if (err instanceof Error && err.name === 'AbortError') {
-				return;
-			}
 			log.error('Workspace AI Studio run failed:', err);
-			workspaceStreamError = err instanceof Error ? err.message : 'Run failed';
-		} finally {
-			workspaceExecuting = false;
-			workspaceRunAbort = null;
 		}
 	}
 
@@ -912,7 +851,7 @@
 	onDestroy(() => {
 		promptSyncManager?.cleanup();
 		projectSyncManager?.cleanup();
-		workspaceRunAbort?.abort();
+		void workspaceChat.stop();
 	});
 </script>
 
@@ -1114,7 +1053,7 @@
 						selectedPrompt={selectedWorkspacePrompt}
 						bind:question={workspaceQuestion}
 						bind:systemInstruction={workspaceSystemInstruction}
-						chatHistory={workspaceChatHistory}
+						chat={workspaceChat}
 						extraVarNames={workspaceExtraVarNames}
 						bind:extraVarValues={workspaceVarValues}
 						bind:toolsConfig={workspaceToolsConfig}
@@ -1123,9 +1062,6 @@
 						bind:schemaRequired={workspaceSchemaRequired}
 						bind:fieldOrder={workspaceFieldOrder}
 						onLoadSchemaFromLibrary={() => (showSchemaLibrary = true)}
-						streamingText={streamingBuffer}
-						executing={workspaceExecuting}
-						streamError={workspaceStreamError}
 						onRun={runWorkspaceStream}
 						onCancel={cancelWorkspaceStream}
 						addToDashboardButtonLabel={addToDashboardButtonLabel}
@@ -1247,7 +1183,7 @@
 					selectedPrompt={selectedWorkspacePrompt}
 					bind:question={workspaceQuestion}
 					bind:systemInstruction={workspaceSystemInstruction}
-					chatHistory={workspaceChatHistory}
+					chat={workspaceChat}
 					extraVarNames={workspaceExtraVarNames}
 					bind:extraVarValues={workspaceVarValues}
 					bind:toolsConfig={workspaceToolsConfig}
@@ -1256,9 +1192,6 @@
 					bind:schemaRequired={workspaceSchemaRequired}
 					bind:fieldOrder={workspaceFieldOrder}
 					onLoadSchemaFromLibrary={() => (showSchemaLibrary = true)}
-					streamingText={streamingBuffer}
-					executing={workspaceExecuting}
-					streamError={workspaceStreamError}
 					onRun={runWorkspaceStream}
 					onCancel={cancelWorkspaceStream}
 					addToDashboardButtonLabel={addToDashboardButtonLabel}

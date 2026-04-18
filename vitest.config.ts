@@ -4,10 +4,9 @@ import { sveltekit } from '@sveltejs/kit/vite';
 export default defineConfig({
 	plugins: [sveltekit()],
 	test: {
-		// Use jsdom environment for DOM APIs (needed for Svelte)
+		// Use jsdom environment for DOM APIs (needed for Svelte / isomorphic-dompurify)
 		environment: 'jsdom',
-		// Include test files
-		include: ['src/**/*.{test,spec}.{js,ts}'],
+		include: ['src/**/*.{test,spec}.{js,ts}', 'test/**/*.{test,spec}.{js,ts}'],
 		// Setup files
 		setupFiles: [],
 		// Coverage configuration
@@ -22,12 +21,6 @@ export default defineConfig({
 			]
 		},
 		// Globals (enable for jest-like API)
-		globals: true,
-		// Module resolution
-		resolve: {
-			alias: {
-				'$lib': '/src/lib'
-			}
-		}
+		globals: true
 	}
 });
