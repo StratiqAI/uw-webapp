@@ -32,4 +32,5 @@ svelte-flowbite-awssdk-starter-template.code-workspace
 .vscode
 PRIVATE-README.md
 packages/**/service-account.json
+/service-account.json
 svelte-flowbite-awssdk-starter-template.code-workspace
