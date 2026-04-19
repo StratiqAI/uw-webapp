@@ -64,7 +64,7 @@
 		selectedPrompt,
 		question = $bindable(''),
 		systemInstruction = $bindable(WORKSPACE_DEFAULT_SYSTEM_INSTRUCTION),
-		useAgentStream = false,
+		useAgentStream = true,
 		onUseAgentStreamChange,
 		chat,
 		extraVarNames,
@@ -356,7 +356,9 @@
 		{#if selectedPrompt}
 			<p class="mt-0.5 truncate text-[10px] {darkMode ? 'text-slate-500' : 'text-slate-500'}">{selectedPrompt.name}</p>
 		{:else}
-			<p class="mt-0.5 text-[10px] {darkMode ? 'text-slate-500' : 'text-slate-500'}">Select a prompt to run</p>
+			<p class="mt-0.5 text-[10px] {darkMode ? 'text-slate-500' : 'text-slate-500'}">
+				Type a message below, or pick a prompt from the library
+			</p>
 		{/if}
 		<label class="mt-2 flex cursor-pointer items-start gap-2">
 			<input
@@ -706,7 +708,7 @@
 									bind:value={question}
 									placeholder={selectedPrompt
 										? 'Template loaded from the selected prompt — edit here for runs…'
-										: 'Choose a prompt in the library to load its text here, then run or edit…'}
+										: 'Type your message here, or select a library prompt to load its template…'}
 									disabled={executing}
 									class="box-border h-full min-h-0 w-full flex-1 resize-none overflow-y-auto border-0 bg-transparent px-2 py-2 text-sm leading-snug outline-none focus:ring-0 {darkMode
 										? 'text-slate-100 placeholder:text-slate-500'
@@ -719,7 +721,7 @@
 							<button
 								type="button"
 								onclick={onRun}
-								disabled={executing || !question.trim() || !selectedPrompt}
+								disabled={executing}
 								class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
 							>
 								{executing ? 'Running…' : 'Run'}

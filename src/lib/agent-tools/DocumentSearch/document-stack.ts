@@ -59,7 +59,9 @@ export class DocumentRetrievalAndVisionStack {
 	async queryPinecone(query: string, topK?: number): Promise<PineconeQueryResult> {
 		this.ensureServices();
 		const k = topK ?? this.config.topK;
-		return this.pineconeService!.query(query, k);
+		const result = await this.pineconeService!.query(query, k);
+		console.log("[queryPinecone]: ", result);
+		return result;
 	}
 
 	async answerFromImages(question: string): Promise<VisionAnswerResult> {

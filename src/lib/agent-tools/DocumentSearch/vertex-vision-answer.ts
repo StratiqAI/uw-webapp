@@ -121,9 +121,9 @@ export class VertexVisionAnswerService {
 		const { answer, relevantTexts } = this.answerParser.parseStructuredAnswer(text);
 		const highlightBoxes = this.highlighter.findHighlightBoxes(relevantTexts, pageContexts);
 		this.logger.info('Vision model answer generated', {
-			usedImages: fetchedImages.length,
-			relevantTexts: relevantTexts.length,
-			highlightBoxes: highlightBoxes.length
+			usedImages: fetchedImages,
+			relevantTexts: relevantTexts,
+			highlightBoxes: highlightBoxes
 		});
 
 		return {

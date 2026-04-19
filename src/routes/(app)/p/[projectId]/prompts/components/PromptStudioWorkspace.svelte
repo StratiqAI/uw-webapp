@@ -140,7 +140,10 @@
 	let workspaceTopK = $state(5);
 	let workspaceTopKPerNs = $state(5);
 	let workspacePriority = $state<'HIGH' | 'MEDIUM' | 'LOW'>('MEDIUM');
-	let workspaceToolsConfig = $state<AiStudioToolsConfig>({ googleSearch: true });
+	let workspaceToolsConfig = $state<AiStudioToolsConfig>({
+		googleSearch: true,
+		googleMaps: false
+	});
 	let workspaceGoogleSearchProxy = $state(true);
 	let workspaceDocScopeSelectedOnly = $state(false);
 
@@ -154,7 +157,7 @@
 	let workspaceQuestion = $state('');
 	let workspaceSystemInstruction = $state(WORKSPACE_DEFAULT_SYSTEM_INSTRUCTION);
 	/** Experimental: POST `/api/ai-studio` uses `agent-stream.ts` instead of full Vertex pipeline. */
-	let workspaceUseAgentStream = $state(false);
+	let workspaceUseAgentStream = $state(true);
 	let workspaceVarValues = $state<Record<string, string>>({});
 
 	const workspaceChat = new Chat<UIMessage>({
@@ -694,6 +697,16 @@
 			(parsed.systemPrompt ?? '').trim() || WORKSPACE_DEFAULT_SYSTEM_INSTRUCTION;
 	}
 
+	/** Build Widget dialog: auto-select the first library prompt once templates exist (same as clicking the first card). */
+	$effect(() => {
+		if (!embedded || !selectedProjectId) return;
+		const first = projectScopedTemplates[0];
+		if (!first || selectedWorkspacePrompt !== null) return;
+		untrack(() => {
+			handleSelectWorkspacePrompt(first);
+		});
+	});
+
 	async function handleSaveTemplate(saveData: {
 		name: string;
 		description: string;
@@ -800,10 +813,6 @@
 			workspaceChat.status === 'streaming' ||
 			workspaceChat.status === 'submitted'
 		) {
-			return;
-		}
-		if (!selectedWorkspacePrompt) {
-			toastStore.info('Choose a prompt in the library first.');
 			return;
 		}
 		const q = workspaceQuestion.trim();
