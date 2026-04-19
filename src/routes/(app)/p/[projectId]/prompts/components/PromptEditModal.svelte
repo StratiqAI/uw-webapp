@@ -476,7 +476,7 @@
 	</div>
 {:else if template || isCreating}
 <div
-	class="fixed inset-0 bg-black/50 backdrop-blur-[2px] flex items-start justify-center z-50 pt-[3vh] pb-[3vh] overflow-y-auto"
+	class="fixed inset-0 bg-black/50 backdrop-blur-[2px] flex items-start justify-center z-110 pt-[3vh] pb-[3vh] overflow-y-auto"
 	onclick={handleCancel}
 	onkeydown={handleKeydown}
 	role="dialog"

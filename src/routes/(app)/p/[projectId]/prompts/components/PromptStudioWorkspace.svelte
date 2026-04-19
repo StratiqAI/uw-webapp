@@ -938,6 +938,7 @@
 				<p class="text-sm {darkMode ? 'text-slate-400' : 'text-slate-500'}">Loading templates…</p>
 			</div>
 		{:else if embedded}
+			<div class="contents">
 			<div class="flex min-h-0 w-full min-w-0 flex-1 overflow-hidden">
 				<div
 					bind:this={embeddedLeftStackEl}
@@ -963,18 +964,7 @@
 							bind:documentScopeSelectedOnly={workspaceDocScopeSelectedOnly}
 						>
 							{#snippet workspaceEdit()}
-								<PromptEditModal
-									variant="inline"
-									{darkMode}
-									template={isCreating ? null : (editingTemplate ?? selectedWorkspacePrompt)}
-									{isCreating}
-									{queryClient}
-									projectId={selectedProjectId ?? ''}
-									bind:workspaceQuestion
-									bind:systemInstruction={workspaceSystemInstruction}
-									onSave={handleSaveTemplate}
-									onCancel={handleCancelEdit}
-								/>
+								<!-- Build-widget: center column hides inline editor; modal opens from pencil / Create -->
 							{/snippet}
 						</PromptWorkspaceCenter>
 					</div>
@@ -1085,6 +1075,22 @@
 						addToDashboardButtonLabel={addToDashboardButtonLabel}
 					/>
 				</div>
+			</div>
+
+			{#if isCreating || editingTemplate}
+				<PromptEditModal
+					variant="modal"
+					{darkMode}
+					template={isCreating ? null : (editingTemplate ?? selectedWorkspacePrompt)}
+					{isCreating}
+					{queryClient}
+					projectId={selectedProjectId ?? ''}
+					bind:workspaceQuestion
+					bind:systemInstruction={workspaceSystemInstruction}
+					onSave={handleSaveTemplate}
+					onCancel={handleCancelEdit}
+				/>
+			{/if}
 			</div>
 		{:else}
 			<div
