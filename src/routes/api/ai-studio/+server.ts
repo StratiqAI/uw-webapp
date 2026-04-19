@@ -12,6 +12,7 @@ import { resolveStreamInputs } from '$lib/server/ai/resolve-inputs.js';
 import { compileTemplate } from '$lib/server/ai/utils.js';
 import type { StreamRequestBody } from '$lib/server/ai/types.js';
 import type { AiStudioToolsConfig } from '$lib/types/ai-studio.js';
+import { createAiStudioAgentResponse } from '$lib/server/ai/agent-stream.js';
 import { createAiStudioVertexStreamResponse } from '$lib/server/ai/ai-studio-vertex-stream.js';
 
 const log = createLogger('api.ai-studio');
@@ -128,6 +129,29 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 
 	const { modelId, schemaDefinition, variables, promptText } = resolved.data;
 
+	const abortController = new AbortController();
+	request.signal.addEventListener('abort', () => {
+		abortController.abort();
+	});
+
+	if (body.useAgentStream === true) {
+		try {
+			return await createAiStudioAgentResponse({
+				uiMessages,
+				modelId,
+				systemInstruction: typeof body.systemInstruction === 'string' ? body.systemInstruction : undefined,
+				abortSignal: abortController.signal
+			});
+		} catch (err) {
+			log.error('ai-studio.agent_stream_failed', err);
+			const message = err instanceof Error ? err.message : 'Generation failed';
+			return new Response(JSON.stringify({ error: message }), {
+				status: 500,
+				headers: { 'Content-Type': 'application/json' }
+			});
+		}
+	}
+
 	const toolsConfig: AiStudioToolsConfig = body.tools ?? {
 		googleSearch: body.googleSearchEnabled !== false
 	};
@@ -196,11 +220,6 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		compiled +=
 			'\n\n[Note: The PDF attachment was omitted because Grounding with Google Search or Maps is enabled (they do not support PDF inlineData).]\n';
 	}
-
-	const abortController = new AbortController();
-	request.signal.addEventListener('abort', () => {
-		abortController.abort();
-	});
 
 	try {
 		return await createAiStudioVertexStreamResponse({

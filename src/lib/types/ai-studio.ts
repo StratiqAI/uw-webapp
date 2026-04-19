@@ -74,6 +74,11 @@ export interface AiStudioRequest {
 	/** Override or supply a JSON Schema for structured output. */
 	structuredOutput?: AiStudioStructuredOutputConfig;
 
+	/**
+	 * When true, uses the experimental agent stream backend instead of the full Vertex AI Studio pipeline.
+	 */
+	useAgentStream?: boolean;
+
 	// Legacy ------------------------------------------------------------------
 	/** @deprecated Use `tools.googleSearch` instead. */
 	googleSearchEnabled?: boolean;

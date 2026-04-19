@@ -39,6 +39,12 @@ export interface StreamRequestBody {
 	 */
 	systemInstruction?: string;
 
+	/**
+	 * When true, POST `/api/ai-studio` uses the experimental `Experimental_Agent` stream
+	 * (`agent-stream.ts`) instead of the full Vertex AI Studio pipeline.
+	 */
+	useAgentStream?: boolean;
+
 	/** @deprecated Use `tools.googleSearch` instead. */
 	googleSearchEnabled?: boolean;
 

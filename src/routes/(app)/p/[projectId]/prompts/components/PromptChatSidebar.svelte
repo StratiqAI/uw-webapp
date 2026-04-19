@@ -90,6 +90,8 @@
 		selectedPrompt,
 		question = $bindable(''),
 		systemInstruction = $bindable(WORKSPACE_DEFAULT_SYSTEM_INSTRUCTION),
+		useAgentStream = false,
+		onUseAgentStreamChange,
 		chat,
 		extraVarNames,
 		extraVarValues = $bindable<Record<string, string>>({}),
@@ -112,6 +114,9 @@
 		question?: string;
 		/** System instruction (shared with inline prompt editor). */
 		systemInstruction?: string;
+		/** Experimental agent stream backend (`agent-stream.ts`) vs full Vertex AI Studio. */
+		useAgentStream?: boolean;
+		onUseAgentStreamChange?: (value: boolean) => void;
 		chat: Chat<UIMessage>;
 		extraVarNames: string[];
 		extraVarValues?: Record<string, string>;
@@ -368,6 +373,22 @@
 		{:else}
 			<p class="mt-0.5 text-[10px] {darkMode ? 'text-slate-500' : 'text-slate-500'}">Select a prompt to run</p>
 		{/if}
+		<label class="mt-2 flex cursor-pointer items-start gap-2">
+			<input
+				type="checkbox"
+				class="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border {darkMode
+					? 'border-slate-500 bg-slate-800'
+					: 'border-slate-400 bg-white'}"
+				checked={useAgentStream}
+				onchange={(e) => onUseAgentStreamChange?.(e.currentTarget.checked)}
+			/>
+			<span class="text-[11px] leading-snug {darkMode ? 'text-slate-300' : 'text-slate-600'}">
+				Experimental agent backend
+				<span class="mt-0.5 block opacity-75"
+					>Uses chat messages only; Vertex tools and workspace PDF merge are skipped.</span
+				>
+			</span>
+		</label>
 	</div>
 
 	<div

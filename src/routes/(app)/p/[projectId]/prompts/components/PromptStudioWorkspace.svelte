@@ -153,6 +153,8 @@
 	let workspaceSelectedDocId = $state('');
 	let workspaceQuestion = $state('');
 	let workspaceSystemInstruction = $state(WORKSPACE_DEFAULT_SYSTEM_INSTRUCTION);
+	/** Experimental: POST `/api/ai-studio` uses `agent-stream.ts` instead of full Vertex pipeline. */
+	let workspaceUseAgentStream = $state(false);
 	let workspaceVarValues = $state<Record<string, string>>({});
 
 	const workspaceChat = new Chat<UIMessage>({
@@ -182,6 +184,7 @@
 					promptId: prompt?.id ?? '',
 					inputValues,
 					systemInstruction: workspaceSystemInstruction,
+					...(workspaceUseAgentStream ? { useAgentStream: true } : {}),
 					...(documentIds?.length ? { documentIds } : {}),
 					...(!googleGroundingActive && workspaceSelectedDocId.trim()
 						? { workspacePdfDocumentId: workspaceSelectedDocId.trim() }
@@ -213,6 +216,8 @@
 			}
 		})
 	});
+
+	console.log('[workspaceChat]: ', workspaceChat);
 
 	function clampLibrarySidebarWidth(w: number): number {
 		if (typeof window === 'undefined') {
@@ -1053,6 +1058,10 @@
 						selectedPrompt={selectedWorkspacePrompt}
 						bind:question={workspaceQuestion}
 						bind:systemInstruction={workspaceSystemInstruction}
+						useAgentStream={workspaceUseAgentStream}
+						onUseAgentStreamChange={(v) => {
+							workspaceUseAgentStream = v;
+						}}
 						chat={workspaceChat}
 						extraVarNames={workspaceExtraVarNames}
 						bind:extraVarValues={workspaceVarValues}
@@ -1183,6 +1192,10 @@
 					selectedPrompt={selectedWorkspacePrompt}
 					bind:question={workspaceQuestion}
 					bind:systemInstruction={workspaceSystemInstruction}
+					useAgentStream={workspaceUseAgentStream}
+					onUseAgentStreamChange={(v) => {
+						workspaceUseAgentStream = v;
+					}}
 					chat={workspaceChat}
 					extraVarNames={workspaceExtraVarNames}
 					bind:extraVarValues={workspaceVarValues}

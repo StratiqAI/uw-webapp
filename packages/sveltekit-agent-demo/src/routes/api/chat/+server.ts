@@ -9,13 +9,10 @@
  * Uses {@link ToolLoopAgent} (Vercel AI SDK agents) with `stream` + `toUIMessageStreamResponse`
  * for @ai-sdk/svelte Chat.
  */
-import {
-	convertToModelMessages,
-	validateUIMessages,
-	type UIMessage
-} from 'ai';
+import { type UIMessage } from 'ai';
 import type { RequestHandler } from '@sveltejs/kit';
-import { agentToolsForHistory, documentToolLoopAgent } from '$lib/agent';
+import { AgentChatPrompt } from '$lib/agent-chat-prompt';
+import { documentToolLoopAgent } from '$lib/agent';
 
 function readUseMapsForMessage(raw: unknown): boolean {
 	if (raw === true) return true;
@@ -56,15 +53,9 @@ export const POST: RequestHandler = async ({ request }) => {
 		abortController.abort();
 	});
 
-	let validatedMessages: UIMessage[];
+	let chatPrompt: AgentChatPrompt;
 	try {
-		validatedMessages = await validateUIMessages({
-			messages,
-			// Vertex provider tools use input type `{}`; AI SDK validators expect wider `Tool` types.
-			tools: agentToolsForHistory as unknown as Parameters<
-				typeof validateUIMessages
-			>[0]['tools']
-		});
+		chatPrompt = await AgentChatPrompt.fromUIMessages(messages);
 	} catch {
 		return new Response(JSON.stringify({ error: 'Invalid messages' }), {
 			status: 400,
@@ -72,15 +63,8 @@ export const POST: RequestHandler = async ({ request }) => {
 		});
 	}
 
-	const modelMessages = await convertToModelMessages(validatedMessages, {
-		tools: agentToolsForHistory as unknown as NonNullable<
-			Parameters<typeof convertToModelMessages>[1]
-		>['tools'],
-		ignoreIncompleteToolCalls: true
-	});
-
 	const result = await documentToolLoopAgent.stream({
-		prompt: modelMessages,
+		prompt: chatPrompt.prompt,
 		options: { useMapsForMessage, mapsLatLng },
 		abortSignal: abortController.signal
 	});
