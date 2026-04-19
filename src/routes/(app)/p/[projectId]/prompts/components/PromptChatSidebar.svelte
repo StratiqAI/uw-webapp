@@ -13,6 +13,11 @@
 		toolResultEmbeddedError,
 		type ParsedSource
 	} from '$lib/ai/agent-chat-parts.js';
+	import {
+		getAnswerToolData,
+		toolPageCitations,
+		type HighlightPage
+	} from '$lib/ai/agent-chat-highlights.js';
 	import { renderAssistantMarkdown } from '$lib/ai/safe-marked.js';
 	import PromptStudioToolsToggleList from './PromptStudioToolsToggleList.svelte';
 	import ResponseFormatPanel from './ResponseFormatPanel.svelte';
@@ -36,37 +41,6 @@
 		const parsed = parseAssistantTextWithSources(visible);
 		const bodyMd = parsed.sources.length > 0 ? parsed.bodyText : visible;
 		return { html: renderAssistantMarkdown(bodyMd), sources: parsed.sources };
-	}
-
-	type AnswerToolMinimal = {
-		pageImageMap: Map<number, string>;
-		defaultImageUrl: string | null;
-	};
-
-	function getMinimalAnswerToolMeta(parts: Array<Record<string, unknown>>): AnswerToolMinimal {
-		let pageImageMap = new Map<number, string>();
-		let defaultImageUrl: string | null = null;
-
-		for (const part of parts) {
-			const toolUi = getToolRender(part);
-			if (!toolUi?.isSuccess || toolUi.result == null || typeof toolUi.result !== 'object')
-				continue;
-			const out = toolUi.result as Record<string, unknown>;
-			const urls = (out.usedImageUrls as string[] | undefined) ?? [];
-			if (urls.length) defaultImageUrl = urls[0] ?? null;
-			const sources = (out.sources ?? []) as Array<{ pageNumber?: unknown; imageUrl?: string | null }>;
-			for (const s of sources) {
-				const pn =
-					typeof s.pageNumber === 'number'
-						? Math.trunc(s.pageNumber)
-						: typeof s.pageNumber === 'string'
-							? Number(s.pageNumber.trim())
-							: NaN;
-				if (Number.isFinite(pn) && s.imageUrl) pageImageMap.set(pn, s.imageUrl);
-			}
-		}
-
-		return { pageImageMap, defaultImageUrl };
 	}
 
 	/** Tailwind typography for AI replies (matches ChatDrawer pattern). */
@@ -226,10 +200,21 @@
 		}
 	});
 
+	let highlightLightbox = $state<HighlightPage | null>(null);
+
 	function onWindowKeydownTools(e: KeyboardEvent) {
 		if (e.key !== 'Escape' || !toolsSidePanelOpen || structuredActive) return;
 		e.preventDefault();
 		toolsSidePanelOpen = false;
+	}
+
+	function onWindowKeydownChat(e: KeyboardEvent) {
+		if (e.key === 'Escape' && highlightLightbox) {
+			e.preventDefault();
+			highlightLightbox = null;
+			return;
+		}
+		onWindowKeydownTools(e);
 	}
 	const showDashboardActions = $derived(Boolean(projectId?.trim() && promptsAddToDashboard));
 	const dashboardBtnColors = $derived(
@@ -363,7 +348,7 @@
 
 </script>
 
-<svelte:window onkeydown={onWindowKeydownTools} />
+<svelte:window onkeydown={onWindowKeydownChat} />
 
 <div class="flex h-full min-h-0 flex-col overflow-hidden border-l {panel}">
 	<div class="shrink-0 border-b px-3 py-2.5 {darkMode ? 'border-slate-700' : 'border-slate-200'}">
@@ -408,7 +393,7 @@
 			{/if}
 			<div class="flex min-h-full flex-col justify-end gap-2">
 				{#each chat.messages as message (message.id)}
-					{@const answerMeta = getMinimalAnswerToolMeta(message.parts as Array<Record<string, unknown>>)}
+					{@const answerData = getAnswerToolData(message.parts as Array<Record<string, unknown>>)}
 					<div class="overflow-hidden rounded-lg border {bubble}">
 						{#if message.role === 'assistant' && showDashboardActions && collectAssistantVisibleText(message).trim()}
 							<div
@@ -447,6 +432,7 @@
 											</div>
 										{/if}
 										{@const body = assistantBodyHtml(rawText)}
+										{@const toolCitationRows = toolPageCitations(answerData.pageImageMap)}
 										{#if body.sources.length > 0}
 											{#if body.html.trim()}
 												<div class="{mdProseClass} prose-headings:!text-[0.95rem]">{@html body.html}</div>
@@ -457,12 +443,12 @@
 													{#each body.sources as source (`${source.raw}-${source.displayText}`)}
 														{@const imgUrl =
 															source.pageLabel &&
-															pageImageUrl(source.pageLabel, answerMeta.pageImageMap)}
+															pageImageUrl(source.pageLabel, answerData.pageImageMap)}
 														{@const sourceHref =
 															source.url ??
 															imgUrl ??
 															(source.raw.toLowerCase().includes('bounding box')
-																? answerMeta.defaultImageUrl
+																? answerData.defaultImageUrl
 																: null)}
 														<li class="flex flex-wrap items-center gap-1">
 															{#if source.pageLabel}
@@ -485,6 +471,29 @@
 															{:else}
 																<span class="opacity-90">{source.raw}</span>
 															{/if}
+														</li>
+													{/each}
+												</ul>
+											</section>
+										{:else if toolCitationRows.length > 0}
+											{#if body.html.trim()}
+												<div class="{mdProseClass} prose-headings:!text-[0.95rem]">{@html body.html}</div>
+											{/if}
+											<section class="mt-2 rounded-lg border px-2 py-2 text-[11px] {darkMode ? 'border-indigo-900/50 bg-indigo-950/30' : 'border-indigo-100 bg-indigo-50/80'}">
+												<p class="mb-1 font-semibold uppercase tracking-wide opacity-90">Sources</p>
+												<ul class="space-y-1">
+													{#each toolCitationRows as cite (`${cite.pageNumber}-${cite.imageUrl}`)}
+														<li class="flex flex-wrap items-center gap-1">
+															<a
+																class="rounded px-1.5 py-0.5 font-semibold underline-offset-2 hover:underline {darkMode ? 'bg-slate-800 text-indigo-300' : 'bg-white text-indigo-700'}"
+																href={cite.imageUrl}
+																target="_blank"
+																rel="noopener noreferrer">Page {cite.pageNumber}</a>
+															<a
+																class="break-all text-indigo-500 underline-offset-2 hover:underline dark:text-indigo-300"
+																href={cite.imageUrl}
+																target="_blank"
+																rel="noopener noreferrer">Open page image</a>
 														</li>
 													{/each}
 												</ul>
@@ -544,6 +553,65 @@
 									</div>
 								{/if}
 							{/each}
+							{#if message.role === 'assistant' && answerData.highlightPages.length > 0}
+								<div class="mt-3 grid grid-cols-2 gap-2">
+									{#each answerData.highlightPages as page, pageIdx (`${page.imageUrl}-${pageIdx}`)}
+										<div class="min-w-0 overflow-hidden rounded-lg border {darkMode ? 'border-amber-900/40 bg-slate-950/40' : 'border-amber-200 bg-amber-50/40'}">
+											<div class="relative w-full">
+												<button
+													type="button"
+													class="absolute right-1 top-1 z-10 rounded-md border border-white/25 bg-black/55 p-1 text-white shadow-sm backdrop-blur-[2px] transition-colors hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400"
+													aria-label="Enlarge highlighted page"
+													title="Enlarge"
+													onclick={(e) => {
+														e.stopPropagation();
+														highlightLightbox = page;
+													}}
+												>
+													<svg class="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+														<path
+															stroke-linecap="round"
+															stroke-linejoin="round"
+															stroke-width="2"
+															d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+														/>
+													</svg>
+												</button>
+												<img
+													src={page.imageUrl}
+													alt="PDF page with highlighted answer"
+													class="block h-auto w-full select-none"
+												/>
+												<svg
+													class="pointer-events-none absolute inset-0 h-full w-full"
+													viewBox="0 0 {page.pageWidth} {page.pageHeight}"
+													preserveAspectRatio="none"
+													aria-hidden="true"
+												>
+													{#each page.boxes as box, i (`${box.x}-${box.y}-${i}`)}
+														<rect
+															x={box.x}
+															y={page.pageHeight - box.y - box.h}
+															width={box.w}
+															height={box.h}
+															rx="2"
+															ry="2"
+															fill="rgba(251, 191, 36, 0.22)"
+															stroke="rgba(217, 119, 6, 0.85)"
+															stroke-width="2"
+															vector-effect="non-scaling-stroke"
+														/>
+													{/each}
+												</svg>
+											</div>
+											<p class="flex flex-wrap items-center gap-2 border-t px-2 py-1.5 text-[10px] opacity-90 {darkMode ? 'border-amber-900/30 text-amber-200/90' : 'border-amber-200 text-amber-950/80'}">
+												<span class="inline-block size-3 shrink-0 rounded-sm border border-amber-600 bg-amber-400/40 dark:border-amber-500 dark:bg-amber-500/25" aria-hidden="true"></span>
+												<span>{page.boxes.length} region{page.boxes.length === 1 ? '' : 's'} highlighted</span>
+											</p>
+										</div>
+									{/each}
+								</div>
+							{/if}
 						</div>
 					</div>
 				{/each}
@@ -965,4 +1033,68 @@
 				</div>
 		</div>
 	</div>
+
+	{#if highlightLightbox}
+		<div
+			class="fixed inset-0 z-80 flex items-center justify-center bg-black/65 p-3 backdrop-blur-[1px]"
+			role="presentation"
+			onclick={() => (highlightLightbox = null)}
+		>
+			<div
+				class="relative max-h-[min(92vh,900px)] max-w-[min(96vw,56rem)] overflow-auto rounded-lg border shadow-2xl {darkMode ? 'border-slate-600 bg-slate-950' : 'border-slate-300 bg-white'}"
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="highlight-lightbox-title"
+				tabindex="-1"
+				onclick={(e) => e.stopPropagation()}
+				onkeydown={(e) => e.stopPropagation()}
+			>
+				<h2 id="highlight-lightbox-title" class="sr-only">Highlighted page</h2>
+				<div class="relative w-full">
+					<button
+						type="button"
+						class="absolute right-2 top-2 z-10 rounded-md border px-2 py-1 text-[11px] font-medium shadow-sm {darkMode
+							? 'border-slate-600 bg-slate-900/95 text-slate-200 hover:bg-slate-800'
+							: 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50'}"
+						aria-label="Close enlarged view"
+						onclick={() => (highlightLightbox = null)}
+					>
+						Close
+					</button>
+					<img
+						src={highlightLightbox.imageUrl}
+						alt="PDF page with highlighted answer (enlarged)"
+						class="block h-auto w-full select-none"
+					/>
+					<svg
+						class="pointer-events-none absolute inset-0 h-full w-full"
+						viewBox="0 0 {highlightLightbox.pageWidth} {highlightLightbox.pageHeight}"
+						preserveAspectRatio="none"
+						aria-hidden="true"
+					>
+						{#each highlightLightbox.boxes as box, i (`${box.x}-${box.y}-${i}`)}
+							<rect
+								x={box.x}
+								y={highlightLightbox.pageHeight - box.y - box.h}
+								width={box.w}
+								height={box.h}
+								rx="2"
+								ry="2"
+								fill="rgba(251, 191, 36, 0.22)"
+								stroke="rgba(217, 119, 6, 0.85)"
+								stroke-width="2"
+								vector-effect="non-scaling-stroke"
+							/>
+						{/each}
+					</svg>
+				</div>
+				<p class="flex flex-wrap items-center gap-2 border-t px-3 py-2 text-xs {darkMode ? 'border-slate-700 text-slate-300' : 'border-slate-200 text-slate-700'}">
+					<span class="inline-block size-3.5 shrink-0 rounded-sm border border-amber-600 bg-amber-400/40 dark:border-amber-500 dark:bg-amber-500/25" aria-hidden="true"></span>
+					<span
+						>{highlightLightbox.boxes.length} region{highlightLightbox.boxes.length === 1 ? '' : 's'} highlighted</span
+					>
+				</p>
+			</div>
+		</div>
+	{/if}
 </div>
