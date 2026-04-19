@@ -1,4 +1,5 @@
 // src/hooks.server.ts
+import '$lib/server/ensure-google-adc';
 import '$lib/server/retainSubscriptionDocumentsForSsr';
 import { createLogger } from '$lib/utils/logger';
 

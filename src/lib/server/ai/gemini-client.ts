@@ -4,6 +4,7 @@
 
 import { GoogleGenAI } from '@google/genai';
 import { env } from '$env/dynamic/private';
+import { ensureGoogleApplicationCredentialsFromJsonEnv } from '$lib/agent-tools/DocumentSearch/google-credentials';
 
 const DEFAULT_MODEL = 'gemini-2.5-flash';
 
@@ -35,6 +36,7 @@ function getClient(project: string, location: string): GoogleGenAI {
 }
 
 export function getGeminiClient(): GoogleGenAI {
+	ensureGoogleApplicationCredentialsFromJsonEnv();
 	const project = env.GOOGLE_PROJECT_ID ?? env.GOOGLE_CLOUD_PROJECT ?? '';
 	const location = env.GOOGLE_LOCATION ?? env.GOOGLE_CLOUD_LOCATION ?? 'us-central1';
 	if (!project) {
