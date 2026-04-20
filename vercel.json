@@ -1,3 +1,9 @@
 {
-	"framework": "sveltekit"
+	"framework": "sveltekit",
+	"functions": {
+		"api/ai-studio.js": {
+			"memory": 2048,
+			"maxDuration": 60
+		}
+	}
 }
