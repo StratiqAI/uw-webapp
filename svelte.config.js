@@ -14,7 +14,15 @@ const config = {
 	preprocess: vitePreprocess(),
 	kit: {
 		adapter: isVercel
-			? adapterVercel()
+			? adapterVercel({
+					// ✅ INTEGRATED CHANGE START:
+					// Configure Vercel function limits.
+					// These settings require a Vercel Pro or Enterprise plan.
+					memory: 2048,     // Increase memory allocation (implicit CPU boost)
+					maxDuration: 60, // Set execution timeout to 60 seconds
+					runtime: 'nodejs24.x' // Explicitly set the runtime (optional, good practice)
+					// ✅ INTEGRATED CHANGE END
+				})
 			: isAmplify
 				? adapterAmplify({
 						// any Amplify‐specific options here
