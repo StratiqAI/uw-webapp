@@ -1,6 +1,10 @@
 /**
  * AI Studio — streaming Vertex Gemini via Vercel AI SDK UI message stream.
  * Auth: id_token cookie.
+ *
+ * Successful responses use chunked streams (`toUIMessageStreamResponse`), not a single JSON blob,
+ * which avoids Vercel’s ~4.5 MB serverless response body ceiling. AppSync is only used in
+ * `resolveStreamInputs()` for prompt/schema metadata (parsed server-side), not proxied as the HTTP response.
  */
 
 import { Buffer } from 'node:buffer';

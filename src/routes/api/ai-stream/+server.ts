@@ -23,6 +23,22 @@ import type { StreamRequestBody } from '$lib/server/ai/types.js';
 
 const log = createLogger('api.ai-stream');
 
+/**
+ * Vercel Serverless buffers the function response (~4.5 MB hard cap per invocation).
+ * Sending an entire cached `rawOutput` as one SSE frame can exceed that. Split large text.
+ */
+const SSE_TEXT_CHUNK_CHARS = 256 * 1024;
+
+function enqueueTextChunks(send: (data: object) => void, fullText: string): void {
+	if (fullText.length <= SSE_TEXT_CHUNK_CHARS) {
+		send({ type: 'chunk', text: fullText });
+		return;
+	}
+	for (let i = 0; i < fullText.length; i += SSE_TEXT_CHUNK_CHARS) {
+		send({ type: 'chunk', text: fullText.slice(i, i + SSE_TEXT_CHUNK_CHARS) });
+	}
+}
+
 function isValidExecutionId(s: string): boolean {
 	if (typeof s !== 'string' || s.length === 0) return false;
 	const uuidRegex =
@@ -143,7 +159,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 						promptTokenCount: existing.promptTokenCount ?? 0,
 						candidatesTokenCount: existing.candidatesTokenCount ?? 0
 					});
-					send({ type: 'chunk', text: out });
+					enqueueTextChunks(send, typeof out === 'string' ? out : String(out ?? ''));
 					send({
 						type: 'done',
 						executionId: existing.executionId ?? executionId,
@@ -266,7 +282,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 						r.modelId,
 						(t) => {
 							fullText += t;
-							send({ type: 'chunk', text: t });
+							enqueueTextChunks(send, t);
 						}
 					);
 					send({
@@ -285,7 +301,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 					{ googleSearch: body.googleSearchEnabled !== false },
 					(t) => {
 						fullText += t;
-						send({ type: 'chunk', text: t });
+						enqueueTextChunks(send, t);
 					}
 				);
 					send({
