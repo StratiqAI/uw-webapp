@@ -2,7 +2,7 @@
 	import type { Project } from '@stratiqai/types-simple';
 	import { themeStore } from '$lib/stores/themeStore.svelte';
 	import PromptStudioWorkspace from '../../../routes/(app)/p/[projectId]/prompts/components/PromptStudioWorkspace.svelte';
-    # update
+    
 	interface Props {
 		open?: boolean;
 		data: { idToken: string; projects: Project[]; currentUser?: unknown };
