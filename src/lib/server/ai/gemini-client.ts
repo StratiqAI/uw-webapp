@@ -4,6 +4,7 @@
 
 import { GoogleGenAI } from '@google/genai';
 import { env } from '$env/dynamic/private';
+import '$lib/server/ensure-google-adc';
 import { ensureGoogleApplicationCredentialsFromJsonEnv } from '$lib/agent-tools/DocumentSearch/google-credentials';
 
 const DEFAULT_MODEL = 'gemini-2.5-flash';

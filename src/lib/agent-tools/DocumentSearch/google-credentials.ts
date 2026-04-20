@@ -29,6 +29,21 @@ function readJsonCredentialsFromEnv(): string | undefined {
 	return undefined;
 }
 
+/** Avoid google-auth-library ENOENT when `.env` points at a removed or gitignored key file. */
+function clearStaleGoogleApplicationCredentialsFileEnv(): void {
+	const raw = process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim();
+	if (!raw) return;
+	const expanded = path.isAbsolute(raw) ? raw : path.resolve(process.cwd(), raw);
+	try {
+		const st = fs.statSync(expanded);
+		if (!st.isFile()) {
+			delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
+		}
+	} catch {
+		delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
+	}
+}
+
 /**
  * Writes service account JSON from env to a temp file and sets `GOOGLE_APPLICATION_CREDENTIALS`.
  * Idempotent. Used on Vercel (and similar) where there is no repo file path.
@@ -39,6 +54,8 @@ function readJsonCredentialsFromEnv(): string | undefined {
  */
 export function ensureGoogleApplicationCredentialsFromJsonEnv(): boolean {
 	if (credentialsFromJsonApplied) return true;
+
+	clearStaleGoogleApplicationCredentialsFileEnv();
 
 	const raw = readJsonCredentialsFromEnv();
 	if (!raw) return false;
