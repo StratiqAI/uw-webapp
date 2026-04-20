@@ -10,6 +10,7 @@
  *
  * Logs appear under **Deployments → [deployment] → Functions** (or Runtime Logs). Filter by `breadcrumb`.
  *
+ * 
  * **Privacy:** Only pass counts, ids, lengths — never full prompts, tokens, or message bodies.
  */
 
