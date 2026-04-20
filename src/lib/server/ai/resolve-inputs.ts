@@ -9,6 +9,7 @@ import { env } from '$env/dynamic/private';
 import { getGeminiClient, getGcpProjectAndLocation, resolveModelId } from './gemini-client.js';
 import type { ResolveStreamResult, StreamRequestBody, VisionRagBlock } from './types.js';
 import { ErrorCode } from './utils.js';
+import { apiBreadcrumb } from '$lib/server/api-breadcrumbs.js';
 
 function resolveSchemaRef(schema: Record<string, unknown>): Record<string, unknown> {
 	const ref = schema.$ref;
@@ -80,16 +81,21 @@ export async function resolveStreamInputs(
 	idToken: string,
 	options?: ResolveStreamOptions
 ): Promise<ResolveStreamResult> {
+	apiBreadcrumb('resolveStreamInputs', 'gql_get_prompt_start', {
+		promptIdLen: typeof body.promptId === 'string' ? body.promptId.length : 0
+	});
 	const getPromptResult = await gql<{ getPrompt: Prompt | null }>(
 		Q_GET_PROMPT,
 		{ id: body.promptId },
 		idToken
 	);
+	apiBreadcrumb('resolveStreamInputs', 'gql_get_prompt_ok', {});
 	const prompt = getPromptResult?.getPrompt as
 		| Pick<Prompt, 'prompt' | 'inputVariables' | 'model' | 'jsonSchemaId'>
 		| null;
 
 	if (!prompt?.prompt) {
+		apiBreadcrumb('resolveStreamInputs', 'prompt_missing', {});
 		return {
 			kind: 'error',
 			errorCode: ErrorCode.PROMPT_NOT_FOUND,
@@ -103,6 +109,9 @@ export async function resolveStreamInputs(
 		client = getGeminiClient();
 		modelId = resolveModelId(typeof prompt.model === 'string' ? prompt.model : undefined);
 	} catch (err) {
+		apiBreadcrumb('resolveStreamInputs', 'gemini_client_error', {
+			messageLen: err instanceof Error ? err.message.length : 0
+		});
 		return {
 			kind: 'error',
 			errorCode: ErrorCode.API_KEY_MISSING,
@@ -142,6 +151,9 @@ export async function resolveStreamInputs(
 	let visionRag: VisionRagBlock | null = null;
 	if (useVisionRag) {
 		if (!hasVisionRagConfig()) {
+			apiBreadcrumb('resolveStreamInputs', 'vision_rag_config_missing', {
+				missingCount: missingVisionRagVars().length
+			});
 			return {
 				kind: 'error',
 				errorCode: ErrorCode.VISION_CONFIG_MISSING,
@@ -163,6 +175,13 @@ export async function resolveStreamInputs(
 			googleSearchEnabled: body.googleSearchEnabled !== false
 		};
 	}
+
+	apiBreadcrumb('resolveStreamInputs', 'resolved', {
+		modelIdLen: modelId.length,
+		hasVisionRag: visionRag != null,
+		docIdCount: documentIds.length,
+		jsonSchemaFetched: !!schemaDefinition
+	});
 
 	return {
 		kind: 'resolved',

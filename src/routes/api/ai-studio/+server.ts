@@ -8,6 +8,7 @@
  */
 
 import { Buffer } from 'node:buffer';
+import { randomUUID } from 'node:crypto';
 import type { UIMessage } from 'ai';
 import { PUBLIC_DOCUMENTS_BUCKET, PUBLIC_REGION } from '$env/static/public';
 import type { RequestHandler } from './$types';
@@ -18,6 +19,7 @@ import type { StreamRequestBody } from '$lib/server/ai/types.js';
 import type { AiStudioToolsConfig } from '$lib/types/ai-studio.js';
 import { createAiStudioAgentResponse } from '$lib/server/ai/agent-stream.js';
 import { createAiStudioVertexStreamResponse } from '$lib/server/ai/ai-studio-vertex-stream.js';
+import { apiBreadcrumb } from '$lib/server/api-breadcrumbs.js';
 
 const log = createLogger('api.ai-studio');
 
@@ -75,8 +77,12 @@ async function resolveDocumentIdsForCompat(body: StreamRequestBody): Promise<str
 }
 
 export const POST: RequestHandler = async ({ request, cookies }) => {
+	const rid = randomUUID().slice(0, 12);
+	apiBreadcrumb('POST /api/ai-studio', 'begin', { rid });
+
 	const idToken = cookies.get('id_token');
 	if (!idToken) {
+		apiBreadcrumb('POST /api/ai-studio', 'reject_no_token', { rid });
 		return new Response(JSON.stringify({ error: 'Unauthorized' }), {
 			status: 401,
 			headers: { 'Content-Type': 'application/json' }
@@ -86,7 +92,14 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	let body: StreamRequestBody;
 	try {
 		body = (await request.json()) as StreamRequestBody;
+		apiBreadcrumb('POST /api/ai-studio', 'parsed_body', {
+			rid,
+			messageCount: Array.isArray(body.messages) ? body.messages.length : -1,
+			useAgentStream: body.useAgentStream === true,
+			promptIdLen: typeof body.promptId === 'string' ? body.promptId.length : 0
+		});
 	} catch {
+		apiBreadcrumb('POST /api/ai-studio', 'reject_invalid_json', { rid });
 		return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
 			status: 400,
 			headers: { 'Content-Type': 'application/json' }
@@ -116,6 +129,11 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	});
 
 	if (resolved.kind === 'error') {
+		apiBreadcrumb('POST /api/ai-studio', 'resolve_inputs_error', {
+			rid,
+			code: resolved.errorCode,
+			messageLen: resolved.errorMessage.length
+		});
 		const status =
 			resolved.errorCode === 'PROMPT_NOT_FOUND'
 				? 404
@@ -131,6 +149,13 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		);
 	}
 
+	apiBreadcrumb('POST /api/ai-studio', 'resolve_inputs_ok', {
+		rid,
+		modelIdLen: resolved.data.modelId?.length ?? 0,
+		hasSchema: !!resolved.data.schemaDefinition,
+		promptTextChars: resolved.data.promptText?.length ?? 0
+	});
+
 	const { modelId, schemaDefinition, variables, promptText } = resolved.data;
 
 	const abortController = new AbortController();
@@ -139,14 +164,24 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	});
 
 	if (body.useAgentStream === true) {
+		apiBreadcrumb('POST /api/ai-studio', 'agent_stream_start', { rid, modelIdLen: modelId.length });
 		try {
-			return await createAiStudioAgentResponse({
+			const streamRes = await createAiStudioAgentResponse({
 				uiMessages,
 				modelId,
 				systemInstruction: typeof body.systemInstruction === 'string' ? body.systemInstruction : undefined,
 				abortSignal: abortController.signal
 			});
+			apiBreadcrumb('POST /api/ai-studio', 'agent_stream_response_ready', {
+				rid,
+				contentType: streamRes.headers.get('Content-Type') ?? ''
+			});
+			return streamRes;
 		} catch (err) {
+			apiBreadcrumb('POST /api/ai-studio', 'agent_stream_throw', {
+				rid,
+				error: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200)
+			});
 			log.error('ai-studio.agent_stream_failed', err);
 			const message = err instanceof Error ? err.message : 'Generation failed';
 			return new Response(JSON.stringify({ error: message }), {
@@ -211,10 +246,20 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 
 	let pdfInlineBase64: string | null = null;
 	if (workspacePdfUrl) {
+		apiBreadcrumb('POST /api/ai-studio', 'workspace_pdf_fetch_begin', {
+			rid,
+			docIdLen: rawWorkspaceDocId.length
+		});
 		pdfInlineBase64 = await fetchPdfAsBase64(workspacePdfUrl);
 		if (!pdfInlineBase64) {
+			apiBreadcrumb('POST /api/ai-studio', 'workspace_pdf_fetch_empty', { rid });
 			compiled +=
 				'\n\n[Note: The PDF could not be loaded on the server for inline attachment; use the URL above if you can access it.]\n';
+		} else {
+			apiBreadcrumb('POST /api/ai-studio', 'workspace_pdf_fetch_ok', {
+				rid,
+				base64Chars: pdfInlineBase64.length
+			});
 		}
 	} else if (
 		typeof body.workspacePdfDocumentId === 'string' &&
@@ -225,8 +270,20 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			'\n\n[Note: The PDF attachment was omitted because Grounding with Google Search or Maps is enabled (they do not support PDF inlineData).]\n';
 	}
 
+	apiBreadcrumb('POST /api/ai-studio', 'vertex_stream_begin', {
+		rid,
+		compiledChars: compiled.length,
+		hasPdfInline: !!pdfInlineBase64,
+		pdfInlineChars: pdfInlineBase64?.length ?? 0,
+		structured:
+			applyStructured &&
+			!!effectiveSchema &&
+			Object.keys(effectiveSchema).length > 0 &&
+			!googleGroundingActive,
+		googleGroundingActive
+	});
 	try {
-		return await createAiStudioVertexStreamResponse({
+		const streamRes = await createAiStudioVertexStreamResponse({
 			uiMessages,
 			compiledPrompt: compiled,
 			pdfInlineBase64,
@@ -238,7 +295,16 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			systemInstruction: typeof body.systemInstruction === 'string' ? body.systemInstruction : undefined,
 			abortSignal: abortController.signal
 		});
+		apiBreadcrumb('POST /api/ai-studio', 'vertex_stream_response_ready', {
+			rid,
+			contentType: streamRes.headers.get('Content-Type') ?? ''
+		});
+		return streamRes;
 	} catch (err) {
+		apiBreadcrumb('POST /api/ai-studio', 'vertex_stream_throw', {
+			rid,
+			error: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200)
+		});
 		log.error('ai-studio.stream_failed', err);
 		const message = err instanceof Error ? err.message : 'Generation failed';
 		return new Response(JSON.stringify({ error: message }), {

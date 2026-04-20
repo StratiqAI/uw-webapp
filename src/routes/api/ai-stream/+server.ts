@@ -4,7 +4,7 @@
  */
 
 import type { RequestHandler } from './$types';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { createLogger } from '$lib/utils/logger';
 import { gql } from '$lib/services/realtime/graphql/requestHandler';
 import {
@@ -20,6 +20,7 @@ import { streamVisionRag } from '$lib/server/ai/vision-rag-stream.js';
 import { streamTextTemplate } from '$lib/server/ai/generate-stream.js';
 import { compileTemplate, classifyErrorCode } from '$lib/server/ai/utils.js';
 import type { StreamRequestBody } from '$lib/server/ai/types.js';
+import { apiBreadcrumb } from '$lib/server/api-breadcrumbs.js';
 
 const log = createLogger('api.ai-stream');
 
@@ -86,6 +87,9 @@ async function resolveDocumentIds(
 }
 
 export const POST: RequestHandler = async ({ request, cookies }) => {
+	const rid = randomUUID().slice(0, 12);
+	apiBreadcrumb('POST /api/ai-stream', 'begin', { rid });
+
 	const idToken = cookies.get('id_token');
 	if (!idToken) {
 		return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -104,6 +108,11 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	let body: StreamRequestBody;
 	try {
 		body = (await request.json()) as StreamRequestBody;
+		apiBreadcrumb('POST /api/ai-stream', 'parsed_body', {
+			rid,
+			promptIdLen: typeof body.promptId === 'string' ? body.promptId.length : 0,
+			projectIdLen: typeof body.projectId === 'string' ? body.projectId.length : 0
+		});
 	} catch {
 		return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
 			status: 400,
@@ -119,6 +128,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	}
 
 	const documentIds = await resolveDocumentIds(body, idToken);
+	apiBreadcrumb('POST /api/ai-stream', 'document_ids', { rid, docCount: documentIds.length });
 
 	let executionId = body.executionId?.trim();
 	if (executionId) {
@@ -141,6 +151,12 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		);
 		const existing = existingResult?.getAIQueryExecution;
 		if (existing?.status === 'SUCCESS' && existing.rawOutput != null) {
+			const raw = existing.rawOutput;
+			const rawLen = typeof raw === 'string' ? raw.length : String(raw ?? '').length;
+			apiBreadcrumb('POST /api/ai-stream', 'cache_hit_sse', {
+				rid,
+				rawOutputChars: rawLen
+			});
 			const encoder = new TextEncoder();
 			const out = existing.rawOutput;
 			const stream = new ReadableStream({
@@ -187,6 +203,10 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	}
 
 	const resolved = await resolveStreamInputs(body, documentIds, idToken);
+	apiBreadcrumb('POST /api/ai-stream', 'resolve_inputs_done', {
+		rid,
+		ok: resolved.kind === 'resolved'
+	});
 	if (resolved.kind === 'error') {
 		return new Response(
 			JSON.stringify({ error: resolved.errorMessage, code: resolved.errorCode }),
@@ -239,6 +259,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	}
 
 	const execRecordId = execution.id;
+	apiBreadcrumb('POST /api/ai-stream', 'execution_created', { rid, execRecordIdLen: execRecordId.length });
 
 	try {
 		await gql(
@@ -268,6 +289,10 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 
 			let fullText = '';
 			try {
+				apiBreadcrumb('POST /api/ai-stream', 'sse_stream_open', {
+					rid,
+					hasVisionRag: !!r.visionRag
+				});
 				send({
 					type: 'started',
 					id: execRecordId,
@@ -313,6 +338,11 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 				}
 
 				const durationMs = Date.now() - streamStartedAt;
+				apiBreadcrumb('POST /api/ai-stream', 'sse_generation_done', {
+					rid,
+					durationMs,
+					fullTextChars: fullText.length
+				});
 
 				await gql(
 					M_UPDATE_AI_QUERY_EXECUTION,
@@ -338,6 +368,11 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			} catch (err: unknown) {
 				const message = err instanceof Error ? err.message : 'Unknown error';
 				const code = classifyErrorCode(message);
+				apiBreadcrumb('POST /api/ai-stream', 'sse_stream_error', {
+					rid,
+					code,
+					messageLen: message.length
+				});
 				send({ type: 'error', message, code });
 				try {
 					await gql(
